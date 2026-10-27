@@ -63,9 +63,9 @@ SvelteKit's nesting rather than with shallow routing:
   and the list route's own `+page.svelte` is empty. The list's actions stay in
   `+page.server.ts`.
 - Each sheet is a child route whose whole page is a `RouteSheet`: `add/`,
-  `[taskId]/`, `history/` under `/home/tasks`, and the same under
-  `/home/rewards`, `/partner/[id]/tasks` and `/partner/[id]/rewards`. Their
-  loads and actions are the ones those pages always had.
+  `[taskId]/`, `history/` under `/tasks`, and `add/`, `[rewardId]/`,
+  `history/` under `/rewards`. Each has its own load and action, and can read
+  the list's data through `parent()`.
 - The list renders the child with `{@render children()}`, so it stays mounted,
   scrolled where it was, while sheets open and close over it.
 

@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import ItemRow from '$lib/components/ItemRow.svelte';
-	import { initialsFor } from '$lib/initials';
 	import type { ItemAction } from '$lib/item-action.svelte';
 	import { openedTask, shownTitle } from '$lib/sealed-views.svelte';
 	import { opensLater, quotaText, type TaskEntry, type TaskListMode } from '$lib/task-list';
 	import { shortAvailability, shortTaskSchedule } from '$lib/task-schedule';
+	import SpaceChip from './context/SpaceChip.svelte';
 	import WhoseTime from './WhoseTime.svelte';
 
 	/**
@@ -95,15 +95,10 @@
 	leading={mode === 'set' ? undefined : leading}
 >
 	{#snippet meta()}
-		{#if entry.partnerName}
-			<!-- Their picture rather than their name: it says whose at a glance in
-			     a quarter of the room. Named for a screen reader. -->
-			<wa-avatar
-				class="who"
-				image={entry.partnerImage ?? undefined}
-				initials={initialsFor(entry.partnerName)}
-				label={entry.partnerName}
-			></wa-avatar>
+		{#if entry.space}
+			<!-- Whose space, on a list of several (Everyone): the chip every
+			     Everyone list puts on its rows (docs/contexts.md). -->
+			<SpaceChip space={entry.space} />
 		{/if}
 		{#if later && task.nextEligibleAt}
 			<span class="when">
@@ -152,9 +147,6 @@
 			use:enhance={completing.enhance(task.id)}
 		>
 			<input type="hidden" name="taskId" value={task.id} />
-			{#if entry.partnershipId}
-				<input type="hidden" name="partnershipId" value={entry.partnershipId} />
-			{/if}
 			<!-- A native button drawn as a circle, not a `wa-button`: it is the
 			     tick box of a to-do list, and the round control is the whole of
 			     it. Named by the task, so a list of them is not a list of
@@ -246,12 +238,6 @@
 		border-radius: 50%;
 		color: var(--wa-color-text-quiet);
 		font-size: 0.75rem;
-	}
-
-	wa-avatar.who {
-		--size: 1.125rem;
-		flex: none;
-		font-size: 0.5625rem;
 	}
 
 	.when {

@@ -618,7 +618,15 @@
 					"summary": "Tasks for yourself or between partners, on a schedule, earning credits.",
 					"status": "shipped",
 					"shippedOn": "2026-09-14",
-					"icon": "list-check"
+					"icon": "list-check",
+					"children": [
+						{
+							"id": "tasks-everyone",
+							"title": "All your tasks on one page",
+							"summary": "Your own tasks and every partner's in one list, or just one partner's at a tap.",
+							"status": "in-progress"
+						}
+					]
 				},
 				{
 					"id": "task-proof",
@@ -671,7 +679,15 @@
 					"summary": "Rewards to claim with the credits you earn.",
 					"status": "shipped",
 					"shippedOn": "2026-09-13",
-					"icon": "gift"
+					"icon": "gift",
+					"children": [
+						{
+							"id": "rewards-everyone",
+							"title": "All your rewards on one page",
+							"summary": "Every balance and what it can buy, yours and each partner's, on one page.",
+							"status": "in-progress"
+						}
+					]
 				},
 				{
 					"id": "request-rewards",

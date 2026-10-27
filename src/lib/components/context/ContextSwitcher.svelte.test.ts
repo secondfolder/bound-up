@@ -19,7 +19,7 @@ vi.mock('$lib/crypto/vaults.svelte', async (importOriginal) => ({
 }));
 vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 const invalidate = vi.hoisted(() => vi.fn(() => Promise.resolve()));
-vi.mock('$app/navigation', () => ({ invalidate }));
+vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidate }));
 
 const { default: ContextSwitcher } = await import('./ContextSwitcher.svelte');
 

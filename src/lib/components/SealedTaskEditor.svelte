@@ -23,6 +23,7 @@
 		task = null,
 		submitLabel,
 		timeZoneContext = null,
+		fields = {},
 		action,
 		onsaved
 	}: {
@@ -33,6 +34,8 @@
 		task?: { id: string; revision: number; content: TaskContent } | null;
 		submitLabel: string;
 		timeZoneContext?: TimeZoneContext | null;
+		/** Posted beside the sealed record: a new task's `spaceId`, which the form names. */
+		fields?: Record<string, string>;
 		/**
 		 * Where it posts, when that is not the page it is on: the add or edit
 		 * route's action, from a sheet over the task list.
@@ -127,6 +130,7 @@
 				return;
 			}
 			replaceWithSealed(formData, TEXT_FIELDS, {
+				...fields,
 				...outcome.fields,
 				completionMessageCount: String(content.completionMessages.length),
 				...(task ? { expectedRevision: String(task.revision) } : {})

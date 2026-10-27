@@ -112,9 +112,9 @@ Partners are trusted to that extent.
 - Everything server-rendered — nav tabs, page titles, widget lines — shows "…"
   until hydration opens the names.
 
-There are no plaintext name columns. The sealed ones are nullable, as on the
-task tables, and a row with neither a sealed record nor an invite shows its
-names as "can't be shown".
+There are no plaintext name columns. The sealed ones are nullable, and a row
+with neither a sealed record nor an invite shows its names as "can't be
+shown".
 
 ### Never map the names yourself
 
@@ -181,9 +181,8 @@ The Zod schema accepts only `me` / `them` / `mix` — posting the _stored_ value
 | Action                                                | Who may do it                                    |
 | ----------------------------------------------------- | ------------------------------------------------ |
 | Change the names, the roles, the control setting      | Whoever `control` names, or both                 |
-| Manage partnership rewards and set reward credits     | Whoever `control` names, or both                 |
-| Manage partnership tasks                              | Whoever `control` names, or both                 |
-| Complete partnership tasks                            | The non-controller, or both under shared control |
+| Set tasks and rewards, and the other's credits        | Whoever `control` names, or both (`can_manage`)  |
+| Complete tasks and claim rewards                      | The non-controller, or both under shared control; never what they wrote |
 | Make a notebook entry read-only or hidden for the other | Whoever `control` names; with both, the entry's creator ([notebook.md](notebook.md#access)) |
 | Rewrite the names and roles while accepting an invite | The accepter, if control is theirs or shared     |
 | Disconnect, or cancel a pending invite                | **Either member, always**                        |
@@ -269,63 +268,33 @@ token (`not-found`), an expired one (`expired`), the inviter's own link
 | `/settings/partners/[id]`          | `(auth-required)` | Who is whose role, then: pending, the link, share, renew; accepted, edit. Disconnect/cancel last, apart.  |
 | `/invite/[token]`                  | **`(public)`**    | The landing page for the person being invited.                                                            |
 | `/partner/[id]`                    | `(auth-required)` | The partner's own page. Accepted links only. Shows their local time, and date too when their day differs. |
-| `/partner/[id]/tasks`              | `(auth-required)` | Shared tasks and recent completion history for that link.                                                 |
-| `/partner/[id]/tasks/add`          | `(auth-required)` | The add-task form for the controlling side of that link.                                                  |
-| `/partner/[id]/tasks/[taskId]`     | `(auth-required)` | The edit screen for one partnership task, reusing the same form layout as add.                            |
-| `/partner/[id]/rewards`            | `(auth-required)` | Shared rewards and reward credits for that link, with buttons to add rewards or open claim history.       |
-| `/partner/[id]/rewards/add`        | `(auth-required)` | The add-reward form for the controlling side of that link.                                                |
-| `/partner/[id]/rewards/[rewardId]` | `(auth-required)` | The edit screen for one reward on that link, using the same form layout as add.                           |
-| `/partner/[id]/rewards/history`    | `(auth-required)` | Reward claim history for that link.                                                                       |
 | `/playroom/kink-list/partner/[id]` | `(auth-required)` | Your kink list for that partner, linked from the partner page. See [kink-list.md](kink-list.md#partners). |
 | `/api/partnerships/[id]/names`     | own `locals.user` check | `GET` where to read names still under the invite, `PUT` them sealed into the vault. See above.         |
 
-## Partnership rewards
+## Tasks and rewards
 
-Accepted partner pages now also have a rewards screen. It reuses the same
-control setting instead of inventing a separate permission model:
+A partnership's tasks and rewards are in its shared space, on the same
+`/tasks` and `/rewards` pages as the viewer's own, shown when the context
+switcher names the partnership or Everyone ([contexts.md](contexts.md)). The
+partner page's Tasks and Rewards cards lead there, switching to the
+partnership's context on the way.
 
-- Whoever `control` names may create rewards, edit any reward in that
-  partnership, toggle rewards active or inactive, and set the other member's
-  reward credits.
-- The claiming side may spend their own partnership-scoped credits on active
-  rewards.
-- Shared control means both members may manage rewards and both may claim
-  rewards the other member created.
-- A user may never claim a partnership reward they created themselves, even
-  under shared control.
+They follow `control` through the members' `can_manage`, never by reading the
+column:
 
-On the list page, editable rewards now show an edit icon rather than an inline
-form. That icon opens a dedicated nested edit page which reuses the same reward
-form layout as the add screen, prefilled with the reward's current values.
+- Whoever manages sets tasks and rewards for the other member, edits the ones
+  they set, picks whose timezone a scheduled task runs in, and sets the other
+  member's credits in the partnership.
+- The other member completes those tasks, which pays credits into their
+  balance in the partnership, and claims those rewards from it.
+- Shared control means each sets tasks and rewards for the other, and each
+  completes and claims what the other set.
+- Nobody completes a task or claims a reward they wrote, even under shared
+  control.
 
-The full behaviour, including the dedicated home rewards hub at `/home/rewards`, is documented in
-[`docs/rewards.md`](rewards.md).
-
-## Partnership tasks
-
-Accepted partner pages now also have a tasks screen.
-
-The feature deliberately reuses the same `control` field as the rest of the
-partnership, but its split is different from rewards:
-
-- Whoever `control` names may create tasks, edit any partnership task, and pick
-  which partner's timezone a scheduled task is relative to.
-- The completion side may complete eligible tasks and receive the resulting
-  reward credits.
-- Shared control means both members may manage tasks and both may complete
-  tasks the other member created.
-- A user may never complete a partnership task they created themselves.
-
-Partnership task scheduling is also partner-relative.
-
-- A task stores `timezone_owner_user_id`, not a raw timezone string.
-- Date and datetime fields default to the other partner's timezone on create.
-- When the two partners currently share the same timezone, that extra UI is
-  hidden.
-- When they differ, task dates show the same compact timezone-note style used
-  on the partner page.
-
-The full task behavior is documented in [`docs/tasks.md`](tasks.md).
+A new task's dates default to the partner's timezone, and a date in a
+timezone other than the viewer's says whose it is. The full behaviour is in
+[`docs/tasks.md`](tasks.md) and [`docs/rewards.md`](rewards.md).
 
 ### Why `/invite/[token]` is public
 

@@ -85,18 +85,19 @@ describe('TaskChecklist', () => {
 		expect(container.querySelector('.award')).toHaveTextContent('+3 credits');
 	});
 
-	it('puts a partnership on the completion, for a task completed from a mixed list', async () => {
+	it('posts only the task, and says whose space it is in on a list of several', async () => {
 		const { container } = await renderList([
 			{
-				task: testPartnershipTaskView({ title: 'Make tea' }),
-				completeAction: '?/partner',
-				partnershipId: 'p1',
-				partnerName: 'Jun'
+				task: testSelfTaskView({ title: 'Make tea' }),
+				completeAction: '?/complete',
+				space: { id: 'space-own', kind: 'solo', colour: 'me', names: null }
 			}
 		]);
 		const form = defined(container.querySelector('form'), 'the completion form');
-		expect(new FormData(form).get('partnershipId')).toBe('p1');
-		expect(waProp(container.querySelector('wa-avatar.who'), 'label')).toBe('Jun');
+		// The task carries its own space: nothing else is posted, and the
+		// context never decides where a completion goes.
+		expect([...new FormData(form).keys()]).toEqual(['taskId']);
+		expect(container.querySelector('.chip')).toHaveTextContent('Me');
 	});
 
 	it('shows a task that opens later with a clock and when, and no circle', async () => {
@@ -156,7 +157,7 @@ describe('TaskChecklist', () => {
 			{
 				task: testSelfTaskView({ title: 'Walk', schedule: threeAWeek, windowCompletions: 1 }),
 				completeAction: '?/done',
-				editHref: '/home/tasks/t1'
+				editHref: '/tasks/t1'
 			}
 		]);
 		const dialog = await openDetail(container, 'Walk');

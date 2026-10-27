@@ -10,6 +10,8 @@
 		cancelLabel: string;
 		targetUserId?: string | null;
 		targetUserIdField?: string;
+		/** The space the balance is in, posted with it: a balance is one member's in one space. */
+		spaceId?: string | null;
 	};
 
 	let {
@@ -98,6 +100,7 @@
 				value={editable.targetUserId}
 			/>
 		{/if}
+		{#if editable.spaceId}<input type="hidden" name="spaceId" value={editable.spaceId} />{/if}
 
 		{#if showLabel && label}<span class="credit-label">{label}</span>{/if}
 

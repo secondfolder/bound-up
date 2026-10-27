@@ -81,8 +81,7 @@
 	 *
 	 * Noted as the completion is posted, because by the time the answer
 	 * arrives the list has reloaded and the task has moved — a one-off to
-	 * Inactive, or off `/home/tasks` altogether, since a partner's inactive
-	 * tasks are not listed there. The undo line goes back where the tap was.
+	 * Inactive, say. The undo line goes back where the tap was.
 	 */
 	let ticked = $state<{ entry: TaskEntry; groupKey: string; index: number } | null>(null);
 	$effect.pre(() => {
@@ -176,7 +175,6 @@
 								creditsAwarded={undo.entry.task.creditsAwarded}
 								action={undo.action}
 								completionId={undo.completionId}
-								partnershipId={undo.entry.partnershipId}
 								onhold={(value) => {
 									held = value;
 								}}

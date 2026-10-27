@@ -57,15 +57,18 @@ Messages are per-partner: there is no single `/messages` page behind the word,
 so its title is plain text and each row carries its own link to that partner's
 board. Every other card links.
 
-The Notebook card links to `/notebook`, which shows the current context
-([contexts.md](contexts.md)) rather than one space, so following it switches
-the context to the card's own space first — your own on `/home`, the
-partnership's on `/partner/[id]` — through `SectionWidget`'s `onfollow`. A
-link opened in a new tab skips that and shows the context as it is. Such a
-link is not preloaded on hover (`data-sveltekit-preload-data="off"`): the
-preload would fetch the list in the old context, and the navigation then used
-it. It navigates with `invalidate: ['app:context']`, so the app layout's
-context, which a navigation does not otherwise re-run, follows too.
+The Notebook, Tasks and Rewards cards link to `/notebook`, `/tasks` and
+`/rewards`, which show the current context ([contexts.md](contexts.md)) rather
+than one space, so following one switches the context to what the card
+previews first — Everyone from `/home` for tasks and rewards, the viewer's own
+space for the notebook, the partnership from `/partner/[id]` — through
+`followInContext` in `context-client.svelte.ts` (the cards' `opensIn` prop, and
+`SectionWidget`'s `onfollow`). A link opened in a new tab skips that and shows
+the context as it is. Such a link is not preloaded on hover
+(`data-sveltekit-preload-data="off"`): the preload would fetch the list in the
+old context, and the navigation then used it. It navigates with
+`invalidate: ['app:context']`, so the app layout's context, which a navigation
+does not otherwise re-run, follows too.
 
 That card goes away **entirely** when nothing is unread — the whole card, not
 just its body, which is what every other card drops. A "Messages" header on its
@@ -75,32 +78,36 @@ links nowhere, so there would be nothing to do with it.
 It stays first on the page. Something waiting from a partner is the reason to
 have opened the app, and it should not be below the fold on a short phone.
 
-## /home is an overview of both halves
+## /home is an overview of every space
 
-`/home/tasks` and `/home/rewards` each show **your own section plus one per
-partner**. The cards that link to them show the same two halves merged into one
-preview, and that is load-bearing: a card that read only the self half reported
-"Nothing to do right now." while a partner task sat waiting one tap away, which
-is the opposite of what the cards are for.
+The Tasks and Rewards cards on `/home` cover **every space the viewer is in** —
+their own and each partnership's — which is what `/tasks` and `/rewards` show
+in the Everyone context, where those cards lead. That is load-bearing: a card
+that read only the viewer's own tasks reported "Nothing to do right now." while
+a partner's task sat waiting one tap away, which is the opposite of what the
+cards are for. On `/partner/[id]` the same cards cover that one partnership's
+space.
 
-`getHomeTasksWidget` and `getHomeRewardsWidget` therefore take the layout's
-partner list — the same list `listUnreadCounts` takes — and decide which partner
-rows count exactly as `listHomePartnerTaskSections` and
-`listHomePartnerRewardSections` decide it:
+Both pages call the same readers, `getTasksWidget` and `getRewardsWidget`, with
+the space ids to cover, and they sort rows onto a side with the same rules the
+full pages use (`taskListFor`, `rewardListFor`; see
+[tasks.md](tasks.md#to-do-and-set-for-others)):
 
-- the partnerships where you are on the **completing / claiming** side, and
-- minus the rows you wrote yourself, since authorship is independent of control.
+- the preview lists only what the viewer completes or claims, and
+- never a row they wrote themselves, since authorship is independent of who
+  manages.
 
-A partnership you **manage** contributes nothing to `/home`. Managing it happens
-on its own partner page — which is also why `viewerActs` is always true on
-`/home`.
+What a viewer sets for a partner adds nothing to the `/home` preview. Their own
+space is always among `/home`'s spaces and they always act in it, which is why
+`viewerActs` is always true there.
 
-Merged rows carry a `context`: the partner's name, or null for your own. Without
-it two partners naming a task the same thing are the same line twice. Sorting
-happens across both sources, not per source, so the three rows shown are the
-three most overdue (or the three cheapest) rather than the first three self rows.
+Rows from several spaces carry a `context`: the partner's name, or null for the
+viewer's own. Without it two partners naming a task the same thing are the same
+line twice. Sorting happens across every space, not per space, so the three
+rows shown are the three most overdue (or the three cheapest) rather than the
+first three of one space.
 
-The other two cards have no self half to merge:
+The other two cards have no spaces to merge:
 
 - **Guides** are shared content — not per account, not per partnership.
 - **Messages** are per-partner by nature; that card is already nothing but
@@ -109,12 +116,12 @@ The other two cards have no self half to merge:
 ### Credits do not pool
 
 `RewardsWidgetView` carries `balances`, a list, rather than a `credits` number.
-A partnership's credits buy that partnership's rewards and nothing else, so one
+A space's credits buy that space's rewards and nothing else, so one
 total would state a spending power nobody has — and would offer a claim the
 claim path then refuses. Each row is priced against **its own** balance.
 
-A partner page has one scope, so one unlabelled balance, and reads exactly as a
-single number. `/home` labels each one.
+A partner page has one space, so one unlabelled balance, and reads exactly as a
+single number. `/home` labels each partnership's with the partner's name.
 
 ## No empty states
 
@@ -166,7 +173,8 @@ one tap away behind the header link.
 ## Which side is looking
 
 On a partnership, one side manages tasks and rewards and the other completes and
-claims them — see [partners.md](partners.md) for how control decides that. A
+claims them — see [tasks.md](tasks.md#who-does-what) for how the space's
+members decide that. A
 "ready to complete" list shown to the manager would be somebody else's to-do
 list, so `TasksWidgetView` and `RewardsWidgetView` both carry `viewerActs`:
 
@@ -197,16 +205,16 @@ only what the preview shows:
 
 | Type                        | Read by                                               | Lives in              |
 | --------------------------- | ----------------------------------------------------- | --------------------- |
-| `TasksWidgetView`           | `getHomeTasksWidget`, `getPartnershipTasksWidget`     | `server/tasks.ts`     |
-| `RewardsWidgetView`         | `getHomeRewardsWidget`, `getPartnershipRewardsWidget` | `server/rewards.ts`   |
+| `TasksWidgetView`           | `getTasksWidget`, over the card's space ids           | `server/tasks.ts`     |
+| `RewardsWidgetView`         | `getRewardsWidget`, over the card's space ids         | `server/rewards.ts`   |
 | `GuidesWidgetView`          | `loadGuidesCard`, only with the guides feature        | the `/home` load      |
 | `DaydreamsWidgetView`       | `getDaydreamsWidget`, only with the daydreams feature | `server/daydreams.ts` |
 | `PartnerMessagesWidgetView` | `getPartnerMessagesWidget`                            | `server/messaging.ts` |
 | `IqTestResultView`          | `latestIqTestResult` (one row)                        | `server/iq-test.ts`   |
 | `WidgetItemView[]` (notebook) | `getHomeNotebookWidget`, `getPartnershipNotebookWidget`; hidden entries left out on the server | `server/notebook.ts` |
 
-These deliberately do **not** reuse `getSelfTasksSection`, `getSelfRewardsSection`
-or the `get*Page` loaders. Those also read every completion and every claim ever
+These deliberately do **not** reuse `listTasks`, `listRewards` or the other
+page loaders. Those also read every completion and every claim ever
 recorded, for a body that shows at most three titles, and D1 charges for rows
 read. Each widget reader is one pass over the active rows with the handful of
 columns the card renders, splitting ready-from-waiting and affordable-from-locked
@@ -214,11 +222,11 @@ in JS so it reuses the same `isTaskCompletableAt` and `credits >= cost` rules th
 full pages apply. An off-by-one here would offer a claim the claim path then
 refuses.
 
-The two partnership readers return `null` when the viewer is not a member, each
-going through its own `require*Membership` — tasks and rewards resolve
-_different_ permissions from the same partnership (who completes, who claims),
-and those checks belong with the rules they enforce rather than being re-derived
-in the page load.
+The tasks and rewards readers read only the spaces among those named that the
+viewer is in (`loadItemSpaces`), so a space id they are not in contributes
+nothing rather than leaking rows; which side of each space the viewer is on is
+worked out there with the rules the full pages use, rather than re-derived in
+the page load.
 
 ### Messages are counts, and that is not a shortcut
 

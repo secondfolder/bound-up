@@ -393,8 +393,8 @@ test.describe('signing in is what unlocks', () => {
 		await page.waitForURL('**/home');
 
 		await evictKeyStorage(page);
-		await page.goto('/home/tasks');
-		await expectSentToSignIn(page, '/home/tasks');
+		await page.goto('/tasks');
+		await expectSentToSignIn(page, '/tasks');
 
 		// An ordinary login page: nothing about keys, locks or messages.
 		await expect(page.getByRole('button', { name: LOG_IN_BUTTON })).toBeVisible();
@@ -404,7 +404,7 @@ test.describe('signing in is what unlocks', () => {
 		await expect(page.locator('wa-input[name="email"] input')).toHaveValue(who.email);
 
 		await logInHere(page, who);
-		await page.waitForURL('/home/tasks');
+		await page.waitForURL('/tasks');
 		expect(await deviceHoldsKey(page)).toBe(true);
 	});
 

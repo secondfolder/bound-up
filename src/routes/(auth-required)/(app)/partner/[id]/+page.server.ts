@@ -2,8 +2,8 @@ import { error } from '@sveltejs/kit';
 import { getPartnerMessagesWidget } from '$lib/server/messaging';
 import { getPartnershipNotebookWidget } from '$lib/server/notebook';
 import { getPartnershipForUser } from '$lib/server/partnerships';
-import { getPartnershipRewardsWidget } from '$lib/server/rewards';
-import { getPartnershipTasksWidget } from '$lib/server/tasks';
+import { getRewardsWidget, rewardsDependency } from '$lib/server/rewards';
+import { getTasksWidget, tasksDependency } from '$lib/server/tasks';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, params, depends }) => {
@@ -24,19 +24,18 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 	// a reward or reading a thread refreshes the cards here too.
 	depends('messages:unread');
 	depends(`messages:board:${params.id}`);
-	depends('tasks:home');
-	depends('rewards:home');
+	depends(tasksDependency(params.id), rewardsDependency(params.id));
 	depends(`notebook:${params.id}`);
 
 	// Each widget re-checks membership for itself rather than being handed the
-	// partnership above: tasks and rewards each resolve a *different* permission
-	// from it (who completes, who claims), and those checks live with the rules
-	// they enforce. Three single-row reads is the price of not re-deriving
-	// either rule here.
+	// partnership above: the checks live with the rules they enforce. The task
+	// and reward cards cover this partnership's space alone, which is what
+	// their links open the lists in.
+	const noNames = new Map<string, never>();
 	const [messages, tasks, rewards, notebook] = await Promise.all([
 		getPartnerMessagesWidget(locals.db, params.id, locals.user.id),
-		getPartnershipTasksWidget(locals.db, params.id, locals.user.id, locals.user.timezone),
-		getPartnershipRewardsWidget(locals.db, params.id, locals.user.id),
+		getTasksWidget(locals.db, locals.user.id, [params.id], noNames),
+		getRewardsWidget(locals.db, locals.user.id, [params.id], noNames),
 		getPartnershipNotebookWidget(locals.db, params.id, locals.user.id)
 	]);
 

@@ -4,79 +4,89 @@ Tasks are a second feature beside rewards and guides. They are user-managed,
 credit-awarding pieces of work: completing a task adds reward credits instead
 of spending them.
 
-The feature has two scopes, deliberately mirroring rewards:
+A task lives in a **space** ([spaces.md](spaces.md)): the viewer's own (solo)
+space, where they set tasks for themselves, or a partnership's shared space,
+where one member sets tasks for the other. Every task is in one table, `tasks`,
+and every rule about it follows from two columns and the space's members: who
+wrote it (`created_by_user_id`) and who it is for (`assignee_user_id`).
 
-- **Self tasks** live on `/home/tasks` and belong to one user.
-- **Partnership tasks** live on `/partner/[id]/tasks` and belong to one accepted
-  partnership.
-
-The split is deliberate. The permission rules are different enough between the
-two scopes that one polymorphic table would push every read and write through a
-nullable scope branch.
+There used to be two tables per thing, `self_*` and `partnership_*`, on the
+grounds that the permission rules differed too much between the two scopes for
+one table. The rules turned out to be logic rather than storage — they were
+already pure functions — and the split made every list that shows more than
+one scope a hand-written union, and every operation a pair of near-identical
+functions and actions. With a space on every row and the assignee a column,
+there is one code path per operation, and "every space at once" (the Everyone
+context, [contexts.md](contexts.md)) is one `space_id IN (…)` query.
 
 ## Edge tasks are unrelated
 
 This feature is unrelated to the guide feature's ordered **edge tasks**.
 
 - Guides still contain ordered edge tasks under `/home/guides/[id]`.
-- User-managed tasks are the new credit-awarding feature under `/home/tasks`
-  and `/partner/[id]/tasks`.
+- User-managed tasks are the credit-awarding feature under `/tasks`.
 
-The codebase now keeps those names separate on purpose so the two concepts do
+The codebase keeps those names separate on purpose so the two concepts do
 not silently collide in future work.
 
-## Self tasks
+## Who does what
 
-Self tasks are fully self-managed.
+The rules are pure and node-tested, in `src/lib/spaces.ts` (what a member may
+do in a space) and `src/lib/tasks.ts` (what that means for a task). They are
+written in terms of members, not of "the partner", so nothing in them assumes
+a space of two.
 
-- The owner creates, edits, and completes them.
-- Completing one awards credits into the owner's existing `self_reward_credits`
-  balance.
-- A one-off task deactivates itself after completion.
-- Repeatable tasks advance their own `next_eligible_at` instead.
-
-The home tasks page shows one to-do list: the owner's self tasks and every
-partner task they may complete, each partner's marked with that partner's name
-(see "The checklist" below).
-
-## Partnership tasks
-
-Partnership tasks reuse the existing partnership `control` setting, but with a
-different split from rewards.
-
-| Current control value | Who may manage tasks | Who may complete tasks |
-| --------------------- | -------------------- | ---------------------- |
-| `inviter`             | inviter only         | invitee only           |
-| `invitee`             | invitee only         | inviter only           |
-| `both`                | both members         | both members           |
-
-"Manage" means create tasks, toggle the tasks you created active or inactive,
-edit the tasks you created, and choose whose timezone a scheduled task is
-relative to.
-
-"Complete" means mark a currently eligible task done and receive its credit
-award into your own `partnership_reward_credits` balance for that partnership.
+- **Setting a task** (`managesSpace`): any member whose `space_members`
+  `can_manage` is set. In a solo space that is its owner; in a shared one it is
+  whoever the partnership's control names, or both.
+- **Who it is for** (`assigneeFor`) is decided by the server when the task is
+  created, never posted: the creator themselves in a solo space, and in a
+  shared one the other member. Nobody is ever assigned a task they wrote.
+- **Completing** (`actsOn`, `canCompleteTask`): the task is assigned to the
+  viewer, the viewer is on the side that acts in the space (`viewerActsIn`:
+  in a shared space, someone *else* could have set it, which a member who
+  manages alone is not), in a shared space they did not write it, and it is
+  active and due.
+- **Editing** (`managesRecord`): the viewer manages the space, and the task is
+  set for someone else — or, in their own space, simply theirs. Nobody edits a
+  task set for them. In a space of two this is "only its creator edits it".
+  "Edit" covers the title, description, schedule, credits, active, and whose
+  time it runs in.
 
 ### Authorship still matters under shared control
 
-Shared control does **not** mean someone may complete a task they created, and
-it does not let them edit the tasks their partner created.
+When both members of a partnership manage it, each sets tasks for the other,
+and each completes the ones the other set. Ada may edit the tasks she set for
+Jun but not complete them; Jun completes them and cannot edit them. Without
+the authorship rule, shared control would let anyone mint their own credits
+from their own task definitions — so it holds whatever `can_manage` says now.
 
-- If Ada creates a partnership task, Ada may edit it under shared control.
-- Ada may not complete that same task.
-- Jun may complete it when it is eligible.
-- Jun may edit only the partnership tasks Jun created.
+If who manages changes later, the tasks stay stored, assignee and all, and a
+list shows only the ones that still belong on the viewer's side
+(`taskListFor` returns null for the rest). Changing it back shows them again.
 
-If control later changes, old partnership tasks stay in the database but the
-tasks page only shows the ones that still belong on the viewer's current side:
+## To do and set for others
 
-- the managing side sees only the tasks they created for their partner
-- the completing side sees only the tasks their partner created for them
-- shared control shows both again
+`taskListFor` puts every task the viewer can see on one of two lists:
 
-That rule is independent of later control changes for the same reason as the
-reward authorship rule: without it, shared control would let someone mint their
-own credits from their own task definitions.
+- **To do** — the ones they complete: in Me their own, in a partnership the
+  ones set for them, in Everyone all of those.
+- **Set for others** — the ones they set for someone else in a shared space
+  they manage. Never in a solo space, so the list is hidden in Me, and hidden
+  wherever else it is empty.
+
+The two used to be split by place instead: `/home` showed only what you do,
+and the partner page split its tasks into "For you" and "For them" tabs. With
+one page that follows the context, the split is by what the viewer can do
+about a task, which reads the same in every context.
+
+## Credits
+
+Credits are kept per member per space, in `reward_balances` (unique on
+`space_id`, `user_id`): a wallet. Completing a task adds its award to the
+assignee's balance **in the task's space**, and only that space's rewards
+spend it. Balances are never pooled, because each is spent on different
+rewards ([rewards.md](rewards.md#credits)).
 
 ## Scheduling modes
 
@@ -133,30 +143,27 @@ Task dates are not stored as "this happened at 14:00 UTC and therefore means
 that forever". They are stored as **local wall-clock values** plus a stable
 reference to whose timezone that wall-clock value belongs to.
 
-For self tasks, the owner is always the signed-in user.
+In a solo space the owner is always the signed-in user; the server sets it
+whatever the form says.
 
-For partnership tasks, the stored value points at one specific user in the
-partnership:
+In a shared space the stored value points at one member of the space — the
+viewer or their partner — and the server refuses anyone else.
 
-- the current viewer, or
-- their partner
-
-That is why the task tables store `timezone_owner_user_id` rather than a raw
+That is why the table stores `timezone_owner_user_id` rather than a raw
 timezone string. If that user later changes their account timezone, the task's
 local time remains relative to that person's current timezone instead of being
 frozen to the old offset.
 
 ### What the UI does
 
-- Partner-task date and datetime fields default to the **other partner's**
-  timezone on create.
+- A new task in a shared space defaults to the **partner's** timezone: they
+  are the one doing it (`TaskEditorBody`).
 - If both accounts currently share the same timezone, the timezone-owner toggle
   is hidden.
 - If they differ, the form shows a small toggle between "Your time" and
   "Their time", and the partner option includes the current relative offset.
 - Anywhere the app shows a task date that belongs to a different timezone than
-  the viewer's current timezone, it renders the same compact timezone note
-  style used on the partner page.
+  the viewer's current timezone, it says so ("Jun's time", `WhoseTime`).
 - One-off tasks show no timezone note, because they have no task-local date or
   datetime to explain.
 
@@ -164,8 +171,9 @@ frozen to the old offset.
 
 A task's **content** — its title, description and completion messages — is
 end-to-end encrypted. It is one sealed record (kind `task`, in
-`src/lib/sealed-kinds/tasks.ts`) in the scope's vault: the owner's own vault
-for a self task, the partnership's for a partnership task. See
+`src/lib/sealed-kinds/tasks.ts`) in the vault of the task's space
+(`vaultIdForSpace` in `server/sealed-content.ts`): the owner's own vault in a
+solo space, the partnership's in a shared one. See
 [docs/encryption.md](encryption.md#sealed-records) for vaults and the record
 format.
 
@@ -175,7 +183,7 @@ The server sees everything it acts on, and nothing else:
 | ----------------------------------------------------------------- | ------------------------------------- |
 | `active`, `credits_awarded`, `schedule`, `timezone_owner_user_id` | `title`                               |
 | `completion_message_count`                                        | `description` (rich text)             |
-| who created it, timestamps, eligibility                           | `completionMessages` (up to 20)       |
+| its space, who wrote it, who it is for, timestamps, eligibility   | `completionMessages` (up to 20)       |
 | `vault_id`, `payload_version`, `revision`                         |                                       |
 
 **Completion messages are picked by index.** The server cannot read the
@@ -183,15 +191,14 @@ messages, so it is told how many there are (`completion_message_count`) and
 picks a random index on completion; the device showing the completion reads
 that entry out of the snapshot.
 
-**What moved into the browser.** The checks on the content — a title of 1–80
+**What runs in the browser.** The checks on the content — a title of 1–80
 characters, at most 20 completion messages, a description of at most 500
 visible characters — run in the browser before sealing, and again on every
 read (`taskKind` validates whatever comes out of a vault, so a malformed or
 tampered record reads as "can't be shown" rather than as whatever it says).
 The server checks only what it can: the ciphertext's shape and size, a known
-`payload_version`, the vault belonging to the task's scope, and every
-permission. Permissions never moved: who may create, edit or complete a task
-is decided from the stored rows exactly as before.
+`payload_version`, the vault belonging to the task's space, and every
+permission, decided from the stored rows.
 
 **Forms.** The editor (`SealedTaskEditor.svelte`, drawing `TaskForm.svelte`,
 whose fields are the app's `InputField`, `SelectField` and `CheckboxField`)
@@ -205,9 +212,9 @@ there are no text fields to send back.
 
 **A tick in the description is a content-only write.** Ticking a to-do item
 in a task's sheet re-seals the content and posts it alone to the list page's
-`?/selfTaskContent` or `?/taskContent`, under the same permission as an edit.
-Not the edit action, which would work the schedule out again and make a task
-done today due again. See [rich-text.md](rich-text.md#to-do-lists).
+`?/content`, under the same permission as an edit. Not the edit action, which
+would work the schedule out again and make a task done today due again. See
+[rich-text.md](rich-text.md#to-do-lists).
 
 **Edits are compare-and-swap.** Every sealed write bumps `revision`, and an
 edit names the revision it opened. If the other partner saved in between, the
@@ -221,16 +228,23 @@ this device. Nothing is rendered on the server.
 
 ## Data model
 
-The current schema uses four task tables:
+Two tables, both in `schema/app.ts`:
 
-- `self_tasks`
-- `self_task_completions`
-- `partnership_tasks`
-- `partnership_task_completions`
+- `tasks`
+- `task_completions`
 
-Important fields on the live task rows:
+and the balances completions pay into, `reward_balances`
+([rewards.md](rewards.md#data-model)).
 
-- `ciphertext`, `vault_id`, `payload_version`, `revision` — the sealed content
+Important fields on a task:
+
+- `space_id` — `NOT NULL`, `ON DELETE CASCADE` from `spaces`
+- `created_by_user_id`, and `assignee_user_id`, who completes it. Nullable
+  only for a space with nobody else in it yet; `createTask` refuses to make one
+  (`no-assignee`). One column rather than "the other member" so a space of
+  more than two would need no new one.
+- `ciphertext`, `vault_id`, `payload_version`, `revision` — the sealed
+  content, all `NOT NULL`
 - `completion_message_count`
 - `active`, `credits_awarded`
 - `schedule`
@@ -239,11 +253,8 @@ Important fields on the live task rows:
 - `completed_count`
 - `next_eligible_at`
 
-There is no plaintext content column. `ciphertext` and `vault_id` are
-nullable only because rows from before sealing had none: making them `NOT
-NULL` would mean rebuilding the table, which on D1 cascade-deletes everything
-that references it (the trap in AGENTS.md). Every writer sets them, and a row
-without them reads as one that cannot be shown.
+Indexes cover the list reads (`space_id` with `active`, and with
+`next_eligible_at`) and every user column.
 
 The task views add one thing worked out at load: `windowCompletions`, how many
 completions of a rolling-window task with a limit still count against it right
@@ -254,15 +265,14 @@ earliest instant any of the list's windows could reach back to
 (`completionsInWindow`, the same test `nextEligibleAtAfterCompletion` uses).
 Null for every other task.
 
-Completion rows snapshot:
+Completion rows carry their own `space_id` and snapshot:
 
 - the task's sealed record as it was when completed — a copy of its
   ciphertext, which still opens as a task (`snapshot_*` columns; it stays
   sealed to the task's id, `snapshot_record_id`)
 - `completion_message_index`, which of the snapshot's messages was given
 - the credit award amount
-- who created the task for partnership rows
-- who completed it for partnership rows
+- who wrote the task, and who completed it
 - the task's `active`, `next_eligible_at` and `last_completed_at` as they were
   just before (`previous_*`), so the completion can be undone exactly
 
@@ -271,30 +281,65 @@ stay truthful even if the live task is edited later. Copying the ciphertext is
 what lets the server take a snapshot it cannot read, and either partner's
 completion can trigger it.
 
+**Where the rows came from.** `drizzle/0051_add_merged_tasks_rewards.sql`
+made the tables, `0052_copy_tasks_rewards_into_spaces.sql` copied every row
+from the old `self_*` and `partnership_*` tables keeping its id — a sealed
+record is bound to its kind, id and vault, none of which changed, so every
+ciphertext still opens — with the owner as assignee of a solo row and the
+member who did not write it of a shared one, and `0053` dropped the old
+tables, children first (the reviewed exception in
+`src/lib/server/db/migrations.test.ts`).
+
 ## Route surface
 
-| Route                          | What it shows                                                  |
-| ------------------------------ | -------------------------------------------------------------- |
-| `/home/tasks`                  | One to-do list: self tasks and the partner tasks the viewer completes |
-| `/home/tasks/add`              | The list, with the form for a new self task in a sheet over it (titled "Add a task": "self" is not a word users see) |
-| `/home/tasks/[taskId]`         | The list, with one self task's edit form in a sheet            |
-| `/home/tasks/history`          | The list, with the self task completion history in a sheet     |
-| `/partner/[id]/tasks`          | Partnership tasks; a tab each for "For them" and "For you" under shared control |
-| `/partner/[id]/tasks/history`  | The list, with the partnership's completion history in a sheet |
-| `/partner/[id]/tasks/add`      | The list, with the form for a new partnership task in a sheet, when this side controls tasks; the other side is redirected to the list (a direct post is still a 403) |
-| `/partner/[id]/tasks/[taskId]` | The list, with one partnership task's edit form in a sheet, when this side controls tasks |
+All under `src/routes/(auth-required)/(app)/tasks/`:
+
+| Route              | What it shows                                                             |
+| ------------------ | ------------------------------------------------------------------------- |
+| `/tasks`           | The list for the current context: To do, then Set for others              |
+| `/tasks/add`       | The list, with the form for a new task in a sheet over it; redirected to the list when the context has nowhere the viewer may set one |
+| `/tasks/[taskId]`  | The list, with one task's edit form in a sheet, for a task the viewer may edit (403 otherwise, 404 outside their spaces) |
+| `/tasks/history`   | The list, with the completion history of the context's spaces in a sheet |
 
 The add, edit and history pages are sheets over the list with URLs of their
 own (`RouteSheet`; see [docs/dialogs.md](dialogs.md#sheets-with-their-own-url)):
-the list is each route's `+layout.svelte`, and a reload on `/home/tasks/add`
-shows the list with the add form open over it. The forms themselves are
+the list is the route's `+layout.svelte`, and a reload on `/tasks/add` shows
+the list with the add form open over it. The forms themselves are
 `TaskEditorBody`. History is reached by the clock icon beside the page title:
 a line per completion under the day it happened, with the completion message
 it gave.
 
+**The list follows the context.** The layout's load reads the context's
+spaces (`contextSpaceIds`), depends on `app:context` and on
+`tasks:<spaceId>` for each (`tasksDependency`, which the home and partner
+cards share), and the context switcher sits in the header's corner. At the top
+of the page a Tasks | Rewards pair of links (`ItemsTabs`) moves between the two
+pages, which read as one place since tasks are what pay for rewards. An edit
+sheet takes its space from the task, so a link to one opens whatever the
+context is ([contexts.md](contexts.md#items-carry-their-own-space)). The old
+`/home/tasks` and `/partner/[id]/tasks` routes are gone, with no redirects.
+
+**Actions** all live on `/tasks` and name what they act on — never the
+context, which another tab can change:
+
+| Action       | Posts                         | Does                                      |
+| ------------ | ----------------------------- | ----------------------------------------- |
+| `?/complete` | `taskId`                      | `completeTask`                            |
+| `?/undo`     | `completionId`                | `undoTaskCompletion`                      |
+| `?/content`  | a sealed record               | `updateTaskContent`: a tick in the description |
+| `/tasks/add` | `spaceId` and a sealed record | `createTask`                              |
+| `/tasks/[taskId]` | a sealed record          | `updateTask`                              |
+
+**Adding** asks "For whom?" (`ForWhom`) first when the context shows more than
+one space the viewer may set tasks in — in practice Everyone — listing Me and
+each partner they manage with. The choice is remembered on the device
+(`localStorage`, `bound-up:tasks-for-whom`) and posted as `spaceId`; the
+server checks the viewer manages that space and picks the assignee itself.
+Where there is only one such space the question is not asked.
+
 ### The checklist
 
-The tasks pages are a to-do list, not a stack of cards: a card per task, with
+The tasks page is a to-do list, not a stack of cards: a card per task, with
 its whole description and two buttons, meant two tasks filled a phone screen.
 The pieces are generic (`ItemRow`, `ItemGroup`, `ResponsiveDialog`; see
 [docs/theme.md](theme.md#lists-of-items) and [docs/dialogs.md](dialogs.md)), and
@@ -303,27 +348,24 @@ The wording rules are pure and node-tested: `src/lib/task-list.ts`,
 `groupTasksToDo` / `groupTasksSet` in `src/lib/tasks.ts`, and
 `shortTaskSchedule` / `shortAvailability` in `src/lib/task-schedule.ts`.
 
-A list is either the viewer's to do, or tasks they set for their partner, and
-is grouped by what can be done about each:
+Each of the page's two lists is grouped by what can be done about each task:
 
 | Mode    | Groups                                                     | At the start of a row |
 | ------- | ---------------------------------------------------------- | --------------------- |
 | `to-do` | Ready, Later (soonest first), Inactive                     | a circle to tick when it can be done; a dashed clock when it is not due yet |
 | `set`   | one unheaded list (still to do, then done for now), Inactive | nothing, and no column for it: the viewer cannot complete these, and a ring there was a control-shaped thing that did nothing |
 
-The `set` list has no heading of its own: the page's "For them" tab, or the
-page itself, already says whose these are. Inactive is a closed `wa-details`
-in both, there for whoever looks. A row that is not due yet (or, on the side
-that set it, done for now) has its title and award greyed: it cannot be
-completed before then (the server refuses), so it should not look like one
-that can.
+The `set` list has no group heading of its own: the "Set for others" heading
+already says whose these are. Inactive is a closed `wa-details` in both,
+there for whoever looks. A row that is not due yet (or, on the side that set
+it, done for now) has its title and award greyed: it cannot be completed
+before then (the server refuses), so it should not look like one that can.
 
 Each row is the title and one quiet line, with the award ("+2") at the end.
 The line, in the order shown, as the design proposal had it:
 
-- whose it is, on `/home/tasks` only: the partner's picture (`wa-avatar`,
-  named for a screen reader), which says it in a quarter of the room a name
-  took;
+- whose space it is in, in Everyone only: the `SpaceChip` every Everyone list
+  puts on its rows ([contexts.md](contexts.md)), in that space's colour;
 - when it is due again, with a clock: "Tomorrow 9am", or on the side that set
   it "Again tomorrow 9am";
 - the schedule, with a repeat icon for "Repeat anytime" and "After
@@ -339,31 +381,25 @@ which is built on `Intl.DateTimeFormat#formatToParts` and
 and "tomorrow" are in the reader's language.
 
 Above the list are the balances the tasks pay into (`CreditBalances`, a row
-of `CreditPill`s labelled by a coins icon at its start), kept
-apart rather than added up because they are spent on different rewards. On
-`/home/tasks`: "Yours", then "With Jun" for each partner, with their picture.
-On the partner page: the viewer's own when they complete tasks there, and the
-partner's when they set them.
+of `CreditPill`s labelled by a coins icon at its start, built by
+`balancePills` in `src/lib/item-pages.svelte.ts`), kept apart rather than
+added up because they are spent on different rewards: the viewer's own where
+they complete tasks ("Yours", or "With Jun" beside other spaces' in
+Everyone), and each partner's they set tasks for, with their picture. They are
+read-only here; they are set on the rewards page.
 
-`/home/tasks` merges the viewer's own tasks with every partner's into the one
-`to-do` list; there used to be a panel per partner, each with buttons of its
-own. `/partner/[id]/tasks` is one list for one-sided control (`to-do` for the
-completing side, `set` for the managing side), and under shared control a
-pill-shaped segmented control (`SegmentedTabs`) with "For them" first and shown
-first, since setting tasks is what a side in control comes for, then "For you"
-and a count on each, which used to be two stacked panels. Adding a task is a
-dashed "Add a task" row on `/home/tasks` and the round amber button over the
-bottom of the partner page (`ListDock`, sticky rather than fixed, because the
-app shell's window does not scroll).
+Adding a task is a dashed "Add a task" row (`QuickAddLink`) over the lists,
+shown when the context has somewhere the viewer may set one.
 
 Tapping a task opens its detail (`TaskDetailDialog`), and the row stays lit
 behind it so it is plain which one is open. The detail has the description,
-then: whose it is, "Repeats" (the whole schedule: "Anytime, up to 3 times a
-week"), the quota as squares ("This week"), when it is due again, when it was
-last done, whose time it runs in, and the award. In its footer **Complete**
-comes first and widest, then Edit, then the partner's whole task list (from
-`/home/tasks`). That Complete submits the row's own form (`requestSubmit`), so
-both ways of completing post the same thing and celebrate the same way.
+then: whose it is ("From" Jun on the to-do side, "For" Jun on the side that set
+it), "Repeats" (the whole schedule: "Anytime, up to 3 times a week"), the quota
+as squares ("This week"), when it is due again, when it was last done, whose
+time it runs in, and the award. In its footer **Complete** comes first and
+widest, then Edit where the viewer may edit it. That Complete submits the
+row's own form (`requestSubmit`), so both ways of completing post the same
+thing and celebrate the same way.
 
 ### The task form
 
@@ -390,24 +426,23 @@ the app-wide notice (docs/request-failures.md).
 
 A circle is far easier to tap by mistake than the button it replaced, and a
 completion pays out credits, so every completion can be taken back for a
-while. The complete actions answer with the new completion's id and the task's,
-and the task's own line becomes `TaskUndoRow` — "Completed · +2" and an Undo —
+while. `?/complete` answers with the new completion's id and the task's, and
+the task's own line becomes `TaskUndoRow` — "Completed · +2" and an Undo —
 for ten seconds, longer while it is hovered or focused, and then the task shows
 wherever the reload put it. The line goes where the circle was tapped, not
 where the task now belongs: `TaskChecklist` notes the task's group and place as
 the completion is posted (`ItemAction.pending`), because by the time the answer
-arrives a one-off has moved to Inactive, or off `/home/tasks` altogether. A
+arrives a one-off has moved to Inactive, or off the list altogether. A
 toast at the bottom of the page came before it, and was a long way from the
-tap it was about. Undo posts to `selfUndoCompletion` / `partnerUndoCompletion`
-on `/home/tasks` or `undoCompletion` on the partner page, which call
-`undoSelfTaskCompletion` / `undoPartnershipTaskCompletion`, and answer
-`{ undone: true }` with no message: the task coming back in its place says it.
+tap it was about. Undo posts to `?/undo`, which calls `undoTaskCompletion`
+and answers `{ undone: true }` with no message: the task coming back in its
+place says it.
 
 The server allows it only when every one of these holds, and says which did
 not (`UNDO_REFUSALS`):
 
-- the viewer made the completion (and, for a partnership task, is still on the
-  completing side): it is their credits that come back out;
+- the viewer made the completion, and the task is still on their to-do list
+  (`taskListFor`): it is their credits that come back out;
 - it is the task's newest completion, so the state it restores is the current
   one;
 - it is under `UNDO_WINDOW_MS` (ten minutes) old: long enough to notice a
@@ -419,11 +454,12 @@ not (`UNDO_REFUSALS`):
 
 One `db.batch` then deletes the completion, puts the task's `active`,
 `next_eligible_at` and `last_completed_at` back as recorded, takes one off
-`completed_count`, and subtracts the award. The previous state is stored on the
-completion rather than recomputed because a scheduled task's next occurrence
-cannot be rebuilt once its schedule has been edited, and a one-off's `active` is
-gone the moment it completes. Completing and undoing both change the balance in
-SQL (`credits + n`, `credits - n`) rather than reading it and writing it back,
+`completed_count`, and subtracts the award from the viewer's balance in the
+task's space. The previous state is stored on the completion rather than
+recomputed because a scheduled task's next occurrence cannot be rebuilt once
+its schedule has been edited, and a one-off's `active` is gone the moment it
+completes. Completing and undoing both change the balance in SQL
+(`credits + n`, `credits - n`) rather than reading it and writing it back,
 which used to lose an award when two completions landed at once.
 
 The task form's save button follows the app's convention: outlined until the

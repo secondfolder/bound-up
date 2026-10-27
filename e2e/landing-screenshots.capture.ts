@@ -10,6 +10,7 @@ import {
 	openBoard,
 	reply,
 	settle,
+	showContext,
 	signUp,
 	waitForHydration,
 	writeThread
@@ -73,7 +74,10 @@ test('landing page feature screenshots', async ({ browser }) => {
 		await morgan.page.goto(link);
 		await clickWaButton(morgan.page, 'Accept and link');
 		await morgan.page.waitForURL(/\/partner\/[0-9a-f-]{36}$/);
-		const partnerPage = morgan.page.url();
+		const partnershipId = morgan.page.url().split('/').at(-1) ?? '';
+		// Tasks and rewards follow the context: Morgan adds them in the
+		// partnership's, so each is set for Riley.
+		await showContext(morgan.page, partnershipId);
 
 		const tasks: [string, string, string][] = [
 			['Morning check-in', 'Message me before 9 to say good morning.', '1'],
@@ -82,7 +86,7 @@ test('landing page feature screenshots', async ({ browser }) => {
 			['Kneel at the door', 'When you hear my key. Eyes down until I say.', '2']
 		];
 		for (const [title, body, credits] of tasks) {
-			await morgan.page.goto(`${partnerPage}/tasks/add`);
+			await morgan.page.goto('/tasks/add');
 			await waitForHydration(morgan.page);
 			await morgan.page.locator('wa-input[name="title"] input').fill(title);
 			await fillRichText(morgan.page.locator('.task-form'), body);
@@ -100,7 +104,7 @@ test('landing page feature screenshots', async ({ browser }) => {
 			['A night off', 'No tasks, no rules, until morning.', '8']
 		];
 		for (const [title, body, cost] of rewards) {
-			await morgan.page.goto(`${partnerPage}/rewards/add`);
+			await morgan.page.goto('/rewards/add');
 			await waitForHydration(morgan.page);
 			await morgan.page.locator('.add-form wa-input[name="title"] input').first().fill(title);
 			await fillRichText(morgan.page.locator('.add-form'), body);
@@ -110,7 +114,7 @@ test('landing page feature screenshots', async ({ browser }) => {
 		}
 
 		// Credits to spend, earned the way they are in the app.
-		await riley.page.goto('/home/tasks');
+		await riley.page.goto('/tasks');
 		await waitForHydration(riley.page);
 		for (const title of ['Wear what I picked', 'Write me a letter']) {
 			await riley.page.getByRole('button', { name: `Complete ${title}` }).click();
@@ -138,10 +142,11 @@ test('landing page feature screenshots', async ({ browser }) => {
 		await riley.page.goto(rileysPartnerPage);
 		await capture(riley.page, 'partner');
 
-		await riley.page.goto(`${rileysPartnerPage}/tasks`);
+		await showContext(riley.page, partnershipId);
+		await riley.page.goto('/tasks');
 		await capture(riley.page, 'tasks');
 
-		await riley.page.goto(`${rileysPartnerPage}/rewards`);
+		await riley.page.goto('/rewards');
 		await capture(riley.page, 'rewards');
 	} finally {
 		await riley.close();

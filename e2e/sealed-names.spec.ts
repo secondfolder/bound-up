@@ -129,11 +129,11 @@ test.describe('sealed partnership names', () => {
 		try {
 			await newAccount(ada.page, ada.who);
 
-			await ada.page.goto('/home/tasks/add');
+			await ada.page.goto('/tasks/add');
 			await waitForHydration(ada.page);
 			await ada.page.locator('wa-input[name="title"] input').fill('Lines, one hundred');
 			await clickWaButton(ada.page, 'Add task');
-			await waitForSheetClosed(ada.page, /\/home\/tasks$/);
+			await waitForSheetClosed(ada.page, /\/tasks$/);
 
 			// Edit is in the task's detail, which its row opens.
 			await waitForHydration(ada.page);

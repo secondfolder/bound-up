@@ -290,11 +290,11 @@ test.describe('signing in with a passkey', () => {
 			await finishNaming(page);
 
 			await evictKeyStorage(page);
-			await page.goto('/home/tasks');
-			await expectSentToSignIn(page, '/home/tasks');
+			await page.goto('/tasks');
+			await expectSentToSignIn(page, '/tasks');
 
 			await signInWithPasskeyHere(page);
-			await page.waitForURL('/home/tasks');
+			await page.waitForURL('/tasks');
 			expect(await deviceHoldsKey(page)).toBe(true);
 		} finally {
 			await authenticator.forget();

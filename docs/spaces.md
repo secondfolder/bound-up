@@ -11,9 +11,11 @@ point of the model is that a group of more than two people later needs no
 database or low-level rework: nothing in `spaces` or `space_members` assumes
 two.
 
-Spaces are, for now, plumbing underneath the features that already exist.
-Every feature still reads its rows by its own columns (`owner_id`,
-`partnership_id`) and writes `space_id` beside them.
+Tasks and rewards are built on spaces outright: their tables are keyed by
+`space_id` and their rules are written in members ([tasks.md](tasks.md),
+[rewards.md](rewards.md)). For the other features spaces are, for now,
+plumbing underneath: they still read their rows by their own columns
+(`owner_id`, `partnership_id`) and write `space_id` beside them.
 
 ## The tables
 
@@ -22,7 +24,7 @@ Every feature still reads its rows by its own columns (`owner_id`,
 | `spaces`        | `id`, `kind` (`solo` or `shared`), timestamps. Nothing about a space is content.            |
 | `space_members` | `space_id`, `user_id`, `can_manage`, `colour`. Unique on the pair, indexed on `user_id`.    |
 
-These carry a nullable `space_id`:
+These carry a nullable `space_id`, added beside their old scope columns:
 
 | Table                                                     | Its space                                                                      |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------ |
@@ -32,9 +34,13 @@ These carry a nullable `space_id`:
 | `vault_escrows`                                           | The partnership the escrow is held in — not the space of the vault it holds   |
 | `daydreams`, `daydream_characters`, `daydream_scenes`     | The owner's solo space; see below                                              |
 
-Tasks, rewards, their credits, completions and claims have no `space_id` yet:
-those tables are to be replaced by merged ones keyed on `space_id` from the
-start, and adding a column to tables about to go buys nothing.
+Tasks, rewards, their completions, claims and balances (`tasks`,
+`task_completions`, `rewards`, `reward_claims`, `reward_balances`) were created
+with a `space_id` that is `NOT NULL` and a real `ON DELETE CASCADE` from
+`spaces`, and have no other scope column. They replaced ten tables kept per
+scope, `self_*` and `partnership_*`, whose rows were copied in keeping their
+ids (`drizzle/0052_copy_tasks_rewards_into_spaces.sql`; a solo row into its
+owner's solo space, a partnership row into the shared space with the same id).
 
 Account-level data stays on the account: IQ test results, scene preferences,
 settings, features.
@@ -74,11 +80,12 @@ partnership's status.
 **`can_manage` is what the permission rules follow.** The partnership's
 `control` (`inviter`, `invitee`, `both`) was a statement about two roles;
 `can_manage` says the same per member, and `both` is simply two members who
-manage. Every read of `control` goes through `partnershipControl()` in
-`server/spaces.ts`, which works it out from the members, so the rules still
-written in terms of `control` (`canEditPartnership`, the task and reward
-completion and claim rules, the notebook's access rules, the kink list's
-starting side) are following `can_manage`.
+manage. The task and reward rules read `can_manage` directly
+(`managesSpace`, `viewerActsIn` and the rest in `src/lib/spaces.ts`). Every
+read of `control` goes through `partnershipControl()` in `server/spaces.ts`,
+which works it out from the members, so the rules still written in terms of
+`control` (`canEditPartnership`, the notebook's access rules, the kink list's
+starting side) are following `can_manage` too.
 
 `control` is still written, through one helper: `syncSharedSpaceMembers`
 batches after every write of the partnership's invitee or control, adds the
@@ -113,19 +120,22 @@ Ending a partnership and deleting an account delete the space and everything
 in it, explicitly, in one `db.batch()` (`deleteSpaceStatements`). Nothing can
 be left to cascades:
 
-- The `space_id` columns were added to tables that already existed, and a
+- Most `space_id` columns were added to tables that already existed, and a
   column added by `ALTER TABLE … REFERENCES` gets no `ON DELETE` (the trap in
-  AGENTS.md), so nothing cascades from `spaces`.
+  AGENTS.md), so they do not cascade from `spaces`. Only the tasks and rewards
+  tables, created with theirs, do.
 - **Not everything sealed under a vault cascades from it either.** Only the
-  tables created with their `vault_id` do (notebook, kink lists, daydreams).
-  Tasks, rewards, their completions and claims, messages, reactions and tags
-  had theirs added later, so their key is NO ACTION and a vault cannot be
-  deleted while any of them name it.
+  tables created with their `vault_id` do (notebook, kink lists, daydreams,
+  tasks and rewards). Messages, reactions and tags had theirs added later, so
+  their key is NO ACTION and a vault cannot be deleted while any of them name
+  it.
 
 So `deleteSpaceStatements` deletes, in order: every row carrying the space's
-id; the rows sealed under its vaults whose key would refuse the vault's
-deletion; the partnership row, for a shared space, whose own cascades take the
-partnership's tasks, rewards and credits; the vaults; the members; the space.
+id — tasks and rewards included, children first, even though the space's own
+deletion would cascade to them, so the list says everything a space holds
+rather than leaning on which tables happen to cascade; the rows sealed under
+its vaults whose key would refuse the vault's deletion; the partnership row,
+for a shared space; the vaults; the members; the space.
 `src/lib/server/spaces.test.ts` fills every table with a `space_id` — found
 from the Drizzle schema, so a new one is included without anyone listing it —
 ends a partnership and deletes an account, and fails if any row is left.
@@ -170,9 +180,11 @@ product decisions rather than plumbing:
   per-member display names, which is a design question, not a column.
 - **Partner-assisted sign-in.** Escrow and approval trust a *person*: one
   escrow per partnership, one restore request per partnership.
-- **The task and reward rules**, which read `control` and "the counterpart".
-  `someoneElseManages` in `src/lib/spaces.ts` is the rule they generalise to:
-  a member acts on tasks when someone else could have set them.
+- **Who a new task or reward is for.** `assigneeFor` picks "the first other
+  member" of a shared space, which in a space of two is the partner. The
+  column, `assignee_user_id`, is already one per row, so a group needs a
+  choice in the add form rather than a schema change; the rules themselves
+  (`actsOn`, `managesRecord`, `canSetBalance`) are already written in members.
 
 ## The hard part, deferred
 
@@ -195,10 +207,13 @@ so they need no change when screens start speaking in spaces.
 
 | Path                                   | What                                                                           |
 | -------------------------------------- | ------------------------------------------------------------------------------ |
-| `src/lib/spaces.ts`                    | The pure half: `SpaceKind`, the membership type, `managersFromControl`, `someoneElseManages`. Alias-free. |
-| `src/lib/server/spaces.ts`             | Membership, the solo space, `partnershipControl`, the sync, and deleting      |
+| `src/lib/spaces.ts`                    | The pure half: `SpaceKind`, the membership type, `managersFromControl`, `someoneElseManages`, and the task and reward rules in members (`assigneeFor`, `viewerActsIn`, `actsOn`, `managesSpace`, `managesRecord`, `canSetBalance`). Alias-free. |
+| `src/lib/server/spaces.ts`             | Membership, the solo space, `partnershipControl`, the sync, `loadItemSpaces`, and deleting |
 | `drizzle/0048_add_spaces.sql`          | The tables and the `space_id` columns, all `CREATE` and `ADD COLUMN`           |
 | `drizzle/0049_backfill_spaces.sql`     | The trigger, and spaces and members for what already existed                   |
 | `drizzle/0050_add_space_member_colour.sql` | Each member's colour for the space ([contexts.md](contexts.md#colours))    |
+| `drizzle/0051_add_merged_tasks_rewards.sql` | The tasks and rewards tables, keyed by `space_id`                        |
+| `drizzle/0052_copy_tasks_rewards_into_spaces.sql` | Every old task and reward row copied in, ids kept (custom SQL)     |
+| `drizzle/0053_drop_scoped_tasks_rewards.sql` | The ten old tables dropped, children first ([tasks.md](tasks.md#data-model)) |
 | `src/lib/server/spaces.test.ts`        | Membership, the sync, the id clash, and the no-orphans tests                   |
-| `src/lib/server/db/migrations.test.ts` | The backfill, against rows written before it                                   |
+| `src/lib/server/db/migrations.test.ts` | The backfill and the tasks and rewards copy, against rows written before them, and the reviewed drops |

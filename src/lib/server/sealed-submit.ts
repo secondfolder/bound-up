@@ -16,16 +16,27 @@ import type { SealedTaskContent } from '../tasks';
  * still parses the post, against the sealed schema.
  */
 
-export async function readSealedTask(request: Request): Promise<TaskSealedSubmit | null> {
-	const form = await superValidate(request, zod4(taskSealedSubmitSchema));
+/**
+ * Each reader takes the request, or its form data when the action has already
+ * read it for a field of its own (a create's `spaceId`): a body can be read
+ * only once.
+ */
+async function formDataOf(request: Request | FormData): Promise<FormData> {
+	return request instanceof FormData ? request : await request.formData();
+}
+
+export async function readSealedTask(
+	request: Request | FormData
+): Promise<TaskSealedSubmit | null> {
+	const form = await superValidate(await formDataOf(request), zod4(taskSealedSubmitSchema));
 	return form.valid ? form.data : null;
 }
 
 /** A reward form, as posted: the plain fields and the sealed content. Null when malformed. */
 export async function readSealedReward(
-	request: Request
+	request: Request | FormData
 ): Promise<{ recordId: string; expectedRevision: number; input: RewardInput } | null> {
-	const formData = await request.formData();
+	const formData = await formDataOf(request);
 	const field = (key: string) => {
 		const value = formData.get(key);
 		return typeof value === 'string' && value !== '' ? value : undefined;
@@ -107,10 +118,15 @@ export function sealedRefusal(
 			return fail(400, { error: 'That timezone selection does not match this partnership.' });
 		case 'forbidden':
 			return fail(403, {
-				error:
-					what === 'task'
-						? 'Only the partner who created a task can edit it.'
-						: 'Only the controlling side can manage rewards here.'
+				error: `Only whoever set this ${what} for someone else can change it.`
+			});
+		case 'not-a-member':
+			return fail(404, {
+				error: `That is not somewhere you can add a ${what}. Reload and try again.`
+			});
+		case 'no-assignee':
+			return fail(400, {
+				error: `There is nobody there to set this ${what} for yet. Reload and try again.`
 			});
 		default:
 			return fail(400, { error: `That ${what} could not be saved. Reload and try again.` });

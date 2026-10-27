@@ -1,13 +1,26 @@
 <script lang="ts">
 	import SectionWidget from '$lib/components/SectionWidget.svelte';
 	import WidgetItems from '$lib/components/WidgetItems.svelte';
+	import type { AppContext } from '$lib/context';
+	import { followInContext } from '$lib/context-client.svelte';
 	import type { TasksWidgetView } from '$lib/types';
 
+	/**
+	 * The tasks card. `/tasks` shows whatever the context is, so following the
+	 * card switches to the context it previews first — Everyone on /home, the
+	 * partnership on its page — as the notebook's card does
+	 * (`followInContext`, docs/contexts.md).
+	 */
 	let {
 		tasks,
 		href,
+		opensIn,
 		title = 'Tasks'
-	}: { tasks: TasksWidgetView; href: string; title?: string } = $props();
+	}: { tasks: TasksWidgetView; href: string; opensIn: AppContext; title?: string } = $props();
+
+	async function follow(event: MouseEvent) {
+		await followInContext(event, opensIn, href);
+	}
 
 	const hidden = $derived(Math.max(0, tasks.readyCount - tasks.ready.length));
 	const more = $derived.by(() => {
@@ -30,7 +43,13 @@
 	);
 </script>
 
-<SectionWidget {title} {href} icon="list-check" body={hasBody ? preview : undefined} />
+<SectionWidget
+	{title}
+	{href}
+	icon="list-check"
+	onfollow={follow}
+	body={hasBody ? preview : undefined}
+/>
 
 {#snippet preview()}
 	{#if tasks.viewerActs}

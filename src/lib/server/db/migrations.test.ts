@@ -56,6 +56,39 @@ const REVIEWED_REBUILDS = new Set([
 ]);
 
 /**
+ * Migrations that drop whole tables on purpose, and exactly which, in the
+ * order they must go. Any other DROP TABLE in the file, or these in another
+ * order, fails the test below.
+ *
+ * 0053 drops the tasks and rewards tables kept per scope, once 0052 has
+ * copied every row into the ones kept per space (tested below). Safe on D1,
+ * where the DROP's implicit DELETE fires cascades, because:
+ *
+ * - each child goes before its parent — claims before rewards, completions
+ *   before tasks — so no cascade from these tables has anything left to
+ *   reach;
+ * - nothing outside them references them (checked when it was written: their
+ *   only foreign keys in are each other's), and their own keys point
+ *   outwards, which a drop never follows;
+ * - the copy ran first, in its own migration, and `npm run test:e2e:worker`
+ *   applied both to local D1.
+ */
+const REVIEWED_DROPS: Record<string, string[]> = {
+	'0053_drop_scoped_tasks_rewards.sql': [
+		'partnership_reward_claims',
+		'partnership_reward_credits',
+		'partnership_rewards',
+		'partnership_task_completions',
+		'partnership_tasks',
+		'self_reward_claims',
+		'self_reward_credits',
+		'self_rewards',
+		'self_task_completions',
+		'self_tasks'
+	]
+};
+
+/**
  * No migration may rebuild a table — drizzle-kit's `CREATE __new_x … DROP TABLE
  * x … RENAME` — without someone deciding it is safe.
  *
@@ -72,14 +105,21 @@ const REVIEWED_REBUILDS = new Set([
  * and write an empty value, say. If one really is needed, check every table
  * that references it on a copy of a D1 database before adding it here.
  */
-test('no migration rebuilds a table without review', async () => {
+test('no migration rebuilds or drops a table without review', async () => {
 	const { readdir } = await import('node:fs/promises');
 	const folder = path.resolve(process.cwd(), 'drizzle');
 	const files = (await readdir(folder)).filter((file) => file.endsWith('.sql'));
 	const rebuilds: string[] = [];
 	for (const file of files) {
 		const sql = await readFile(path.join(folder, file), 'utf8');
-		if (/\bDROP TABLE\b/i.test(sql) && !REVIEWED_REBUILDS.has(file)) {
+		if (!/\bDROP TABLE\b/i.test(sql) || REVIEWED_REBUILDS.has(file)) {
+			continue;
+		}
+		const allowed = REVIEWED_DROPS[file];
+		const dropped = [...sql.matchAll(/\bDROP TABLE\s+`?(?<table>\w+)`?/gi)].map(
+			(match) => match.groups?.table
+		);
+		if (!allowed || JSON.stringify(dropped) !== JSON.stringify(allowed)) {
 			rebuilds.push(file);
 		}
 	}
@@ -363,4 +403,245 @@ test('the spaces backfill gives every account a solo space and every partnership
 		"INSERT INTO user (id, name, email, created_at, updated_at) VALUES ('new', 'New', 'new@example.test', 9, 9)"
 	);
 	await solo('new');
+});
+
+test('tasks and rewards are copied into their spaces, every row, before the old tables go', async () => {
+	client = createClient({ url: ':memory:' });
+	const [before, after] = await migrationsSplitAt('0052_copy_tasks_rewards_into_spaces.sql');
+	for (const sql of before) {
+		await client.executeMultiple(sql);
+	}
+
+	// Accounts get their solo spaces from the trigger. A partnership made
+	// after the spaces backfill needs its space and members written as
+	// `createInvite` and `acceptInvite` write them: Ada and Jun, Ada in
+	// control; and Jun and Kit sharing it, Jun's members row first so the
+	// "first other member" order is not the insert order of the people.
+	await client.executeMultiple(`
+		INSERT INTO user (id, name, email, created_at, updated_at) VALUES
+			('ada', 'Ada', 'ada@example.test', 1, 1),
+			('jun', 'Jun', 'jun@example.test', 2, 2),
+			('kit', 'Kit', 'kit@example.test', 3, 3);
+		INSERT INTO partnerships (id, inviter_id, invitee_id, status, control, accepted_at, created_at, updated_at) VALUES
+			('p-ada-jun', 'ada', 'jun', 'accepted', 'inviter', 10, 5, 5),
+			('p-jun-kit', 'kit', 'jun', 'accepted', 'both', 11, 6, 6);
+		INSERT INTO spaces (id, kind) VALUES ('p-ada-jun', 'shared'), ('p-jun-kit', 'shared');
+		INSERT INTO space_members (id, space_id, user_id, can_manage, created_at, updated_at) VALUES
+			('m1', 'p-ada-jun', 'ada', 1, 5, 5), ('m2', 'p-ada-jun', 'jun', 0, 10, 10),
+			('m3', 'p-jun-kit', 'jun', 1, 4, 4), ('m4', 'p-jun-kit', 'kit', 1, 6, 6);
+	`);
+	// Foreign keys off for the vaults, which need no wraps behind them for this.
+	await client.execute('PRAGMA foreign_keys = OFF');
+	await client.executeMultiple(`
+		INSERT INTO vaults (id, kind, owner_user_id, partnership_id, key_check) VALUES
+			('v-ada', 'self', 'ada', NULL, 'k'),
+			('v-ada-jun', 'partnership', NULL, 'p-ada-jun', 'k'),
+			('v-jun-kit', 'partnership', NULL, 'p-jun-kit', 'k');
+	`);
+	await client.execute('PRAGMA foreign_keys = ON');
+
+	const schedule = JSON.stringify({ mode: 'rolling-window', limit: null });
+	await client.executeMultiple(`
+		INSERT INTO self_tasks (id, owner_id, active, credits_awarded, completion_message_count, ciphertext, vault_id, payload_version, revision, schedule, timezone_owner_user_id, last_completed_at, completed_count, next_eligible_at, created_at, updated_at) VALUES
+			('t-own', 'ada', 1, 3, 2, 'sb1.own', 'v-ada', 1, 4, '${schedule}', 'ada', 100, 1, NULL, 20, 21);
+		INSERT INTO partnership_tasks (id, partnership_id, created_by_user_id, timezone_owner_user_id, active, credits_awarded, completion_message_count, ciphertext, vault_id, payload_version, revision, schedule, last_completed_at, completed_count, next_eligible_at, created_at, updated_at) VALUES
+			('t-for-jun', 'p-ada-jun', 'ada', 'jun', 0, 5, 0, 'sb1.forjun', 'v-ada-jun', 1, 0, '${schedule}', NULL, 0, 500, 22, 23),
+			('t-for-jun-from-kit', 'p-jun-kit', 'kit', 'kit', 1, 1, 0, 'sb1.kit', 'v-jun-kit', 1, 0, '${schedule}', NULL, 0, NULL, 24, 25),
+			('t-for-kit', 'p-jun-kit', 'jun', 'jun', 1, 1, 0, 'sb1.jun', 'v-jun-kit', 1, 0, '${schedule}', NULL, 0, NULL, 26, 27);
+		INSERT INTO self_task_completions (id, owner_id, task_id, credits_awarded, completion_message_index, snapshot_ciphertext, snapshot_vault_id, snapshot_version, snapshot_record_id, previous_active, previous_next_eligible_at, previous_last_completed_at, created_at, updated_at) VALUES
+			('c-own', 'ada', 't-own', 3, 1, 'sb1.ownold', 'v-ada', 1, 't-own', 1, NULL, NULL, 100, 100);
+		INSERT INTO partnership_task_completions (id, partnership_id, task_id, completed_by_user_id, created_by_user_id, credits_awarded, completion_message_index, snapshot_ciphertext, snapshot_vault_id, snapshot_version, snapshot_record_id, previous_active, previous_next_eligible_at, previous_last_completed_at, created_at, updated_at) VALUES
+			('c-jun', 'p-ada-jun', 't-for-jun', 'jun', 'ada', 5, NULL, 'sb1.forjunold', 'v-ada-jun', 1, 't-for-jun', NULL, NULL, NULL, 110, 110);
+		INSERT INTO self_rewards (id, owner_id, cost, active, ciphertext, vault_id, payload_version, revision, created_at, updated_at) VALUES
+			('r-own', 'ada', 4, 1, 'sb1.rown', 'v-ada', 1, 2, 30, 31);
+		INSERT INTO partnership_rewards (id, partnership_id, created_by_user_id, cost, active, ciphertext, vault_id, payload_version, revision, created_at, updated_at) VALUES
+			('r-for-jun', 'p-ada-jun', 'ada', 6, 0, 'sb1.rjun', 'v-ada-jun', 1, 0, 32, 33);
+		INSERT INTO self_reward_claims (id, owner_id, reward_id, reward_cost, snapshot_ciphertext, snapshot_vault_id, snapshot_version, snapshot_record_id, created_at, updated_at) VALUES
+			('k-own', 'ada', 'r-own', 4, 'sb1.rownold', 'v-ada', 1, 'r-own', 120, 120);
+		INSERT INTO partnership_reward_claims (id, partnership_id, reward_id, claimed_by_user_id, created_by_user_id, reward_cost, snapshot_ciphertext, snapshot_vault_id, snapshot_version, snapshot_record_id, created_at, updated_at) VALUES
+			('k-jun', 'p-ada-jun', 'r-for-jun', 'jun', 'ada', 6, 'sb1.rjunold', 'v-ada-jun', 1, 'r-for-jun', 130, 130);
+		INSERT INTO self_reward_credits (id, owner_id, credits, created_at, updated_at) VALUES ('b-ada', 'ada', 7, 40, 41);
+		INSERT INTO partnership_reward_credits (id, partnership_id, user_id, credits, created_at, updated_at) VALUES
+			('b-jun', 'p-ada-jun', 'jun', 9, 42, 43), ('b-ada-shared', 'p-ada-jun', 'ada', 0, 44, 45);
+	`);
+
+	for (const sql of after) {
+		await client.executeMultiple(sql);
+	}
+
+	const adaSolo = String(
+		(
+			await client.execute(`select m.space_id from space_members m join spaces s on s.id = m.space_id
+				where s.kind = 'solo' and m.user_id = 'ada'`)
+		).rows[0]?.space_id
+	);
+	const rows = async (sql: string) =>
+		(await client?.execute(sql))?.rows.map((row) => ({ ...row })) ?? [];
+
+	expect(
+		await rows(
+			'select id, space_id, created_by_user_id, assignee_user_id, timezone_owner_user_id, active, credits_awarded, completion_message_count, ciphertext, vault_id, payload_version, revision, schedule, last_completed_at, completed_count, next_eligible_at, created_at, updated_at from tasks order by id'
+		)
+	).toEqual([
+		{
+			id: 't-for-jun',
+			space_id: 'p-ada-jun',
+			created_by_user_id: 'ada',
+			assignee_user_id: 'jun',
+			timezone_owner_user_id: 'jun',
+			active: 0,
+			credits_awarded: 5,
+			completion_message_count: 0,
+			ciphertext: 'sb1.forjun',
+			vault_id: 'v-ada-jun',
+			payload_version: 1,
+			revision: 0,
+			schedule,
+			last_completed_at: null,
+			completed_count: 0,
+			next_eligible_at: 500,
+			created_at: 22,
+			updated_at: 23
+		},
+		expect.objectContaining({
+			id: 't-for-jun-from-kit',
+			space_id: 'p-jun-kit',
+			created_by_user_id: 'kit',
+			assignee_user_id: 'jun'
+		}),
+		// Shared control: Jun's own task is Kit's to do, never Jun's.
+		expect.objectContaining({
+			id: 't-for-kit',
+			space_id: 'p-jun-kit',
+			created_by_user_id: 'jun',
+			assignee_user_id: 'kit'
+		}),
+		{
+			id: 't-own',
+			space_id: adaSolo,
+			created_by_user_id: 'ada',
+			assignee_user_id: 'ada',
+			timezone_owner_user_id: 'ada',
+			active: 1,
+			credits_awarded: 3,
+			completion_message_count: 2,
+			ciphertext: 'sb1.own',
+			vault_id: 'v-ada',
+			payload_version: 1,
+			revision: 4,
+			schedule,
+			last_completed_at: 100,
+			completed_count: 1,
+			next_eligible_at: null,
+			created_at: 20,
+			updated_at: 21
+		}
+	]);
+
+	expect(
+		await rows(
+			'select id, space_id, task_id, completed_by_user_id, created_by_user_id, credits_awarded, completion_message_index, snapshot_ciphertext, snapshot_vault_id, snapshot_version, snapshot_record_id, previous_active, created_at from task_completions order by id'
+		)
+	).toEqual([
+		{
+			id: 'c-jun',
+			space_id: 'p-ada-jun',
+			task_id: 't-for-jun',
+			completed_by_user_id: 'jun',
+			created_by_user_id: 'ada',
+			credits_awarded: 5,
+			completion_message_index: null,
+			snapshot_ciphertext: 'sb1.forjunold',
+			snapshot_vault_id: 'v-ada-jun',
+			snapshot_version: 1,
+			snapshot_record_id: 't-for-jun',
+			previous_active: null,
+			created_at: 110
+		},
+		{
+			id: 'c-own',
+			space_id: adaSolo,
+			task_id: 't-own',
+			completed_by_user_id: 'ada',
+			created_by_user_id: 'ada',
+			credits_awarded: 3,
+			completion_message_index: 1,
+			snapshot_ciphertext: 'sb1.ownold',
+			snapshot_vault_id: 'v-ada',
+			snapshot_version: 1,
+			snapshot_record_id: 't-own',
+			previous_active: 1,
+			created_at: 100
+		}
+	]);
+
+	expect(
+		await rows(
+			'select id, space_id, created_by_user_id, assignee_user_id, cost, active, ciphertext, vault_id, revision from rewards order by id'
+		)
+	).toEqual([
+		{
+			id: 'r-for-jun',
+			space_id: 'p-ada-jun',
+			created_by_user_id: 'ada',
+			assignee_user_id: 'jun',
+			cost: 6,
+			active: 0,
+			ciphertext: 'sb1.rjun',
+			vault_id: 'v-ada-jun',
+			revision: 0
+		},
+		{
+			id: 'r-own',
+			space_id: adaSolo,
+			created_by_user_id: 'ada',
+			assignee_user_id: 'ada',
+			cost: 4,
+			active: 1,
+			ciphertext: 'sb1.rown',
+			vault_id: 'v-ada',
+			revision: 2
+		}
+	]);
+
+	expect(
+		await rows(
+			'select id, space_id, reward_id, claimed_by_user_id, created_by_user_id, reward_cost, snapshot_ciphertext, snapshot_record_id from reward_claims order by id'
+		)
+	).toEqual([
+		{
+			id: 'k-jun',
+			space_id: 'p-ada-jun',
+			reward_id: 'r-for-jun',
+			claimed_by_user_id: 'jun',
+			created_by_user_id: 'ada',
+			reward_cost: 6,
+			snapshot_ciphertext: 'sb1.rjunold',
+			snapshot_record_id: 'r-for-jun'
+		},
+		{
+			id: 'k-own',
+			space_id: adaSolo,
+			reward_id: 'r-own',
+			claimed_by_user_id: 'ada',
+			created_by_user_id: 'ada',
+			reward_cost: 4,
+			snapshot_ciphertext: 'sb1.rownold',
+			snapshot_record_id: 'r-own'
+		}
+	]);
+
+	expect(
+		await rows('select id, space_id, user_id, credits from reward_balances order by id')
+	).toEqual([
+		{ id: 'b-ada', space_id: adaSolo, user_id: 'ada', credits: 7 },
+		{ id: 'b-ada-shared', space_id: 'p-ada-jun', user_id: 'ada', credits: 0 },
+		{ id: 'b-jun', space_id: 'p-ada-jun', user_id: 'jun', credits: 9 }
+	]);
+
+	// And the old tables are gone.
+	const left = await rows(
+		"select name from sqlite_master where type = 'table' and (name like 'self\\_%' escape '\\' or name like 'partnership\\_%' escape '\\') order by name"
+	);
+	expect(left).toEqual([]);
 });

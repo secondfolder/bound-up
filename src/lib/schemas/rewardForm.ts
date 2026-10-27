@@ -16,7 +16,7 @@ const userIdSchema = z.string().trim().min(1, 'Malformed user id');
 /**
  * What a reward form actually posts: the cost and whether it is active, which
  * the server checks claims against, and the title and description sealed into
- * the scope's vault in place of the text fields (`sealRewardSubmission` in
+ * the space's vault in place of the text fields (`sealRewardSubmission` in
  * `sealed-forms.ts`). See docs/rewards.md.
  */
 export const rewardSealedSubmitSchema = z.object({
@@ -56,11 +56,9 @@ export type RewardEditorFormValues = z.output<typeof rewardEditorFormSchema>;
 
 export const rewardClaimSchema = z.object({ rewardId: rewardIdSchema });
 
-export const partnerRewardClaimSchema = rewardClaimSchema.extend({
-	partnershipId: z.string().uuid('Malformed partnership id')
-});
-
+/** Setting a balance: whose, in which space, to what. */
 export const rewardCreditsSchema = z.object({
+	spaceId: z.string().uuid('Malformed space id'),
 	targetUserId: userIdSchema,
 	credits: creditsSchema
 });

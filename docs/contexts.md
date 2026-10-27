@@ -7,9 +7,10 @@ whose list follows it, and it is a view filter and nothing more: no write
 ever reads it.
 
 Code says `solo`, `shared` and `all` ([spaces.md](spaces.md)); users see
-"Me", the partner's name and "Everyone". Only the notebook follows the context
-so far (`/notebook`, [notebook.md](notebook.md)); tasks, rewards and messages
-still live under `/home` and `/partner/[id]`.
+"Me", the partner's name and "Everyone". The notebook (`/notebook`,
+[notebook.md](notebook.md)), tasks (`/tasks`, [tasks.md](tasks.md)) and
+rewards (`/rewards`, [rewards.md](rewards.md)) follow the context; messages
+still live under `/partner/[id]`.
 
 ## Where it lives: one cookie
 
@@ -37,7 +38,8 @@ The app layout's load (`(app)/+layout.server.ts`) hands every page
 `contextSpaces` (each space's id, kind, colour and, for a partnership, its
 `PartnerNamesSource`) and `context`, and depends on `app:context`. A page whose
 list follows the context also depends on it, and reads the context from
-`locals.context()` itself.
+`locals.context()` itself — or, for the space ids it shows, from
+`contextSpaceIds(locals)` in `server/context.ts`, which only a load may call.
 
 ## Writes name their space
 
@@ -52,12 +54,16 @@ move the next entry started in another tab — still showing your own notebook �
 into the partnership. Instead the notebook's create posts `spaceId`, and its
 "show again" posts the entry's space; `/notebook/page.server.test.ts` creates
 with the cookie pointing at one space and the form naming another, and e2e
-does the same across two real tabs.
+does the same across two real tabs. Adding a task or a reward posts `spaceId`
+the same way, chosen under "For whom?" (`ForWhom`) when the context shows more
+than one space it could go to; completing, undoing, claiming and editing name
+the task, completion or reward, which carries its own space; setting credits
+names the space and the member.
 
 ## Items carry their own space
 
-An item page (`/notebook/[entryId]` and its menus) takes its space from the
-item, never from the context: opened while the switcher says someone else, it
+An item page (`/notebook/[entryId]` and its menus, `/tasks/[taskId]`,
+`/rewards/[rewardId]`) takes its space from the item, never from the context: opened while the switcher says someone else, it
 shows as whoever's it is (a chip at the top right), with that partnership's
 names and the actions its rules allow, and the context is left as it was. So
 a link to an item means the same thing to everyone who can open it, whatever
@@ -73,8 +79,17 @@ their device's context is, and needs no context in its URL.
   one context over a list of another.
 - **Back does not undo a switch.** History holds URLs, and switching does not
   change the URL: the same page re-runs its loads in place.
-- **A pasted list link** (`/notebook`) shows whatever context the person
-  opening it has.
+- **A pasted list link** (`/notebook`, `/tasks`, `/rewards`) shows whatever
+  context the person opening it has.
+- **A card's link switches first.** The `/home` and `/partner/[id]` cards for
+  the notebook, tasks and rewards lead to a list that follows the context, so
+  following one sets the context the card previewed and then navigates
+  (`followInContext` in `context-client.svelte.ts`): Everyone from `/home` for
+  tasks and rewards, Me for the notebook, the partnership from its page. A
+  deliberate choice of context, not a silent switch. A click that opens a new
+  tab is left alone, and such links are not preloaded, since a preload would
+  fetch the list in the old context
+  ([section-widgets.md](section-widgets.md#the-unlinked-header)).
 
 ## The switcher
 
@@ -162,16 +177,16 @@ list.
 | --- | --- |
 | `src/lib/context.ts` | The pure half: `AppContext`, the cookie's name and format, parsing, `spacesInContext`. Alias-free |
 | `src/lib/space-colours.ts` | The palette, its labels, `resolveSpaceColours`. Alias-free: the schema imports `SpaceColour` |
-| `src/lib/server/context.ts` | `listContextSpaces`, the per-request resolver, the cookie, `setSpaceColour`, `contextSpaceViews` |
-| `src/lib/context-client.svelte.ts` | Names and avatars for the browser, `switchContext` and `storeContext` |
+| `src/lib/server/context.ts` | `listContextSpaces`, the per-request resolver, the cookie, `setSpaceColour`, `contextSpaceViews`, `contextSpaceIds` |
+| `src/lib/context-client.svelte.ts` | Names and avatars for the browser, `switchContext`, `storeContext` and `followInContext` |
 | `src/lib/components/context/` | `ContextSwitcher`, `ContextAvatar`, `SpaceChip`, `SpaceColourForm` |
 | `src/routes/api/context/+server.ts` | Switching |
 | `drizzle/0050_add_space_member_colour.sql` | `space_members.colour`, a plain `ADD COLUMN` |
 
 ## Not built yet
 
-- Tasks, rewards and messages following the context, and the Dashboard that
-  replaces `/home` and `/partner/[id]`.
+- Messages following the context, and the Dashboard that replaces `/home`
+  and `/partner/[id]`.
 - A live Everyone list: it refreshes when looked at again rather than holding a
   stream per partnership. Fanning list events out to each member's own room
   would let one stream cover it ([notebook.md](notebook.md#the-list-in-every-context)).

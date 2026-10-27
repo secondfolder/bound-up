@@ -7,7 +7,7 @@
  * everywhere else.
  */
 
-import { invalidate } from '$app/navigation';
+import { goto, invalidate } from '$app/navigation';
 import { type AppContext, CONTEXT_DEPENDENCY, serialiseContext } from './context';
 import { initialsFor } from './initials';
 import { partnerName } from './partner-names.svelte';
@@ -109,4 +109,33 @@ export async function switchContext(context: AppContext): Promise<boolean> {
 	}
 	await invalidate(CONTEXT_DEPENDENCY);
 	return true;
+}
+
+/**
+ * Follows a card's link into a list in the card's own context: remembers that
+ * context, then goes to the list, which loads in it. The list then shows what
+ * the card previewed — a deliberate choice of that context, not a silent
+ * switch. A click that opens elsewhere (a new tab, a modifier) is left alone,
+ * and shows the context as it is. See docs/contexts.md.
+ *
+ * `href` is resolved by the caller.
+ */
+export async function followInContext(
+	event: MouseEvent,
+	context: AppContext,
+	href: string
+): Promise<void> {
+	const opensElsewhere =
+		event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+	if (opensElsewhere) {
+		return;
+	}
+	event.preventDefault();
+	// Followed even if the switch failed (the notice says so): the list then
+	// shows the context as it was, which is still the list.
+	await storeContext(context);
+	// The app layout's context too: a navigation re-runs it only when
+	// something it depends on was invalidated, and the cookie is not that.
+	// biome-ignore lint/plugin: `href` arrives resolved; see above.
+	await goto(href, { invalidate: [CONTEXT_DEPENDENCY] });
 }

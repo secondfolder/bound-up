@@ -44,23 +44,18 @@
 			href={resolve('/(auth-required)/(app)/partner/[id]/messages', { id: partner.id })}
 		/>
 
-		<!-- `tasks` and `rewards` are null only when the widget's own membership
-		     check said this viewer has no business with that section, which the
-		     404 above has already ruled out for an accepted partnership. Guarded
-		     rather than asserted so a future control mode cannot crash the page. -->
-		{#if data.tasks}
-			<TasksWidget
-				tasks={data.tasks}
-				href={resolve('/(auth-required)/(app)/partner/[id]/tasks', { id: partner.id })}
-			/>
-		{/if}
+		<!-- This partnership's alone, so they open their lists in its context. -->
+		<TasksWidget
+			tasks={data.tasks}
+			href={resolve('/(auth-required)/(app)/tasks')}
+			opensIn={{ kind: 'space', spaceId: partner.id }}
+		/>
 
-		{#if data.rewards}
-			<RewardsWidget
-				rewards={data.rewards}
-				href={resolve('/(auth-required)/(app)/partner/[id]/rewards', { id: partner.id })}
-			/>
-		{/if}
+		<RewardsWidget
+			rewards={data.rewards}
+			href={resolve('/(auth-required)/(app)/rewards')}
+			opensIn={{ kind: 'space', spaceId: partner.id }}
+		/>
 
 		<NotebookWidget
 			items={data.notebook}

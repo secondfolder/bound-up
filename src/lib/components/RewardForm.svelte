@@ -25,6 +25,7 @@
 		submitLabel,
 		sealScope,
 		reward = null,
+		fields = {},
 		action,
 		onsaved
 	}: {
@@ -33,6 +34,8 @@
 		sealScope: SealScope;
 		/** The reward being edited; null to create one. */
 		reward?: { id: string; revision: number } | null;
+		/** Posted beside the sealed record: a new reward's `spaceId`, which the form names. */
+		fields?: Record<string, string>;
 		/**
 		 * Where it posts, when that is not the page it is on: the add or edit
 		 * route's action, from a sheet over the rewards list.
@@ -99,6 +102,7 @@
 					return;
 				}
 				replaceWithSealed(formData, ['title', 'description'], {
+					...fields,
 					...outcome.fields,
 					...(reward ? { expectedRevision: String(reward.revision) } : {})
 				});

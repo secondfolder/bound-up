@@ -295,7 +295,10 @@ the background, by a device that opened it — and that code is gone. An
 instance holding any of them must have been opened, signed in, on a version
 from before migration `0047_drop_legacy_migrations` to carry them over: that
 migration drops the plaintext columns, and a message still in the old scheme
-shows as one that cannot be read.
+shows as one that cannot be read. A task, reward, completion or claim that was
+never sealed stops migration `0052_copy_tasks_rewards_into_spaces` outright,
+since the tables it copies into require the sealed columns, rather than
+arriving there unreadable.
 
 The history before the first release carries a `v0.0.0` seed tag, so the first
 release is 0.1.0 rather than a version computed from years of pre-release

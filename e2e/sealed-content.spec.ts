@@ -29,7 +29,7 @@ test.describe('sealed tasks and rewards', () => {
 			await newAccount(ada.page, ada.who);
 			const adaId = await userId(ada.who.email);
 
-			await ada.page.goto('/home/tasks/add');
+			await ada.page.goto('/tasks/add');
 			await waitForHydration(ada.page);
 			await ada.page.locator('wa-input[name="title"] input').fill('Ninety lengths');
 			await fillRichText(ada.page.locator('.task-form'), 'Before breakfast');
@@ -37,21 +37,21 @@ test.describe('sealed tasks and rewards', () => {
 				.locator('wa-textarea[name="completionMessagesText"] textarea')
 				.fill('Strong work');
 			await clickWaButton(ada.page, 'Add task');
-			await waitForSheetClosed(ada.page, /\/home\/tasks$/);
+			await waitForSheetClosed(ada.page, /\/tasks$/);
 			// Shown, which means opened in the browser: the server never had it.
 			await expect(ada.page.getByRole('button', { name: /^Ninety lengths/ })).toBeVisible();
 
-			await ada.page.goto('/home/rewards/add');
+			await ada.page.goto('/rewards/add');
 			await waitForHydration(ada.page);
 			await ada.page.locator('.add-form wa-input[name="title"] input').fill('Sunday lie-in');
 			await fillRichText(ada.page.locator('.add-form'), 'Until noon');
 			await ada.page.locator('.add-form wa-input[name="cost"] input').fill('2');
 			await clickWaButton(ada.page, 'Add reward');
-			await waitForSheetClosed(ada.page, /\/home\/rewards$/);
+			await waitForSheetClosed(ada.page, /\/rewards$/);
 			await expect(ada.page.getByRole('button', { name: /^Sunday lie-in/ })).toBeVisible();
 
-			const tasks = await sql('SELECT * FROM self_tasks WHERE owner_id = ?', [adaId]);
-			const rewards = await sql('SELECT * FROM self_rewards WHERE owner_id = ?', [adaId]);
+			const tasks = await sql('SELECT * FROM tasks WHERE created_by_user_id = ?', [adaId]);
+			const rewards = await sql('SELECT * FROM rewards WHERE created_by_user_id = ?', [adaId]);
 			expect(tasks.rows).toHaveLength(1);
 			expect(rewards.rows).toHaveLength(1);
 			const [task] = tasks.rows;

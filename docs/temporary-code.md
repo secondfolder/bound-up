@@ -165,8 +165,11 @@ Spaces (docs/spaces.md) say who manages a shared space per member, in
 worked out from those flags (`partnershipControl` in
 `src/lib/server/spaces.ts`). The `partnerships.control` column is still
 **written**, because the partner settings form asks and answers in terms of
-it, and the task, reward and notebook rules are still written against it.
-`can_manage` is kept in step from it by one helper. Grep for `LEGACY-SPACES`.
+it, and the notebook's rules and the partnership's own edit rule
+(`canEditPartnership`, behind the partner settings and the invite) are still
+written against it. The task and reward rules no longer read it: they take the
+space's members and their `can_manage` (`src/lib/spaces.ts`). `can_manage` is
+kept in step from `control` by one helper. Grep for `LEGACY-SPACES`.
 
 ### Where it lives
 
@@ -180,8 +183,8 @@ it, and the task, reward and notebook rules are still written against it.
 ### What removes the need for it
 
 The partner settings form writing members' `can_manage` directly, and the
-rules in `src/lib/tasks.ts`, `src/lib/rewards.ts`, `src/lib/notebook.ts` and
-`src/lib/partnership.ts` taking members rather than a `control` value. Nothing
+rules in `src/lib/notebook.ts` and `src/lib/partnership.ts` taking members
+rather than a `control` value, as the task and reward rules already do. Nothing
 on a device or in old data depends on the column: every accepted
 partnership's members already say what it says.
 

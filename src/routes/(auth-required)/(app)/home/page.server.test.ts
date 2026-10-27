@@ -15,7 +15,8 @@ import {
 	createTestUser,
 	setTestPartnershipRewardCredits,
 	setTestSelfRewardCredits,
-	type TestUser
+	type TestUser,
+	testSoloSpace
 } from '$lib/testing/fixtures';
 import { testPartnerView } from '$lib/testing/names';
 import type { PartnerView } from '$lib/types';
@@ -84,7 +85,9 @@ describe('load', () => {
 		await createTestSelfReward(db, ada, { cost: 50 });
 
 		const data = await runLoad(load(at(ada)));
-		expect(data.rewards.balances).toEqual([{ id: 'self', label: null, credits: 5 }]);
+		expect(data.rewards.balances).toEqual([
+			{ id: await testSoloSpace(db, ada.id), label: null, credits: 5 }
+		]);
 		expect(data.rewards.claimable).toEqual([
 			{
 				id: bath.id,
@@ -102,10 +105,10 @@ describe('load', () => {
 	});
 
 	/**
-	 * The cards are an overview of /home/tasks and /home/rewards, and both of
-	 * those pages show your own section plus one per partner. A card that read
-	 * only the self half reported "nothing to do" with a partner task waiting,
-	 * which is the opposite of what the cards are for.
+	 * The cards are an overview of /tasks and /rewards in Everyone, which is
+	 * where they lead, and those show your own things and every partner's. A
+	 * card that read only the solo half reported "nothing to do" with a
+	 * partner task waiting, which is the opposite of what the cards are for.
 	 */
 	it('carries partner tasks and rewards into the cards, not just your own', async () => {
 		// Jun controls, so what Jun sets up is Ada's to do and to claim.
@@ -128,7 +131,7 @@ describe('load', () => {
 		]);
 		// Both balances, separately — partnership credits do not buy self rewards.
 		expect(data.rewards.balances).toEqual([
-			{ id: 'self', label: null, credits: 0 },
+			{ id: await testSoloSpace(db, ada.id), label: null, credits: 0 },
 			{ id, label: testPartnerView(id, 'Jun').names, credits: 1 }
 		]);
 	});

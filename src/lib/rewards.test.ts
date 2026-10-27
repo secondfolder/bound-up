@@ -1,113 +1,63 @@
 import { describe, expect, it } from 'vitest';
-import type { PartnershipRecord } from './partnership';
-import {
-	canClaimFromPartnership,
-	canClaimPartnershipReward,
-	canManagePartnershipRewards,
-	canSetPartnershipCredits,
-	type PartnershipRewardRecord
-} from './rewards';
+import type { PartnershipControl } from './partnership';
+import { canClaimReward, type RewardRuleRecord, rewardListFor } from './rewards';
+import { managersFromControl, type SpaceForRules } from './spaces';
 
-const INVITER = 'user-inviter';
-const INVITEE = 'user-invitee';
-const STRANGER = 'user-stranger';
+const ADA = 'ada';
+const JUN = 'jun';
 
-function partnership(overrides: Partial<PartnershipRecord> = {}): PartnershipRecord {
+function shared(control: PartnershipControl): SpaceForRules {
 	return {
-		id: 'p1',
-		status: 'accepted',
-		inviterId: INVITER,
-		inviteeId: INVITEE,
-		control: 'both',
-		namesCiphertext: null,
-		namesVaultId: null,
-		namesPayloadVersion: null,
-		namesRevision: 0,
-		inviteCiphertext: null,
-		invitePayloadVersion: null,
-		inviteKeyWrap: null,
-		...overrides
+		kind: 'shared',
+		members: managersFromControl(control, { inviterId: ADA, inviteeId: JUN })
 	};
 }
 
-function reward(overrides: Partial<PartnershipRewardRecord> = {}): PartnershipRewardRecord {
-	return {
-		...partnership(),
-		partnershipId: 'p1',
-		createdByUserId: INVITER,
-		active: true,
-		cost: 3,
-		...overrides
-	};
+const solo: SpaceForRules = { kind: 'solo', members: [{ userId: ADA, canManage: true }] };
+
+/** A reward Ada wrote for Jun, unless told otherwise. */
+function reward(overrides: Partial<RewardRuleRecord> = {}): RewardRuleRecord {
+	return { createdByUserId: ADA, assigneeUserId: JUN, active: true, cost: 3, ...overrides };
 }
 
-describe('canManagePartnershipRewards', () => {
-	it('matches the existing control rule', () => {
-		expect(canManagePartnershipRewards(partnership({ control: 'both' }), INVITER)).toBe(true);
-		expect(canManagePartnershipRewards(partnership({ control: 'both' }), INVITEE)).toBe(true);
-		expect(canManagePartnershipRewards(partnership({ control: 'inviter' }), INVITER)).toBe(true);
-		expect(canManagePartnershipRewards(partnership({ control: 'inviter' }), INVITEE)).toBe(false);
+describe('rewardListFor', () => {
+	it('puts your own rewards in your own wallet', () => {
+		expect(rewardListFor(reward({ assigneeUserId: ADA }), solo, ADA)).toBe('claim');
+	});
+
+	it('puts a reward set for you in your wallet, and in the setter’s set-for-others', () => {
+		expect(rewardListFor(reward(), shared('inviter'), JUN)).toBe('claim');
+		expect(rewardListFor(reward(), shared('inviter'), ADA)).toBe('set');
+	});
+
+	it('keeps the authorship rule under shared control', () => {
+		expect(rewardListFor(reward(), shared('both'), ADA)).toBe('set');
+		expect(rewardListFor(reward(), shared('both'), JUN)).toBe('claim');
+	});
+
+	it('hides a reward a change of manager left on the wrong side', () => {
+		expect(rewardListFor(reward(), shared('invitee'), JUN)).toBeNull();
+		expect(rewardListFor(reward(), shared('invitee'), ADA)).toBeNull();
 	});
 });
 
-describe('canClaimFromPartnership', () => {
-	it('lets the non-controller claim when control is one-sided', () => {
-		expect(canClaimFromPartnership(partnership({ control: 'inviter' }), INVITEE)).toBe(true);
-		expect(canClaimFromPartnership(partnership({ control: 'inviter' }), INVITER)).toBe(false);
-		expect(canClaimFromPartnership(partnership({ control: 'invitee' }), INVITER)).toBe(true);
-		expect(canClaimFromPartnership(partnership({ control: 'invitee' }), INVITEE)).toBe(false);
+describe('canClaimReward', () => {
+	it('lets the person it is for claim it when they can afford it', () => {
+		expect(canClaimReward(reward(), shared('inviter'), JUN, 3)).toBe(true);
+		expect(canClaimReward(reward(), shared('inviter'), JUN, 2)).toBe(false);
+		expect(canClaimReward(reward({ assigneeUserId: ADA }), solo, ADA, 3)).toBe(true);
 	});
 
-	it('lets both members claim under shared control', () => {
-		expect(canClaimFromPartnership(partnership({ control: 'both' }), INVITER)).toBe(true);
-		expect(canClaimFromPartnership(partnership({ control: 'both' }), INVITEE)).toBe(true);
+	it('never lets the author claim their own reward, even under shared control', () => {
+		expect(canClaimReward(reward(), shared('both'), ADA, 99)).toBe(false);
 	});
 
-	it('refuses pending links and strangers', () => {
-		expect(
-			canClaimFromPartnership(partnership({ status: 'pending', inviteeId: null }), INVITER)
-		).toBe(false);
-		expect(canClaimFromPartnership(partnership(), STRANGER)).toBe(false);
-	});
-});
-
-describe('canSetPartnershipCredits', () => {
-	it("lets the controller set only the other person's credits", () => {
-		const row = partnership({ control: 'inviter' });
-		expect(canSetPartnershipCredits(row, INVITER, INVITEE)).toBe(true);
-		expect(canSetPartnershipCredits(row, INVITER, INVITER)).toBe(false);
-		expect(canSetPartnershipCredits(row, INVITEE, INVITER)).toBe(false);
+	it('refuses an inactive reward', () => {
+		expect(canClaimReward(reward({ active: false }), shared('inviter'), JUN, 99)).toBe(false);
 	});
 
-	it('keeps the same rule under shared control', () => {
-		const row = partnership({ control: 'both' });
-		expect(canSetPartnershipCredits(row, INVITER, INVITEE)).toBe(true);
-		expect(canSetPartnershipCredits(row, INVITEE, INVITER)).toBe(true);
-	});
-});
-
-describe('canClaimPartnershipReward', () => {
-	it('blocks the author even under shared control', () => {
-		expect(
-			canClaimPartnershipReward(reward({ control: 'both', createdByUserId: INVITER }), INVITER, 10)
-		).toBe(false);
-	});
-
-	it('lets the other member claim when control allows it and credits are enough', () => {
-		expect(
-			canClaimPartnershipReward(
-				reward({ control: 'invitee', createdByUserId: INVITEE }),
-				INVITER,
-				3
-			)
-		).toBe(true);
-		expect(
-			canClaimPartnershipReward(reward({ control: 'both', createdByUserId: INVITEE }), INVITER, 3)
-		).toBe(true);
-	});
-
-	it('rejects inactive rewards and insufficient credits', () => {
-		expect(canClaimPartnershipReward(reward({ active: false }), INVITEE, 10)).toBe(false);
-		expect(canClaimPartnershipReward(reward({ cost: 4 }), INVITEE, 3)).toBe(false);
+	it('refuses the side that only sets rewards', () => {
+		// Jun is the reward's assignee, but Jun manages alone now.
+		expect(canClaimReward(reward(), shared('invitee'), JUN, 99)).toBe(false);
 	});
 });

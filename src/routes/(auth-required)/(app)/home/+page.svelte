@@ -7,6 +7,7 @@
 	import RewardsWidget from '$lib/components/RewardsWidget.svelte';
 	import TasksWidget from '$lib/components/TasksWidget.svelte';
 	import UnreadMessagesWidget from '$lib/components/UnreadMessagesWidget.svelte';
+	import { ALL_CONTEXT } from '$lib/context';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -35,8 +36,17 @@
 				href={resolve('/(auth-required)/(app)/daydreams')}
 			/>
 		{/if}
-		<TasksWidget tasks={data.tasks} href={resolve('/(auth-required)/(app)/home/tasks')} />
-		<RewardsWidget rewards={data.rewards} href={resolve('/(auth-required)/(app)/home/rewards')} />
+		<!-- Both cover every space the viewer is in, so they open their lists in Everyone. -->
+		<TasksWidget
+			tasks={data.tasks}
+			href={resolve('/(auth-required)/(app)/tasks')}
+			opensIn={ALL_CONTEXT}
+		/>
+		<RewardsWidget
+			rewards={data.rewards}
+			href={resolve('/(auth-required)/(app)/rewards')}
+			opensIn={ALL_CONTEXT}
+		/>
 		<NotebookWidget
 			items={data.notebook}
 			spaceId={data.contextSpaces.find((space) => space.kind === 'solo')?.id ?? null}

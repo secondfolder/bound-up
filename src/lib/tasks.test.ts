@@ -1,78 +1,39 @@
 import { describe, expect, it } from 'vitest';
-import type { PartnershipRecord } from './partnership';
+import type { PartnershipControl } from './partnership';
+import { managersFromControl, type SpaceForRules } from './spaces';
 import {
-	canCompleteFromPartnership,
-	canCompletePartnershipTask,
-	canManagePartnershipTasks,
-	canViewPartnershipTask,
+	canCompleteTask,
 	groupTasksSet,
 	groupTasksToDo,
 	isTaskCompletableAt,
-	type PartnershipTaskRecord
+	type TaskRuleRecord,
+	taskListFor
 } from './tasks';
 
-const INVITER = 'inviter-user';
-const INVITEE = 'invitee-user';
-const STRANGER = 'stranger-user';
+const ADA = 'ada';
+const JUN = 'jun';
+const MO = 'mo';
 
-function partnership(overrides: Partial<PartnershipRecord> = {}): PartnershipRecord {
+/** Ada and Jun's shared space, Ada having invited Jun, under a given control. */
+function shared(control: PartnershipControl): SpaceForRules {
 	return {
-		id: 'partnership-1',
-		status: 'accepted',
-		inviterId: INVITER,
-		inviteeId: INVITEE,
-		control: 'inviter',
-		namesCiphertext: null,
-		namesVaultId: null,
-		namesPayloadVersion: null,
-		namesRevision: 0,
-		inviteCiphertext: null,
-		invitePayloadVersion: null,
-		inviteKeyWrap: null,
-		...overrides
+		kind: 'shared',
+		members: managersFromControl(control, { inviterId: ADA, inviteeId: JUN })
 	};
 }
 
-function task(overrides: Partial<PartnershipTaskRecord> = {}): PartnershipTaskRecord {
+const solo: SpaceForRules = { kind: 'solo', members: [{ userId: ADA, canManage: true }] };
+
+/** A task Ada wrote for Jun, unless told otherwise. */
+function task(overrides: Partial<TaskRuleRecord> = {}): TaskRuleRecord {
 	return {
-		...partnership(),
-		partnershipId: 'partnership-1',
-		createdByUserId: INVITER,
+		createdByUserId: ADA,
+		assigneeUserId: JUN,
 		active: true,
 		nextEligibleAt: null,
 		...overrides
 	};
 }
-
-describe('canManagePartnershipTasks', () => {
-	it('matches the existing control rule', () => {
-		expect(canManagePartnershipTasks(partnership({ control: 'both' }), INVITER)).toBe(true);
-		expect(canManagePartnershipTasks(partnership({ control: 'both' }), INVITEE)).toBe(true);
-		expect(canManagePartnershipTasks(partnership({ control: 'inviter' }), INVITER)).toBe(true);
-		expect(canManagePartnershipTasks(partnership({ control: 'inviter' }), INVITEE)).toBe(false);
-	});
-});
-
-describe('canCompleteFromPartnership', () => {
-	it('lets the non-controller complete when control is one-sided', () => {
-		expect(canCompleteFromPartnership(partnership({ control: 'inviter' }), INVITEE)).toBe(true);
-		expect(canCompleteFromPartnership(partnership({ control: 'inviter' }), INVITER)).toBe(false);
-		expect(canCompleteFromPartnership(partnership({ control: 'invitee' }), INVITER)).toBe(true);
-		expect(canCompleteFromPartnership(partnership({ control: 'invitee' }), INVITEE)).toBe(false);
-	});
-
-	it('lets both members complete under shared control', () => {
-		expect(canCompleteFromPartnership(partnership({ control: 'both' }), INVITER)).toBe(true);
-		expect(canCompleteFromPartnership(partnership({ control: 'both' }), INVITEE)).toBe(true);
-	});
-
-	it('refuses pending links and strangers', () => {
-		expect(
-			canCompleteFromPartnership(partnership({ status: 'pending', inviteeId: null }), INVITER)
-		).toBe(false);
-		expect(canCompleteFromPartnership(partnership(), STRANGER)).toBe(false);
-	});
-});
 
 describe('isTaskCompletableAt', () => {
 	const now = new Date('2026-09-14T12:00:00Z');
@@ -95,62 +56,66 @@ describe('isTaskCompletableAt', () => {
 	});
 });
 
-describe('canCompletePartnershipTask', () => {
-	const now = new Date('2026-09-14T12:00:00Z');
-
-	it('blocks the author even under shared control', () => {
-		expect(
-			canCompletePartnershipTask(task({ control: 'both', createdByUserId: INVITER }), INVITER, now)
-		).toBe(false);
+describe('taskListFor', () => {
+	it('puts a task in your own space on your to-do list', () => {
+		expect(taskListFor(task({ assigneeUserId: ADA }), solo, ADA)).toBe('to-do');
 	});
 
-	it('lets the other member complete when control allows it and the task is ready', () => {
-		expect(
-			canCompletePartnershipTask(
-				task({ control: 'both', createdByUserId: INVITEE, nextEligibleAt: now }),
-				INVITER,
-				now
-			)
-		).toBe(true);
+	it('puts a task set for you on your to-do list, and the setter’s set-for-others', () => {
+		expect(taskListFor(task(), shared('inviter'), JUN)).toBe('to-do');
+		expect(taskListFor(task(), shared('inviter'), ADA)).toBe('set');
 	});
 
-	it('rejects inactive and not-yet-eligible tasks', () => {
-		expect(canCompletePartnershipTask(task({ active: false }), INVITEE, now)).toBe(false);
+	it('keeps the authorship rule under shared control', () => {
+		// Ada wrote it for Jun: never on Ada's to-do list, whoever manages.
+		expect(taskListFor(task(), shared('both'), ADA)).toBe('set');
+		expect(taskListFor(task(), shared('both'), JUN)).toBe('to-do');
 		expect(
-			canCompletePartnershipTask(
-				task({ nextEligibleAt: new Date('2026-09-14T12:01:00Z') }),
-				INVITEE,
-				now
-			)
-		).toBe(false);
+			taskListFor(task({ createdByUserId: JUN, assigneeUserId: ADA }), shared('both'), ADA)
+		).toBe('to-do');
+	});
+
+	it('hides what a change of manager left on the wrong side, rather than deleting it', () => {
+		// Ada wrote it for Jun, and then Jun took control: Jun only sets tasks
+		// now, and Ada no longer does.
+		expect(taskListFor(task(), shared('invitee'), JUN)).toBeNull();
+		expect(taskListFor(task(), shared('invitee'), ADA)).toBeNull();
+		// And it comes back when control does.
+		expect(taskListFor(task(), shared('inviter'), JUN)).toBe('to-do');
+	});
+
+	it('shows nothing to someone who is not in the space', () => {
+		expect(taskListFor(task(), shared('both'), MO)).toBeNull();
+		expect(taskListFor(task({ assigneeUserId: MO }), shared('both'), MO)).toBeNull();
+	});
+
+	it('gives a task assigned to nobody to nobody to do', () => {
+		expect(taskListFor(task({ assigneeUserId: null }), shared('both'), JUN)).toBe('set');
+		expect(taskListFor(task({ assigneeUserId: null }), shared('both'), ADA)).toBe('set');
 	});
 });
 
-describe('canViewPartnershipTask', () => {
-	it('shows both sides all tasks under shared control', () => {
-		expect(
-			canViewPartnershipTask(task({ control: 'both', createdByUserId: INVITER }), INVITER)
-		).toBe(true);
-		expect(
-			canViewPartnershipTask(task({ control: 'both', createdByUserId: INVITER }), INVITEE)
-		).toBe(true);
+describe('canCompleteTask', () => {
+	const now = new Date('2026-09-14T12:00:00Z');
+
+	it('lets the person it is for complete it once it is ready', () => {
+		expect(canCompleteTask(task({ nextEligibleAt: now }), shared('both'), JUN, now)).toBe(true);
+		expect(canCompleteTask(task({ assigneeUserId: ADA }), solo, ADA, now)).toBe(true);
 	});
 
-	it('shows only counterpart-authored tasks to the completing side', () => {
-		expect(
-			canViewPartnershipTask(task({ control: 'inviter', createdByUserId: INVITER }), INVITEE)
-		).toBe(true);
-		expect(
-			canViewPartnershipTask(task({ control: 'inviter', createdByUserId: INVITEE }), INVITEE)
-		).toBe(false);
+	it('never lets the author complete it, even under shared control', () => {
+		expect(canCompleteTask(task(), shared('both'), ADA, now)).toBe(false);
 	});
 
-	it('shows only self-authored tasks to the managing side', () => {
+	it('rejects inactive and not-yet-eligible tasks', () => {
+		expect(canCompleteTask(task({ active: false }), shared('inviter'), JUN, now)).toBe(false);
 		expect(
-			canViewPartnershipTask(task({ control: 'inviter', createdByUserId: INVITER }), INVITER)
-		).toBe(true);
-		expect(
-			canViewPartnershipTask(task({ control: 'inviter', createdByUserId: INVITEE }), INVITER)
+			canCompleteTask(
+				task({ nextEligibleAt: new Date('2026-09-14T12:01:00Z') }),
+				shared('inviter'),
+				JUN,
+				now
+			)
 		).toBe(false);
 	});
 });

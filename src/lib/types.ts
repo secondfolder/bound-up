@@ -102,24 +102,29 @@ export type SealedRefView = {
  */
 export type TaskCompletionView = {
 	id: string;
+	/** The space the task was in, for the chip on an Everyone list. */
+	spaceId: string;
 	creditsAwarded: number;
 	createdAt: Date;
 	sealed: SealedRefView | null;
 	completionMessageIndex: number | null;
-};
-
-export type PartnershipTaskCompletionView = TaskCompletionView & {
+	/** The viewer completed it. */
 	mine: boolean;
+	/** The viewer wrote the task. */
 	createdByMe: boolean;
 };
 
 /**
+ * A task as the viewer sees it, in whichever space it is: their own, or one
+ * shared with a partner. See docs/tasks.md.
+ *
  * The title, description and completion messages are in `sealed`, opened by a
  * device (`openedTask` in `sealed-views.svelte.ts`). `revision` is what an
  * edit is compare-and-swap against.
  */
-export type SelfTaskView = {
+export type TaskView = {
 	id: string;
+	spaceId: string;
 	active: boolean;
 	creditsAwarded: number;
 	sealed: SealedRefView | null;
@@ -134,49 +139,56 @@ export type SelfTaskView = {
 	 * for "1 left"; null for a task with no such limit.
 	 */
 	windowCompletions: number | null;
-	canComplete: boolean;
-	createdAt: Date;
-	updatedAt: Date;
-	timeZoneNote: TaskTimeZoneNoteView | null;
-};
-
-/** As `SelfTaskView`, sealed in the partnership's vault. */
-export type PartnershipTaskView = {
-	id: string;
-	active: boolean;
-	creditsAwarded: number;
-	sealed: SealedRefView | null;
-	revision: number;
-	schedule: TaskSchedule;
-	timezoneOwnerUserId: string;
-	lastCompletedAt: Date | null;
-	completedCount: number;
-	nextEligibleAt: Date | null;
-	/** As on `SelfTaskView`. */
-	windowCompletions: number | null;
 	createdByMe: boolean;
+	/** Who completes it: the viewer, or the partner it was set for. */
+	assigneeUserId: string | null;
+	/** May the viewer edit it: their own, or one they set for someone else. */
 	canManage: boolean;
+	/** May the viewer complete it now. */
 	canComplete: boolean;
 	createdAt: Date;
 	updatedAt: Date;
 	timeZoneNote: TaskTimeZoneNoteView | null;
 };
 
-export type SelfTasksSectionView = {
-	tasks: SelfTaskView[];
-	completions: TaskCompletionView[];
-	/** The owner's own balance, which completing a self task adds to. */
-	credits: number;
+/**
+ * One space a tasks or rewards page shows, and where the viewer stands in it.
+ * The names are the switcher's (`ContextSpaceView`), looked up by `id`.
+ */
+export type ItemSpaceView = {
+	id: string;
+	kind: 'solo' | 'shared';
+	/** May the viewer set tasks and rewards here (and a partner's credits). */
+	canManage: boolean;
+	/** Does the viewer complete tasks and claim rewards here. */
+	viewerActs: boolean;
+	/** Everyone else in it, for whose time a task runs in. Empty for your own. */
+	others: { userId: string; timezone: string }[];
 };
 
-export type HomePartnerTasksSectionView = {
-	partnershipId: string;
-	/** Where the browser reads what the viewer calls them (`partner-names.svelte.ts`). */
-	names: PartnerNamesSource;
-	image: string | null;
-	tasks: PartnershipTaskView[];
-	/** The viewer's balance in this partnership, which completing these adds to. */
+/**
+ * One member's credits in one space: a wallet. Never added up with another
+ * (docs/rewards.md, "Credits").
+ */
+export type BalanceView = {
+	spaceId: string;
+	userId: string;
+	/** The viewer's own, which they earn and spend; otherwise a partner's. */
+	mine: boolean;
 	credits: number;
+	/** May the viewer set it: their own in their own space, a partner's they manage. */
+	canSet: boolean;
+};
+
+/** A tasks page's list, for whatever the context shows. */
+export type TasksListView = {
+	spaces: ItemSpaceView[];
+	/** Tasks the viewer completes. */
+	toDo: TaskView[];
+	/** Tasks the viewer set for someone else, in a shared space they manage. */
+	setForOthers: TaskView[];
+	/** The balances these tasks pay into: the viewer's where they act, a partner's they set for. */
+	balances: BalanceView[];
 };
 
 /** The subset of a `guides` row that GuidesList.svelte / Guide.svelte consume. */
@@ -435,55 +447,44 @@ export type UnreadPartnerView = {
 };
 
 /** A claimed reward, as history. `sealed` as on `TaskCompletionView`. */
-export type RewardHistoryView = {
+export type RewardClaimView = {
 	id: string;
+	spaceId: string;
 	rewardCost: number;
 	createdAt: Date;
 	sealed: SealedRefView | null;
-};
-
-/** The title and description are in `sealed`, as on `SelfTaskView`. */
-export type SelfRewardView = {
-	id: string;
-	sealed: SealedRefView | null;
-	revision: number;
-	cost: number;
-	active: boolean;
-	canClaim: boolean;
-	createdAt: Date;
-	updatedAt: Date;
-};
-
-export type PartnershipRewardView = {
-	id: string;
-	sealed: SealedRefView | null;
-	revision: number;
-	cost: number;
-	active: boolean;
-	createdByMe: boolean;
-	canClaim: boolean;
-	createdAt: Date;
-	updatedAt: Date;
-};
-
-export type PartnershipRewardClaimView = RewardHistoryView & {
+	/** The viewer claimed it. */
 	mine: boolean;
+	/** The viewer wrote the reward. */
 	createdByMe: boolean;
 };
 
-export type SelfRewardsSectionView = {
-	credits: number;
-	rewards: SelfRewardView[];
-	claims: RewardHistoryView[];
+/** A reward, in whichever space. The title and description are in `sealed`, as on `TaskView`. */
+export type RewardView = {
+	id: string;
+	spaceId: string;
+	sealed: SealedRefView | null;
+	revision: number;
+	cost: number;
+	active: boolean;
+	createdByMe: boolean;
+	/** Who claims it, from their balance in the space. */
+	assigneeUserId: string | null;
+	/** May the viewer edit it: their own, or one they set for someone else. */
+	canManage: boolean;
+	/** May the viewer claim it now. */
+	canClaim: boolean;
+	createdAt: Date;
+	updatedAt: Date;
 };
 
-export type HomePartnerRewardsSectionView = {
-	partnershipId: string;
-	/** Where the browser reads what the viewer calls them (`partner-names.svelte.ts`). */
-	names: PartnerNamesSource;
-	image: string | null;
-	credits: number;
-	rewards: PartnershipRewardView[];
+/** One balance and the rewards it pays for. */
+export type RewardWalletView = BalanceView & { rewards: RewardView[] };
+
+/** A rewards page's wallets, for whatever the context shows: the viewer's first. */
+export type RewardsListView = {
+	spaces: ItemSpaceView[];
+	wallets: RewardWalletView[];
 };
 
 /**

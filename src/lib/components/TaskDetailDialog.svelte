@@ -87,9 +87,7 @@
 	const title = $derived(shownTitle(content));
 	const canTick = $derived(mode === 'to-do' && entry.completeAction !== null && task.canComplete);
 	/** Whether there is anything for the footer: it is left out rather than drawn empty. */
-	const hasActions = $derived(
-		Boolean((entry.listHref && entry.partnerName) || entry.editHref || canTick)
-	);
+	const hasActions = $derived(Boolean(entry.editHref || canTick));
 	const quota = $derived(
 		task.schedule.mode === 'rolling-window' && task.schedule.limit && task.windowCompletions !== null
 			? { used: task.windowCompletions, of: task.schedule.limit.completions }
@@ -125,7 +123,7 @@
 
 		<dl class="facts">
 			{#if entry.partnerName}
-				<dt>From</dt>
+				<dt>{mode === 'set' ? 'For' : 'From'}</dt>
 				<dd>{entry.partnerName}</dd>
 			{/if}
 			<dt>Repeats</dt>
@@ -187,9 +185,6 @@
 		<wa-button appearance="outlined" href={entry.editHref} onclick={() => dialog?.close()}
 			>Edit</wa-button
 		>
-	{/if}
-	{#if entry.listHref && entry.partnerName}
-		<wa-button appearance="plain" href={entry.listHref}>{entry.partnerName}'s task list</wa-button>
 	{/if}
 {/snippet}
 

@@ -18,7 +18,6 @@
 		creditsAwarded,
 		action,
 		completionId,
-		partnershipId = null,
 		onhold
 	}: {
 		title: string;
@@ -26,8 +25,6 @@
 		/** The form action that undoes it. */
 		action: string;
 		completionId: string;
-		/** Posted with it, for a partnership task undone from `/home/tasks`. */
-		partnershipId?: string | null;
 		/** Called with true while the line is pointed at or focused, so it is not taken away then. */
 		onhold: (held: boolean) => void;
 	} = $props();
@@ -70,7 +67,6 @@
 	{#snippet trailing()}
 		<form method="POST" {action} use:enhance={undo}>
 			<input type="hidden" name="completionId" value={completionId} />
-			{#if partnershipId}<input type="hidden" name="partnershipId" value={partnershipId} />{/if}
 			<wa-button type="submit" appearance="outlined" size="s" disabled={busy}>Undo</wa-button>
 		</form>
 	{/snippet}

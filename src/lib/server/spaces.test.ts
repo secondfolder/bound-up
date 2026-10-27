@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestDb, type TestDb } from '../testing/db';
 import { defined } from '../testing/defined';
 import {
+	claimTestReward,
+	completeTestTask,
 	createTestDaydream,
 	createTestInvite,
 	createTestNotebookEntry,
@@ -236,11 +238,16 @@ async function fillSpaces(partnershipId: string) {
 			content: { vaultId: own, ciphertext: fakeSealed(kind), payloadVersion: 1 }
 		});
 	}
-	// No `space_id` of their own yet; they go with the vault.
-	await createTestSelfTask(db, ada);
-	await createTestSelfReward(db, ada);
-	await createTestPartnershipTask(db, partnershipId, ada);
-	await createTestPartnershipReward(db, partnershipId, ada);
+	// A task and a reward in each space, each completed or claimed, so their
+	// completions, claims and balances are there too.
+	const ownTask = await createTestSelfTask(db, ada);
+	await completeTestTask(db, ada, ownTask.id);
+	const ownReward = await createTestSelfReward(db, ada, { cost: 1 });
+	await claimTestReward(db, ada, ownReward.id);
+	const sharedTask = await createTestPartnershipTask(db, partnershipId, ada);
+	await completeTestTask(db, jun, sharedTask.id);
+	const sharedReward = await createTestPartnershipReward(db, partnershipId, ada, { cost: 1 });
+	await claimTestReward(db, jun, sharedReward.id);
 }
 
 describe('deleting a space', () => {

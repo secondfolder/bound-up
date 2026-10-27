@@ -9,8 +9,8 @@ Beside each user's identity sit **vaults**: one key per user and one per
 partnership, which a user's data is sealed under as **sealed records**. Both
 are described below. Messages, message tags' names and the partnership's own names are sealed in
 their partnership's vault;
-tasks, rewards, and their completions and claims in the owner's or the
-partnership's vault ([docs/tasks.md](tasks.md#what-the-server-can-see),
+tasks, rewards, and their completions and claims in the vault of their space,
+the owner's or the partnership's ([docs/tasks.md](tasks.md#what-the-server-can-see),
 [docs/rewards.md](rewards.md#what-the-server-can-see)); a daydream's setup,
 every turn and mark of it, and the user's library of characters and ideas in
 the owner's own vault ([docs/daydreams.md](daydreams.md)). Moving the remaining

@@ -66,24 +66,6 @@ function sealedContent() {
 }
 
 /**
- * A copy of a sealed record, taken when a task is completed or a reward
- * claimed, so the history says what it said at the time. The copy is the
- * ciphertext itself — the person completing or claiming need not be its
- * author, and cannot re-seal what they did not write — so it stays bound to
- * the record it was sealed as: `snapshot_record_id`.
- */
-function sealedSnapshot() {
-	return {
-		snapshotCiphertext: text('snapshot_ciphertext'),
-		snapshotVaultId: text('snapshot_vault_id').references(() => vaults.id, {
-			onDelete: 'cascade'
-		}),
-		snapshotVersion: integer('snapshot_version'),
-		snapshotRecordId: text('snapshot_record_id')
-	};
-}
-
-/**
  * What a task completion changed on its task, as it was before, so the
  * completion can be undone exactly (docs/tasks.md, "Undoing a completion").
  *
@@ -311,267 +293,82 @@ function spaceColumn() {
 }
 
 /**
- * A reward a user can assign and redeem for themselves.
- *
- * Kept separate from partnership rewards because the permission model is not
- * the same: self rewards are always managed and claimed by the owner, while
- * partnership rewards are managed by control and claimed against authorship.
- * A single polymorphic table would push those differences into nullable scope
- * columns and case-heavy queries on every read path.
+ * The sealed content of a task or reward: NOT NULL, unlike `sealedContent()`'s,
+ * because these tables were made after every task and reward was sealed
+ * (production read zero unsealed rows on 2026-10-27, before the copy into
+ * them). A proper `ON DELETE CASCADE` on the vault too, since these tables
+ * were created with it rather than given it by `ALTER TABLE`.
  */
-export const selfRewards = sqliteTable(
-	'self_rewards',
-	{
-		id: text('id')
-			.primaryKey()
-			.$defaultFn(() => crypto.randomUUID()),
-		ownerId: text('owner_id')
+function sealedRecord() {
+	return {
+		ciphertext: text('ciphertext').notNull(),
+		vaultId: text('vault_id')
 			.notNull()
-			.references(() => user.id, { onDelete: 'cascade' }),
-		cost: integer('cost').notNull(),
-		active: integer('active', { mode: 'boolean' }).notNull().default(true),
-		...sealedContent(),
-		...timestamps
-	},
-	(table) => [
-		index('self_rewards_owner_active_idx').on(table.ownerId, table.active),
-		index('self_rewards_owner_created_idx').on(table.ownerId, table.createdAt)
-	]
-);
-
-/** One credit balance per user for their own self-reward pool. */
-export const selfRewardCredits = sqliteTable(
-	'self_reward_credits',
-	{
-		id: text('id')
-			.primaryKey()
-			.$defaultFn(() => crypto.randomUUID()),
-		ownerId: text('owner_id')
-			.notNull()
-			.unique()
-			.references(() => user.id, { onDelete: 'cascade' }),
-		credits: integer('credits').notNull().default(0),
-		...timestamps
-	},
-	(table) => [index('self_reward_credits_owner_idx').on(table.ownerId)]
-);
+			.references(() => vaults.id, { onDelete: 'cascade' }),
+		payloadVersion: integer('payload_version').notNull(),
+		revision: integer('revision').notNull().default(0)
+	};
+}
 
 /**
- * One self-reward redemption.
- *
- * The title/description/cost are snapshotted so visible history stays truthful
- * even if the reward is edited later. The foreign key still exists so the row
- * can be grouped back to the source reward while it lives.
+ * A copy of a sealed record, taken when a task is completed or a reward
+ * claimed, so the history says what it said at the time. The copy is the
+ * ciphertext itself — the person completing or claiming need not be its
+ * author, and cannot re-seal what they did not write — so it stays bound to
+ * the record it was sealed as: `snapshot_record_id`. NOT NULL as
+ * `sealedRecord()`'s are.
  */
-export const selfRewardClaims = sqliteTable(
-	'self_reward_claims',
-	{
-		id: text('id')
-			.primaryKey()
-			.$defaultFn(() => crypto.randomUUID()),
-		ownerId: text('owner_id')
+function sealedRecordCopy() {
+	return {
+		snapshotCiphertext: text('snapshot_ciphertext').notNull(),
+		snapshotVaultId: text('snapshot_vault_id')
 			.notNull()
-			.references(() => user.id, { onDelete: 'cascade' }),
-		rewardId: text('reward_id')
-			.notNull()
-			.references(() => selfRewards.id, { onDelete: 'cascade' }),
-		rewardCost: integer('reward_cost').notNull(),
-		...sealedSnapshot(),
-		...timestamps
-	},
-	(table) => [
-		index('self_reward_claims_owner_created_idx').on(table.ownerId, table.createdAt),
-		index('self_reward_claims_reward_idx').on(table.rewardId)
-	]
-);
+			.references(() => vaults.id, { onDelete: 'cascade' }),
+		snapshotVersion: integer('snapshot_version').notNull(),
+		snapshotRecordId: text('snapshot_record_id').notNull()
+	};
+}
 
 /**
- * A reward shared inside one partnership.
- *
- * `createdByUserId` is load-bearing: under shared control, both people may
- * create and edit rewards, but a user may never claim one they authored.
+ * The space a task, a reward, or something about one belongs to. NOT NULL with
+ * a real `ON DELETE CASCADE`, unlike `spaceColumn()`: these tables were created
+ * with it, so deleting a space takes them with it on D1 too.
  */
-export const partnershipRewards = sqliteTable(
-	'partnership_rewards',
+function ownSpaceColumn() {
+	return text('space_id')
+		.notNull()
+		.references(() => spaces.id, { onDelete: 'cascade' });
+}
+
+/**
+ * A task: a piece of work that earns credits, in one space. See docs/tasks.md.
+ *
+ * One table for a person's own tasks and the ones partners set each other,
+ * told apart by their space rather than by a table each (they were two until
+ * 0052 copied them here). Who may do what follows from the space's members
+ * and two columns:
+ *
+ * - `createdByUserId` wrote it. Set on a solo task too, to its owner.
+ * - `assigneeUserId` completes it and is paid for it: the owner in a solo
+ *   space, and in a shared one the member it was set for — never its creator,
+ *   which is the authorship rule (nobody completes what they wrote). Nullable
+ *   so a space of more than two can one day have a task nobody has taken yet;
+ *   every writer sets it today, and a task with none is nobody's to complete.
+ *
+ * `timezoneOwnerUserId` points at whose local time the schedule's dates are
+ * in, so a later change of time zone keeps that relationship.
+ */
+export const tasks = sqliteTable(
+	'tasks',
 	{
 		id: text('id')
 			.primaryKey()
 			.$defaultFn(() => crypto.randomUUID()),
-		partnershipId: text('partnership_id')
-			.notNull()
-			.references(() => partnerships.id, { onDelete: 'cascade' }),
+		spaceId: ownSpaceColumn(),
 		createdByUserId: text('created_by_user_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
-		cost: integer('cost').notNull(),
-		active: integer('active', { mode: 'boolean' }).notNull().default(true),
-		...sealedContent(),
-		...timestamps
-	},
-	(table) => [
-		index('partnership_rewards_partnership_active_idx').on(table.partnershipId, table.active),
-		index('partnership_rewards_partnership_created_idx').on(table.partnershipId, table.createdAt),
-		index('partnership_rewards_creator_idx').on(table.createdByUserId)
-	]
-);
-
-/** One credit balance per member per partnership. */
-export const partnershipRewardCredits = sqliteTable(
-	'partnership_reward_credits',
-	{
-		id: text('id')
-			.primaryKey()
-			.$defaultFn(() => crypto.randomUUID()),
-		partnershipId: text('partnership_id')
-			.notNull()
-			.references(() => partnerships.id, { onDelete: 'cascade' }),
-		userId: text('user_id')
-			.notNull()
-			.references(() => user.id, { onDelete: 'cascade' }),
-		credits: integer('credits').notNull().default(0),
-		...timestamps
-	},
-	(table) => [
-		uniqueIndex('partnership_reward_credits_partnership_user_unq').on(
-			table.partnershipId,
-			table.userId
-		),
-		index('partnership_reward_credits_user_partnership_idx').on(table.userId, table.partnershipId)
-	]
-);
-
-/**
- * One redemption of a partnership reward.
- *
- * `createdByUserId` is copied so history still shows whose reward it was if
- * the source row is later edited inactive, and so home can render a compact
- * history without joining back through the live reward table.
- */
-export const partnershipRewardClaims = sqliteTable(
-	'partnership_reward_claims',
-	{
-		id: text('id')
-			.primaryKey()
-			.$defaultFn(() => crypto.randomUUID()),
-		partnershipId: text('partnership_id')
-			.notNull()
-			.references(() => partnerships.id, { onDelete: 'cascade' }),
-		rewardId: text('reward_id')
-			.notNull()
-			.references(() => partnershipRewards.id, { onDelete: 'cascade' }),
-		claimedByUserId: text('claimed_by_user_id')
-			.notNull()
-			.references(() => user.id, { onDelete: 'cascade' }),
-		createdByUserId: text('created_by_user_id')
-			.notNull()
-			.references(() => user.id, { onDelete: 'cascade' }),
-		rewardCost: integer('reward_cost').notNull(),
-		...sealedSnapshot(),
-		...timestamps
-	},
-	(table) => [
-		index('partnership_reward_claims_partnership_claimed_idx').on(
-			table.partnershipId,
-			table.claimedByUserId,
-			table.createdAt
-		),
-		index('partnership_reward_claims_reward_idx').on(table.rewardId)
-	]
-);
-
-/**
- * A user-managed task in the self scope.
- *
- * `timezoneOwnerUserId` is still stored even though it always points at the
- * owner in this first pass. Keeping the same column shape as partnership tasks
- * means the scheduling layer can treat both scopes uniformly, while the UI
- * still omits the toggle for self tasks.
- */
-export const selfTasks = sqliteTable(
-	'self_tasks',
-	{
-		id: text('id')
-			.primaryKey()
-			.$defaultFn(() => crypto.randomUUID()),
-		ownerId: text('owner_id')
-			.notNull()
-			.references(() => user.id, { onDelete: 'cascade' }),
-		active: integer('active', { mode: 'boolean' }).notNull().default(true),
-		creditsAwarded: integer('credits_awarded').notNull().default(0),
-		/**
-		 * How many completion messages the sealed content holds. Plaintext so the
-		 * server can still pick one at random on completion — an index, which the
-		 * reader looks up after opening the snapshot.
-		 */
-		completionMessageCount: integer('completion_message_count').notNull().default(0),
-		...sealedContent(),
-		schedule: text('schedule', { mode: 'json' }).$type<TaskSchedule>().notNull(),
-		timezoneOwnerUserId: text('timezone_owner_user_id')
-			.notNull()
-			.references(() => user.id, { onDelete: 'cascade' }),
-		lastCompletedAt: integer('last_completed_at', { mode: 'timestamp_ms' }),
-		completedCount: integer('completed_count').notNull().default(0),
-		nextEligibleAt: integer('next_eligible_at', { mode: 'timestamp_ms' }),
-		...timestamps
-	},
-	(table) => [
-		index('self_tasks_owner_active_idx').on(table.ownerId, table.active),
-		index('self_tasks_owner_next_eligible_idx').on(table.ownerId, table.nextEligibleAt),
-		index('self_tasks_timezone_owner_idx').on(table.timezoneOwnerUserId)
-	]
-);
-
-/**
- * One completion of a self task.
- *
- * The title, description, reward amount and chosen completion message are
- * snapshotted so visible history stays truthful if the task changes later.
- */
-export const selfTaskCompletions = sqliteTable(
-	'self_task_completions',
-	{
-		id: text('id')
-			.primaryKey()
-			.$defaultFn(() => crypto.randomUUID()),
-		ownerId: text('owner_id')
-			.notNull()
-			.references(() => user.id, { onDelete: 'cascade' }),
-		taskId: text('task_id')
-			.notNull()
-			.references(() => selfTasks.id, { onDelete: 'cascade' }),
-		creditsAwarded: integer('credits_awarded').notNull(),
-		/** Which of the snapshot's completion messages was picked, or NULL for none. */
-		completionMessageIndex: integer('completion_message_index'),
-		...sealedSnapshot(),
-		...undoState(),
-		...timestamps
-	},
-	(table) => [
-		index('self_task_completions_owner_created_idx').on(table.ownerId, table.createdAt),
-		index('self_task_completions_task_idx').on(table.taskId)
-	]
-);
-
-/**
- * A task managed inside one partnership.
- *
- * `createdByUserId` is load-bearing for shared control, where both people may
- * create tasks but nobody may complete one they authored themselves.
- * `timezoneOwnerUserId` points at whose local timezone the task's scheduled
- * dates are relative to, so later timezone changes preserve that relationship.
- */
-export const partnershipTasks = sqliteTable(
-	'partnership_tasks',
-	{
-		id: text('id')
-			.primaryKey()
-			.$defaultFn(() => crypto.randomUUID()),
-		partnershipId: text('partnership_id')
-			.notNull()
-			.references(() => partnerships.id, { onDelete: 'cascade' }),
-		createdByUserId: text('created_by_user_id')
-			.notNull()
-			.references(() => user.id, { onDelete: 'cascade' }),
+		assigneeUserId: text('assignee_user_id').references(() => user.id, { onDelete: 'cascade' }),
 		timezoneOwnerUserId: text('timezone_owner_user_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
@@ -583,7 +380,7 @@ export const partnershipTasks = sqliteTable(
 		 * reader looks up after opening the snapshot.
 		 */
 		completionMessageCount: integer('completion_message_count').notNull().default(0),
-		...sealedContent(),
+		...sealedRecord(),
 		schedule: text('schedule', { mode: 'json' }).$type<TaskSchedule>().notNull(),
 		lastCompletedAt: integer('last_completed_at', { mode: 'timestamp_ms' }),
 		completedCount: integer('completed_count').notNull().default(0),
@@ -591,35 +388,36 @@ export const partnershipTasks = sqliteTable(
 		...timestamps
 	},
 	(table) => [
-		index('partnership_tasks_partnership_active_idx').on(table.partnershipId, table.active),
-		index('partnership_tasks_partnership_next_eligible_idx').on(
-			table.partnershipId,
-			table.nextEligibleAt
-		),
-		index('partnership_tasks_creator_idx').on(table.createdByUserId),
-		index('partnership_tasks_timezone_owner_idx').on(table.timezoneOwnerUserId)
+		// Every list: "the tasks in these spaces", active first.
+		index('tasks_space_active_idx').on(table.spaceId, table.active),
+		// The cards: "the active tasks in these spaces, soonest due first".
+		index('tasks_space_next_eligible_idx').on(table.spaceId, table.nextEligibleAt),
+		index('tasks_assignee_idx').on(table.assigneeUserId),
+		index('tasks_creator_idx').on(table.createdByUserId),
+		index('tasks_timezone_owner_idx').on(table.timezoneOwnerUserId),
+		// A lost vault's contents are deleted by it (`deleteLostSelfVault`).
+		index('tasks_vault_idx').on(table.vaultId)
 	]
 );
 
 /**
- * One completion of a partnership task.
+ * One completion of a task.
  *
- * `createdByUserId` and the task details are copied so history can be rendered
- * without consulting the live task row, and so the original authorship rule is
- * still visible after later task edits.
+ * The task's sealed record is copied as it was (`snapshot_*`), with which of
+ * its completion messages was given and the award, so history stays truthful
+ * if the task is edited later. `createdByUserId` is the task's author, copied
+ * so history can say whose task it was without the live row.
  */
-export const partnershipTaskCompletions = sqliteTable(
-	'partnership_task_completions',
+export const taskCompletions = sqliteTable(
+	'task_completions',
 	{
 		id: text('id')
 			.primaryKey()
 			.$defaultFn(() => crypto.randomUUID()),
-		partnershipId: text('partnership_id')
-			.notNull()
-			.references(() => partnerships.id, { onDelete: 'cascade' }),
+		spaceId: ownSpaceColumn(),
 		taskId: text('task_id')
 			.notNull()
-			.references(() => partnershipTasks.id, { onDelete: 'cascade' }),
+			.references(() => tasks.id, { onDelete: 'cascade' }),
 		completedByUserId: text('completed_by_user_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
@@ -629,19 +427,120 @@ export const partnershipTaskCompletions = sqliteTable(
 		creditsAwarded: integer('credits_awarded').notNull(),
 		/** Which of the snapshot's completion messages was picked, or NULL for none. */
 		completionMessageIndex: integer('completion_message_index'),
-		...sealedSnapshot(),
+		...sealedRecordCopy(),
 		...undoState(),
 		...timestamps
 	},
 	(table) => [
-		index('partnership_task_completions_partnership_completed_idx').on(
-			table.partnershipId,
-			table.completedByUserId,
-			table.createdAt
-		),
-		index('partnership_task_completions_task_idx').on(table.taskId)
+		// History: "the completions in these spaces, newest first".
+		index('task_completions_space_created_idx').on(table.spaceId, table.createdAt),
+		// A task's newest completion (undo), and its window's completions ("1 left").
+		index('task_completions_task_created_idx').on(table.taskId, table.createdAt),
+		index('task_completions_completed_by_idx').on(table.completedByUserId),
+		index('task_completions_snapshot_vault_idx').on(table.snapshotVaultId)
 	]
 );
+
+/**
+ * A reward: something credits buy, in one space. See docs/rewards.md.
+ *
+ * One table for both kinds, as `tasks` is, with the same two people:
+ * `createdByUserId` wrote it, and `assigneeUserId` is who claims it — the
+ * owner in a solo space, the member it was set for in a shared one, never its
+ * creator. It is paid from the assignee's balance in the same space
+ * (`reward_balances`).
+ */
+export const rewards = sqliteTable(
+	'rewards',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		spaceId: ownSpaceColumn(),
+		createdByUserId: text('created_by_user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		/** Who claims it. Nullable for the reason `tasks.assignee_user_id` is. */
+		assigneeUserId: text('assignee_user_id').references(() => user.id, { onDelete: 'cascade' }),
+		cost: integer('cost').notNull(),
+		active: integer('active', { mode: 'boolean' }).notNull().default(true),
+		...sealedRecord(),
+		...timestamps
+	},
+	(table) => [
+		index('rewards_space_active_idx').on(table.spaceId, table.active),
+		index('rewards_assignee_idx').on(table.assigneeUserId),
+		index('rewards_creator_idx').on(table.createdByUserId),
+		index('rewards_vault_idx').on(table.vaultId)
+	]
+);
+
+/**
+ * One claim of a reward: its sealed record and cost as they were, so history
+ * does not change when the reward does, and whose reward it was.
+ */
+export const rewardClaims = sqliteTable(
+	'reward_claims',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		spaceId: ownSpaceColumn(),
+		rewardId: text('reward_id')
+			.notNull()
+			.references(() => rewards.id, { onDelete: 'cascade' }),
+		claimedByUserId: text('claimed_by_user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		createdByUserId: text('created_by_user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		rewardCost: integer('reward_cost').notNull(),
+		...sealedRecordCopy(),
+		...timestamps
+	},
+	(table) => [
+		index('reward_claims_space_created_idx').on(table.spaceId, table.createdAt),
+		index('reward_claims_reward_idx').on(table.rewardId),
+		index('reward_claims_claimed_by_idx').on(table.claimedByUserId),
+		index('reward_claims_snapshot_vault_idx').on(table.snapshotVaultId)
+	]
+);
+
+/**
+ * One member's credits in one space: a wallet. Never pooled — a space's
+ * credits buy that space's rewards and nothing else — so there is one row per
+ * (space, member), and none until something is credited or set.
+ */
+export const rewardBalances = sqliteTable(
+	'reward_balances',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		spaceId: ownSpaceColumn(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		credits: integer('credits').notNull().default(0),
+		...timestamps
+	},
+	(table) => [
+		uniqueIndex('reward_balances_space_user_idx').on(table.spaceId, table.userId),
+		index('reward_balances_user_idx').on(table.userId)
+	]
+);
+
+export type TaskRow = typeof tasks.$inferSelect;
+export type NewTaskRow = typeof tasks.$inferInsert;
+export type TaskCompletionRow = typeof taskCompletions.$inferSelect;
+export type NewTaskCompletionRow = typeof taskCompletions.$inferInsert;
+export type RewardRow = typeof rewards.$inferSelect;
+export type NewRewardRow = typeof rewards.$inferInsert;
+export type RewardClaimRow = typeof rewardClaims.$inferSelect;
+export type NewRewardClaimRow = typeof rewardClaims.$inferInsert;
+export type RewardBalanceRow = typeof rewardBalances.$inferSelect;
+export type NewRewardBalanceRow = typeof rewardBalances.$inferInsert;
 
 /**
  * A user's long-term age recipient — their public key.

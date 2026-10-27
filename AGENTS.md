@@ -37,6 +37,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/lib/partnership.ts`      | The partners domain rules. Alias-free. See [docs/partners.md](docs/partners.md)              |
 | `src/lib/context.ts`, `src/lib/space-colours.ts`, `src/lib/components/context/` | The current context (whose things a list shows) and each space's colour: the pure halves (alias-free), the switcher. See [docs/contexts.md](docs/contexts.md) |
 | `src/lib/spaces.ts`, `src/lib/server/spaces.ts` | Spaces: a solo one per account, a shared one per partnership (same id), members and `can_manage`, deleting a space with everything in it. `spaces.ts` is pure and alias-free. See [docs/spaces.md](docs/spaces.md) |
+| `src/lib/tasks.ts`, `src/lib/rewards.ts`, `src/lib/server/tasks.ts`, `src/lib/server/rewards.ts`, `(app)/tasks/`, `(app)/rewards/` | Tasks and rewards, one table each keyed by space: the rules in members (pure, alias-free, over `spaces.ts`), the one server code path, and the two pages that follow the context. See [docs/tasks.md](docs/tasks.md), [docs/rewards.md](docs/rewards.md) |
 | `src/lib/features.ts`         | Feature registry. Alias-free. See [docs/features-and-admin.md](docs/features-and-admin.md)   |
 | `src/lib/vault.ts`, `src/lib/sealed.ts` | Vaults and sealed records, the pure halves: formats, the per-kind payload versions. Alias-free. See [docs/encryption.md](docs/encryption.md#vaults) |
 | `src/lib/tree.ts`, `src/lib/components/tree/` | The generic tree drawing: the pure layout, dimming and folding rules, and `Tree.svelte`. See [docs/tree.md](docs/tree.md) |
@@ -183,7 +184,7 @@ accompanied by a keyboard event handler`` (`a11y_click_events_have_key_events`,
 - `npm test`: Partners, tasks, and the encryption keys are covered end to end
   at three levels — see **Testing** below. Outside those the net is still thin.
 - `npm run test:e2e`: Playwright specs, about three and a half minutes for the
-  current ~235 of them at four workers against the built server (seven under
+  current ~255 of them at four workers against the built server (seven under
   `vite dev`), once the browser is installed (`npx playwright install
   chromium` first). A spec sitting at ~90 seconds is one hanging on its
   timeout, and the reported failure is usually the `finally` that could not
@@ -428,9 +429,10 @@ load, so a check that only lives in a layout gates nothing. Admin pages call
 [docs/features-and-admin.md](docs/features-and-admin.md).
 
 **The context is a view filter; every write names its space.** Lists that
-follow the switcher (`/notebook` so far) read `locals.context()` and depend on
-`app:context`. No action may read the context to decide where a write goes —
-it is one cookie per device, so another tab can change it at any moment — so a
+follow the switcher (`/notebook`, `/tasks`, `/rewards`) read
+`locals.context()` and depend on `app:context`. No action may read the
+context to decide where a write goes — it is one cookie per device, so another
+tab can change it at any moment — so a
 create or change posts its `spaceId` (or takes it from the item it changes)
 and the server checks membership of that space. An item page takes its space
 from the item, never the context. See [docs/contexts.md](docs/contexts.md).
@@ -1081,8 +1083,8 @@ Four places, split on scope:
 | [docs/partners.md](docs/partners.md)                                                     | Linking two accounts: invites, the control permission, the nav tabs          |
 | [docs/spaces.md](docs/spaces.md)                                                         | Solo and shared spaces: members, `can_manage`, ids, deleting, what is still pair-shaped |
 | [docs/user-commitments-and-product-goals.md](docs/user-commitments-and-product-goals.md) | What the app promises users: never losing their data, and privacy boundaries |
-| [docs/rewards.md](docs/rewards.md)                                                       | Self rewards and partnership rewards: credits, claims, control               |
-| [docs/tasks.md](docs/tasks.md)                                                           | Self tasks and partnership tasks: scheduling, credits, timezone ownership    |
+| [docs/rewards.md](docs/rewards.md)                                                       | Rewards in a space: who sets and claims, wallets, credits, claims            |
+| [docs/tasks.md](docs/tasks.md)                                                           | Tasks in a space: to do and set for others, scheduling, timezones, undo      |
 | [docs/encryption.md](docs/encryption.md)                                                 | Message keys: the client-side KDF, the wraps, what the guarantee is          |
 | [docs/passkeys.md](docs/passkeys.md)                                                     | Passkeys: PRF and user-handle wraps, sign-in that unlocks, provider naming   |
 | [docs/account-recovery.md](docs/account-recovery.md)                                     | Partner-assisted sign-in after losing every way in, and its known gap        |

@@ -358,6 +358,27 @@
       "when": 1793095534660,
       "tag": "0050_add_space_member_colour",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "6",
+      "when": 1793103383724,
+      "tag": "0051_add_merged_tasks_rewards",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "6",
+      "when": 1793103391988,
+      "tag": "0052_copy_tasks_rewards_into_spaces",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "6",
+      "when": 1793103449121,
+      "tag": "0053_drop_scoped_tasks_rewards",
+      "breakpoints": true
     }
   ]
 }

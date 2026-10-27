@@ -3,7 +3,7 @@ import { isKnownVersion, type SealedKind, sealedPatternFor } from '../sealed';
 import type { SealedRefView } from '../types';
 import type { Db } from './db';
 import { partnerships, vaults } from './db/schema';
-import { isSpaceMember } from './spaces';
+import { type ItemSpace, isSpaceMember } from './spaces';
 
 /**
  * What the server does with a sealed record, shared by every kind that has
@@ -50,6 +50,23 @@ export async function partnershipVaultIdFor(db: Db, partnershipId: string): Prom
 		.where(eq(vaults.partnershipId, partnershipId))
 		.limit(1);
 	return row?.id ?? null;
+}
+
+/**
+ * The vault a space's content is sealed under, or null while it has none:
+ * its member's own vault for a solo space, the partnership's for a shared one.
+ * Looked up by the vault's own scope columns, which every vault has had from
+ * the start, rather than its later `space_id`.
+ */
+export async function vaultIdForSpace(
+	db: Db,
+	space: Pick<ItemSpace, 'id' | 'kind' | 'members'>
+): Promise<string | null> {
+	if (space.kind === 'shared') {
+		return await partnershipVaultIdFor(db, space.id);
+	}
+	const [owner] = space.members;
+	return owner ? await selfVaultIdFor(db, owner.userId) : null;
 }
 
 /** Whether `userId` is in this accepted partnership. */

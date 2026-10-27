@@ -327,23 +327,29 @@ shows them, built from two generic components:
   where a heading meets the right-hand column read, at a skim, as one more
   row's credits — or with `collapsed` a closed `wa-details` for what most
   people do not need to see (the inactive ones), or `headless` where
-  something else already names the rows (a tab). Callers leave out an empty
+  something else already names the rows (a heading). Callers leave out an empty
   group.
 
 Around them: `CreditBalances`, the balances a page's items pay into, as a row
 of `CreditPill`s labelled by a coins icon at its start, a partner's marked with
-their picture and any the viewer may set editable in place; `SegmentedTabs`, a pill-shaped
-segmented control with a count on each tab, for a page split two or three ways
-that should read as one thing from different sides (native buttons with the
-ARIA tab pattern, since `wa-button` forwards no `aria-selected`); and
-`WhoseTime`, "Jun's time" with a tooltip giving the zone and both people's
-time, for any time that belongs to someone else's clock. Times a list shows
-are informal — "9am", "Tomorrow 6:30pm" — through `src/lib/informal-time.ts`.
+their picture and any the viewer may set editable in place; `ItemsTabs`, the
+Tasks | Rewards pair of links at the top of both pages, drawn as the same pill
+as a segmented control but plain links with `aria-current`, since each is a
+page with its own URL and sheets; and `WhoseTime`, "Jun's time" with a tooltip
+giving the zone and both people's time, for any time that belongs to someone
+else's clock. Times a list shows are informal — "9am", "Tomorrow 6:30pm" —
+through `src/lib/informal-time.ts`. Adding to a list is a dashed row at its
+top (`QuickAddLink`, "Add a task").
 
-Over the bottom of a list page float the round amber add button
-(`FloatingAddButton`), in a `ListDock`: `position: sticky`
-at the end of the page, because inside the app shell the window does not
-scroll and `fixed` would not stay put. An item's detail is a `ResponsiveDialog`
+`SegmentedTabs`, a pill-shaped segmented control with a count on each tab, for
+a page split two or three ways that should read as one thing from different
+sides (native buttons with the ARIA tab pattern, since `wa-button` forwards no
+`aria-selected`), has no user since the partner tasks and rewards pages'
+"For you" / "For them" tabs gave way to the To do and Set for others lists. It
+is kept, with its test, on purpose: there are plans for it, so do not delete
+it as dead code.
+
+An item's detail is a `ResponsiveDialog`
 ([docs/dialogs.md](dialogs.md)).
 
 ## Space colours

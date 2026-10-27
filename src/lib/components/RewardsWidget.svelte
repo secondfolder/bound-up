@@ -1,14 +1,22 @@
 <script lang="ts">
 	import SectionWidget from '$lib/components/SectionWidget.svelte';
 	import WidgetItems from '$lib/components/WidgetItems.svelte';
+	import type { AppContext } from '$lib/context';
+	import { followInContext } from '$lib/context-client.svelte';
 	import { partnerName } from '$lib/partner-names.svelte';
 	import type { RewardsWidgetView } from '$lib/types';
 
+	/** The rewards card; following it switches context first, as the tasks card does. */
 	let {
 		rewards,
 		href,
+		opensIn,
 		title = 'Rewards'
-	}: { rewards: RewardsWidgetView; href: string; title?: string } = $props();
+	}: { rewards: RewardsWidgetView; href: string; opensIn: AppContext; title?: string } = $props();
+
+	async function follow(event: MouseEvent) {
+		await followInContext(event, opensIn, href);
+	}
 
 	const hidden = $derived(Math.max(0, rewards.claimableCount - rewards.claimable.length));
 	/**
@@ -36,7 +44,7 @@
 	);
 </script>
 
-<SectionWidget {title} {href} icon="gift" body={hasBody ? preview : undefined} />
+<SectionWidget {title} {href} icon="gift" onfollow={follow} body={hasBody ? preview : undefined} />
 
 {#snippet preview()}
 	{#if rewards.viewerActs}

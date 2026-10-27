@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/svelte';
 import '@testing-library/jest-dom/vitest';
 import { describe, expect, it, vi } from 'vitest';
+import { ALL_CONTEXT } from '$lib/context';
 import { testNamesSource } from '$lib/testing/names';
 import { testSealedRef } from '$lib/testing/sealed-refs';
 import { waProp } from '$lib/testing/web-awesome';
@@ -43,7 +44,8 @@ function rewards(overrides: Partial<RewardsWidgetView> = {}): RewardsWidgetView 
 describe('TasksWidget', () => {
 	it('lists what is ready and counts what is hidden behind it', async () => {
 		render(TasksWidget, {
-			href: '/home/tasks',
+			href: '/tasks',
+			opensIn: ALL_CONTEXT,
 			tasks: tasks({
 				ready: [
 					{
@@ -67,7 +69,8 @@ describe('TasksWidget', () => {
 
 	it('keeps whose a row is beside a title too long to fit, rather than inside its ellipsis', async () => {
 		const { container } = render(TasksWidget, {
-			href: '/home/tasks',
+			href: '/tasks',
+			opensIn: ALL_CONTEXT,
 			tasks: tasks({
 				ready: [
 					{
@@ -96,7 +99,8 @@ describe('TasksWidget', () => {
 
 	it('shows a placeholder, not an empty title, for a sealed row no vault has opened', () => {
 		render(TasksWidget, {
-			href: '/home/tasks',
+			href: '/tasks',
+			opensIn: ALL_CONTEXT,
 			tasks: tasks({
 				ready: [
 					{
@@ -125,7 +129,8 @@ describe('TasksWidget', () => {
 
 	it('says what is waiting when nothing is ready, rather than that nothing is', () => {
 		render(TasksWidget, {
-			href: '/home/tasks',
+			href: '/tasks',
+			opensIn: ALL_CONTEXT,
 			tasks: tasks({ waitingCount: 2, activeCount: 2 })
 		});
 
@@ -135,7 +140,11 @@ describe('TasksWidget', () => {
 	});
 
 	it('renders no body at all when there is nothing to say', () => {
-		const { container } = render(TasksWidget, { href: '/home/tasks', tasks: tasks() });
+		const { container } = render(TasksWidget, {
+			href: '/tasks',
+			opensIn: ALL_CONTEXT,
+			tasks: tasks()
+		});
 
 		// The header still stands; the body is gone, collapsed by the class
 		// SectionWidget puts on the card. "Nothing to do right now." told a
@@ -147,7 +156,8 @@ describe('TasksWidget', () => {
 
 	it('shows the managing side a count instead of somebody else’s to-do list', () => {
 		render(TasksWidget, {
-			href: '/partner/p1/tasks',
+			href: '/tasks',
+			opensIn: { kind: 'space', spaceId: 'p1' },
 			tasks: tasks({ viewerActs: false, activeCount: 1 })
 		});
 
@@ -159,7 +169,8 @@ describe('TasksWidget', () => {
 describe('RewardsWidget', () => {
 	it('leads with the balance the costs beside it are read against', async () => {
 		render(RewardsWidget, {
-			href: '/home/rewards',
+			href: '/rewards',
+			opensIn: ALL_CONTEXT,
 			rewards: rewards({
 				balances: [{ id: 'self', label: null, credits: 12 }],
 				claimable: [
@@ -188,7 +199,8 @@ describe('RewardsWidget', () => {
 
 	it('renders no body at all on a fresh account with no rewards and no credits', () => {
 		const { container } = render(RewardsWidget, {
-			href: '/home/rewards',
+			href: '/rewards',
+			opensIn: ALL_CONTEXT,
 			rewards: rewards({ activeCount: 0 })
 		});
 
@@ -198,7 +210,8 @@ describe('RewardsWidget', () => {
 
 	it('says nothing at all about rewards the balance does not cover', () => {
 		const { container } = render(RewardsWidget, {
-			href: '/home/rewards',
+			href: '/rewards',
+			opensIn: ALL_CONTEXT,
 			rewards: rewards({
 				balances: [{ id: 'self', label: null, credits: 0 }],
 				activeCount: 3
@@ -214,7 +227,8 @@ describe('RewardsWidget', () => {
 
 	it('shows the managing side a count instead of a claim list', () => {
 		render(RewardsWidget, {
-			href: '/partner/p1/rewards',
+			href: '/rewards',
+			opensIn: { kind: 'space', spaceId: 'p1' },
 			rewards: rewards({ viewerActs: false, activeCount: 2 })
 		});
 

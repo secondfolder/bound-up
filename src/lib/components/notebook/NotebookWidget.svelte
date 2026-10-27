@@ -1,10 +1,8 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import SectionWidget from '$lib/components/SectionWidget.svelte';
 	import WidgetItems from '$lib/components/WidgetItems.svelte';
-	import { CONTEXT_DEPENDENCY } from '$lib/context';
-	import { storeContext } from '$lib/context-client.svelte';
+	import { followInContext } from '$lib/context-client.svelte';
 	import type { WidgetItemView } from '$lib/types';
 
 	/**
@@ -25,18 +23,9 @@
 	const href = resolve('/(auth-required)/(app)/notebook');
 
 	async function follow(event: MouseEvent) {
-		const opensElsewhere =
-			event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
-		if (spaceId === null || opensElsewhere) {
-			return;
+		if (spaceId !== null) {
+			await followInContext(event, { kind: 'space', spaceId }, href);
 		}
-		event.preventDefault();
-		// Followed even if the switch failed (the notice says so): the list
-		// then shows the context as it was, which is still the notebook.
-		await storeContext({ kind: 'space', spaceId });
-		// The app layout's context too: a navigation re-runs it only when
-		// something it depends on was invalidated, and the cookie is not that.
-		await goto(resolve('/(auth-required)/(app)/notebook'), { invalidate: [CONTEXT_DEPENDENCY] });
 	}
 </script>
 

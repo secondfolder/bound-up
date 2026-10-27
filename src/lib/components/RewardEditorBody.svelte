@@ -1,23 +1,24 @@
 <script lang="ts">
 	import RewardForm from '$lib/components/RewardForm.svelte';
-	import type { RewardView } from '$lib/reward-list';
+	import type { ItemTarget } from '$lib/item-target';
+	import { sealScopeForSpace } from '$lib/sealed-forms';
 	import { openedReward } from '$lib/sealed-views.svelte';
+	import type { RewardView } from '$lib/types';
 
 	/**
-	 * Adding or editing a reward, self or partnership: what the four add and
-	 * edit pages show under their headers, and what the rewards list's sheet
-	 * shows (`RoutedDialog` over those same routes), so the two cannot drift.
+	 * Adding or editing a reward, in whichever space: what the add and edit
+	 * sheets show, so the two cannot drift.
 	 */
 	let {
 		reward = null,
-		partnershipId = null,
+		target,
 		action,
 		onsaved
 	}: {
 		/** The reward being edited; null to add one. */
 		reward?: RewardView | null;
-		/** The partnership a partnership reward belongs to; null for a self reward. */
-		partnershipId?: string | null;
+		/** Its space: a new one's, posted as `spaceId`, or the edited one's own. */
+		target: Pick<ItemTarget, 'spaceId' | 'kind'>;
 		/** The route's action, from a sheet on another page. */
 		action?: string;
 		onsaved?: () => void;
@@ -47,15 +48,14 @@
 			};
 		}
 	});
-	const sealScope = $derived(
-		partnershipId ? { kind: 'partnership' as const, partnershipId } : { kind: 'self' as const }
-	);
+	const sealScope = $derived(sealScopeForSpace(target));
 </script>
 
 {#if values}
 	<RewardForm
 		{values}
 		{sealScope}
+		fields={{ spaceId: target.spaceId }}
 		reward={reward ? { id: reward.id, revision: reward.revision } : null}
 		submitLabel={reward ? 'Save reward' : 'Add reward'}
 		{action}

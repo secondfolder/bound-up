@@ -103,6 +103,10 @@
 		return (
 			routeId === '/(auth-required)/(app)/home' ||
 			routeId.startsWith('/(auth-required)/(app)/partner/') ||
+			// Where tasks set in a partner's time are shown and set, as the
+			// partner's own task and reward pages were before they merged.
+			routeId.startsWith('/(auth-required)/(app)/tasks') ||
+			routeId.startsWith('/(auth-required)/(app)/rewards') ||
 			routeId.startsWith('/(auth-required)/(app)/settings')
 		);
 	});

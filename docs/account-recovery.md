@@ -108,8 +108,8 @@ to sign in again (`initialiseKeyring` in `crypto/session.svelte.ts`).
 - **Everything shared with a partner who helps** — the partnership vault,
   wrapped for the new key: messages, and the partnership's tasks and rewards
   (docs/messaging.md).
-- **The account's own vault** — self tasks and self rewards, with their
-  history — if any partner held it in escrow: the partner
+- **The account's own vault** — the tasks and rewards in their own space,
+  with their history — if any partner held it in escrow: the partner
   who helps passes on their half, and the server releases its half once the
   sign-in completes by email (docs/encryption.md, "Escrow"). Released for
   seven days after the sign-in; the next load does it automatically.
@@ -118,7 +118,7 @@ to sign in again (`initialiseKeyring` in `crypto/session.svelte.ts`).
 
 **Someone with no partner gets nothing back**, because nobody held anything.
 Their own vault is replaced with a new, empty one on the first load after the
-sign-in, and the self tasks and rewards sealed in the old one go with it: the
+sign-in, and their own tasks and rewards sealed in the old one go with it: the
 rows reference their vault and are deleted with it, since nobody can ever
 open them again and an entry with no title could not even be edited.
 

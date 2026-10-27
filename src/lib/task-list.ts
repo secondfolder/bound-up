@@ -3,14 +3,12 @@
  * so it can be tested in node. See docs/tasks.md, "The checklist".
  */
 import type { ContentSaveTarget } from './description-ticks';
-import type { PartnershipTaskView, SelfTaskView, TaskRepeatUnit } from './types';
-
-export type TaskView = SelfTaskView | PartnershipTaskView;
+import type { ContextSpaceView, TaskRepeatUnit, TaskView } from './types';
 
 /**
  * One task as a list shows it, with what the list needs to act on it. The
- * same task reads differently on `/home/tasks` (a partner's, with their name)
- * and on the partner page (no name: the page is theirs).
+ * same task reads differently in Everyone (a chip saying whose space it is
+ * in) and in one space's context (no chip: the switcher says whose).
  */
 export type TaskEntry = {
 	task: TaskView;
@@ -18,18 +16,14 @@ export type TaskEntry = {
 	completeAction: string | null;
 	/** The form action that takes a completion of it back, alongside `completeAction`. */
 	undoAction?: string | null;
-	/** Posted with the completion, for a partnership task completed from `/home/tasks`. */
-	partnershipId?: string | null;
-	/** Whose task it is, on a list that mixes yours with your partners'. */
+	/** Whose space it is in, as a chip, on a list of several spaces (Everyone). */
+	space?: ContextSpaceView | null;
+	/** The partner it is with, for "Jun's time" and its detail; null for the viewer's own. */
 	partnerName?: string | null;
-	/** Their picture, which is how the row shows whose it is. */
-	partnerImage?: string | null;
 	/** Its edit page, when the viewer may edit it. */
 	editHref?: string | null;
 	/** Where ticking a to-do item in its description saves, beside `editHref`. */
 	contentSave?: ContentSaveTarget | null;
-	/** The whole list it comes from, from a list that mixes several. */
-	listHref?: string | null;
 };
 
 /**

@@ -3,9 +3,7 @@
  * can be tested in node. See docs/rewards.md, "The wallet".
  */
 import type { ContentSaveTarget } from './description-ticks';
-import type { PartnershipRewardView, SelfRewardView } from './types';
-
-export type RewardView = SelfRewardView | PartnershipRewardView;
+import type { RewardView } from './types';
 
 /**
  * One reward as a list shows it, with what the list needs to act on it.
@@ -14,16 +12,10 @@ export type RewardEntry = {
 	reward: RewardView;
 	/** The form action that claims it, or null when the viewer does not claim it. */
 	claimAction: string | null;
-	/** Posted with the claim, for a partnership reward claimed from `/home/rewards`. */
-	partnershipId?: string | null;
 	/** Its edit page, when the viewer may edit it. */
 	editHref?: string | null;
 	/** Where ticking a to-do item in its description saves, beside `editHref`. */
 	contentSave?: ContentSaveTarget | null;
-	/** The whole list it comes from, from a page that shows several. */
-	listHref?: string | null;
-	/** Whose list that is, to name the link. */
-	listOwner?: string | null;
 };
 
 /**

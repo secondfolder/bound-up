@@ -23,6 +23,16 @@ import { normaliseTagName, TAG_NAME_INDEX_PURPOSE, tagKind } from './sealed-kind
 /** Whose vault a form seals into. */
 export type SealScope = { kind: 'self' } | { kind: 'partnership'; partnershipId: string };
 
+/**
+ * The vault a space's content is sealed into: the viewer's own for their solo
+ * space, the partnership's for a shared one, whose id is the space's.
+ */
+export function sealScopeForSpace(space: { spaceId: string; kind: 'solo' | 'shared' }): SealScope {
+	return space.kind === 'solo'
+		? { kind: 'self' }
+		: { kind: 'partnership', partnershipId: space.spaceId };
+}
+
 export type SealedFields = {
 	recordId: string;
 	vaultId: string;

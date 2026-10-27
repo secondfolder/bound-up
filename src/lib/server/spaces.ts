@@ -1,8 +1,13 @@
-import { and, eq, inArray, type SQL, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, or, type SQL, sql } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
 import type { PartnershipControl } from '../partnership';
-import { managersFromControl, type SpaceKind, type SpaceMembership } from '../spaces';
+import {
+	managersFromControl,
+	type SpaceKind,
+	type SpaceMember,
+	type SpaceMembership
+} from '../spaces';
 import type { Db } from './db';
 import {
 	daydreamCharacters,
@@ -15,17 +20,14 @@ import {
 	messageTags,
 	messageThreads,
 	notebookEntries,
-	partnershipRewardClaims,
-	partnershipRewards,
 	partnerships,
-	partnershipTaskCompletions,
-	partnershipTasks,
-	selfRewardClaims,
-	selfRewards,
-	selfTaskCompletions,
-	selfTasks,
+	rewardBalances,
+	rewardClaims,
+	rewards,
 	spaceMembers,
 	spaces,
+	taskCompletions,
+	tasks,
 	user,
 	vaultEscrows,
 	vaults
@@ -104,6 +106,66 @@ export async function listSpacesForUser(db: Db, userId: string): Promise<SpaceMe
 		.innerJoin(spaces, eq(spaces.id, spaceMembers.spaceId))
 		.where(eq(spaceMembers.userId, userId))
 		.orderBy(sql`${spaces.kind} = 'shared'`, spaces.createdAt, spaces.id);
+}
+
+/** A member of a space as the task and reward pages need them: with the time zone their dates are in. */
+export type ItemSpaceMember = SpaceMember & { timezone: string };
+
+/** A space the viewer is in, with every member, for the task and reward rules (`SpaceForRules`). */
+export type ItemSpace = { id: string; kind: SpaceKind; members: ItemSpaceMember[] };
+
+/**
+ * The spaces among `spaceIds` that `viewerId` is in and that have something in
+ * them to show — their solo space, and each partnership once it is accepted —
+ * with all their members. One query for a page's spaces, however many the
+ * context shows. Spaces the viewer is not in are simply missing, so a caller
+ * that names one by id treats a miss as "not found".
+ */
+export async function loadItemSpaces(
+	db: Db,
+	viewerId: string,
+	spaceIds: readonly string[]
+): Promise<Map<string, ItemSpace>> {
+	const found = new Map<string, ItemSpace>();
+	// `in ()` is a syntax error in SQLite.
+	if (spaceIds.length === 0) {
+		return found;
+	}
+	const rows = await db
+		.select({
+			spaceId: spaceMembers.spaceId,
+			kind: spaces.kind,
+			userId: spaceMembers.userId,
+			canManage: spaceMembers.canManage,
+			timezone: user.timezone
+		})
+		.from(spaceMembers)
+		.innerJoin(spaces, eq(spaces.id, spaceMembers.spaceId))
+		.innerJoin(user, eq(user.id, spaceMembers.userId))
+		.leftJoin(partnerships, eq(partnerships.id, spaces.id))
+		.where(
+			and(
+				inArray(spaceMembers.spaceId, [...spaceIds]),
+				isSpaceMember(spaceMembers.spaceId, viewerId),
+				or(eq(spaces.kind, 'solo' satisfies SpaceKind), eq(partnerships.status, 'accepted'))
+			)
+		)
+		.orderBy(asc(spaceMembers.createdAt), asc(spaceMembers.id));
+	for (const row of rows) {
+		const space = found.get(row.spaceId) ?? { id: row.spaceId, kind: row.kind, members: [] };
+		space.members.push({ userId: row.userId, canManage: row.canManage, timezone: row.timezone });
+		found.set(row.spaceId, space);
+	}
+	return found;
+}
+
+/** One space as `loadItemSpaces` has it, or null when the viewer is not in it. */
+export async function loadItemSpace(
+	db: Db,
+	viewerId: string,
+	spaceId: string
+): Promise<ItemSpace | null> {
+	return (await loadItemSpaces(db, viewerId, [spaceId])).get(spaceId) ?? null;
 }
 
 /**
@@ -230,19 +292,24 @@ export function syncSharedSpaceMembers(db: Db, partnershipId: string): Batch {
 /**
  * The statements that delete a space and everything in it, for one batch.
  *
- * Explicit, table by table, because nothing cascades from `spaces`: the
- * `space_id` columns were added to tables that already existed, and a column
- * added by `ALTER TABLE … REFERENCES` gets no `ON DELETE` (the trap in
- * AGENTS.md). The same trap means a vault's deletion does not cascade to
- * everything sealed under it either — only to the tables that were created
- * with their `vault_id`. Tasks, rewards, their completions and claims,
- * messages, reactions and tags had theirs added later, so their foreign key
- * is NO ACTION and a vault cannot go while any of them point at it.
+ * Explicit, table by table, because most of it does not cascade from
+ * `spaces`: the `space_id` columns added to tables that already existed got
+ * no `ON DELETE` (a column added by `ALTER TABLE … REFERENCES` never does —
+ * the trap in AGENTS.md). The same trap means a vault's deletion does not
+ * cascade to everything sealed under it either — only to the tables that
+ * were created with their `vault_id`. Messages, reactions and tags had theirs
+ * added later, so their foreign key is NO ACTION and a vault cannot go while
+ * any of them point at it.
+ *
+ * Tasks, rewards, their completions, claims and balances were created with
+ * `space_id` and a real cascade, so the space's own deletion would take them;
+ * they are deleted here all the same, children first, so this list says
+ * everything a space holds and does not lean on which tables happen to
+ * cascade.
  *
  * So, in order: the rows that carry the space, then the rows sealed under its
  * vaults whose foreign key would refuse the vault's deletion, then the
- * partnership row (for a shared space: it is the space's details, and its own
- * cascades take the partnership's tasks, rewards and credits), then the
+ * partnership row (for a shared space: it is the space's details), then the
  * vaults, the members and the space.
  *
  * `spaces.test.ts` fails if a table gains a `space_id` that this misses.
@@ -259,20 +326,12 @@ export function deleteSpaceStatements(db: Db, spaceId: string): Batch {
 		db.delete(daydreams).where(eq(daydreams.spaceId, spaceId)),
 		db.delete(daydreamCharacters).where(eq(daydreamCharacters.spaceId, spaceId)),
 		db.delete(daydreamIdeas).where(eq(daydreamIdeas.spaceId, spaceId)),
+		db.delete(taskCompletions).where(eq(taskCompletions.spaceId, spaceId)),
+		db.delete(rewardClaims).where(eq(rewardClaims.spaceId, spaceId)),
+		db.delete(tasks).where(eq(tasks.spaceId, spaceId)),
+		db.delete(rewards).where(eq(rewards.spaceId, spaceId)),
+		db.delete(rewardBalances).where(eq(rewardBalances.spaceId, spaceId)),
 		// Sealed under the space's vaults with a NO ACTION key; see above.
-		// Snapshots first, since they are the children.
-		db.delete(selfTaskCompletions).where(inArray(selfTaskCompletions.snapshotVaultId, spaceVaults)),
-		db.delete(selfRewardClaims).where(inArray(selfRewardClaims.snapshotVaultId, spaceVaults)),
-		db
-			.delete(partnershipTaskCompletions)
-			.where(inArray(partnershipTaskCompletions.snapshotVaultId, spaceVaults)),
-		db
-			.delete(partnershipRewardClaims)
-			.where(inArray(partnershipRewardClaims.snapshotVaultId, spaceVaults)),
-		db.delete(selfTasks).where(inArray(selfTasks.vaultId, spaceVaults)),
-		db.delete(selfRewards).where(inArray(selfRewards.vaultId, spaceVaults)),
-		db.delete(partnershipTasks).where(inArray(partnershipTasks.vaultId, spaceVaults)),
-		db.delete(partnershipRewards).where(inArray(partnershipRewards.vaultId, spaceVaults)),
 		db.delete(messageReactions).where(inArray(messageReactions.vaultId, spaceVaults)),
 		db.delete(messages).where(inArray(messages.vaultId, spaceVaults)),
 		db.delete(messageTags).where(inArray(messageTags.vaultId, spaceVaults)),

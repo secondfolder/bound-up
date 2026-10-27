@@ -15,9 +15,9 @@ import {
 import {
 	accountRecoveryRequests,
 	partnerships,
-	selfRewards,
-	selfTaskCompletions,
-	selfTasks,
+	rewards,
+	taskCompletions,
+	tasks,
 	userKeys,
 	vaultEscrowRelays,
 	vaultEscrows,
@@ -25,7 +25,7 @@ import {
 	vaultWraps
 } from './db/schema';
 import { restoreVaultAccess } from './messaging';
-import { completeSelfTask } from './tasks';
+import { completeTask } from './tasks';
 import {
 	createVault,
 	deleteLostSelfVault,
@@ -510,19 +510,15 @@ describe('escrow', () => {
 		it('takes what was sealed in it along, which nothing could open again', async () => {
 			const task = await createTestSelfTask(harness.db, ada);
 			const reward = await createTestSelfReward(harness.db, ada);
-			const completed = await completeSelfTask(harness.db, ada.id, ada.timezone, task.id);
+			const completed = await completeTask(harness.db, ada, task.id);
 			expect(completed).toMatchObject({ ok: true });
 			await loseAdasKey();
 
-			// The sealed columns' foreign keys have no ON DELETE action in the
-			// database (they were added by ALTER TABLE), so this would be refused
-			// if the rows were left for the vault delete to take.
+			// What was sealed in the vault goes with it: nothing could open it again.
 			await expect(deleteLostSelfVault(harness.db, ada.id)).resolves.toBe(true);
-			expect(await harness.db.select().from(selfTasks)).toEqual([]);
-			expect(await harness.db.select().from(selfTaskCompletions)).toEqual([]);
-			expect(
-				await harness.db.select().from(selfRewards).where(eq(selfRewards.id, reward.id))
-			).toEqual([]);
+			expect(await harness.db.select().from(tasks)).toEqual([]);
+			expect(await harness.db.select().from(taskCompletions)).toEqual([]);
+			expect(await harness.db.select().from(rewards).where(eq(rewards.id, reward.id))).toEqual([]);
 		});
 
 		it('waits while an escrow could still bring it back, and not after', async () => {

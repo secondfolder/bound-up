@@ -82,9 +82,7 @@
 	const title = $derived(shownTitle(content));
 	const canClaim = $derived(mode === 'claim' && entry.claimAction !== null && reward.canClaim);
 	const celebrating = $derived(claiming.celebrating === reward.id);
-	const hasActions = $derived(
-		Boolean(canClaim || entry.editHref || (entry.listHref && entry.listOwner))
-	);
+	const hasActions = $derived(Boolean(canClaim || entry.editHref));
 
 	const claim: SubmitFunction = async (input) => {
 		refusal = null;
@@ -134,9 +132,6 @@
 	{#if canClaim && entry.claimAction}
 		<form method="POST" action={entry.claimAction} class="claim-form" use:enhance={claim}>
 			<input type="hidden" name="rewardId" value={reward.id} />
-			{#if entry.partnershipId}
-				<input type="hidden" name="partnershipId" value={entry.partnershipId} />
-			{/if}
 			<wa-button
 				class="claim"
 				type="submit"
@@ -158,9 +153,6 @@
 		<wa-button appearance="outlined" href={entry.editHref} onclick={() => dialog?.close()}
 			>Edit</wa-button
 		>
-	{/if}
-	{#if entry.listHref && entry.listOwner}
-		<wa-button appearance="plain" href={entry.listHref}>{entry.listOwner}'s rewards</wa-button>
 	{/if}
 {/snippet}
 

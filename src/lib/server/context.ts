@@ -5,6 +5,7 @@ import {
 	CONTEXT_COOKIE_MAX_AGE,
 	parseContext,
 	serialiseContext,
+	spacesInContext,
 	validContext
 } from '../context';
 import type { PartnerNamesSource } from '../partnership';
@@ -169,4 +170,21 @@ export function contextSpaceViews(
 			? [{ id: space.spaceId, kind: 'shared', colour, names: partner.names }]
 			: [];
 	});
+}
+
+/**
+ * The current context and the spaces it shows, in the switcher's order: one
+ * space, or every space for Everyone. For a list page's load, which reads
+ * what to show from it — and never for an action, which names its space
+ * (docs/contexts.md, "Writes name their space").
+ */
+export async function contextSpaceIds(
+	locals: Pick<App.Locals, 'context' | 'contextSpaces'>
+): Promise<{ context: AppContext; spaceIds: string[] }> {
+	const [context, list] = await Promise.all([locals.context(), locals.contextSpaces()]);
+	const shown = spacesInContext(
+		context,
+		list.map((space) => ({ id: space.spaceId }))
+	);
+	return { context, spaceIds: shown.map((space) => space.id) };
 }

@@ -18,17 +18,12 @@ import {
 	notebookEntries,
 	notebookUpdates,
 	notebookVersions,
-	partnershipRewardClaims,
-	partnershipRewardCredits,
-	partnershipRewards,
 	partnerships,
-	partnershipTaskCompletions,
-	partnershipTasks,
-	selfRewardClaims,
-	selfRewardCredits,
-	selfRewards,
-	selfTaskCompletions,
-	selfTasks,
+	rewardBalances,
+	rewardClaims,
+	rewards,
+	taskCompletions,
+	tasks,
 	threadReads,
 	user,
 	userKeys,
@@ -41,16 +36,9 @@ import type { MediaStore } from '../server/media';
 import { type OutgoingAttachment, sendMessage, startThread } from '../server/messaging';
 import { createEntry, resolveScope } from '../server/notebook';
 import { acceptInvite, createInvite } from '../server/partnerships';
-import {
-	claimPartnershipReward,
-	claimSelfReward,
-	createPartnershipReward,
-	createSelfReward,
-	setPartnershipRewardCredits,
-	setSelfRewardCredits
-} from '../server/rewards';
-import { soloSpaceIdOf, syncSharedSpaceMembers } from '../server/spaces';
-import { createPartnershipTask, createSelfTask } from '../server/tasks';
+import { claimReward, createReward, setRewardBalance } from '../server/rewards';
+import { soloSpaceFor, soloSpaceIdOf, syncSharedSpaceMembers } from '../server/spaces';
+import { completeTask, createTask } from '../server/tasks';
 import type { TaskSettings } from '../tasks';
 import type { TaskSchedule } from '../types';
 import { FAKE_WRAP_BLOB, PASSWORD_WRAP_PARAMS } from './crypto';
@@ -304,22 +292,77 @@ export type TestTaskInput = Partial<TaskSettings> & {
 	completionMessageCount?: number;
 };
 
+/** A user's solo space, which every account has from the moment it exists. */
+export async function testSoloSpace(db: Db, userId: string): Promise<string> {
+	const spaceId = await soloSpaceFor(db, userId);
+	if (!spaceId) {
+		throw new Error(`fixture: ${userId} has no solo space`);
+	}
+	return spaceId;
+}
+
+/** The vault a space's content is sealed under, made if it has none. */
+async function testVaultFor(db: Db, spaceId: string, creator: TestUser): Promise<string> {
+	return spaceId === (await soloSpaceFor(db, creator.id))
+		? await ensureTestSelfVault(db, creator.id)
+		: await ensureTestPartnershipVault(db, spaceId);
+}
+
+/**
+ * A reward in a space, written by `creator`, through the real `createReward`
+ * — so it is set for whoever that sets it for: the creator in their own
+ * space, the partner in a shared one.
+ */
+export async function createTestReward(
+	db: Db,
+	spaceId: string,
+	creator: TestUser,
+	input: TestRewardInput = {}
+): Promise<{ id: string; ciphertext: string }> {
+	const id = crypto.randomUUID();
+	const ciphertext = input.ciphertext ?? fakeSealed('reward');
+	const result = await createReward(db, creator.id, spaceId, id, {
+		cost: input.cost ?? 3,
+		active: input.active ?? true,
+		content: { vaultId: await testVaultFor(db, spaceId, creator), ciphertext, payloadVersion: 1 }
+	});
+	if (!result.ok) {
+		throw new Error(`fixture could not create reward: ${result.reason}`);
+	}
+	return { id, ciphertext };
+}
+
+/** A reward in the owner's own space. */
 export async function createTestSelfReward(
 	db: Db,
 	owner: TestUser,
 	input: TestRewardInput = {}
 ): Promise<{ id: string; ciphertext: string }> {
-	const id = crypto.randomUUID();
-	const ciphertext = input.ciphertext ?? fakeSealed('reward');
-	const result = await createSelfReward(db, owner.id, id, {
-		cost: input.cost ?? 3,
-		active: input.active ?? true,
-		content: { vaultId: await ensureTestSelfVault(db, owner.id), ciphertext, payloadVersion: 1 }
-	});
+	return await createTestReward(db, await testSoloSpace(db, owner.id), owner, input);
+}
+
+/** A reward in a partnership's space, written by `owner` and so set for the partner. */
+export async function createTestPartnershipReward(
+	db: Db,
+	partnershipId: string,
+	owner: TestUser,
+	input: TestRewardInput = {}
+): Promise<{ id: string; ciphertext: string }> {
+	return await createTestReward(db, partnershipId, owner, { cost: 2, ...input });
+}
+
+/** Sets a member's credits in a space, as `actor` — who must be allowed to. */
+export async function setTestBalance(
+	db: Db,
+	spaceId: string,
+	actor: TestUser,
+	target: TestUser,
+	credits: number
+): Promise<void> {
+	const result = await setRewardBalance(db, actor.id, spaceId, target.id, credits);
 	if (!result.ok) {
-		throw new Error(`fixture could not create self reward: ${result.reason}`);
+		throw new Error(`fixture could not set credits: ${result.reason}`);
 	}
-	return { id, ciphertext };
 }
 
 export async function setTestSelfRewardCredits(
@@ -327,63 +370,7 @@ export async function setTestSelfRewardCredits(
 	owner: TestUser,
 	credits: number
 ): Promise<void> {
-	await setSelfRewardCredits(db, owner.id, credits);
-}
-
-export async function claimTestSelfReward(
-	db: Db,
-	owner: TestUser,
-	rewardId: string
-): Promise<void> {
-	const result = await claimSelfReward(db, owner.id, rewardId);
-	if (!result.ok) {
-		throw new Error(`fixture could not claim self reward: ${result.reason}`);
-	}
-}
-
-export async function readSelfRewardRow(db: Db, id: string) {
-	const rows = await db.select().from(selfRewards).where(eq(selfRewards.id, id)).limit(1);
-	return rows[0];
-}
-
-export async function readSelfRewardCreditRow(db: Db, ownerId: string) {
-	const rows = await db
-		.select()
-		.from(selfRewardCredits)
-		.where(eq(selfRewardCredits.ownerId, ownerId))
-		.limit(1);
-	return rows[0];
-}
-
-export async function readSelfRewardClaimRows(db: Db, ownerId: string) {
-	return await db
-		.select()
-		.from(selfRewardClaims)
-		.where(eq(selfRewardClaims.ownerId, ownerId))
-		.orderBy(selfRewardClaims.createdAt, selfRewardClaims.id);
-}
-
-export async function createTestPartnershipReward(
-	db: Db,
-	partnershipId: string,
-	owner: TestUser,
-	input: TestRewardInput = {}
-): Promise<{ id: string; ciphertext: string }> {
-	const id = crypto.randomUUID();
-	const ciphertext = input.ciphertext ?? fakeSealed('reward');
-	const result = await createPartnershipReward(db, partnershipId, owner.id, id, {
-		cost: input.cost ?? 2,
-		active: input.active ?? true,
-		content: {
-			vaultId: await ensureTestPartnershipVault(db, partnershipId),
-			ciphertext,
-			payloadVersion: 1
-		}
-	});
-	if (!result.ok) {
-		throw new Error(`fixture could not create partnership reward: ${result.reason}`);
-	}
-	return { id, ciphertext };
+	await setTestBalance(db, await testSoloSpace(db, owner.id), owner, owner, credits);
 }
 
 export async function setTestPartnershipRewardCredits(
@@ -393,39 +380,64 @@ export async function setTestPartnershipRewardCredits(
 	target: TestUser,
 	credits: number
 ): Promise<void> {
-	const result = await setPartnershipRewardCredits(db, partnershipId, actor.id, target.id, credits);
+	await setTestBalance(db, partnershipId, actor, target, credits);
+}
+
+/** Claims a reward as `viewer`, through the real `claimReward`. */
+export async function claimTestReward(db: Db, viewer: TestUser, rewardId: string): Promise<void> {
+	const result = await claimReward(db, viewer.id, rewardId);
 	if (!result.ok) {
-		throw new Error(`fixture could not set partnership credits: ${result.reason}`);
+		throw new Error(`fixture could not claim reward: ${result.reason}`);
 	}
+}
+
+export async function claimTestSelfReward(
+	db: Db,
+	owner: TestUser,
+	rewardId: string
+): Promise<void> {
+	await claimTestReward(db, owner, rewardId);
 }
 
 export async function claimTestPartnershipReward(
 	db: Db,
-	partnershipId: string,
+	_partnershipId: string,
 	viewer: TestUser,
 	rewardId: string
 ): Promise<void> {
-	const result = await claimPartnershipReward(db, { partnershipId, rewardId, userId: viewer.id });
-	if (!result.ok) {
-		throw new Error(`fixture could not claim partnership reward: ${result.reason}`);
-	}
+	await claimTestReward(db, viewer, rewardId);
 }
 
-export async function readPartnershipRewardRow(db: Db, id: string) {
+export async function readRewardRow(db: Db, id: string) {
+	const rows = await db.select().from(rewards).where(eq(rewards.id, id)).limit(1);
+	return rows[0];
+}
+
+export const readSelfRewardRow = readRewardRow;
+export const readPartnershipRewardRow = readRewardRow;
+
+export async function readRewardRows(db: Db, spaceId: string) {
+	return await db
+		.select()
+		.from(rewards)
+		.where(eq(rewards.spaceId, spaceId))
+		.orderBy(rewards.createdAt, rewards.id);
+}
+
+export const readPartnershipRewardRows = readRewardRows;
+
+/** One member's balance row in a space, or undefined while nothing was credited or set. */
+export async function readBalanceRow(db: Db, spaceId: string, userId: string) {
 	const rows = await db
 		.select()
-		.from(partnershipRewards)
-		.where(eq(partnershipRewards.id, id))
+		.from(rewardBalances)
+		.where(and(eq(rewardBalances.spaceId, spaceId), eq(rewardBalances.userId, userId)))
 		.limit(1);
 	return rows[0];
 }
 
-export async function readPartnershipRewardRows(db: Db, partnershipId: string) {
-	return await db
-		.select()
-		.from(partnershipRewards)
-		.where(eq(partnershipRewards.partnershipId, partnershipId))
-		.orderBy(partnershipRewards.createdAt, partnershipRewards.id);
+export async function readSelfRewardCreditRow(db: Db, ownerId: string) {
+	return await readBalanceRow(db, await testSoloSpace(db, ownerId), ownerId);
 }
 
 export async function readPartnershipRewardCreditRow(
@@ -433,115 +445,122 @@ export async function readPartnershipRewardCreditRow(
 	partnershipId: string,
 	userId: string
 ) {
-	const rows = await db
-		.select()
-		.from(partnershipRewardCredits)
-		.where(
-			and(
-				eq(partnershipRewardCredits.partnershipId, partnershipId),
-				eq(partnershipRewardCredits.userId, userId)
-			)
-		)
-		.limit(1);
-	return rows[0];
+	return await readBalanceRow(db, partnershipId, userId);
 }
 
-export async function readPartnershipRewardClaimRows(db: Db, partnershipId: string) {
+export async function readRewardClaimRows(db: Db, spaceId: string) {
 	return await db
 		.select()
-		.from(partnershipRewardClaims)
-		.where(eq(partnershipRewardClaims.partnershipId, partnershipId))
-		.orderBy(partnershipRewardClaims.createdAt, partnershipRewardClaims.id);
+		.from(rewardClaims)
+		.where(eq(rewardClaims.spaceId, spaceId))
+		.orderBy(rewardClaims.createdAt, rewardClaims.id);
 }
+
+export async function readSelfRewardClaimRows(db: Db, ownerId: string) {
+	return await readRewardClaimRows(db, await testSoloSpace(db, ownerId));
+}
+
+export const readPartnershipRewardClaimRows = readRewardClaimRows;
 
 function defaultTaskSchedule(): TaskSchedule {
 	return { mode: 'one-off' };
 }
 
-export async function createTestSelfTask(
+/**
+ * A task in a space, written by `creator`, through the real `createTask` — so
+ * set for whoever that sets it for: the creator in their own space, the
+ * partner in a shared one.
+ */
+export async function createTestTask(
 	db: Db,
-	owner: TestUser,
+	spaceId: string,
+	creator: TestUser,
 	input: TestTaskInput = {}
 ): Promise<{ id: string; ciphertext: string }> {
 	const id = crypto.randomUUID();
 	const ciphertext = input.ciphertext ?? fakeSealed('task');
-	const result = await createSelfTask(db, owner.id, owner.timezone, id, {
+	const result = await createTask(db, creator, spaceId, id, {
 		active: input.active ?? true,
 		creditsAwarded: input.creditsAwarded ?? 2,
 		schedule: input.schedule ?? defaultTaskSchedule(),
-		timezoneOwnerUserId: input.timezoneOwnerUserId ?? owner.id,
+		timezoneOwnerUserId: input.timezoneOwnerUserId ?? creator.id,
 		content: {
-			vaultId: await ensureTestSelfVault(db, owner.id),
+			vaultId: await testVaultFor(db, spaceId, creator),
 			ciphertext,
 			payloadVersion: 1,
 			completionMessageCount: input.completionMessageCount ?? 1
 		}
 	});
 	if (!result.ok) {
-		throw new Error(`fixture could not create self task: ${result.reason}`);
+		throw new Error(`fixture could not create task: ${result.reason}`);
 	}
 	return { id, ciphertext };
 }
 
+/** A task in the owner's own space. */
+export async function createTestSelfTask(
+	db: Db,
+	owner: TestUser,
+	input: TestTaskInput = {}
+): Promise<{ id: string; ciphertext: string }> {
+	return await createTestTask(db, await testSoloSpace(db, owner.id), owner, input);
+}
+
+/** A task in a partnership's space, written by `viewer` and so set for the partner. */
 export async function createTestPartnershipTask(
 	db: Db,
 	partnershipId: string,
 	viewer: TestUser,
 	input: TestTaskInput = {}
 ): Promise<{ id: string; ciphertext: string }> {
-	const id = crypto.randomUUID();
-	const ciphertext = input.ciphertext ?? fakeSealed('task');
-	const result = await createPartnershipTask(db, partnershipId, viewer.id, viewer.timezone, id, {
-		active: input.active ?? true,
-		creditsAwarded: input.creditsAwarded ?? 2,
-		schedule: input.schedule ?? defaultTaskSchedule(),
-		timezoneOwnerUserId: input.timezoneOwnerUserId ?? viewer.id,
-		content: {
-			vaultId: await ensureTestPartnershipVault(db, partnershipId),
-			ciphertext,
-			payloadVersion: 1,
-			completionMessageCount: input.completionMessageCount ?? 1
-		}
-	});
-	if (!result.ok) {
-		throw new Error(`fixture could not create partnership task: ${result.reason}`);
-	}
-	return { id, ciphertext };
+	return await createTestTask(db, partnershipId, viewer, input);
 }
 
-export async function readSelfTaskRow(db: Db, id: string) {
-	const rows = await db.select().from(selfTasks).where(eq(selfTasks.id, id)).limit(1);
+/** Completes a task as `viewer`, through the real `completeTask`; the completion's id. */
+export async function completeTestTask(
+	db: Db,
+	viewer: TestUser,
+	taskId: string,
+	now?: Date
+): Promise<string> {
+	const result = await completeTask(db, viewer, taskId, now);
+	if (!result.ok) {
+		throw new Error(`fixture could not complete task: ${result.reason}`);
+	}
+	return result.completionId;
+}
+
+export async function readTaskRow(db: Db, id: string) {
+	const rows = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
 	return rows[0];
+}
+
+export const readSelfTaskRow = readTaskRow;
+export const readPartnershipTaskRow = readTaskRow;
+
+export async function readTaskRows(db: Db, spaceId: string) {
+	return await db
+		.select()
+		.from(tasks)
+		.where(eq(tasks.spaceId, spaceId))
+		.orderBy(tasks.createdAt, tasks.id);
+}
+
+export const readPartnershipTaskRows = readTaskRows;
+
+export async function readTaskCompletionRows(db: Db, spaceId: string) {
+	return await db
+		.select()
+		.from(taskCompletions)
+		.where(eq(taskCompletions.spaceId, spaceId))
+		.orderBy(taskCompletions.createdAt, taskCompletions.id);
 }
 
 export async function readSelfTaskCompletionRows(db: Db, ownerId: string) {
-	return await db
-		.select()
-		.from(selfTaskCompletions)
-		.where(eq(selfTaskCompletions.ownerId, ownerId))
-		.orderBy(selfTaskCompletions.createdAt, selfTaskCompletions.id);
+	return await readTaskCompletionRows(db, await testSoloSpace(db, ownerId));
 }
 
-export async function readPartnershipTaskRow(db: Db, id: string) {
-	const rows = await db.select().from(partnershipTasks).where(eq(partnershipTasks.id, id)).limit(1);
-	return rows[0];
-}
-
-export async function readPartnershipTaskRows(db: Db, partnershipId: string) {
-	return await db
-		.select()
-		.from(partnershipTasks)
-		.where(eq(partnershipTasks.partnershipId, partnershipId))
-		.orderBy(partnershipTasks.createdAt, partnershipTasks.id);
-}
-
-export async function readPartnershipTaskCompletionRows(db: Db, partnershipId: string) {
-	return await db
-		.select()
-		.from(partnershipTaskCompletions)
-		.where(eq(partnershipTaskCompletions.partnershipId, partnershipId))
-		.orderBy(partnershipTaskCompletions.createdAt, partnershipTaskCompletions.id);
-}
+export const readPartnershipTaskCompletionRows = readTaskCompletionRows;
 
 /**
  * A thread with one message, through the real `startThread` path.

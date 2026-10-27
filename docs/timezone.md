@@ -67,7 +67,7 @@ user source that populates `locals.user`.
 
 The signed-in app shell mounts
 [src/lib/components/TimezoneWarning.svelte](../src/lib/components/TimezoneWarning.svelte)
-above page content on `/home`, `/partner/*`, and `/settings*`. The banner is
+above page content on `/home`, `/partner/*`, `/tasks*`, `/rewards*` and `/settings*`. The banner is
 shown when the current device timezone differs from `page.data.user.timezone`.
 
 It offers two actions:
@@ -110,15 +110,16 @@ that user's timezone instead of being frozen to the old offset.
 
 ### What the UI does with that
 
-- Self tasks always use the owner's timezone.
-- Partnership task date fields default to the other partner's timezone.
+- A task in the viewer's own space always uses the owner's timezone.
+- A new task in a partnership's shared space defaults to the other partner's
+  timezone, since they are the one doing it.
 - If the two partners currently share the same timezone, the timezone-owner
   toggle is hidden.
 - If they differ, the form shows a toggle between "Your time" and
   "<partner>'s time", including the current relative offset.
 - When the app renders a task date belonging to a different timezone than the
-  viewer's current timezone, it shows a small note in the same style as the
-  partner page's timezone line.
+  viewer's current timezone, it says whose time it is ("Jun's time",
+  `WhoseTime`, with the zone and both people's time in its tooltip).
 
 ### Schedule math
 

@@ -64,3 +64,94 @@ export function managersFromControl(
 export function someoneElseManages(members: readonly SpaceMember[], userId: string): boolean {
 	return members.some((member) => member.userId !== userId && member.canManage);
 }
+
+/** A space as the task and reward rules see it: what kind, and who is in it. */
+export type SpaceForRules = { kind: SpaceKind; members: readonly SpaceMember[] };
+
+/**
+ * A task or reward as its rules see it: who wrote it, and who it is for —
+ * who completes the task or claims the reward.
+ */
+export type AssignedRecord = { createdByUserId: string; assigneeUserId: string | null };
+
+/**
+ * Who a new task or reward is for, written by `creatorId`: in their own space
+ * themselves, and in a shared one the first other member — never the
+ * creator, because nobody completes or claims what they wrote. Null when
+ * there is nobody else yet (a pending invite's space). The same rule copied
+ * every partnership task and reward into its space
+ * (drizzle/0052_copy_tasks_rewards_into_spaces.sql).
+ */
+export function assigneeFor(space: SpaceForRules, creatorId: string): string | null {
+	if (space.kind === 'solo') {
+		return creatorId;
+	}
+	return space.members.find((member) => member.userId !== creatorId)?.userId ?? null;
+}
+
+/**
+ * Whether the viewer is someone a space's tasks and rewards can be set for:
+ * everyone in their own space, and in a shared one whoever someone else could
+ * have set them for (`someoneElseManages`). A member who manages alone sets
+ * them and does not do them — which is what `control` used to say.
+ */
+export function viewerActsIn(space: SpaceForRules, viewerId: string): boolean {
+	if (!space.members.some((member) => member.userId === viewerId)) {
+		return false;
+	}
+	return space.kind === 'solo' || someoneElseManages(space.members, viewerId);
+}
+
+/**
+ * Whether the viewer completes this task, or claims this reward: it is theirs
+ * (`assigneeUserId`), they are on the side that acts (`viewerActsIn`), and in
+ * a shared space they did not write it. The authorship rule holds whatever
+ * the members' `can_manage` says now, so nobody can mint their own credits.
+ */
+export function actsOn(record: AssignedRecord, space: SpaceForRules, viewerId: string): boolean {
+	if (record.assigneeUserId !== viewerId || !viewerActsIn(space, viewerId)) {
+		return false;
+	}
+	return space.kind === 'solo' || record.createdByUserId !== viewerId;
+}
+
+/** Whether the viewer may set tasks and rewards in a space (and its other members' credits). */
+export function managesSpace(space: SpaceForRules, viewerId: string): boolean {
+	return space.members.some((member) => member.userId === viewerId && member.canManage);
+}
+
+/**
+ * Whether the viewer may edit this task or reward: they manage the space, and
+ * it is set for someone else — or, in their own space, it is simply theirs.
+ * Nobody edits what is set for them, which in a space of two is the same as
+ * "only its creator edits it".
+ */
+export function managesRecord(
+	record: AssignedRecord,
+	space: SpaceForRules,
+	viewerId: string
+): boolean {
+	if (!managesSpace(space, viewerId)) {
+		return false;
+	}
+	return space.kind === 'solo' || record.assigneeUserId !== viewerId;
+}
+
+/**
+ * Whether the viewer may set this member's credits in a space: their own in
+ * their own space, and in a shared one another member's when they manage it —
+ * never their own, which would be paying themselves.
+ */
+export function canSetBalance(
+	space: SpaceForRules,
+	viewerId: string,
+	targetUserId: string
+): boolean {
+	if (!space.members.some((member) => member.userId === targetUserId)) {
+		return false;
+	}
+	if (space.kind === 'solo') {
+		return targetUserId === viewerId;
+	}
+	return targetUserId !== viewerId && managesSpace(space, viewerId);
+}

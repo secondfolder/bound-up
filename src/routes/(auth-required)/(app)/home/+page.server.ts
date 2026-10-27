@@ -5,8 +5,8 @@ import { guides } from '$lib/server/db/schema';
 import { latestIqTestResult } from '$lib/server/iq-test';
 import { listUnreadCounts } from '$lib/server/messaging';
 import { getHomeNotebookWidget } from '$lib/server/notebook';
-import { getHomeRewardsWidget } from '$lib/server/rewards';
-import { getHomeTasksWidget } from '$lib/server/tasks';
+import { getRewardsWidget, rewardsDependency } from '$lib/server/rewards';
+import { getTasksWidget, tasksDependency } from '$lib/server/tasks';
 import type {
 	DaydreamsWidgetView,
 	GuidesWidgetView,
@@ -51,13 +51,19 @@ export const load: PageServerLoad = async ({ locals, parent, depends }) => {
 	// nav, so take it from there rather than reading `partnerships` a second
 	// time. It also carries the per-viewer name, which is resolved in exactly
 	// one place (invariant 12).
-	const { partners, features } = await parent();
+	const [{ partners, features }, spaces] = await Promise.all([parent(), locals.contextSpaces()]);
+
+	// The tasks and rewards cards cover every space the viewer is in — what
+	// /tasks and /rewards show in Everyone, which is where they lead.
+	const spaceIds = spaces.map((space) => space.spaceId);
+	const names = new Map(partners.map((partner) => [partner.id, partner.names]));
 
 	depends('messages:unread');
-	// The same keys the /home/tasks and /home/rewards loads use, so completing a
-	// task or claiming a reward refreshes the cards here too.
-	depends('tasks:home');
-	depends('rewards:home');
+	// The same keys the /tasks and /rewards loads use, so completing a task or
+	// claiming a reward refreshes the cards here too.
+	for (const spaceId of spaceIds) {
+		depends(tasksDependency(spaceId), rewardsDependency(spaceId));
+	}
 	// The solo notebook's own key, so an entry written elsewhere refreshes the card.
 	depends('notebook:self');
 
@@ -72,10 +78,8 @@ export const load: PageServerLoad = async ({ locals, parent, depends }) => {
 			hasFeature(features, 'daydreams')
 				? getDaydreamsWidget(locals.db, locals.user.id, DAYDREAMS_PREVIEW_LIMIT)
 				: null,
-			// Both take the layout's partner list: the cards mirror /home/tasks and
-			// /home/rewards, which show your own things AND each partner's.
-			getHomeTasksWidget(locals.db, locals.user.id, partners),
-			getHomeRewardsWidget(locals.db, locals.user.id, partners),
+			getTasksWidget(locals.db, locals.user.id, spaceIds, names),
+			getRewardsWidget(locals.db, locals.user.id, spaceIds, names),
 			// One row, for the Playroom card's "Last IQ test" line.
 			latestIqTestResult(locals.db, locals.user.id),
 			getHomeNotebookWidget(locals.db, locals.user.id)

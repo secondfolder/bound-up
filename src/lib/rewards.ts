@@ -1,9 +1,9 @@
-import { canEditPartnership, type PartnershipRecord, roleOf } from './partnership';
+import { type AssignedRecord, actsOn, managesRecord, type SpaceForRules } from './spaces';
 
 /**
- * The editable fields on a reward in either scope: the cost and whether it is
- * active, which the server checks claims against, and the title and
- * description sealed in the scope's vault (`rewardKind`).
+ * The editable fields on a reward: the cost and whether it is active, which
+ * the server checks claims against, and the title and description sealed in
+ * its space's vault (`rewardKind`).
  */
 export type RewardInput = {
 	cost: number;
@@ -11,78 +11,39 @@ export type RewardInput = {
 	content: { vaultId: string; ciphertext: string; payloadVersion: number };
 };
 
-export type PartnershipRewardRecord = Pick<
-	PartnershipRecord,
-	'control' | 'inviterId' | 'inviteeId'
-> & {
-	status: PartnershipRecord['status'];
-	partnershipId: string;
-	createdByUserId: string;
-	active: boolean;
-	cost: number;
-};
-
-/** Shared control means both members can manage rewards, matching link edits. */
-export function canManagePartnershipRewards(record: PartnershipRecord, userId: string): boolean {
-	return canEditPartnership(record, userId);
-}
+/** A reward as its rules see it. */
+export type RewardRuleRecord = AssignedRecord & { active: boolean; cost: number };
 
 /**
- * Whether this member is on the claiming side of the current control setting.
- *
- * Sole control splits the feature into manager and claimant roles; shared
- * control deliberately lets both members do both.
+ * Whether the viewer may claim this reward with the credits they have in its
+ * space: it is theirs to claim (`actsOn` — set for them, on the side that
+ * acts, and never one they wrote, so nobody spends credits on their own
+ * reward), it is active, and the balance covers it. See docs/rewards.md.
  */
-export function canClaimFromPartnership(
-	record: Pick<PartnershipRecord, 'status' | 'control' | 'inviterId' | 'inviteeId'>,
-	userId: string
-): boolean {
-	const role = roleOf(record, userId);
-	if (!role || record.status !== 'accepted') {
-		return false;
-	}
-	return record.control === 'both' || record.control !== role;
-}
-
-/** Managers may set the counterpart's balance, never their own. */
-export function canSetPartnershipCredits(
-	record: PartnershipRecord,
-	actorUserId: string,
-	targetUserId: string
-): boolean {
-	if (!canManagePartnershipRewards(record, actorUserId)) {
-		return false;
-	}
-	if (actorUserId === targetUserId) {
-		return false;
-	}
-	const actorRole = roleOf(record, actorUserId);
-	if (!actorRole || record.status !== 'accepted') {
-		return false;
-	}
-	const counterpartId = actorRole === 'inviter' ? record.inviteeId : record.inviterId;
-	return counterpartId === targetUserId;
-}
-
-/**
- * One reward claim check.
- *
- * Authorship is independent of control: even under shared control a user may
- * never claim their own reward, but can still claim one the other member wrote.
- */
-export function canClaimPartnershipReward(
-	record: PartnershipRewardRecord,
+export function canClaimReward(
+	record: RewardRuleRecord,
+	space: SpaceForRules,
 	viewerId: string,
 	availableCredits: number
 ): boolean {
-	if (!canClaimFromPartnership(record, viewerId)) {
-		return false;
+	return actsOn(record, space, viewerId) && record.active && availableCredits >= record.cost;
+}
+
+/**
+ * Which side of a rewards page a reward is on for this viewer: `claim`, the
+ * wallets they spend from, or `set`, the ones they keep for someone else in a
+ * shared space they manage. Null hides it, as `taskListFor` does.
+ */
+export function rewardListFor(
+	record: AssignedRecord,
+	space: SpaceForRules,
+	viewerId: string
+): 'claim' | 'set' | null {
+	if (actsOn(record, space, viewerId)) {
+		return 'claim';
 	}
-	if (!record.active) {
-		return false;
+	if (space.kind === 'shared' && managesRecord(record, space, viewerId)) {
+		return 'set';
 	}
-	if (record.createdByUserId === viewerId) {
-		return false;
-	}
-	return availableCredits >= record.cost;
+	return null;
 }

@@ -248,9 +248,8 @@ Where that applies today:
   so exactly when the viewer may edit the record. The description is sealed
   content, so a tick is a new sealed record: `descriptionSaver` in
   `description-ticks.ts` re-seals the content as opened with the new
-  description and posts it to the list page's content action
-  (`?/selfTaskContent`, `?/taskContent`, `?/selfRewardContent`,
-  `?/rewardContent`). Those take the sealed content **alone**, never the
+  description and posts it to the list page's content action (`?/content`
+  on `/tasks` or `/rewards`). Those take the sealed content **alone**, never the
   settings: the edit form's action works a task's schedule out again from
   what it is given, so a tick through it would make a task done today due
   again. The server applies the same permission as an edit and the same

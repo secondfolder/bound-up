@@ -2,20 +2,14 @@ import type { z } from 'zod';
 import { assertNever } from './assert-never';
 import type { TaskEditorFormSchema, TaskSealedSubmit } from './schemas/taskEditorForm';
 import type { TaskInput } from './tasks';
-import type {
-	PartnershipTaskView,
-	SelfTaskView,
-	TaskMonthlyPattern,
-	TaskSchedule,
-	TaskScheduleEnd
-} from './types';
+import type { TaskMonthlyPattern, TaskSchedule, TaskScheduleEnd, TaskView } from './types';
 
 // `z.output` rather than superforms' `Infer<>`, which is the same type for a
 // Zod schema: Biome 2.5's type inference recurses on `Infer<>` until it
 // overflows its stack, crashing the whole lint run rather than one rule.
 export type TaskEditorFormValues = z.output<TaskEditorFormSchema>;
 
-type TaskEditableView = SelfTaskView | PartnershipTaskView;
+type TaskEditableView = TaskView;
 
 /** The schedule fields, which the editor and the sealed submit share. */
 type ScheduleValues = Omit<

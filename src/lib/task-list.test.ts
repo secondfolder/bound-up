@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { opensLater, quotaText, type TaskView } from './task-list';
-import type { TaskSchedule } from './types';
+import { opensLater, quotaText } from './task-list';
+import type { TaskSchedule, TaskView } from './types';
 
 const now = new Date('2026-10-22T12:00:00.000Z');
 const threeAWeek: TaskSchedule = {

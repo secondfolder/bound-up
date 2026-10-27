@@ -1,4 +1,4 @@
-import { canEditPartnership, type PartnershipRecord, roleOf } from './partnership';
+import { type AssignedRecord, actsOn, managesRecord, type SpaceForRules } from './spaces';
 import type { TaskSchedule } from './types';
 
 /** What the server can see of a task: everything it schedules, credits and checks. */
@@ -25,68 +25,12 @@ export type SealedTaskContent = {
 
 export type TaskInput = TaskSettings & { content: SealedTaskContent };
 
-export type PartnershipTaskRecord = Pick<
-	PartnershipRecord,
-	'status' | 'control' | 'inviterId' | 'inviteeId'
-> & {
-	partnershipId: string;
-	createdByUserId: string;
-	active: boolean;
-	nextEligibleAt: Date | null;
-};
+/** A task as its rules see it: who it is from and for, and whether it is open now. */
+export type TaskRuleRecord = AssignedRecord & { active: boolean; nextEligibleAt: Date | null };
 
-/** Shared control means both members can manage tasks, matching link edits. */
-export function canManagePartnershipTasks(
-	record: Pick<PartnershipRecord, 'control' | 'inviterId' | 'inviteeId'>,
-	userId: string
-): boolean {
-	return canEditPartnership(record, userId);
-}
-
-/**
- * Whether this member is on the completion side of the current control setting.
- *
- * Sole control splits the feature into manager and completer roles; shared
- * control lets both members complete, subject to authorship and availability.
- */
-export function canCompleteFromPartnership(
-	record: Pick<PartnershipRecord, 'status' | 'control' | 'inviterId' | 'inviteeId'>,
-	userId: string
-): boolean {
-	const role = roleOf(record, userId);
-	if (!role || record.status !== 'accepted') {
-		return false;
-	}
-	return record.control === 'both' || record.control !== role;
-}
-
-/**
- * Whether this member should currently see the task on the partnership task page.
- *
- * A control flip can leave old tasks in the database that are now assigned to the
- * wrong side for this viewer. Those tasks stay persisted so they can reappear if
- * control changes again, but the current page only shows tasks that are still on
- * this viewer's present side of the split.
- */
-export function canViewPartnershipTask(record: PartnershipTaskRecord, userId: string): boolean {
-	const canManage = canManagePartnershipTasks(record, userId);
-	const canComplete = canCompleteFromPartnership(record, userId);
-
-	if (!(canManage || canComplete)) {
-		return false;
-	}
-	if (canManage && canComplete) {
-		return true;
-	}
-	if (canManage) {
-		return record.createdByUserId === userId;
-	}
-	return record.createdByUserId !== userId;
-}
-
-/** One availability check shared by self and partnership tasks. */
+/** One availability check for every task. */
 export function isTaskCompletableAt(
-	record: Pick<PartnershipTaskRecord, 'active' | 'nextEligibleAt'>,
+	record: Pick<TaskRuleRecord, 'active' | 'nextEligibleAt'>,
 	now: Date = new Date()
 ): boolean {
 	if (!record.active) {
@@ -99,23 +43,38 @@ export function isTaskCompletableAt(
 }
 
 /**
- * One partnership task completion check.
- *
- * Authorship is independent of control: shared control may let both members
- * complete tasks, but never the one who created that task.
+ * Whether the viewer may complete this task now: it is theirs to do
+ * (`actsOn` — assigned to them, on the side that acts, and not one they
+ * wrote) and it is open. See docs/tasks.md.
  */
-export function canCompletePartnershipTask(
-	record: PartnershipTaskRecord,
+export function canCompleteTask(
+	record: TaskRuleRecord,
+	space: SpaceForRules,
 	viewerId: string,
 	now: Date = new Date()
 ): boolean {
-	if (!canCompleteFromPartnership(record, viewerId)) {
-		return false;
+	return actsOn(record, space, viewerId) && isTaskCompletableAt(record, now);
+}
+
+/**
+ * Which of a tasks page's two lists a task is on for this viewer: **to do**,
+ * the ones they complete, or **set for others**, the ones they set for
+ * someone else in a shared space they manage. Null for neither, which hides
+ * it: one left on the wrong side by a change of who manages stays stored, and
+ * shows again if it changes back.
+ */
+export function taskListFor(
+	record: AssignedRecord,
+	space: SpaceForRules,
+	viewerId: string
+): 'to-do' | 'set' | null {
+	if (actsOn(record, space, viewerId)) {
+		return 'to-do';
 	}
-	if (record.createdByUserId === viewerId) {
-		return false;
+	if (space.kind === 'shared' && managesRecord(record, space, viewerId)) {
+		return 'set';
 	}
-	return isTaskCompletableAt(record, now);
+	return null;
 }
 
 type GroupableTask = {

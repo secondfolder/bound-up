@@ -1,24 +1,18 @@
 import { z } from 'zod';
 
 /**
- * Completing a task: the only task form that is not the editor. The editor's
- * schemas are in `taskEditorForm.ts`.
+ * Completing a task, and taking a completion back: the only task forms that
+ * are not the editor. The editor's schemas are in `taskEditorForm.ts`. Each
+ * names its record, which carries its space; neither reads the context
+ * (docs/contexts.md, "Writes name their space").
  */
 
-const taskIdSchema = z.string().uuid('Malformed task id');
-const partnershipIdSchema = z.string().uuid('Malformed partnership id');
-
-export const taskCompleteSchema = z.object({ taskId: taskIdSchema });
-
-export const partnerTaskCompleteSchema = taskCompleteSchema.extend({
-	partnershipId: partnershipIdSchema
-});
+export const taskCompleteSchema = z.object({ taskId: z.string().uuid('Malformed task id') });
 
 /** Takes back a completion; the id is what the complete action answered with. */
 export const taskUndoSchema = z.object({
 	completionId: z.string().uuid('Malformed completion id')
 });
 
-export const partnerTaskUndoSchema = taskUndoSchema.extend({
-	partnershipId: partnershipIdSchema
-});
+/** The space a new task or reward goes to, which the form names (never the context). */
+export const spaceIdSchema = z.string().uuid('Choose who it’s for');

@@ -23,13 +23,13 @@ test.describe('rewards', () => {
 	 * page silently reverted it to the stored one.
 	 *
 	 * Only a page loaded in full is hydrated, so both are reached with `goto`:
-	 * the click-through from /home/rewards the other tests use is a client-side
+	 * the click-through from /rewards the other tests use is a client-side
 	 * navigation, which mounts instead, and never showed it.
 	 */
 	test('keeps a title typed before the description, adding and editing', async ({ page }) => {
 		await newAccount(page, account('Ada'));
 
-		await page.goto('/home/rewards/add');
+		await page.goto('/rewards/add');
 		const title = page.locator('.add-form wa-input[name="title"] input');
 		await waitForHydration(page);
 		await title.fill('Long bath');
@@ -38,7 +38,7 @@ test.describe('rewards', () => {
 
 		await page.locator('.add-form wa-input[name="cost"] input').fill('2');
 		await clickWaButton(page, 'Add reward');
-		await waitForSheetClosed(page, /\/home\/rewards$/);
+		await waitForSheetClosed(page, /\/rewards$/);
 
 		// Edit is in the reward's detail, which its row opens.
 		await waitForHydration(page);
@@ -66,7 +66,7 @@ test.describe('rewards', () => {
 			await newAccount(ada.page, ada.who);
 			await ada.page.waitForURL('**/home');
 			await ada.page.getByRole('link', { name: 'Rewards' }).click();
-			await ada.page.waitForURL(/\/home\/rewards$/);
+			await ada.page.waitForURL(/\/rewards$/);
 
 			await ada.page.getByRole('button', { name: 'Edit your reward credits' }).click();
 			await ada.page.getByLabel('Set your reward credits').fill('4');
@@ -76,13 +76,13 @@ test.describe('rewards', () => {
 			);
 
 			await ada.page.getByRole('link', { name: 'Add a reward' }).click();
-			await ada.page.waitForURL(/\/home\/rewards\/add$/);
+			await ada.page.waitForURL(/\/rewards\/add$/);
 			await waitForHydration(ada.page);
 			await ada.page.locator('.add-form wa-input[name="title"] input').first().fill('Long bath');
 			await fillRichText(ada.page.locator('.add-form'), 'No interruptions');
 			await ada.page.locator('.add-form wa-input[name="cost"] input').first().fill('2');
 			await clickWaButton(ada.page, 'Add reward');
-			await waitForSheetClosed(ada.page, /\/home\/rewards$/);
+			await waitForSheetClosed(ada.page, /\/rewards$/);
 
 			// Claimed only from the reward's detail: a second, deliberate tap.
 			const within = ada.page.locator('.item-group').filter({ hasText: 'Within reach' });
@@ -95,9 +95,9 @@ test.describe('rewards', () => {
 			);
 
 			await ada.page.getByRole('link', { name: 'Claim history' }).click();
-			await ada.page.waitForURL(/\/home\/rewards\/history$/);
+			await ada.page.waitForURL(/\/rewards\/history$/);
 			await expect(ada.page.locator('wa-dialog').getByText('Long bath')).toBeVisible();
-			await expect(ada.page.getByRole('heading', { name: 'Your reward history' })).toBeVisible();
+			await expect(ada.page.getByRole('heading', { name: 'Reward history' })).toBeVisible();
 		} finally {
 			await ada.close();
 		}
@@ -113,7 +113,7 @@ test.describe('rewards', () => {
 			await newAccount(ada.page, ada.who);
 			await ada.page.waitForURL('**/home');
 			await ada.page.getByRole('link', { name: 'Rewards' }).click();
-			await ada.page.waitForURL(/\/home\/rewards$/);
+			await ada.page.waitForURL(/\/rewards$/);
 			const link = await createInvite(ada.page, {
 				partnerName: 'Jun',
 				yourName: 'Ada',
@@ -126,6 +126,8 @@ test.describe('rewards', () => {
 			await clickWaButton(jun.page, 'Accept and link');
 			await jun.page.waitForURL(/\/partner\/[0-9a-f-]{36}$/);
 
+			// After hydration, so the card switches to the partnership's context.
+			await waitForHydration(jun.page);
 			await jun.page.getByRole('link', { name: 'Rewards' }).click();
 			await jun.page.waitForURL(/\/rewards$/);
 			await jun.page.getByRole('button', { name: "Edit Ada's reward credits" }).click();
@@ -144,32 +146,21 @@ test.describe('rewards', () => {
 			const affordable = jun.page.locator('.item-group').filter({ hasText: 'Ada can afford' });
 			await expect(affordable.getByRole('button', { name: /^Tea service/ })).toBeVisible();
 
-			await ada.page.goto('/home/rewards');
+			// Ada never switched, so /rewards is Everyone: her own wallet, then
+			// the one Jun keeps for her, never one merged list.
+			await ada.page.goto('/rewards');
 			await expect(ada.page.getByRole('heading', { name: 'From Jun' })).toBeVisible();
 			const balance = ada.page.locator('.balances li').filter({ hasText: 'With Jun' });
 			await expect(balance).toContainText('4');
-			const teaService = ada.page.locator('.partner').getByRole('button', { name: /^Tea service/ });
+			const teaService = ada.page.getByRole('button', { name: /^Tea service/ });
 			await waitForHydration(ada.page);
 			await teaService.click();
 			await clickWaButton(ada.page, /^Claim · 2 credits$/);
 			await expect(balance).toContainText(/With Jun\s*2\b/);
 
-			/**
-			 * Both waits name the partner's route, as tasks.spec.ts does. A bare
-			 * `/\/rewards$/` already matches /home/rewards, so it returned before
-			 * the client-side navigation had loaded anything, and the click below
-			 * found /home/rewards' own "Claim history" — the self one — whenever
-			 * the partner page's load was slower than the click (four workers,
-			 * now and then). Ada then landed on /home/rewards/history, which
-			 * `/\/rewards\/history$/` matched too, and "Claimed by you" never
-			 * came, because her self history is empty.
-			 */
-			// The whole list is a link in the reward's detail.
-			await teaService.click();
-			await ada.page.locator('wa-dialog').getByRole('link', { name: "Jun's rewards" }).click();
-			await ada.page.waitForURL(/\/partner\/[0-9a-f-]{36}\/rewards$/);
+			// The history follows the context too, and says who claimed it.
 			await ada.page.getByRole('link', { name: 'Claim history' }).click();
-			await ada.page.waitForURL(/\/partner\/[0-9a-f-]{36}\/rewards\/history$/);
+			await ada.page.waitForURL(/\/rewards\/history$/);
 			await expect(ada.page.getByText('Claimed by you')).toBeVisible();
 		} finally {
 			await ada.close();

@@ -36,7 +36,7 @@ import { type NotebookEntryHeader, notebookEntryKind } from './sealed-kinds/note
 import { tagKind } from './sealed-kinds/tags';
 import { type RewardContent, rewardKind, type TaskContent, taskKind } from './sealed-kinds/tasks';
 import type {
-	RewardHistoryView,
+	RewardClaimView,
 	SealedRefView,
 	TagView,
 	TaskCompletionView,
@@ -84,7 +84,7 @@ export function openedReward(reward: { sealed: SealedRefView | null }): Opened<R
 }
 
 /** A claim as history shows it: the reward as it was when claimed. */
-export function openedClaim(claim: RewardHistoryView): Opened<RewardContent> {
+export function openedClaim(claim: RewardClaimView): Opened<RewardContent> {
 	return open(rewardKind, claim.sealed);
 }
 
