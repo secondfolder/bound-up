@@ -77,6 +77,32 @@ test.describe('vaults', () => {
 				[adaId]
 			);
 			expect(Number(rows[0]?.n)).toBe(1);
+
+			// Each vault is in its space: an account's in their solo space, the
+			// pair's in the shared space that has the partnership's id, which
+			// both of them are members of (docs/spaces.md).
+			const placed = await sql(
+				`SELECT v.kind AS kind, s.kind AS spaceKind,
+				        (SELECT group_concat(m.user_id) FROM space_members m WHERE m.space_id = s.id) AS members,
+				        v.partnership_id IS NULL OR v.partnership_id = s.id AS samePartnership
+				   FROM vaults v JOIN spaces s ON s.id = v.space_id
+				  WHERE v.owner_user_id IN (?, ?)
+				     OR v.partnership_id IN (SELECT id FROM partnerships WHERE inviter_id = ?)
+				  ORDER BY v.kind, v.owner_user_id = ? DESC`,
+				[adaId, junId, adaId, adaId]
+			);
+			expect(
+				placed.rows.map((row) => [
+					row.kind,
+					row.spaceKind,
+					String(row.members).split(',').sort().join(','),
+					Number(row.samePartnership)
+				])
+			).toEqual([
+				['partnership', 'shared', [adaId, junId].sort().join(','), 1],
+				['self', 'solo', adaId, 1],
+				['self', 'solo', junId, 1]
+			]);
 		} finally {
 			await ada.close();
 			await jun.close();

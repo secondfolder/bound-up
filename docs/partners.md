@@ -22,12 +22,17 @@ relationship, so storing them twice would let the two halves disagree.
 | `status`                             | `'pending'` or `'accepted'`. There is no declined or ended state — see below.    |
 | `names_*`                            | The names and roles, sealed in the partnership's vault. See below.               |
 | `invite_*`                           | Before the names reach the vault: sealed under the invite key. See below.        |
-| `control`                            | `'inviter'`, `'invitee'` or `'both'`. Who may change the names and roles.        |
+| `control`                            | `'inviter'`, `'invitee'` or `'both'`. Who may change the names and roles. Read from the members' `can_manage`; see below. |
 | `invite_token` / `invite_expires_at` | The secret in the URL and its deadline. Both cleared on acceptance.              |
 | `accepted_at`                        | When the link was made.                                                          |
 
-Both foreign keys cascade on delete, so deleting a user removes every link they
-were in — otherwise the other person would keep a nav tab pointing at nothing.
+A partnership is also a **shared space** ([spaces.md](spaces.md)) with the
+partnership's own id: the inviter is a member from the moment they invite, the
+invitee from the moment they accept, and the row is the space's details — the
+invite and the names. Ending a partnership deletes the space and everything in
+it (`deletePartnership` → `deleteSpace`), and so does deleting either account,
+explicitly rather than by cascade — otherwise the other person would keep a
+nav tab pointing at nothing.
 
 `invite_token` has a unique index. SQLite allows many `NULL`s in a unique index,
 so clearing the token on acceptance also frees the inviter to send another
@@ -159,6 +164,14 @@ answerFromControl('inviter', 'invitee'); // → 'them'
 ```
 
 The round trip holds for all six combinations, and there is a test that says so.
+
+What the permission rules follow is not the column but the space's members:
+each has a `can_manage` flag, kept in step with `control` by
+`syncSharedSpaceMembers` in the same batch as every write of it, and every read
+of `control` is worked out from those flags (`partnershipControl`). `both` is
+two members who manage. A pending invite has only its inviter as a member, so
+until it is accepted `control` is read from the row, as what the invite
+offers. See [spaces.md](spaces.md#membership-and-can_manage).
 The Zod schema accepts only `me` / `them` / `mix` — posting the _stored_ value
 `inviter` is rejected, so there is no way to set `control` without going through
 `controlFromAnswer`.
@@ -405,6 +418,7 @@ navigation does not dismiss a browser-level sheet.
 | `src/lib/components/PartnerAcceptForm.svelte` | The accept form. Owns its `superForm`.                              |
 | `src/lib/invite-url.ts`, `src/lib/share.ts`   | Building the URL, and handing it to the platform.                   |
 | `src/lib/safe-redirect.ts`                    | The `redirectTo` allowlist.                                         |
+| `src/lib/server/spaces.ts`                    | The shared space: membership, `can_manage` and `control`, deleting. |
 | `src/lib/server/db/schema/app.ts`             | The `partnerships` table.                                           |
 
 `partnership.ts` is **alias-free** (relative imports only), like

@@ -3,7 +3,7 @@ import { generateAgeIdentity } from '../crypto/identity';
 import type { DaydreamTurnRole } from '../daydream';
 import type { ThreadIcon } from '../messaging';
 import type { NotebookKind, PartnerAccess } from '../notebook';
-import type { ControlAnswer } from '../partnership';
+import type { ControlAnswer, PartnershipControl } from '../partnership';
 import { controlFromAnswer } from '../partnership';
 import { appendTurn, createDaydream } from '../server/daydreams';
 import type { Db } from '../server/db';
@@ -49,6 +49,7 @@ import {
 	setPartnershipRewardCredits,
 	setSelfRewardCredits
 } from '../server/rewards';
+import { soloSpaceIdOf, syncSharedSpaceMembers } from '../server/spaces';
 import { createPartnershipTask, createSelfTask } from '../server/tasks';
 import type { TaskSettings } from '../tasks';
 import type { TaskSchedule } from '../types';
@@ -116,6 +117,8 @@ export async function createTestUser(db: Db, overrides: Partial<TestUser> = {}):
 		createdAt: new Date(),
 		updatedAt: new Date()
 	});
+	// The insert also gives the user their solo space: the migrations'
+	// `user_has_solo_space` trigger makes it, as it does for a real sign-up.
 	// Written after the insert, not with it: the migrations' first-account
 	// trigger makes whichever fixture user is inserted first an admin, and a
 	// test's roles should be what it asked for, not an accident of order.
@@ -177,6 +180,23 @@ export async function createTestPartnership(
 		throw new Error(`fixture could not accept invite: ${result.reason}`);
 	}
 	return { id: result.id };
+}
+
+/**
+ * Changes who holds control, as the partner settings form would: the row's
+ * `control` and the members' `can_manage` together, through the one helper
+ * that keeps them in step. Setting the column alone changes nothing a
+ * permission reads (`partnershipControl` in `server/spaces.ts`).
+ */
+export async function setTestPartnershipControl(
+	db: Db,
+	partnershipId: string,
+	control: PartnershipControl
+): Promise<void> {
+	await db.batch([
+		db.update(partnerships).set({ control }).where(eq(partnerships.id, partnershipId)),
+		...syncSharedSpaceMembers(db, partnershipId)
+	]);
 }
 
 /** Pushes a pending invite's expiry into the past. */
@@ -252,6 +272,7 @@ export async function createTestRestoreRequest(
 		db.insert(historyRestoreRequests).values({
 			id,
 			partnershipId: input.partnershipId,
+			spaceId: input.partnershipId,
 			requesterId: input.requesterId,
 			requestedRecipient: input.recipient,
 			recoveryRequestId
@@ -543,9 +564,13 @@ export async function ensureTestPartnershipVault(db: Db, partnershipId: string):
 		return existing.id;
 	}
 	const id = crypto.randomUUID();
-	await db
-		.insert(vaults)
-		.values({ id, kind: 'partnership', partnershipId, keyCheck: 'K'.repeat(43) });
+	await db.insert(vaults).values({
+		id,
+		kind: 'partnership',
+		partnershipId,
+		spaceId: partnershipId,
+		keyCheck: 'K'.repeat(43)
+	});
 	return id;
 }
 
@@ -560,9 +585,13 @@ export async function ensureTestSelfVault(db: Db, userId: string): Promise<strin
 		return existing.id;
 	}
 	const id = crypto.randomUUID();
-	await db
-		.insert(vaults)
-		.values({ id, kind: 'self', ownerUserId: userId, keyCheck: 'K'.repeat(43) });
+	await db.insert(vaults).values({
+		id,
+		kind: 'self',
+		ownerUserId: userId,
+		spaceId: soloSpaceIdOf(userId),
+		keyCheck: 'K'.repeat(43)
+	});
 	return id;
 }
 

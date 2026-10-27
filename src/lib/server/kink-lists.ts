@@ -11,6 +11,7 @@ import {
 	sealedIsAcceptable,
 	selfVaultIdFor
 } from './sealed-content';
+import { soloSpaceIdOf } from './spaces';
 
 /**
  * Every database access for kink lists. See docs/kink-list.md.
@@ -147,6 +148,8 @@ export async function saveKinkList(
 				ownerId: userId,
 				scope: scopeKey(scope),
 				partnershipId: scope === 'self' ? null : scope.partnershipId,
+				// A partnership's space has the partnership's id.
+				spaceId: scope === 'self' ? soloSpaceIdOf(userId) : scope.partnershipId,
 				ciphertext: content.ciphertext,
 				vaultId: content.vaultId,
 				payloadVersion: content.payloadVersion,

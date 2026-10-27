@@ -16,6 +16,7 @@ import type { NotebookKind, PartnerAccess } from '../../../notebook';
 import type { PartnershipControl, PartnershipStatus } from '../../../partnership';
 import type { Intensity, Role, Vibe } from '../../../playroom/iq-test/settings';
 import type { ServerSettingKey, ServerSettingSource } from '../../../server-settings';
+import type { SpaceKind } from '../../../spaces';
 import type { EdgeTaskInstructions, TaskSchedule } from '../../../types';
 import type { VaultKind } from '../../../vault';
 import { user } from './auth';
@@ -232,6 +233,73 @@ export const partnerships = sqliteTable(
 
 export type Partnership = typeof partnerships.$inferSelect;
 export type NewPartnership = typeof partnerships.$inferInsert;
+
+/**
+ * Where scoped data lives: one person's own space, or one shared by the
+ * members of a partnership. See docs/spaces.md.
+ *
+ * Every account has exactly one `solo` space, made by a trigger on `user`
+ * (drizzle/*_backfill_spaces.sql) so it holds however the account is created.
+ * A partnership's `shared` space has the partnership's own id, so a
+ * `partnership_id` anywhere is already the id of its space; the partnership
+ * row stays as the shared space's details — the invite, the sealed names.
+ *
+ * Nothing about a space is content, so there is nothing here but its kind.
+ */
+export const spaces = sqliteTable('spaces', {
+	id: text('id')
+		.primaryKey()
+		.$defaultFn(() => crypto.randomUUID()),
+	kind: text('kind').$type<SpaceKind>().notNull(),
+	...timestamps
+});
+
+/**
+ * Who is in a space, and whether they manage it.
+ *
+ * `can_manage` replaces the partnership's `control` as what the server reads:
+ * a flag per member rather than an inviter/invitee/both enum, so nothing in
+ * the database assumes a space has two members. `partnerships.control` is
+ * still written, in the same batch, by `server/spaces.ts` — see the
+ * LEGACY-SPACES note there.
+ */
+export const spaceMembers = sqliteTable(
+	'space_members',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		spaceId: text('space_id')
+			.notNull()
+			.references(() => spaces.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		canManage: integer('can_manage', { mode: 'boolean' }).notNull(),
+		...timestamps
+	},
+	(table) => [
+		uniqueIndex('space_members_space_user_idx').on(table.spaceId, table.userId),
+		// "Which spaces am I in" — every membership check and the solo-space lookup.
+		index('space_members_user_id_idx').on(table.userId)
+	]
+);
+
+export type Space = typeof spaces.$inferSelect;
+export type NewSpace = typeof spaces.$inferInsert;
+export type SpaceMemberRow = typeof spaceMembers.$inferSelect;
+export type NewSpaceMemberRow = typeof spaceMembers.$inferInsert;
+
+/**
+ * A space a row belongs to. Nullable, with no `ON DELETE`, because it is
+ * added to tables that already exist: making it NOT NULL, or giving it an
+ * action, means rebuilding the table, which on D1 cascade-deletes everything
+ * referencing it (the trap in AGENTS.md). Every writer sets it, and deleting
+ * a space deletes its rows explicitly (`deleteSpace` in `server/spaces.ts`).
+ */
+function spaceColumn() {
+	return text('space_id').references(() => spaces.id);
+}
 
 /**
  * A reward a user can assign and redeem for themselves.
@@ -646,8 +714,13 @@ export const userKeyWraps = sqliteTable(
 );
 
 /**
- * One key that a scope's user data is sealed under: a user's own, or a
+ * One key that a space's user data is sealed under: a user's own, or a
  * partnership's. See docs/encryption.md, "Vaults".
+ *
+ * A vault belongs to a space (`space_id`) but is not the space itself: its id
+ * is bound into every ciphertext sealed under it, and a space that ever loses
+ * a member will need a new key — a new vault — while staying the same space
+ * (docs/spaces.md).
  *
  * The key itself is never here. What the server holds is a public fingerprint
  * of it (`key_check`) and, in `vault_wraps`, a copy of it encrypted to each
@@ -671,11 +744,14 @@ export const vaults = sqliteTable(
 		partnershipId: text('partnership_id')
 			.unique()
 			.references(() => partnerships.id, { onDelete: 'cascade' }),
+		/** The space this is the key of. `owner_user_id`/`partnership_id` say the same, and stay. */
+		spaceId: spaceColumn(),
 		/** HKDF of the key, base64url. Public; see `VAULT_KEY_CHECK_INFO`. */
 		keyCheck: text('key_check').notNull(),
 		...timestamps
 	},
 	(table) => [
+		index('vaults_space_id_idx').on(table.spaceId),
 		check(
 			'vaults_scope_matches_kind',
 			sql`(${table.kind} = 'self' AND ${table.ownerUserId} IS NOT NULL AND ${table.partnershipId} IS NULL) OR (${table.kind} = 'partnership' AND ${table.partnershipId} IS NOT NULL AND ${table.ownerUserId} IS NULL)`
@@ -739,6 +815,7 @@ export const messageThreads = sqliteTable(
 		partnershipId: text('partnership_id')
 			.notNull()
 			.references(() => partnerships.id, { onDelete: 'cascade' }),
+		spaceId: spaceColumn(),
 		/**
 		 * The sticker this thread shows on the board. PLAINTEXT, and re-validated
 		 * against `THREAD_ICONS` at every write path.
@@ -788,7 +865,9 @@ export const messageThreads = sqliteTable(
 		index('message_threads_partnership_sender_idx').on(
 			table.partnershipId,
 			table.lastMessageSenderId
-		)
+		),
+		// Every space-scoped table is indexed on its space, for `deleteSpace`.
+		index('message_threads_space_id_idx').on(table.spaceId)
 	]
 );
 
@@ -802,6 +881,7 @@ export const messageTags = sqliteTable(
 		partnershipId: text('partnership_id')
 			.notNull()
 			.references(() => partnerships.id, { onDelete: 'cascade' }),
+		spaceId: spaceColumn(),
 		color: text('color').notNull(),
 		/**
 		 * The name, sealed in the partnership's vault (kind `tag`), and its
@@ -815,7 +895,8 @@ export const messageTags = sqliteTable(
 	},
 	(table) => [
 		uniqueIndex('message_tags_partnership_name_index_unq').on(table.partnershipId, table.nameIndex),
-		index('message_tags_partnership_idx').on(table.partnershipId)
+		index('message_tags_partnership_idx').on(table.partnershipId),
+		index('message_tags_space_id_idx').on(table.spaceId)
 	]
 );
 
@@ -1124,6 +1205,7 @@ export const historyRestoreRequests = sqliteTable(
 		partnershipId: text('partnership_id')
 			.notNull()
 			.references(() => partnerships.id, { onDelete: 'cascade' }),
+		spaceId: spaceColumn(),
 		/** Who lost their key. The other member is the one who can act on it. */
 		requesterId: text('requester_id')
 			.notNull()
@@ -1140,7 +1222,8 @@ export const historyRestoreRequests = sqliteTable(
 	(table) => [
 		// The partner's board asks "is anyone waiting on me in this partnership?".
 		index('history_restore_requests_partnership_status_idx').on(table.partnershipId, table.status),
-		index('history_restore_requests_recovery_idx').on(table.recoveryRequestId)
+		index('history_restore_requests_recovery_idx').on(table.recoveryRequestId),
+		index('history_restore_requests_space_id_idx').on(table.spaceId)
 	]
 );
 
@@ -1169,11 +1252,17 @@ export const vaultEscrows = sqliteTable(
 		partnershipId: text('partnership_id')
 			.notNull()
 			.references(() => partnerships.id, { onDelete: 'cascade' }),
+		/**
+		 * The shared space the escrow is held in — the partner's side of it —
+		 * not the space of the vault it holds (that is the owner's solo space).
+		 */
+		spaceId: spaceColumn(),
 		ciphertext: text('ciphertext').notNull(),
 		...timestamps
 	},
 	(table) => [
-		uniqueIndex('vault_escrows_vault_partnership_idx').on(table.vaultId, table.partnershipId)
+		uniqueIndex('vault_escrows_vault_partnership_idx').on(table.vaultId, table.partnershipId),
+		index('vault_escrows_space_id_idx').on(table.spaceId)
 	]
 );
 
@@ -1418,6 +1507,8 @@ export const daydreams = sqliteTable(
 		ownerId: text('owner_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
+		/** The owner's solo space, for now; see docs/spaces.md. */
+		spaceId: spaceColumn(),
 		/** The setup: title, character, scenario, limits. */
 		ciphertext: text('ciphertext').notNull(),
 		vaultId: text('vault_id')
@@ -1440,7 +1531,8 @@ export const daydreams = sqliteTable(
 	},
 	(table) => [
 		// The list and the /home card: "this user's, most recently played first".
-		index('daydreams_owner_last_turn_idx').on(table.ownerId, table.lastTurnAt)
+		index('daydreams_owner_last_turn_idx').on(table.ownerId, table.lastTurnAt),
+		index('daydreams_space_id_idx').on(table.spaceId)
 	]
 );
 
@@ -1601,6 +1693,7 @@ export const daydreamCharacters = sqliteTable(
 		ownerId: text('owner_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
+		spaceId: spaceColumn(),
 		ciphertext: text('ciphertext').notNull(),
 		vaultId: text('vault_id')
 			.notNull()
@@ -1609,7 +1702,10 @@ export const daydreamCharacters = sqliteTable(
 		revision: integer('revision').notNull().default(0),
 		...timestamps
 	},
-	(table) => [index('daydream_characters_owner_updated_idx').on(table.ownerId, table.updatedAt)]
+	(table) => [
+		index('daydream_characters_owner_updated_idx').on(table.ownerId, table.updatedAt),
+		index('daydream_characters_space_id_idx').on(table.spaceId)
+	]
 );
 
 /**
@@ -1624,6 +1720,7 @@ export const daydreamIdeas = sqliteTable(
 		ownerId: text('owner_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
+		spaceId: spaceColumn(),
 		ciphertext: text('ciphertext').notNull(),
 		vaultId: text('vault_id')
 			.notNull()
@@ -1632,7 +1729,10 @@ export const daydreamIdeas = sqliteTable(
 		revision: integer('revision').notNull().default(0),
 		...timestamps
 	},
-	(table) => [index('daydream_scenes_owner_updated_idx').on(table.ownerId, table.updatedAt)]
+	(table) => [
+		index('daydream_scenes_owner_updated_idx').on(table.ownerId, table.updatedAt),
+		index('daydream_scenes_space_id_idx').on(table.spaceId)
+	]
 );
 
 /**
@@ -1728,6 +1828,8 @@ export const kinkLists = sqliteTable(
 		partnershipId: text('partnership_id').references(() => partnerships.id, {
 			onDelete: 'cascade'
 		}),
+		/** The owner's solo space for their own list; the partnership's for a shared copy. */
+		spaceId: spaceColumn(),
 		ciphertext: text('ciphertext').notNull(),
 		vaultId: text('vault_id')
 			.notNull()
@@ -1742,7 +1844,8 @@ export const kinkLists = sqliteTable(
 	(table) => [
 		uniqueIndex('kink_lists_owner_scope_idx').on(table.ownerId, table.scope),
 		// A partner reads the other member's shared copy by partnership.
-		index('kink_lists_partnership_idx').on(table.partnershipId)
+		index('kink_lists_partnership_idx').on(table.partnershipId),
+		index('kink_lists_space_id_idx').on(table.spaceId)
 	]
 );
 
@@ -1807,6 +1910,8 @@ export const notebookEntries = sqliteTable(
 		partnershipId: text('partnership_id').references(() => partnerships.id, {
 			onDelete: 'cascade'
 		}),
+		/** Says what `owner_id`/`partnership_id` say, which stay along with their CHECK. */
+		spaceId: spaceColumn(),
 		kind: text('kind').$type<NotebookKind>().notNull(),
 		/** `YYYY-MM-DD`, for a journal entry; null for a note. */
 		entryDate: text('entry_date'),
@@ -1843,7 +1948,8 @@ export const notebookEntries = sqliteTable(
 			table.entryDate
 		),
 		index('notebook_entries_owner_edited_idx').on(table.ownerId, table.lastEditedAt),
-		index('notebook_entries_partnership_edited_idx').on(table.partnershipId, table.lastEditedAt)
+		index('notebook_entries_partnership_edited_idx').on(table.partnershipId, table.lastEditedAt),
+		index('notebook_entries_space_id_idx').on(table.spaceId)
 	]
 );
 

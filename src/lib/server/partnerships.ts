@@ -16,6 +16,14 @@ import type { PartnerView } from '../types';
 import type { Db } from './db';
 import { partnerships, user } from './db/schema';
 import { partnershipVaultIdFor, sealedIsAcceptable } from './sealed-content';
+import {
+	createSharedSpace,
+	deleteSpace,
+	isSpaceMember,
+	partnershipControl,
+	spaceExists,
+	syncSharedSpaceMembers
+} from './spaces';
 
 const BASE64_PADDING = /[=]+$/;
 
@@ -40,7 +48,8 @@ const partnershipColumns = {
 	status: partnerships.status,
 	inviterId: partnerships.inviterId,
 	inviteeId: partnerships.inviteeId,
-	control: partnerships.control,
+	// What the members' `can_manage` says, not the column; see `partnershipControl`.
+	control: partnershipControl(),
 	namesCiphertext: partnerships.namesCiphertext,
 	namesVaultId: partnerships.namesVaultId,
 	namesPayloadVersion: partnerships.namesPayloadVersion,
@@ -75,9 +84,14 @@ function baseQuery(db: Db) {
 		.leftJoin(inviteeUser, eq(partnerships.inviteeId, inviteeUser.id));
 }
 
-/** Either side of the link. Used by every "my partnerships" read. */
+/**
+ * Either side of the link. Used by every "my partnerships" read.
+ *
+ * Asked of the partnership's space, whose members are the inviter and, once
+ * accepted, the invitee — the same people the row's two columns name.
+ */
 function memberOf(userId: string) {
-	return or(eq(partnerships.inviterId, userId), eq(partnerships.inviteeId, userId));
+	return isSpaceMember(partnerships.id, userId);
 }
 
 function toView(row: PartnershipRow, userId: string): PartnershipView {
@@ -221,26 +235,37 @@ export async function createInvite(
 	}
 	const inviteToken = generateInviteToken();
 	const inviteExpiresAt = new Date(now.getTime() + INVITE_TTL_MS);
-	const rows = await db
-		.insert(partnerships)
-		.values({
-			id: input.id,
-			inviterId: input.inviterId,
-			status: 'pending',
-			control: input.control,
-			inviteToken,
-			inviteExpiresAt,
-			inviteCiphertext: input.invite.ciphertext,
-			invitePayloadVersion: input.invite.payloadVersion,
-			inviteKeyWrap: input.invite.keyWrap
-		})
-		.onConflictDoNothing()
-		.returning({ id: partnerships.id });
-	const [row] = rows;
-	if (!row) {
-		return { ok: false, reason: 'id-taken' };
+	// The partnership and its space in one batch, under the id the browser
+	// chose. Any clash — with a partnership or with any space — fails the lot,
+	// and is told apart from a real failure by looking, as `createVault` does.
+	const [spaceInsert, memberInsert] = createSharedSpace(db, {
+		id: input.id,
+		inviterId: input.inviterId,
+		control: input.control
+	});
+	try {
+		await db.batch([
+			spaceInsert,
+			db.insert(partnerships).values({
+				id: input.id,
+				inviterId: input.inviterId,
+				status: 'pending',
+				control: input.control,
+				inviteToken,
+				inviteExpiresAt,
+				inviteCiphertext: input.invite.ciphertext,
+				invitePayloadVersion: input.invite.payloadVersion,
+				inviteKeyWrap: input.invite.keyWrap
+			}),
+			...(memberInsert ? [memberInsert] : [])
+		]);
+	} catch (error) {
+		if (await spaceExists(db, input.id)) {
+			return { ok: false, reason: 'id-taken' };
+		}
+		throw error;
 	}
-	return { ok: true, id: row.id, inviteToken, inviteExpiresAt };
+	return { ok: true, id: input.id, inviteToken, inviteExpiresAt };
 }
 
 /**
@@ -345,30 +370,35 @@ export async function acceptInvite(
 		input.inviteeId
 	);
 
-	const rows = await db
-		.update(partnerships)
-		.set({
-			inviteeId: input.inviteeId,
-			status: 'accepted',
-			acceptedAt: now,
-			// Clearing the token both consumes the link and releases the unique
-			// index, so the same inviter can send another invite later.
-			inviteToken: null,
-			inviteExpiresAt: null,
-			...(accepterMayEdit
-				? {
-						control: input.control ?? existing.control,
-						...(input.invite
-							? {
-									inviteCiphertext: input.invite.ciphertext,
-									invitePayloadVersion: input.invite.payloadVersion
-								}
-							: {})
-					}
-				: {})
-		})
-		.where(and(eq(partnerships.inviteToken, input.token), eq(partnerships.status, 'pending')))
-		.returning({ id: partnerships.id });
+	const [rows] = await db.batch([
+		db
+			.update(partnerships)
+			.set({
+				inviteeId: input.inviteeId,
+				status: 'accepted',
+				acceptedAt: now,
+				// Clearing the token both consumes the link and releases the unique
+				// index, so the same inviter can send another invite later.
+				inviteToken: null,
+				inviteExpiresAt: null,
+				...(accepterMayEdit
+					? {
+							control: input.control ?? existing.control,
+							...(input.invite
+								? {
+										inviteCiphertext: input.invite.ciphertext,
+										invitePayloadVersion: input.invite.payloadVersion
+									}
+								: {})
+						}
+					: {})
+			})
+			.where(and(eq(partnerships.inviteToken, input.token), eq(partnerships.status, 'pending')))
+			.returning({ id: partnerships.id }),
+		// The invitee joins the space in the same batch, and only if the
+		// update above is what made them the invitee.
+		...syncSharedSpaceMembers(db, existing.id)
+	]);
 
 	const [row] = rows;
 	if (!row) {
@@ -435,18 +465,24 @@ export async function updatePartnership(
 		if (current.status !== 'pending' || current.role !== 'inviter' || !inviteIsAcceptable(invite)) {
 			return { ok: false, reason: 'bad-names' };
 		}
-		await db
-			.update(partnerships)
-			.set({
-				control: input.control,
-				inviteCiphertext: invite.ciphertext,
-				invitePayloadVersion: invite.payloadVersion
-			})
-			.where(and(eq(partnerships.id, id), eq(partnerships.status, 'pending')));
+		await db.batch([
+			db
+				.update(partnerships)
+				.set({
+					control: input.control,
+					inviteCiphertext: invite.ciphertext,
+					invitePayloadVersion: invite.payloadVersion
+				})
+				.where(and(eq(partnerships.id, id), eq(partnerships.status, 'pending'))),
+			...syncSharedSpaceMembers(db, id)
+		]);
 		return { ok: true };
 	}
 	if (!names) {
-		await db.update(partnerships).set({ control: input.control }).where(eq(partnerships.id, id));
+		await db.batch([
+			db.update(partnerships).set({ control: input.control }).where(eq(partnerships.id, id)),
+			...syncSharedSpaceMembers(db, id)
+		]);
 		return { ok: true };
 	}
 	if (
@@ -456,22 +492,26 @@ export async function updatePartnership(
 	) {
 		return { ok: false, reason: 'bad-names' };
 	}
-	const rows = await db
-		.update(partnerships)
-		.set({
-			control: input.control,
-			namesCiphertext: names.ciphertext,
-			namesVaultId: names.vaultId,
-			namesPayloadVersion: names.payloadVersion,
-			namesRevision: names.expectedRevision + 1,
-			// If the names were still under the invite's key, they are in the
-			// vault now, and the invite has nothing left to open.
-			inviteCiphertext: null,
-			invitePayloadVersion: null,
-			inviteKeyWrap: null
-		})
-		.where(and(eq(partnerships.id, id), eq(partnerships.namesRevision, names.expectedRevision)))
-		.returning({ id: partnerships.id });
+	const [rows] = await db.batch([
+		db
+			.update(partnerships)
+			.set({
+				control: input.control,
+				namesCiphertext: names.ciphertext,
+				namesVaultId: names.vaultId,
+				namesPayloadVersion: names.payloadVersion,
+				namesRevision: names.expectedRevision + 1,
+				// If the names were still under the invite's key, they are in the
+				// vault now, and the invite has nothing left to open.
+				inviteCiphertext: null,
+				invitePayloadVersion: null,
+				inviteKeyWrap: null
+			})
+			.where(and(eq(partnerships.id, id), eq(partnerships.namesRevision, names.expectedRevision)))
+			.returning({ id: partnerships.id }),
+		// A lost compare-and-swap left `control` as it was, so this then changes nothing.
+		...syncSharedSpaceMembers(db, id)
+	]);
 	return rows.length > 0 ? { ok: true } : { ok: false, reason: 'conflict' };
 }
 
@@ -558,15 +598,21 @@ export async function moveInviteNamesIntoVault(
 }
 
 /**
- * Removes a link (or cancels a pending invite).
+ * Removes a link (or cancels a pending invite), and with it the shared space
+ * and everything in it (`deleteSpace`).
  *
  * Deliberately not gated on `control`: a user who handed control to their
  * partner must still be able to leave. Membership is the only requirement.
  */
 export async function deletePartnership(db: Db, id: string, userId: string): Promise<boolean> {
-	const rows = await db
-		.delete(partnerships)
+	const [member] = await db
+		.select({ id: partnerships.id })
+		.from(partnerships)
 		.where(and(eq(partnerships.id, id), memberOf(userId)))
-		.returning({ id: partnerships.id });
-	return rows.length > 0;
+		.limit(1);
+	if (!member) {
+		return false;
+	}
+	await deleteSpace(db, id);
+	return true;
 }

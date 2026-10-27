@@ -26,6 +26,7 @@ import {
 	sealedRef,
 	selfVaultIdFor
 } from './sealed-content';
+import { isSpaceMember, partnershipControl, soloSpaceIdOf } from './spaces';
 
 /**
  * Every database access for the notebook. See docs/notebook.md.
@@ -56,7 +57,7 @@ async function partnershipForAccess(
 ): Promise<PartnershipForAccess | null> {
 	const [row] = await db
 		.select({
-			control: partnerships.control,
+			control: partnershipControl(),
 			inviterId: partnerships.inviterId,
 			inviteeId: partnerships.inviteeId
 		})
@@ -65,7 +66,7 @@ async function partnershipForAccess(
 			and(
 				eq(partnerships.id, partnershipId),
 				eq(partnerships.status, 'accepted'),
-				or(eq(partnerships.inviterId, userId), eq(partnerships.inviteeId, userId))
+				isSpaceMember(partnerships.id, userId)
 			)
 		)
 		.limit(1);
@@ -422,6 +423,10 @@ export async function createEntry(
 			id: input.id,
 			ownerId: resolved.scope.kind === 'self' ? userId : null,
 			partnershipId: resolved.scope.kind === 'partnership' ? resolved.scope.partnershipId : null,
+			spaceId:
+				resolved.scope.kind === 'partnership'
+					? resolved.scope.partnershipId
+					: soloSpaceIdOf(userId),
 			kind: input.kind,
 			entryDate: input.kind === 'journal' ? input.entryDate : null,
 			createdByUserId: userId,

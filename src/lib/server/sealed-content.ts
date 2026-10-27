@@ -1,8 +1,9 @@
-import { and, eq, or } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { isKnownVersion, type SealedKind, sealedPatternFor } from '../sealed';
 import type { SealedRefView } from '../types';
 import type { Db } from './db';
 import { partnerships, vaults } from './db/schema';
+import { isSpaceMember } from './spaces';
 
 /**
  * What the server does with a sealed record, shared by every kind that has
@@ -64,7 +65,7 @@ export async function isPartnershipMember(
 			and(
 				eq(partnerships.id, partnershipId),
 				eq(partnerships.status, 'accepted'),
-				or(eq(partnerships.inviterId, userId), eq(partnerships.inviteeId, userId))
+				isSpaceMember(partnerships.id, userId)
 			)
 		)
 		.limit(1);

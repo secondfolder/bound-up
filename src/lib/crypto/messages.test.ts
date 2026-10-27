@@ -2,16 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { MAX_BODY_CHARS } from '../messaging';
 import { generateAgeIdentity, importIdentityKey } from './identity';
 import {
+	type DraftPayload,
 	decryptAttachment,
 	decryptPayload,
 	encryptAttachment,
 	encryptPayload,
-	type MessagePayload,
-	normaliseBody,
-	type ReactionPayload
+	normaliseBody
 } from './messages';
 
-const payload = (text: string): MessagePayload => ({ version: 1, text, attachments: [] });
+const payload = (text: string): DraftPayload => ({ version: 1, text, tagIds: [] });
 
 async function collect(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
 	const chunks: Uint8Array[] = [];
@@ -33,7 +32,7 @@ async function collect(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> 
 }
 
 describe('encryptPayload / decryptPayload', () => {
-	it('lets both partners open one ciphertext, and nobody else', async () => {
+	it('lets every recipient open one ciphertext, and nobody else', async () => {
 		const ada = await generateAgeIdentity();
 		const jun = await generateAgeIdentity();
 		const stranger = await generateAgeIdentity();
@@ -44,20 +43,22 @@ describe('encryptPayload / decryptPayload', () => {
 		]);
 
 		for (const identity of [ada.identity, jun.identity]) {
-			await expect(decryptPayload(ciphertext, identity)).resolves.toEqual(
+			await expect(decryptPayload<DraftPayload>(ciphertext, identity)).resolves.toEqual(
 				payload('meet me in the kitchen')
 			);
 		}
 		// Null, not a throw: a device can hold a draft sealed to a key the
 		// account has since replaced, and that is "no draft", not a failure.
-		await expect(decryptPayload(ciphertext, stranger.identity)).resolves.toBeNull();
+		await expect(decryptPayload<DraftPayload>(ciphertext, stranger.identity)).resolves.toBeNull();
 	});
 
 	it('works with the cached non-extractable CryptoKey', async () => {
 		const ada = await generateAgeIdentity();
 		const ciphertext = await encryptPayload(payload('from a real device'), [ada.recipient]);
 		const key = await importIdentityKey(ada.identity);
-		await expect(decryptPayload(ciphertext, key)).resolves.toEqual(payload('from a real device'));
+		await expect(decryptPayload<DraftPayload>(ciphertext, key)).resolves.toEqual(
+			payload('from a real device')
+		);
 	});
 
 	it('emits base64 that the ciphertext column accepts', async () => {
@@ -74,41 +75,12 @@ describe('encryptPayload / decryptPayload', () => {
 		expect(atob(ciphertext)).not.toContain('distinctive');
 	});
 
-	it('round-trips the attachment manifest, keys and all', async () => {
-		const ada = await generateAgeIdentity();
-		const file = await generateAgeIdentity();
-		const full: MessagePayload = {
-			version: 1,
-			text: 'look',
-			attachments: [
-				{
-					id: crypto.randomUUID(),
-					key: file.identity,
-					kind: 'image',
-					mimeType: 'image/png',
-					fileName: 'sunset.png'
-				}
-			]
-		};
-		const ciphertext = await encryptPayload(full, [ada.recipient]);
-		await expect(decryptPayload(ciphertext, ada.identity)).resolves.toEqual(full);
-	});
-
-	it('handles a reaction payload', async () => {
-		const ada = await generateAgeIdentity();
-		const reaction: ReactionPayload = { version: 1, emoji: '🔥' };
-		const ciphertext = await encryptPayload(reaction, [ada.recipient]);
-		await expect(decryptPayload<ReactionPayload>(ciphertext, ada.identity)).resolves.toEqual(
-			reaction
-		);
-	});
-
 	it('needs at least one recipient', async () => {
 		await expect(encryptPayload(payload('x'), [])).rejects.toThrow(/at least one recipient/);
 	});
 
-	// Happens naturally if someone ever messages themselves; two identical
-	// header stanzas would be pointless rather than harmful, but still wrong.
+	// Two identical header stanzas would be pointless rather than harmful, but
+	// still wrong.
 	it('deduplicates recipients', async () => {
 		const ada = await generateAgeIdentity();
 		const once = await encryptPayload(payload('x'), [ada.recipient]);
@@ -118,14 +90,18 @@ describe('encryptPayload / decryptPayload', () => {
 
 	it('returns null for a body that is not a valid age file', async () => {
 		const ada = await generateAgeIdentity();
-		await expect(decryptPayload('bm90IGFuIGFnZSBmaWxl', ada.identity)).resolves.toBeNull();
+		await expect(
+			decryptPayload<DraftPayload>('bm90IGFuIGFnZSBmaWxl', ada.identity)
+		).resolves.toBeNull();
 	});
 
 	it('survives a multi-byte body', async () => {
 		const ada = await generateAgeIdentity();
 		const text = 'naïve 🔐 — “curly” … 日本語';
 		const ciphertext = await encryptPayload(payload(text), [ada.recipient]);
-		await expect(decryptPayload(ciphertext, ada.identity)).resolves.toEqual(payload(text));
+		await expect(decryptPayload<DraftPayload>(ciphertext, ada.identity)).resolves.toEqual(
+			payload(text)
+		);
 	});
 });
 

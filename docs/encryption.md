@@ -525,8 +525,11 @@ says so instead.
 
 ## Vaults
 
-A **vault** is one key that a scope's data is sealed under: each user has one
-of their own, and each partnership has one the two partners share. It is 32
+A **vault** is one key that a space's data is sealed under: each user has one
+for their solo space, and each partnership has one the two partners share
+([spaces.md](spaces.md)). `vaults.space_id` says whose; a vault is not the
+space itself, because a space that ever loses a member will need a new key
+while staying the same space. It is 32
 random bytes, made in the browser, and never used directly. HKDF-SHA256 over
 it, each with its own `info` (`src/lib/vault.ts`), gives:
 
@@ -543,7 +546,7 @@ keeping the key around.
 
 | Table         | What                                                                          |
 | ------------- | ----------------------------------------------------------------------------- |
-| `vaults`      | `id` (chosen by the browser), `kind`, the owner or the partnership, `key_check` |
+| `vaults`      | `id` (chosen by the browser), `kind`, the owner or the partnership, `space_id`, `key_check` |
 | `vault_wraps` | One per member: the key age-encrypted to their recipient, and which recipient |
 
 A partnership vault's wrap's plaintext is `{ v: 1, vaultId, key }`, and

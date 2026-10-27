@@ -1,4 +1,3 @@
-import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { RewardInput } from '../rewards';
 import { createTestDb, type TestDb } from '../testing/db';
@@ -19,12 +18,12 @@ import {
 	readSelfRewardClaimRows,
 	readSelfRewardCreditRow,
 	readSelfRewardRow,
+	setTestPartnershipControl,
 	setTestPartnershipRewardCredits,
 	setTestSelfRewardCredits,
 	type TestUser
 } from '../testing/fixtures';
 import { testPartnerView } from '../testing/names';
-import { partnerships } from './db/schema';
 import {
 	claimPartnershipReward,
 	claimSelfReward,
@@ -448,10 +447,7 @@ describe('partnership rewards', () => {
 		const { id } = await createTestPartnershipReward(harness.db, shared, jun, { cost: 2 });
 		await setTestPartnershipRewardCredits(harness.db, shared, jun, ada, 3);
 
-		await harness.db
-			.update(partnerships)
-			.set({ control: 'inviter' })
-			.where(eq(partnerships.id, shared));
+		await setTestPartnershipControl(harness.db, shared, 'inviter');
 
 		await expect(
 			claimPartnershipReward(harness.db, { partnershipId: shared, rewardId: id, userId: ada.id })
@@ -501,10 +497,7 @@ describe('home rewards aggregation', () => {
 		await setTestPartnershipRewardCredits(harness.db, withCas, cas, ada, 3);
 		await setTestPartnershipRewardCredits(harness.db, withPat, pat, ada, 3);
 
-		await harness.db
-			.update(partnerships)
-			.set({ control: 'inviter' })
-			.where(eq(partnerships.id, withPat));
+		await setTestPartnershipControl(harness.db, withPat, 'inviter');
 
 		const sections = await listHomePartnerRewardSections(harness.db, ada.id, [
 			testPartnerView(withCas, 'Cas'),

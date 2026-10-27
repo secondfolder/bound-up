@@ -45,6 +45,7 @@ import {
 	selfVaultIdFor,
 	snapshotRef
 } from './sealed-content';
+import { partnershipControl } from './spaces';
 
 const selfTaskColumns = {
 	id: selfTasks.id,
@@ -1531,7 +1532,7 @@ export async function listHomePartnerTaskSections(
 			.select({
 				id: partnerships.id,
 				status: partnerships.status,
-				control: partnerships.control,
+				control: partnershipControl(),
 				inviterId: partnerships.inviterId,
 				inviteeId: partnerships.inviteeId
 			})
@@ -1715,7 +1716,7 @@ export async function getHomeTasksWidget(
 					.select({
 						id: partnerships.id,
 						status: partnerships.status,
-						control: partnerships.control,
+						control: partnershipControl(),
 						inviterId: partnerships.inviterId,
 						inviteeId: partnerships.inviteeId
 					})

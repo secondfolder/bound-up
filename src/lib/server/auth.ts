@@ -14,6 +14,7 @@ import { type Db, schema } from './db';
 import type { MailMessage } from './mail';
 import { existingAccountEmail, verificationEmail } from './mail/templates';
 import type { EmailRateLimiter } from './rate-limit';
+import { deleteSpacesOfUserStatements } from './spaces';
 
 /**
  * The type `@better-auth/passkey` accepts for WebAuthn extensions, derived from
@@ -160,6 +161,26 @@ export function createAuth(db: Db, config: AuthRequestConfig) {
 		// answers 404.
 		disabledPaths: ['/sign-up/email'],
 		database: drizzleAdapter(db, { provider: 'sqlite', schema }),
+		databaseHooks: {
+			user: {
+				// No create hook: every account's solo space is made by the
+				// `user_has_solo_space` trigger, which holds however the row is
+				// inserted. Deleting is the other way round: a space has no owner
+				// column, so nothing cascades to it from `user`, and its rows'
+				// `space_id` has no ON DELETE. The admin plugin's remove-user (and
+				// any other Better Auth deletion) takes the account's spaces with
+				// it here — every one, which for a shared space is ending the
+				// partnership, as the old cascades did. See docs/spaces.md.
+				delete: {
+					before: async (deleted) => {
+						const statements = await deleteSpacesOfUserStatements(db, deleted.id);
+						if (statements) {
+							await db.batch(statements);
+						}
+					}
+				}
+			}
+		},
 		user: {
 			additionalFields: {
 				timezone: {

@@ -35,6 +35,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/lib/types.ts`            | Types both server and components need. Alias-free so the schema can import it                |
 | `src/lib/components/`         | Presentational Svelte components                                                             |
 | `src/lib/partnership.ts`      | The partners domain rules. Alias-free. See [docs/partners.md](docs/partners.md)              |
+| `src/lib/spaces.ts`, `src/lib/server/spaces.ts` | Spaces: a solo one per account, a shared one per partnership (same id), members and `can_manage`, deleting a space with everything in it. `spaces.ts` is pure and alias-free. See [docs/spaces.md](docs/spaces.md) |
 | `src/lib/features.ts`         | Feature registry. Alias-free. See [docs/features-and-admin.md](docs/features-and-admin.md)   |
 | `src/lib/vault.ts`, `src/lib/sealed.ts` | Vaults and sealed records, the pure halves: formats, the per-kind payload versions. Alias-free. See [docs/encryption.md](docs/encryption.md#vaults) |
 | `src/lib/tree.ts`, `src/lib/components/tree/` | The generic tree drawing: the pure layout, dimming and folding rules, and `Tree.svelte`. See [docs/tree.md](docs/tree.md) |
@@ -1069,6 +1070,7 @@ Four places, split on scope:
 | Doc                                                                                      | Feature                                                                      |
 | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | [docs/partners.md](docs/partners.md)                                                     | Linking two accounts: invites, the control permission, the nav tabs          |
+| [docs/spaces.md](docs/spaces.md)                                                         | Solo and shared spaces: members, `can_manage`, ids, deleting, what is still pair-shaped |
 | [docs/user-commitments-and-product-goals.md](docs/user-commitments-and-product-goals.md) | What the app promises users: never losing their data, and privacy boundaries |
 | [docs/rewards.md](docs/rewards.md)                                                       | Self rewards and partnership rewards: credits, claims, control               |
 | [docs/tasks.md](docs/tasks.md)                                                           | Self tasks and partnership tasks: scheduling, credits, timezone ownership    |

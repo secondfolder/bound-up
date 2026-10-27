@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TaskInput } from '../tasks';
 import { createTestDb, type TestDb } from '../testing/db';
@@ -18,10 +18,11 @@ import {
 	readSelfRewardCreditRow,
 	readSelfTaskCompletionRows,
 	readSelfTaskRow,
+	setTestPartnershipControl,
 	type TestUser
 } from '../testing/fixtures';
 import { testPartnerView } from '../testing/names';
-import { partnerships, selfRewardCredits, selfTaskCompletions, selfTasks } from './db/schema';
+import { selfRewardCredits, selfTaskCompletions, selfTasks } from './db/schema';
 import {
 	completePartnershipTask,
 	completeSelfTask,
@@ -664,10 +665,7 @@ describe('partnership tasks', () => {
 		const fromJun = await createTestPartnershipTask(harness.db, shared, jun);
 		const fromAda = await createTestPartnershipTask(harness.db, shared, ada);
 
-		await harness.db
-			.update(partnerships)
-			.set({ control: 'inviter' })
-			.where(and(eq(partnerships.id, shared), eq(partnerships.inviterId, ada.id)));
+		await setTestPartnershipControl(harness.db, shared, 'inviter');
 
 		const page = await getPartnershipTasksPage(harness.db, shared, ada.id, ada.timezone);
 		expect(page?.tasks).toContainEqual(

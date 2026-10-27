@@ -721,7 +721,7 @@ store).
   only once your own list has something in it; before that it starts you on
   your own list. There is no "stop sharing": while you are linked, sharing is
   what the partnership is for, and unlinking deletes the copies with the
-  partnership (`ON DELETE CASCADE`).
+  partnership's shared space (`deleteSpace`, [spaces.md](spaces.md)).
 - **A shared copy follows your own list.** It stores only what differs for
   that partner:
   - **overrides**: answers changed just for them

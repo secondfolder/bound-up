@@ -337,6 +337,20 @@
       "when": 1793089162282,
       "tag": "0047_drop_legacy_migrations",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "6",
+      "when": 1793093072834,
+      "tag": "0048_add_spaces",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "6",
+      "when": 1793093077024,
+      "tag": "0049_backfill_spaces",
+      "breakpoints": true
     }
   ]
 }

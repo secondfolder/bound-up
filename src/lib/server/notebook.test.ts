@@ -12,11 +12,12 @@ import {
 	readNotebookEntryRow,
 	readNotebookUpdateRows,
 	readNotebookVersionRows,
+	setTestPartnershipControl,
 	type TestUser
 } from '../testing/fixtures';
 import { createTestMediaStore, type TestMediaStore } from '../testing/media';
 import type { Db } from './db';
-import { notebookEntries, partnerships } from './db/schema';
+import { notebookEntries } from './db/schema';
 import { notebookEntryPrefix } from './media';
 import {
 	appendUpdate,
@@ -333,10 +334,7 @@ describe('versions', () => {
 
 describe('access', () => {
 	it('lets the member holding control restrict the other, and re-reads control to do it', async () => {
-		await db
-			.update(partnerships)
-			.set({ control: 'inviter' })
-			.where(eq(partnerships.id, partnershipId));
+		await setTestPartnershipControl(db, partnershipId, 'inviter');
 		const entry = await createTestNotebookEntry(db, ada, { partnershipId });
 		expect(await setPartnerAccess(db, await context(entry.id, ada), ada.id, 'hidden')).toEqual({
 			ok: true
@@ -352,10 +350,7 @@ describe('access', () => {
 	});
 
 	it('lets a member lift a restriction once control has moved to them from its setter', async () => {
-		await db
-			.update(partnerships)
-			.set({ control: 'inviter' })
-			.where(eq(partnerships.id, partnershipId));
+		await setTestPartnershipControl(db, partnershipId, 'inviter');
 		const entry = await createTestNotebookEntry(db, ada, {
 			partnershipId,
 			partnerAccess: 'hidden'
@@ -365,20 +360,14 @@ describe('access', () => {
 			reason: 'not-found'
 		});
 
-		await db
-			.update(partnerships)
-			.set({ control: 'invitee' })
-			.where(eq(partnerships.id, partnershipId));
+		await setTestPartnershipControl(db, partnershipId, 'invitee');
 
 		expect(await liftHiddenEntry(db, entry.id, bo.id, partnershipId)).toEqual({ ok: true });
 		expect((await context(entry.id, bo)).access).toBe('edit');
 	});
 
 	it('lists a hidden entry, without its header, only to someone who may now show it', async () => {
-		await db
-			.update(partnerships)
-			.set({ control: 'inviter' })
-			.where(eq(partnerships.id, partnershipId));
+		await setTestPartnershipControl(db, partnershipId, 'inviter');
 		const entry = await createTestNotebookEntry(db, ada, {
 			partnershipId,
 			partnerAccess: 'hidden'
@@ -388,10 +377,7 @@ describe('access', () => {
 			await listEntries(db, defined(await resolveScope(db, scope, bo.id), 'scope'), bo.id, 'note');
 		expect(await asBo()).toEqual([]);
 
-		await db
-			.update(partnerships)
-			.set({ control: 'invitee' })
-			.where(eq(partnerships.id, partnershipId));
+		await setTestPartnershipControl(db, partnershipId, 'invitee');
 
 		expect(await asBo()).toEqual([expect.objectContaining({ id: entry.id, header: null })]);
 	});

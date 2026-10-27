@@ -1,4 +1,4 @@
-import { and, count, eq, gt, inArray, ne, or } from 'drizzle-orm';
+import { and, count, eq, gt, inArray, ne } from 'drizzle-orm';
 import { type KeyWrapParams, normaliseEmail, toBase64Url } from '../encryption';
 import { setPasswordHashStatement } from './credentials';
 import type { Db } from './db';
@@ -14,6 +14,7 @@ import {
 	vaultWraps
 } from './db/schema';
 import { hex, keyedHash } from './keyed-hash';
+import { isSpaceMember } from './spaces';
 
 /**
  * Partner-assisted sign-in: getting back into an account after losing every
@@ -128,12 +129,7 @@ export async function startAccountRecovery(
 		? await db
 				.select({ id: partnerships.id })
 				.from(partnerships)
-				.where(
-					and(
-						eq(partnerships.status, 'accepted'),
-						or(eq(partnerships.inviterId, account.id), eq(partnerships.inviteeId, account.id))
-					)
-				)
+				.where(and(eq(partnerships.status, 'accepted'), isSpaceMember(partnerships.id, account.id)))
 		: [];
 
 	const token = toBase64Url(crypto.getRandomValues(new Uint8Array(32)));
@@ -192,6 +188,7 @@ export async function startAccountRecovery(
 			? partnershipRows.map((partnership) =>
 					db.insert(historyRestoreRequests).values({
 						partnershipId: partnership.id,
+						spaceId: partnership.id,
 						requesterId: account.id,
 						requestedRecipient: input.recipient,
 						recoveryRequestId: id

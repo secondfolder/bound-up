@@ -219,7 +219,8 @@ the stored rows on every load, action and endpoint (invariant 14).
 ## Data model
 
 - `notebook_entries`: one row per entry, scoped to `owner_id` **or**
-  `partnership_id` (a check constraint), with the header's ciphertext. `kind`
+  `partnership_id` (a check constraint), and to the matching space in
+  `space_id` ([spaces.md](spaces.md)), with the header's ciphertext. `kind`
   is `journal`, `note` or `scene`. Ordered by `entry_date` for the journal and
   `last_edited_at` for notes and scenes.
 - `notebook_updates`: the batches of edits, by `seq`, deleted by compaction.

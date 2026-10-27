@@ -38,6 +38,7 @@ import {
 } from './db/schema';
 import { daydreamPicturesPrefix, type MediaStore } from './media';
 import { type SealedWrite, sealedIsAcceptable, selfVaultIdFor } from './sealed-content';
+import { soloSpaceIdOf } from './spaces';
 
 /**
  * Every database access for Daydreams. See docs/daydreams.md.
@@ -388,6 +389,8 @@ export async function createDaydream(
 		.values({
 			id: daydreamId,
 			ownerId: userId,
+			// The owner's own space: a daydream is solo for now (docs/spaces.md).
+			spaceId: soloSpaceIdOf(userId),
 			ciphertext: setup.ciphertext,
 			vaultId: setup.vaultId,
 			payloadVersion: setup.payloadVersion
@@ -901,6 +904,7 @@ export async function createLibraryItem(
 		.values({
 			id: item.id,
 			ownerId: userId,
+			spaceId: soloSpaceIdOf(userId),
 			ciphertext: item.content.ciphertext,
 			vaultId: item.content.vaultId,
 			payloadVersion: item.content.payloadVersion

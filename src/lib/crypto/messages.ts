@@ -53,9 +53,6 @@ export type MessageAttachmentInfo = {
 	fileName: string;
 };
 
-/** A reaction's plaintext. Its own type so a stray string cannot be stored. */
-export type ReactionPayload = { version: 1; emoji: string };
-
 /**
  * An unsent draft, sealed to its writer alone and kept on this device.
  *
@@ -74,14 +71,13 @@ export type NotebookOutboxPayload = { version: 1; batches: { id: string; update:
 
 const encoder = new TextEncoder();
 
-/** Encrypts a payload to every given recipient. Both partners, in practice. */
+/**
+ * Encrypts a payload to every given recipient: the writer's own, in
+ * practice, since messages themselves are sealed in the partnership's vault
+ * rather than encrypted to people (`sealed-kinds/messages.ts`).
+ */
 export async function encryptPayload(
-	payload:
-		| MessagePayload
-		| MessageMetadataPayload
-		| ReactionPayload
-		| DraftPayload
-		| NotebookOutboxPayload,
+	payload: DraftPayload | NotebookOutboxPayload,
 	recipients: string[]
 ): Promise<string> {
 	if (recipients.length === 0) {
@@ -91,8 +87,7 @@ export async function encryptPayload(
 	const age = await loadAge();
 	const encrypter = new age.Encrypter();
 	// Deduplicated because encrypting to the same recipient twice would put two
-	// identical stanzas in the header for no reason — and it happens naturally
-	// if someone ever messages themselves.
+	// identical stanzas in the header for no reason.
 	for (const recipient of [...new Set(recipients)]) {
 		encrypter.addRecipient(recipient);
 	}
@@ -108,7 +103,7 @@ export async function encryptPayload(
  * draft" rather than a failure. age throws for that case, so it is caught and
  * converted here, once.
  */
-export async function decryptPayload<T = MessagePayload>(
+export async function decryptPayload<T extends DraftPayload | NotebookOutboxPayload>(
 	ciphertext: string,
 	identity: CryptoKey | string
 ): Promise<T | null> {

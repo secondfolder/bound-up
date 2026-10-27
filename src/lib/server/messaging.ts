@@ -54,6 +54,7 @@ import { listUserFeatures } from './features';
 import { attachmentKey, MEDIA_LIFETIMES, type MediaStore, partnershipMediaPrefix } from './media';
 import { getPartnershipForUser } from './partnerships';
 import { partnershipVaultIdFor, sealedIsAcceptable, sealedRef } from './sealed-content';
+import { isSpaceMember } from './spaces';
 import { escrowForRequester } from './vaults';
 
 /**
@@ -1140,6 +1141,8 @@ export async function createTag(
 		.values({
 			id: input.id,
 			partnershipId,
+			// A partnership's space has the partnership's id.
+			spaceId: partnershipId,
 			color,
 			ciphertext,
 			vaultId,
@@ -1353,6 +1356,7 @@ export async function startThread(
 		db.insert(messageThreads).values({
 			id: threadId,
 			partnershipId: input.partnershipId,
+			spaceId: input.partnershipId,
 			icon: input.icon,
 			lastMessageAt: now,
 			lastMessageSenderId: input.senderId
@@ -1702,7 +1706,7 @@ export async function listHelpRequests(
 				eq(historyRestoreRequests.status, 'pending'),
 				ne(historyRestoreRequests.requesterId, viewerId),
 				eq(partnerships.status, 'accepted'),
-				or(eq(partnerships.inviterId, viewerId), eq(partnerships.inviteeId, viewerId)),
+				isSpaceMember(partnerships.id, viewerId),
 				restoreStillLive(now)
 			)
 		);

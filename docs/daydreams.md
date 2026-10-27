@@ -1873,7 +1873,9 @@ and the suggestion requests that wrote a daydream's draft
 (`daydream-setup-exchange`, compressed too;
 [debug-mode.md](debug-mode.md#setup-exchanges)), with frozen fixtures. Beside them, in plaintext:
 
-- who owns each daydream and library item, and when each was changed;
+- who owns each daydream and library item, which space it is in (the owner's
+  solo space, for now: [spaces.md](spaces.md#daydreams-are-solo-for-now)),
+  and when each was changed;
 - each turn's place in the tree (`parent_id`, `position`), when it was
   written, and who wrote it (`user` or `story`) — not what kind of turn it is;
 - which turn the user is on (`active_turn_id`);

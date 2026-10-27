@@ -255,3 +255,112 @@ test('copying the model settings leaves a newer row, and a value that is not JSO
 		['storyModel', 'not json']
 	]);
 });
+
+test('the spaces backfill gives every account a solo space and every partnership its own', async () => {
+	client = createClient({ url: ':memory:' });
+	const [before, after] = await migrationsSplitAt('0048_add_spaces.sql');
+	for (const sql of before) {
+		await client.executeMultiple(sql);
+	}
+
+	// Accounts out of id order, so pairing each with its space by position
+	// is tested against an order the inserts did not already give.
+	await client.executeMultiple(`
+		INSERT INTO user (id, name, email, created_at, updated_at) VALUES
+			('zed', 'Zed', 'zed@example.test', 1, 1),
+			('ada', 'Ada', 'ada@example.test', 2, 2),
+			('jun', 'Jun', 'jun@example.test', 3, 3),
+			('kit', 'Kit', 'kit@example.test', 4, 4);
+		INSERT INTO partnerships (id, inviter_id, invitee_id, status, control, accepted_at, created_at, updated_at) VALUES
+			('p-inviter', 'ada', 'jun', 'accepted', 'inviter', 10, 5, 5),
+			('p-invitee', 'zed', 'ada', 'accepted', 'invitee', 11, 6, 6),
+			('p-both', 'jun', 'kit', 'accepted', 'both', 12, 7, 7),
+			('p-pending', 'kit', NULL, 'pending', 'both', NULL, 8, 8);
+	`);
+	// Foreign keys off for the content, so it needs nothing behind it but the
+	// columns the backfill reads.
+	await client.execute('PRAGMA foreign_keys = OFF');
+	await client.executeMultiple(`
+		INSERT INTO vaults (id, kind, owner_user_id, partnership_id, key_check) VALUES
+			('v-ada', 'self', 'ada', NULL, 'k'), ('v-shared', 'partnership', NULL, 'p-inviter', 'k');
+		INSERT INTO notebook_entries (id, owner_id, partnership_id, kind, ciphertext, vault_id, payload_version) VALUES
+			('n-own', 'ada', NULL, 'note', 'c', 'v-ada', 1), ('n-shared', NULL, 'p-inviter', 'note', 'c', 'v-shared', 1);
+		INSERT INTO kink_lists (id, owner_id, scope, partnership_id, ciphertext, vault_id, payload_version) VALUES
+			('k-own', 'ada', 'self', NULL, 'c', 'v-ada', 1), ('k-shared', 'ada', 'p-inviter', 'p-inviter', 'c', 'v-shared', 1);
+		INSERT INTO message_threads (id, partnership_id, icon, last_message_at, last_message_sender_id, created_at, updated_at) VALUES
+			('t1', 'p-inviter', 'envelope', 1, 'ada', 1, 1);
+		INSERT INTO message_tags (id, partnership_id, color, created_at, updated_at) VALUES
+			('tag1', 'p-inviter', '#fff', 1, 1);
+		INSERT INTO history_restore_requests (id, partnership_id, requester_id, requested_recipient) VALUES
+			('r1', 'p-inviter', 'ada', 'age1x');
+		INSERT INTO vault_escrows (id, vault_id, partnership_id, ciphertext) VALUES ('e1', 'v-ada', 'p-inviter', 'c');
+		INSERT INTO daydreams (id, owner_id, ciphertext, vault_id, payload_version) VALUES ('d1', 'ada', 'c', 'v-ada', 1);
+		INSERT INTO daydream_characters (id, owner_id, ciphertext, vault_id, payload_version) VALUES ('c1', 'ada', 'c', 'v-ada', 1);
+		INSERT INTO daydream_scenes (id, owner_id, ciphertext, vault_id, payload_version) VALUES ('i1', 'ada', 'c', 'v-ada', 1);
+	`);
+	await client.execute('PRAGMA foreign_keys = ON');
+
+	for (const sql of after) {
+		await client.executeMultiple(sql);
+	}
+
+	const solo = async (userId: string) => {
+		const rows = await client?.execute({
+			sql: `select m.space_id, m.can_manage from space_members m join spaces s on s.id = m.space_id
+			      where s.kind = 'solo' and m.user_id = ?`,
+			args: [userId]
+		});
+		expect(rows?.rows).toHaveLength(1);
+		expect(Number(rows?.rows[0]?.can_manage)).toBe(1);
+		return String(rows?.rows[0]?.space_id);
+	};
+	const soloIds = await Promise.all(['ada', 'jun', 'kit', 'zed'].map(solo));
+	expect(new Set(soloIds).size).toBe(4);
+	for (const id of soloIds) {
+		expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+		const members = await client.execute({
+			sql: 'select count(*) as n from space_members where space_id = ?',
+			args: [id]
+		});
+		expect(Number(members.rows[0]?.n)).toBe(1);
+	}
+
+	const shared = await client.execute(`
+		select s.id, m.user_id, m.can_manage from spaces s join space_members m on m.space_id = s.id
+		where s.kind = 'shared' order by s.id, m.user_id`);
+	expect(shared.rows.map((row) => [row.id, row.user_id, Number(row.can_manage)])).toEqual([
+		['p-both', 'jun', 1],
+		['p-both', 'kit', 1],
+		['p-invitee', 'ada', 1],
+		['p-invitee', 'zed', 0],
+		['p-inviter', 'ada', 1],
+		['p-inviter', 'jun', 0],
+		// A pending invite has its inviter; the invitee joins on accepting.
+		['p-pending', 'kit', 1]
+	]);
+
+	const adaSolo = await solo('ada');
+	const spaceOf = async (table: string, id: string) =>
+		(await client?.execute({ sql: `select space_id from ${table} where id = ?`, args: [id] }))
+			?.rows[0]?.space_id;
+	expect(await spaceOf('vaults', 'v-ada')).toBe(adaSolo);
+	expect(await spaceOf('vaults', 'v-shared')).toBe('p-inviter');
+	expect(await spaceOf('notebook_entries', 'n-own')).toBe(adaSolo);
+	expect(await spaceOf('notebook_entries', 'n-shared')).toBe('p-inviter');
+	expect(await spaceOf('kink_lists', 'k-own')).toBe(adaSolo);
+	expect(await spaceOf('kink_lists', 'k-shared')).toBe('p-inviter');
+	expect(await spaceOf('message_threads', 't1')).toBe('p-inviter');
+	expect(await spaceOf('message_tags', 'tag1')).toBe('p-inviter');
+	expect(await spaceOf('history_restore_requests', 'r1')).toBe('p-inviter');
+	// The partner holds it, so it is in the shared space, not the owner's.
+	expect(await spaceOf('vault_escrows', 'e1')).toBe('p-inviter');
+	expect(await spaceOf('daydreams', 'd1')).toBe(adaSolo);
+	expect(await spaceOf('daydream_characters', 'c1')).toBe(adaSolo);
+	expect(await spaceOf('daydream_scenes', 'i1')).toBe(adaSolo);
+
+	// And from now on, an account gets its solo space however it is inserted.
+	await client.execute(
+		"INSERT INTO user (id, name, email, created_at, updated_at) VALUES ('new', 'New', 'new@example.test', 9, 9)"
+	);
+	await solo('new');
+});

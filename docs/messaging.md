@@ -81,10 +81,13 @@ page load.
 | `thread_reads`             | Per-user read state for one thread.                                                             |
 | `history_restore_requests` | A partner asked, as part of a partner-assisted sign-in, to share the partnership vault again.  |
 
-Every foreign key cascades. Deleting a partnership takes its threads, messages,
-attachments rows, reactions and read state with it — but **not** the objects in
-the media store, which nothing cascades into. The disconnect action purges them
-itself; see "Attachments and media" below.
+Threads, tags and restore requests carry the partnership's shared space in
+`space_id` as well ([spaces.md](spaces.md)). Ending a partnership deletes the
+space, which deletes its threads, tags and restore requests explicitly, and
+their messages, attachments rows, reactions and read state go with them by
+cascade — but **not** the objects in the media store, which nothing cascades
+into. The disconnect action purges them itself; see "Attachments and media"
+below.
 
 ### Three decisions worth the argument
 

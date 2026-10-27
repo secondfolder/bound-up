@@ -19,6 +19,7 @@ import { putUserKeys } from '$lib/server/keys';
 import { mailProblem } from '$lib/server/mail/config';
 import { rateLimitMessage } from '$lib/server/rate-limit';
 import { holdUntilFloor, SIGN_UP_RESPONSE_FLOOR_MS, startTimer } from '$lib/server/response-floor';
+import { deleteAccount } from '$lib/server/spaces';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
@@ -116,7 +117,8 @@ export const actions: Actions = {
 			// without keys — every account is assumed to have them (sign-in is what
 			// unlocks, and there is no longer a screen that sets keys up later), so an
 			// account without them could sign in and never read a message. Deleting
-			// the user cascades to its credential.
+			// the user cascades to its credential; `deleteAccount` also takes the
+			// solo space the sign-up made, which nothing cascades to.
 			if (stored) {
 				try {
 					await putUserKeys(locals.db, userId, {
@@ -125,7 +127,7 @@ export const actions: Actions = {
 					});
 				} catch (error) {
 					console.error('signup: could not store encryption keys', error);
-					await locals.db.delete(user).where(eq(user.id, userId));
+					await deleteAccount(locals.db, userId);
 					return setError(signupForm, '', 'Could not sign up — please try again');
 				}
 			}

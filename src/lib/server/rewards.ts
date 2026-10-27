@@ -31,6 +31,7 @@ import {
 	selfVaultIdFor,
 	snapshotRef
 } from './sealed-content';
+import { partnershipControl } from './spaces';
 
 const selfRewardColumns = {
 	id: selfRewards.id,
@@ -844,7 +845,7 @@ export async function listHomePartnerRewardSections(
 			.select({
 				id: partnerships.id,
 				status: partnerships.status,
-				control: partnerships.control,
+				control: partnershipControl(),
 				inviterId: partnerships.inviterId,
 				inviteeId: partnerships.inviteeId
 			})
@@ -1005,7 +1006,7 @@ export async function getHomeRewardsWidget(
 						.select({
 							id: partnerships.id,
 							status: partnerships.status,
-							control: partnerships.control,
+							control: partnershipControl(),
 							inviterId: partnerships.inviterId,
 							inviteeId: partnerships.inviteeId
 						})

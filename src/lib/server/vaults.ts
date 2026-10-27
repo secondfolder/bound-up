@@ -19,6 +19,7 @@ import {
 } from './db/schema';
 import { keyedHash } from './keyed-hash';
 import { selfVaultIdFor } from './sealed-content';
+import { isSpaceMember, soloSpaceIdOf } from './spaces';
 
 /**
  * Every database access for vaults. See docs/encryption.md, "Vaults".
@@ -125,12 +126,7 @@ export async function listVaultsForUser(db: Db, userId: string): Promise<VaultLi
 					)
 				)
 			)
-			.where(
-				and(
-					eq(partnerships.status, 'accepted'),
-					or(eq(partnerships.inviterId, userId), eq(partnerships.inviteeId, userId))
-				)
-			)
+			.where(and(eq(partnerships.status, 'accepted'), isSpaceMember(partnerships.id, userId)))
 			.orderBy(partnerships.createdAt, partnerships.id)
 	]);
 
@@ -307,6 +303,8 @@ export async function createVault(
 				kind: input.kind,
 				ownerUserId: input.kind === 'self' ? actorId : null,
 				partnershipId: input.kind === 'partnership' ? input.partnershipId : null,
+				// A partnership's space has the partnership's id.
+				spaceId: input.kind === 'self' ? soloSpaceIdOf(actorId) : input.partnershipId,
 				keyCheck: input.keyCheck
 			}),
 			db.insert(vaultWraps).values(
@@ -479,7 +477,7 @@ export async function putEscrow(
 			and(
 				eq(partnerships.id, input.partnershipId),
 				eq(partnerships.status, 'accepted'),
-				or(eq(partnerships.inviterId, userId), eq(partnerships.inviteeId, userId))
+				isSpaceMember(partnerships.id, userId)
 			)
 		)
 		.limit(1);
@@ -492,7 +490,7 @@ export async function putEscrow(
 			.where(
 				and(eq(vaultEscrows.vaultId, vaultId), eq(vaultEscrows.partnershipId, input.partnershipId))
 			),
-		db.insert(vaultEscrows).values({ ...input, vaultId })
+		db.insert(vaultEscrows).values({ ...input, vaultId, spaceId: input.partnershipId })
 	]);
 	return true;
 }

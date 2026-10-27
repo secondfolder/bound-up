@@ -157,3 +157,44 @@ and enough time passed that self-hosters have upgraded through it.
 
 What stays: everything else in `src/lib/server/settings/`, including
 generating the secrets — a new server still needs nothing set.
+
+## Partnership control beside can_manage
+
+Spaces (docs/spaces.md) say who manages a shared space per member, in
+`space_members.can_manage`, and every read of a partnership's `control` is
+worked out from those flags (`partnershipControl` in
+`src/lib/server/spaces.ts`). The `partnerships.control` column is still
+**written**, because the partner settings form asks and answers in terms of
+it, and the task, reward and notebook rules are still written against it.
+`can_manage` is kept in step from it by one helper. Grep for `LEGACY-SPACES`.
+
+### Where it lives
+
+- `src/lib/server/spaces.ts` — `syncSharedSpaceMembers`, which sets
+  `can_manage` from `control` after every write of it, and
+  `partnershipControl`, which reads it back.
+- `src/lib/server/partnerships.ts` — `createInvite`, `acceptInvite` and
+  `updatePartnership`, which write `control` and batch the sync.
+- `src/lib/testing/fixtures.ts` — `setTestPartnershipControl`.
+
+### What removes the need for it
+
+The partner settings form writing members' `can_manage` directly, and the
+rules in `src/lib/tasks.ts`, `src/lib/rewards.ts`, `src/lib/notebook.ts` and
+`src/lib/partnership.ts` taking members rather than a `control` value. Nothing
+on a device or in old data depends on the column: every accepted
+partnership's members already say what it says.
+
+### What to remove
+
+1. `syncSharedSpaceMembers`'s `can_manage` update, and its callers' batching
+   of it (keep adding the invitee as a member on accept).
+2. `partnershipControl`'s accepted branch, reading the members directly where
+   `control` was read.
+3. The column itself only by `ALTER TABLE … DROP COLUMN`, never a rebuild.
+
+### What should stay
+
+What a pending invite offers: an invite has one member, so the offered
+control stays on the invite (the partnership row, or an invites table of its
+own).

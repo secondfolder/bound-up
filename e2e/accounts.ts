@@ -54,7 +54,8 @@ export async function createAccount(who: Account, timezone: string): Promise<voi
 		{
 			// `role` as the admin plugin's create hook writes it. The migrations'
 			// first-account trigger still makes the run's first account an admin,
-			// as it would through the form.
+			// as it would through the form, and `user_has_solo_space` gives it
+			// its solo space, so nothing here has to.
 			sql: `insert into user (id, name, email, email_verified, role, timezone, created_at, updated_at)
 				values (?, ?, ?, 1, 'user', ?, ?, ?)`,
 			args: [userId, who.name, email, timezone, now, now]
