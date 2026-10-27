@@ -1,5 +1,6 @@
 /**
- * Watching a partnership's messages for changes, from the browser.
+ * Watching messages for changes, from the browser: one partnership's, in its
+ * space's room, or every partnership's at once, in the viewer's own room.
  *
  * BROWSER ONLY. A thin wrapper over `watchRoom` (`$lib/realtime/live`), which
  * holds the visibility gate, the reconnection rules and the presence lease;
@@ -9,19 +10,27 @@
  * `server/realtime/messaging.ts`). The caller's whole reaction is a refetch.
  */
 
-import { partnershipRoom, watchRoom } from '$lib/realtime/live';
+import { type RoomKey, watchRoom } from '$lib/realtime/live';
 
-/** Matches the server's `MessagingEvent`. Metadata only, by design. */
+/** Matches the server's `MessagingFrame`. Metadata only, by design. */
 export type LiveEvent = {
 	kind: 'thread' | 'message' | 'reaction' | 'tags' | 'restore' | 'read';
 	threadId?: string;
+	/** The partnership's space the change is in: which board an Everyone page reloads. */
+	spaceId?: string;
 };
 
 /** The topic messaging publishes on; `MESSAGES_TOPIC` on the server. */
 export const MESSAGES_TOPIC = 'messages';
 
 export type LiveOptions = {
-	partnershipId: string;
+	/**
+	 * `spaceRoom(partnershipId)` for one partnership's board or a thread, or
+	 * `userRoom(viewerId)` for an Everyone board, which every partnership
+	 * fans its events out to. A `read` event is never fanned out, so an
+	 * Everyone board does not hear one.
+	 */
+	room: RoomKey;
 	/**
 	 * Called for every change, and with null whenever something may have been
 	 * missed (becoming visible, a reconnect, a poll).
@@ -33,10 +42,10 @@ export type LiveOptions = {
 };
 
 /** Starts watching. Returns the teardown, for an `$effect`'s cleanup. */
-export function watchPartnership(options: LiveOptions): () => void {
-	const { partnershipId, onChange } = options;
+export function watchMessages(options: LiveOptions): () => void {
+	const { room, onChange } = options;
 	return watchRoom({
-		room: partnershipRoom(partnershipId),
+		room,
 		topics: [MESSAGES_TOPIC],
 		onFrame: (_topic, data) => {
 			try {

@@ -614,10 +614,37 @@ which runs `ensureVaults` (`crypto/ensure-vaults.ts`) over
   members — if the partnership has none. The device that made it pins its key
   check at once, so its first sighting is the real one.
 - **A partner whose wrap is missing, or made for a key they no longer have**,
-  is wrapped for again (`PUT /api/vaults/[id]/wraps`).
+  is wrapped for again (`PUT /api/spaces/[spaceId]/vault/wraps`).
 
 That one path is what covers a new account, a newly linked pair and every
 partnership that existed before vaults, with no migration of its own.
+
+**Every request that writes a vault names its space**, as every scoped write
+does ([spaces.md](spaces.md)): the own vault's is the user's solo space, whose
+id the listing carries as `soloSpaceId`, and a partnership's vault is in the
+shared space with the partnership's id. The listing is the one vault endpoint
+that names none, because it is every space's vault at once.
+
+| Endpoint                                         | What                                                         |
+| ------------------------------------------------ | ------------------------------------------------------------ |
+| `GET /api/vaults`                                | The listing: every vault the user can reach, and `soloSpaceId` |
+| `POST /api/spaces/[spaceId]/vault`               | Make the space's vault: `{ id, keyCheck, wraps }`             |
+| `PUT /api/spaces/[spaceId]/vault/wraps`          | One member's wrap: `{ vaultId, userId, ciphertext, forRecipient }` |
+| `DELETE /api/spaces/[spaceId]/vault`             | Delete a lost own vault (solo space only)                     |
+| `POST /api/spaces/[spaceId]/vault/escrow-share`  | The server's share for a new escrow (solo space only)         |
+| `PUT`, `DELETE /api/spaces/[spaceId]/vault/escrows` | Hold the own vault with a partner (`heldInSpaceId`), or drop every escrow (solo space only) |
+| `POST /api/spaces/[spaceId]/vault/escrow-release` | The relays and shares after a partner-assisted sign-in (solo space only) |
+
+A space the caller is not in is a 404, the same as one that does not exist,
+so a refusal never confirms an id is real; so is a shared space on the
+endpoints that only the own vault has. **The space decides the kind of
+vault**: the body of a create names no scope, so a request cannot ask for one
+kind in the other's space, and a wrap names the vault it was made for, which
+must be that space's — a member of two spaces cannot reach one's vault through
+the other. The wrap names its vault rather than meaning "the space's vault"
+because a wrap is one vault's key: a space that one day has a new vault (see
+[spaces.md](spaces.md#the-vault-is-not-the-space)) must not be handed a wrap
+made for the old one.
 
 **Making or wrapping for a partner waits on the trust check.** Both hand the
 vault key to whatever recipient the server says the partner has, so a key this
@@ -628,10 +655,10 @@ vault needs no such check — reading leaks nothing — so a vault is open even
 while writing into it is held back.
 
 **Two devices racing** to make the same partnership's vault is ordinary: the
-unique column refuses the second insert, `POST /api/vaults` answers 409, and the
-device that lost lists again and opens the winner's. The vault and its wraps
-are written in one `db.batch()`, because a vault nobody can open is worse than
-none — the scope could never get another.
+unique column refuses the second insert, `POST /api/spaces/[spaceId]/vault`
+answers 409, and the device that lost lists again and opens the winner's. The
+vault and its wraps are written in one `db.batch()`, because a vault nobody can
+open is worse than none — the scope could never get another.
 
 **The server checks who may write, nothing else.** A vault is created only by a
 member of its scope, with exactly one wrap per member made for the recipient
@@ -688,10 +715,11 @@ the share.
 
 After the sign-in completes, the requester's first load finds its own vault
 with no wrap for its new key, and asks for the escrow back
-(`POST /api/vaults/self/escrow-release`). The server releases each relay with
-its share **only** to the account itself, and only for a sign-in that
-completed — which took a partner's approval **and** the link emailed to the
-account's address — within the last seven days (`ESCROW_RELEASE_WINDOW_MS`).
+(`POST /api/spaces/[spaceId]/vault/escrow-release`, in its solo space). The
+server releases each relay with its share **only** to the account itself, and
+only for a sign-in that completed — which took a partner's approval **and** the
+link emailed to the account's address — within the last seven days
+(`ESCROW_RELEASE_WINDOW_MS`).
 The device opens the relay with its new key, then `inner` with the share,
 checks the result matches the vault's key check, and writes itself a wrap.
 Every escrow is then **replaced**, under new ids and so new shares, because the

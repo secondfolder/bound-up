@@ -2,7 +2,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { type AppContext, CONTEXT_DEPENDENCY, spacesInContext } from '../context';
-import { entryTopic, isEntryDate, type PartnerAccess } from '../notebook';
+import { entryTopic, isEntryDate, type PartnerAccess, type SpaceForAccess } from '../notebook';
 import { notebookCreateSchema, partnerAccessSchema } from '../schemas/notebook';
 import { calendarDayKey } from '../timezone';
 import type {
@@ -32,7 +32,7 @@ import {
 } from './notebook';
 import { publishEntryFrame, publishListChange } from './notebook-live';
 import { createNotifier } from './realtime/backend';
-import { partnershipRoom, type RoomKey } from './realtime/index';
+import { type RoomKey, spaceRoom, userRoom } from './realtime/index';
 import { getScenePreferences, type ScenePreferencesView } from './scene-preferences';
 import { hasAcceptedSceneHelp } from './scenes/help';
 import { sealedRef } from './sealed-content';
@@ -91,12 +91,11 @@ export type NotebookListData = {
 	notes: NotebookEntryView[];
 	scenes: NotebookEntryView[];
 	/**
-	 * The room a list of one space watches, so it updates live; null for an
-	 * Everyone list of several, which refreshes when the page is looked at
-	 * again instead of holding a stream per partnership (docs/notebook.md,
-	 * "The list in every context").
+	 * The room the list watches, so it updates live: its space's, for a list
+	 * of one, or the viewer's own (`user:<id>`) for an Everyone list of
+	 * several (docs/notebook.md, "The list in every context").
 	 */
-	room: RoomKey | null;
+	room: RoomKey;
 	/** The spaces the list shows, in the switcher's order: one, unless the context is Everyone. */
 	spaceIds: string[];
 	/** The key to invalidate when the list changes elsewhere. */
@@ -113,15 +112,14 @@ export type NotebookListData = {
 	today: string;
 };
 
-/** The other member of a partnership entry's partnership; null for a solo entry. */
-function otherMember(
-	partnership: { inviterId: string; inviteeId: string | null } | null,
-	userId: string
-): string | null {
-	if (!partnership) {
-		return null;
-	}
-	return partnership.inviterId === userId ? partnership.inviteeId : partnership.inviterId;
+/**
+ * The partner in a shared entry's space: the first member who is not the
+ * viewer, which in a space of two is the other one. Null for a solo entry.
+ * Pair-shaped on purpose, like the scene's surprises it is for
+ * (docs/spaces.md, "Still pair-shaped").
+ */
+function otherMember(space: SpaceForAccess | null, userId: string): string | null {
+	return space?.members.find((member) => member.userId !== userId)?.userId ?? null;
 }
 
 /**
@@ -162,7 +160,11 @@ export async function loadNotebookList(
 		journal,
 		notes,
 		scenes,
-		room: resolved.length === 1 && single ? single.room : null,
+		// A list of one space watches that space's room; an Everyone list
+		// watches the viewer's own room, where every space they are in fans its
+		// list events out (docs/realtime.md, "Everyone"): one stream, however
+		// many partnerships.
+		room: resolved.length === 1 && single ? single.room : userRoom(user.id),
 		spaceIds: resolved.map((scope) => scope.spaceId),
 		dependency,
 		context,
@@ -224,7 +226,7 @@ export async function createEntryAction(event: ActionEvent) {
 					: 'That entry could not be created. Reload the page and try again.'
 		});
 	}
-	await publishListChange(await createNotifier(event), resolved.room);
+	await publishListChange(await createNotifier(event), event.locals.db, resolved.spaceId);
 	redirect(303, entryPath(input.id));
 }
 
@@ -243,11 +245,8 @@ export async function showHiddenEntryAction(event: ActionEvent) {
 		error(404, 'Not found');
 	}
 	const notifier = await createNotifier(event);
-	// Only a shared entry can be hidden, and a shared space's id is its
-	// partnership's, so its room is that partnership's.
-	const room = partnershipRoom(spaceId);
-	await publishListChange(notifier, room);
-	await publishEntryFrame(notifier, room, entryId, { type: 'access' });
+	await publishListChange(notifier, event.locals.db, spaceId);
+	await publishEntryFrame(notifier, spaceRoom(spaceId), entryId, { type: 'access' });
 	return { shown: true };
 }
 
@@ -435,17 +434,22 @@ export async function setAccessAction(event: ActionEvent) {
 		error(403, 'Only whoever holds control of this partnership can change that.');
 	}
 	const notifier = await createNotifier(event);
-	const { partnership } = context;
-	const other = partnership.inviterId === user.id ? partnership.inviteeId : partnership.inviterId;
 	// Told before evicted: the frame is queued ahead of the close, so the
 	// partner's open page hears it and leaves at once, rather than only finding
 	// out after its reconnects have been refused and it has fallen back to
-	// polling.
+	// polling. Hidden is from every member but the one who hid it.
 	await publishEntryFrame(notifier, context.room, context.entry.id, { type: 'access' });
-	if (access === 'hidden' && other) {
-		await notifier.evict(context.room, { userId: other, topic: entryTopic(context.entry.id) });
+	if (access === 'hidden') {
+		for (const member of context.partnership.members) {
+			if (member.userId !== user.id) {
+				await notifier.evict(context.room, {
+					userId: member.userId,
+					topic: entryTopic(context.entry.id)
+				});
+			}
+		}
 	}
-	await publishListChange(notifier, context.room);
+	await publishListChange(notifier, event.locals.db, entrySpaceId(context.entry));
 	return { form };
 }
 
@@ -469,6 +473,6 @@ export async function deleteEntryAction(event: ActionEvent) {
 	}
 	const notifier = await createNotifier(event);
 	await publishEntryFrame(notifier, context.room, context.entry.id, { type: 'deleted' });
-	await publishListChange(notifier, context.room);
+	await publishListChange(notifier, event.locals.db, entrySpaceId(context.entry));
 	redirect(303, NOTEBOOK_PATH);
 }

@@ -190,15 +190,18 @@ the stored rows on every load, action and endpoint (invariant 14).
 
 - **A solo entry** is its owner's alone.
 - **A shared entry** can be edited by both partners by default. A member who
-  holds the partnership's control ([partners.md](partners.md#what-control-gates))
-  can make it **read-only** or **hidden** for the other: `partner_access` and
-  `access_set_by_user_id`. The restriction binds only the member who did not set
-  it.
-- **With control shared, the say over an entry is its creator's**
-  (`holdsAccessAuthority`, from `created_by_user_id`). Shared control used to
-  let either member restrict any entry, and the other could not undo it, so
-  each could hide the other's writing from them. An entry whose creator has
-  deleted their account falls back to either member.
+  manages the partnership's space (`space_members.can_manage`, what "holds
+  control" means; [partners.md](partners.md#what-control-gates)) can make it
+  **read-only** or **hidden** for the others: `partner_access` and
+  `access_set_by_user_id`. The restriction binds every member but the one who
+  set it. The rules take the space's members (`SpaceForAccess`), never the
+  partnership's `control` column, which is only the invite's offer.
+- **When more than one member manages (control shared), the say over an entry
+  is its creator's** (`holdsAccessAuthority`, from `created_by_user_id`).
+  Shared control used to let either member restrict any entry, and the other
+  could not undo it, so each could hide the other's writing from them. An
+  entry whose creator is no longer in the space (their account deleted) falls
+  back to every member who manages.
 - A restriction binds whoever did not set it for as long as its setter still
   has the say. Once the say moves away from them (control is handed over, or
   shared control makes the creator the one who decides), the member who has it
@@ -212,7 +215,7 @@ the stored rows on every load, action and endpoint (invariant 14).
   treat a hidden entry exactly like one that does not exist. Partners are
   trusted, and this is a privacy courtesy between them, not a guarantee
   against each other.
-- Changing access evicts the other member's streams on the entry's topic when
+- Changing access evicts every other member's streams on the entry's topic when
   it becomes hidden, and tells every open page to reload what it may do.
 - A reader's edits are refused (403) whatever the page allowed; the editor is
   made non-editable only as display. Deleting needs edit access, and takes the
@@ -241,18 +244,20 @@ has to go with it.
 switcher at the top right:
 
 - **One space** (Me, or a partnership) lists that space's entries, live on its
-  room (`user:<id>` for your own, `partnership:<id>` for a shared one), as each
-  notebook always has.
+  room (`space:<id>`, your solo space or the partnership's), as each notebook
+  always has.
 - **Everyone** lists every space you are in **in one query**
   (`space_id IN (…)`, by `notebook_entries_space_id_idx`), and works each row's
   access out against its own space exactly as that space's list would
   (`entryAccessFor`, and the hidden-but-liftable rows). Each row carries a chip
   saying whose it is. With only your own space, Everyone is just Me: no chips,
   no question.
-- **Everyone is not live.** One stream per partnership would cost one each
-  ([realtime.md](realtime.md)), so the list refreshes when the page is looked
-  at again (`visibilitychange` and `focus`) instead. Fanning list events out to
-  every member's own room, so one stream covers Everyone, is a later step.
+- **Everyone is live on one stream.** Every list event (an entry made,
+  deleted, retitled or re-restricted) is published to its space's room and
+  fanned out to each member's own room, `user:<id>` (`publishListChange`), so
+  an Everyone list watches the viewer's own room alone, however many
+  partnerships it shows ([realtime.md](realtime.md#everyone-one-stream-not-one-per-space)).
+  An entry's edits and cursors stay in its own space's room.
 - **Starting an entry names its space.** In one space it is that space; in
   Everyone a **"For whom?"** choice (Me, or each partner) must be made first,
   and the last one used is remembered on the device (`localStorage`). Either

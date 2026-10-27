@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { getKinkList, hasKinkListVersions, listSharedKinkLists } from '$lib/server/kink-lists';
+import { soloSpaceFor } from '$lib/server/spaces';
 import type { LayoutServerLoad } from './$types';
 
 /**
@@ -11,12 +12,19 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	if (!locals.user) {
 		error(401, 'Not signed in');
 	}
-	const [list, shared, hasHistory] = await Promise.all([
+	const [list, shared, hasHistory, soloSpaceId] = await Promise.all([
 		getKinkList(locals.db, locals.user.id, 'self'),
 		listSharedKinkLists(locals.db, locals.user.id),
-		hasKinkListVersions(locals.db, locals.user.id)
+		hasKinkListVersions(locals.db, locals.user.id),
+		// The space the store saves the list in (`/api/spaces/[spaceId]/kink-list`).
+		soloSpaceFor(locals.db, locals.user.id)
 	]);
+	if (!soloSpaceId) {
+		// Every account has one from the moment it exists, so none means the
+		// account itself has gone (docs/spaces.md).
+		error(401, 'This account could not be found. Sign in again.');
+	}
 	// `hasHistory`: History is offered only once there is a version to show.
 	// A version kept during this visit shows it from the next load.
-	return { list, shared, hasHistory };
+	return { list, shared, hasHistory, soloSpaceId };
 };

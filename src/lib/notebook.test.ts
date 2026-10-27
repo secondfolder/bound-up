@@ -8,7 +8,7 @@ import {
 	holdsControl,
 	isEntryDate,
 	type PartnerAccess,
-	type PartnershipForAccess,
+	type SpaceForAccess,
 	shouldCutVersion,
 	VERSION_IDLE_MS,
 	VERSION_MAX_INTERVAL_MS
@@ -20,8 +20,17 @@ const ada = 'ada';
 const bo = 'bo';
 const stranger = 'cy';
 
-function partnership(control: PartnershipForAccess['control']): PartnershipForAccess {
-	return { control, inviterId: ada, inviteeId: bo };
+/**
+ * Ada and Bo's space, managed as a role-shaped answer says (Ada invited Bo):
+ * `inviter` is Ada alone, `invitee` Bo alone, `both` the two of them.
+ */
+function partnership(control: 'inviter' | 'invitee' | 'both'): SpaceForAccess {
+	return {
+		members: [
+			{ userId: ada, canManage: control !== 'invitee' },
+			{ userId: bo, canManage: control !== 'inviter' }
+		]
+	};
 }
 
 /** A shared entry; Ada wrote it unless `createdBy` says otherwise. */
@@ -88,6 +97,28 @@ describe('holdsAccessAuthority', () => {
 		expect(
 			holdsAccessAuthority(shared('edit', null, stranger), stranger, partnership('both'))
 		).toBe(false);
+	});
+
+	/**
+	 * Written in members, so a space of more than two needs nothing new: the
+	 * creator's say, when it is shared, holds only while they are still in it.
+	 */
+	it('reads can_manage per member, and falls back when the creator has left', () => {
+		const group: SpaceForAccess = {
+			members: [
+				{ userId: ada, canManage: true },
+				{ userId: bo, canManage: true },
+				{ userId: stranger, canManage: false }
+			]
+		};
+		expect(holdsAccessAuthority(shared('edit', null, bo), ada, group)).toBe(false);
+		expect(holdsAccessAuthority(shared('edit', null, bo), bo, group)).toBe(true);
+		expect(holdsAccessAuthority(shared('edit', null, stranger), stranger, group)).toBe(false);
+		const left = shared('edit', null, 'someone-who-left');
+		expect(holdsAccessAuthority(left, ada, group)).toBe(true);
+		expect(holdsAccessAuthority(left, bo, group)).toBe(true);
+		expect(entryAccessFor(shared('hidden', ada), stranger, group)).toBe('none');
+		expect(entryAccessFor(shared('read', ada), stranger, group)).toBe('read');
 	});
 });
 

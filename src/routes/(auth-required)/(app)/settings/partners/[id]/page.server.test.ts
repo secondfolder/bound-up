@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Db } from '$lib/server/db';
 import { partnershipMediaPrefix } from '$lib/server/media';
 import { findPendingInviteByToken } from '$lib/server/partnerships';
+import { requireSpaceMember } from '$lib/server/spaces';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { fakeEvent, runAction, runAndCatch, runLoad } from '$lib/testing/events';
 import {
@@ -46,6 +47,15 @@ const at = (id: string, user: TestUser | null, formData?: Record<string, string>
 	fakeEvent({ db, user, params: { id }, formData, path: `/settings/partners/${id}` });
 
 const run = (name: string, event: never) => runAction(actions, name, event);
+
+/** Whether each of Ada and Jun manages the partnership's space: what every rule reads. */
+async function manages(id: string): Promise<{ ada: boolean; jun: boolean }> {
+	const [forAda, forJun] = await Promise.all([
+		requireSpaceMember(db, id, ada.id),
+		requireSpaceMember(db, id, jun.id)
+	]);
+	return { ada: forAda?.canManage ?? false, jun: forJun?.canManage ?? false };
+}
 
 describe('load', () => {
 	it('gives the inviter the live invite link', async () => {
@@ -138,18 +148,26 @@ describe('the update action', () => {
 		expect(row.namesCiphertext).toBe(edit.namesCiphertext);
 		expect(row.namesVaultId).toBe(edit.namesVaultId);
 		expect(row.namesRevision).toBe(1);
-		expect(row.control).toBe('both');
+		// Control is written where it lives once accepted: each member's
+		// `can_manage`. The row keeps the offer as it was accepted.
+		expect(await manages(id)).toEqual({ ada: true, jun: true });
+		expect(row.control).toBe('inviter');
 		// Moved into the vault, so the invite it came from is gone.
 		expect(row.inviteCiphertext).toBeNull();
 	});
 
-	it('maps the invitee’s control answer onto the stored role', async () => {
-		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
+	it('maps the invitee’s control answer onto who manages', async () => {
+		const { id } = await createTestPartnership(db, ada, jun, { control: 'mix' });
 		const result = await runAndCatch(async () =>
 			run('update', at(id, jun, await sealedEdit(id, { control: 'me' })))
 		);
 		expect(result).toMatchObject({ type: 'redirect', status: 303, location: '/settings/partners' });
-		expect((await readPartnershipRow(db, id)).control).toBe('invitee');
+		expect(await manages(id)).toEqual({ ada: false, jun: true });
+		// And the form opens on what the members now say, from each side.
+		const forJun = await runLoad(load(at(id, jun)));
+		expect(forJun.partnerEditForm.data.control).toBe('me');
+		const forAda = await runLoad(load(at(id, ada)));
+		expect(forAda.partnerEditForm.data.control).toBe('them');
 	});
 
 	it('refuses an edit from the side without control', async () => {

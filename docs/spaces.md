@@ -77,28 +77,29 @@ first. A pending invite's space is listed too, since its inviter is a member,
 so anything that wants linked partnerships only still checks the
 partnership's status.
 
-**`can_manage` is what the permission rules follow.** The partnership's
-`control` (`inviter`, `invitee`, `both`) was a statement about two roles;
-`can_manage` says the same per member, and `both` is simply two members who
-manage. The task and reward rules read `can_manage` directly
-(`managesSpace`, `viewerActsIn` and the rest in `src/lib/spaces.ts`). Every
-read of `control` goes through `partnershipControl()` in `server/spaces.ts`,
-which works it out from the members, so the rules still written in terms of
-`control` (`canEditPartnership`, the notebook's access rules, the kink list's
-starting side) are following `can_manage` too.
+**`can_manage` is what the permission rules follow, and the only thing they
+follow.** The partnership's `control` (`inviter`, `invitee`, `both`) was a
+statement about two roles; `can_manage` says the same per member, and `both`
+is simply two members who manage. The task and reward rules (`managesSpace`,
+`viewerActsIn` and the rest in `src/lib/spaces.ts`), the notebook's access
+rules (`SpaceForAccess` in `src/lib/notebook.ts`), the partnership's own edit
+rule (`canEditPartnership`) and where the kink list starts
+(`controlAnswerFor`) all take the members. A partnership's view carries them
+(`partnershipMembers()`, one JSON subquery per row).
 
-`control` is still written, through one helper: `syncSharedSpaceMembers`
-batches after every write of the partnership's invitee or control, adds the
-invitee once there is one, and sets every member's `can_manage` from
-`control`. It reads the partnership row inside its statements rather than
-taking values, so a write that matched nothing — an accept that lost a race —
-leaves the members as they were. Keeping the column is temporary; see
-[temporary-code.md](temporary-code.md#partnership-control-beside-can_manage).
-
-A **pending invite** has one member, so what it offers the invitee can only be
-read from the row: `partnershipControl()` returns the column itself until the
-partnership is accepted. That is invite detail, and invites are pair-shaped
-(below).
+**`partnerships.control` is the invite's offer**, not a permission: who will
+manage once the invite is accepted. A pending invite's space has one member,
+the inviter, who manages it when the offer keeps control with them
+(`createSharedSpace`); editing the pending invite's control writes the offer
+and the inviter's flag together. Accepting it adds the invitee and sets every
+member's `can_manage` from the offer as accepted
+(`joinSharedSpaceStatements`), each statement requiring the row to name that
+invitee, so an accept that lost a race changes nobody. After that the column
+is never read or written: changing control on the partner settings page writes
+the members' `can_manage` alone (`setManagersStatements`, through
+`managersFromControl`, the one place a role-shaped answer becomes
+per-member flags). The column is kept, as the record of what the invite
+offered. See [partners.md](partners.md#the-control-question).
 
 A member's **`colour`** is how that space looks to *them* in the context
 switcher and on an Everyone list: their own choice from a closed list, or null
@@ -113,6 +114,36 @@ requiring the partnership to be accepted where it did before. It is written
 as `partnerships.id IN (select space_id from space_members where user_id = ?)`
 so SQLite reads the user's few memberships by index and looks the
 partnerships up by key.
+
+## The API names spaces
+
+Every scoped endpoint is under `/api/spaces/[spaceId]/…`, and none is keyed
+by `self` or by a partnership as such: threads, tags, restore and attachments
+([messaging.md](messaging.md)), the partnership's names
+([partners.md](partners.md#names-are-sealed)), the kink list
+([kink-list.md](kink-list.md#saving)) and the vault, its wraps and its escrows
+([encryption.md](encryption.md#made-by-the-devices-on-one-path)). Each checks
+membership of the named space first — `requireSpaceMember`, then the
+feature's own rule, such as the partnership being accepted — and answers a
+space the caller is not in with a 404, the same as one that does not exist,
+so a refusal never confirms an id is real. A browser that needs its own solo
+space's id gets it from the page's load or the vault listing's `soloSpaceId`;
+a shared space's id is the partnership id it already has. The one vault
+endpoint outside it is the listing, `GET /api/vaults`, which is every space's
+vault at once. Realtime rooms are named by space too
+([Realtime rooms](#realtime-rooms)).
+
+Underneath, a feature may still store its old scope: a kink list's `scope`
+column is `'self'` or the partnership's id, and `kinkListScopeIn` is where a
+space becomes one. That is storage, not API.
+
+## Realtime rooms
+
+Every space is a realtime room, `space:<id>`, open to its members, solo and
+shared alike, and each account has its own `user:<id>` room besides. A
+space's list-level events are also fanned out to each member's own room
+(`spaceMemberIds`), so a page showing every space at once watches one stream.
+See [realtime.md](realtime.md).
 
 ## Deleting a space
 
@@ -172,8 +203,8 @@ change.
 These stay shaped for two until groups are designed, because each needs
 product decisions rather than plumbing:
 
-- **Invites.** The token, the invite key and the offered control stay on the
-  partnership row, which is the shared space's detail record. An invite for
+- **Invites.** The token, the invite key and the offered control (`control`)
+  stay on the partnership row, which is the shared space's detail record. An invite for
   more people would be a table of its own.
 - **Sealed names.** Stored per role ("what they call you", "their name") and
   mapped only by `namesForViewer` (AGENTS.md invariant 12). Groups need
@@ -208,12 +239,12 @@ so they need no change when screens start speaking in spaces.
 | Path                                   | What                                                                           |
 | -------------------------------------- | ------------------------------------------------------------------------------ |
 | `src/lib/spaces.ts`                    | The pure half: `SpaceKind`, the membership type, `managersFromControl`, `someoneElseManages`, and the task and reward rules in members (`assigneeFor`, `viewerActsIn`, `actsOn`, `managesSpace`, `managesRecord`, `canSetBalance`). Alias-free. |
-| `src/lib/server/spaces.ts`             | Membership, the solo space, `partnershipControl`, the sync, `loadItemSpaces`, and deleting |
+| `src/lib/server/spaces.ts`             | Membership, the solo space, `partnershipMembers`, setting managers and joining on accept, `spaceMemberIds` (for realtime fan-out), `loadItemSpaces`, and deleting |
 | `drizzle/0048_add_spaces.sql`          | The tables and the `space_id` columns, all `CREATE` and `ADD COLUMN`           |
 | `drizzle/0049_backfill_spaces.sql`     | The trigger, and spaces and members for what already existed                   |
 | `drizzle/0050_add_space_member_colour.sql` | Each member's colour for the space ([contexts.md](contexts.md#colours))    |
 | `drizzle/0051_add_merged_tasks_rewards.sql` | The tasks and rewards tables, keyed by `space_id`                        |
 | `drizzle/0052_copy_tasks_rewards_into_spaces.sql` | Every old task and reward row copied in, ids kept (custom SQL)     |
 | `drizzle/0053_drop_scoped_tasks_rewards.sql` | The ten old tables dropped, children first ([tasks.md](tasks.md#data-model)) |
-| `src/lib/server/spaces.test.ts`        | Membership, the sync, the id clash, and the no-orphans tests                   |
+| `src/lib/server/spaces.test.ts`        | Membership, `can_manage` on accept, the id clash, and the no-orphans tests     |
 | `src/lib/server/db/migrations.test.ts` | The backfill and the tasks and rewards copy, against rows written before them, and the reviewed drops |

@@ -37,8 +37,9 @@ import { type OutgoingAttachment, sendMessage, startThread } from '../server/mes
 import { createEntry, resolveScope } from '../server/notebook';
 import { acceptInvite, createInvite } from '../server/partnerships';
 import { claimReward, createReward, setRewardBalance } from '../server/rewards';
-import { soloSpaceFor, soloSpaceIdOf, syncSharedSpaceMembers } from '../server/spaces';
+import { setManagersStatements, soloSpaceFor, soloSpaceIdOf } from '../server/spaces';
 import { completeTask, createTask } from '../server/tasks';
+import { managersFromControl } from '../spaces';
 import type { TaskSettings } from '../tasks';
 import type { TaskSchedule } from '../types';
 import { FAKE_WRAP_BLOB, PASSWORD_WRAP_PARAMS } from './crypto';
@@ -171,20 +172,28 @@ export async function createTestPartnership(
 }
 
 /**
- * Changes who holds control, as the partner settings form would: the row's
- * `control` and the members' `can_manage` together, through the one helper
- * that keeps them in step. Setting the column alone changes nothing a
- * permission reads (`partnershipControl` in `server/spaces.ts`).
+ * Changes who manages an accepted partnership, as the partner settings form
+ * would: each member's `can_manage`, from a role-shaped answer. The row's
+ * `control` is left alone — it is only the invite's offer, and nothing reads
+ * it once the partnership is accepted.
  */
 export async function setTestPartnershipControl(
 	db: Db,
 	partnershipId: string,
 	control: PartnershipControl
 ): Promise<void> {
-	await db.batch([
-		db.update(partnerships).set({ control }).where(eq(partnerships.id, partnershipId)),
-		...syncSharedSpaceMembers(db, partnershipId)
-	]);
+	const [row] = await db
+		.select({ inviterId: partnerships.inviterId, inviteeId: partnerships.inviteeId })
+		.from(partnerships)
+		.where(eq(partnerships.id, partnershipId))
+		.limit(1);
+	if (!row) {
+		throw new Error(`fixture could not find partnership ${partnershipId}`);
+	}
+	const statements = setManagersStatements(db, partnershipId, managersFromControl(control, row));
+	if (statements) {
+		await db.batch(statements);
+	}
 }
 
 /** Pushes a pending invite's expiry into the past. */

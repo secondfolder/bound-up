@@ -1,12 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
-import {
-	answerFromControl,
-	canEditPartnership,
-	controlFromAnswer,
-	isInviteUsable
-} from '$lib/partnership';
+import { answerFromControl, controlFromAnswer, isInviteUsable, offerGives } from '$lib/partnership';
 import {
 	formFields,
 	partnerAcceptFormSchema,
@@ -86,7 +81,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	// "If their permissions are set to them in control or to mix then the invite
 	// should have the names in editable fields, if not they should just be
 	// displayed" — the accepter is always the invitee.
-	const editable = canEditPartnership({ ...invite, inviteeId: locals.user.id }, locals.user.id);
+	// There is no member to ask yet, so this is the offer's own rule.
+	const editable = offerGives(invite.control, 'invitee');
 
 	return {
 		state: 'confirm' as const,

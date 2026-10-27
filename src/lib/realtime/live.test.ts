@@ -12,7 +12,7 @@ import { defined } from '$lib/testing/defined';
 
 vi.mock('$lib/push-client', () => ({ storedPushDeviceId: () => 'device-1' }));
 
-const { watchPartnership } = await import('$lib/messaging/live');
+const { watchMessages } = await import('$lib/messaging/live');
 
 class FakeEventSource {
 	static opened: FakeEventSource[] = [];
@@ -77,13 +77,13 @@ function streamOf(source: FakeEventSource | undefined): string {
 	return defined(url.searchParams.get('stream'), 'the stream id');
 }
 
-describe('watchPartnership: presence', () => {
+describe('watchMessages: presence', () => {
 	it('opens each stream with an id of its own and the push device', () => {
-		const stop = watchPartnership({ partnershipId: 'p-1', onChange: () => undefined });
+		const stop = watchMessages({ room: 'space:p-1', onChange: () => undefined });
 
 		const url = new URL(defined(FakeEventSource.opened[0], 'the stream').url, 'https://app.test');
 		expect(url.pathname).toBe('/api/realtime/events');
-		expect(url.searchParams.get('room')).toBe('partnership:p-1');
+		expect(url.searchParams.get('room')).toBe('space:p-1');
 		expect(url.searchParams.getAll('topic')).toEqual(['messages']);
 		expect(url.searchParams.get('stream')).toMatch(/^[0-9a-f-]{36}$/);
 		expect(url.searchParams.get('device')).toBe('device-1');
@@ -91,7 +91,7 @@ describe('watchPartnership: presence', () => {
 	});
 
 	it('renews the lease while the stream is open', () => {
-		const stop = watchPartnership({ partnershipId: 'p-1', onChange: () => undefined });
+		const stop = watchMessages({ room: 'space:p-1', onChange: () => undefined });
 		const stream = streamOf(FakeEventSource.opened[0]);
 
 		vi.advanceTimersByTime(25_000 * 3);
@@ -99,7 +99,7 @@ describe('watchPartnership: presence', () => {
 		expect(beacons).toEqual(
 			Array.from({ length: 3 }, () => ({
 				url: '/api/realtime/presence',
-				body: { room: 'partnership:p-1', stream, present: true }
+				body: { room: 'space:p-1', stream, present: true }
 			}))
 		);
 		stop();
@@ -107,25 +107,25 @@ describe('watchPartnership: presence', () => {
 
 	/** The case that broke: a phone leaving the board stayed listed as watching it. */
 	it('says goodbye when torn down, and stops renewing', () => {
-		const stop = watchPartnership({ partnershipId: 'p-1', onChange: () => undefined });
+		const stop = watchMessages({ room: 'space:p-1', onChange: () => undefined });
 		const stream = streamOf(FakeEventSource.opened[0]);
 
 		stop();
 		vi.advanceTimersByTime(25_000 * 3);
 
 		expect(beacons.map((beacon) => beacon.body)).toEqual([
-			{ room: 'partnership:p-1', stream, present: false }
+			{ room: 'space:p-1', stream, present: false }
 		]);
 		expect(FakeEventSource.opened[0]?.closed).toBe(true);
 	});
 
 	it('says goodbye when hidden, and comes back as a new stream', () => {
-		const stop = watchPartnership({ partnershipId: 'p-1', onChange: () => undefined });
+		const stop = watchMessages({ room: 'space:p-1', onChange: () => undefined });
 		const first = streamOf(FakeEventSource.opened[0]);
 
 		setVisibility('hidden');
 		expect(beacons.map((beacon) => beacon.body)).toEqual([
-			{ room: 'partnership:p-1', stream: first, present: false }
+			{ room: 'space:p-1', stream: first, present: false }
 		]);
 
 		setVisibility('visible');
@@ -137,11 +137,11 @@ describe('watchPartnership: presence', () => {
 	});
 });
 
-describe('watchPartnership: frames', () => {
+describe('watchMessages: frames', () => {
 	it('hands a message frame on, parsed', () => {
 		const events: unknown[] = [];
-		const stop = watchPartnership({
-			partnershipId: 'p-1',
+		const stop = watchMessages({
+			room: 'space:p-1',
 			onChange: (event) => events.push(event)
 		});
 		const source = defined(FakeEventSource.opened[0], 'the stream');
@@ -159,8 +159,8 @@ describe('watchPartnership: frames', () => {
 
 	it('catches up once a dropped stream opens again', () => {
 		const events: unknown[] = [];
-		const stop = watchPartnership({
-			partnershipId: 'p-1',
+		const stop = watchMessages({
+			room: 'space:p-1',
 			onChange: (event) => events.push(event)
 		});
 		defined(FakeEventSource.opened[0], 'the first stream').onerror?.();

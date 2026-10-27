@@ -6,8 +6,9 @@ import { isClientId } from '$lib/vault';
 const clientId = z.string().refine(isClientId, 'Malformed id');
 
 /**
- * `PUT /api/kink-lists/[scope]`: a sealed list, new when `expectedRevision`
- * is null. Shared by the endpoint and the browser that builds the request.
+ * `PUT /api/spaces/[spaceId]/kink-list`: a sealed list, new when
+ * `expectedRevision` is null. Shared by the endpoint and the browser that
+ * builds the request.
  */
 export const kinkListSaveSchema = z.object({
 	id: clientId,

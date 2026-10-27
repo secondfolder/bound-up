@@ -93,7 +93,9 @@ one-tap switch, and never switches by itself. Messages in Me is the first:
 - **Coming back refreshes it.** The app shell listens for `visibilitychange`;
   a tab coming to the front whose page was rendered for another context than
   the cookie now names invalidates `app:context`, so the switcher never claims
-  one context over a list of another.
+  one context over a list of another. Unlike a switch, this refresh does not
+  hold the page (see [the switcher](#the-switcher)): until it lands the pill
+  and the list still agree.
 - **Back does not undo a switch.** History holds URLs, and switching does not
   change the URL: the same page re-runs its loads in place.
 - **A pasted list link** (`/today`, `/notebook`, `/tasks`, `/rewards`,
@@ -159,6 +161,39 @@ and `invalidate('app:context')` re-run the page in place. A refusal shows the
 app-wide notice ([request-failures.md](request-failures.md)) and puts the pill
 back to what the page's data says.
 
+**The page is held until the switch lands.** The pill names the picked
+context at once, but the page under it is the old context's until the
+re-run's data arrives, and a quick tap there acted on what it showed: Today's
+tasks card in Everyone, tapped just after picking Me, stored Everyone again
+and opened the tasks in it. So while a switch is under way (from the request
+to the re-run, a refusal included) the app shell's `<main>` is
+`aria-busy="true"` and everything in it except the switcher is `inert`, and
+dims after a beat (no fade under `prefers-reduced-motion`, only the step).
+`switchContext` counts switches in flight and `holdWhileSwitching`, an
+attachment on `<main>` in the `(app)` layout, follows the count, so this
+lives in one place rather than in each page.
+
+- **Inert, not a later label.** Holding back the new name until the data
+  arrived would leave the stale page live, its taps racing the switch's own
+  request for the cookie. `inert` takes the old content out of reach of a
+  pointer, the keyboard and assistive tech alike, which an overlay or a click
+  guard would not.
+- **The switcher stays live.** It sits inside `<main>`, in the page header,
+  and its close hands focus back to the pill, which under an inert ancestor
+  would fall to `<body>`. An inert ancestor cannot be undone below it, so
+  rather than `<main>` itself each sibling on the way down to the switcher
+  (`data-context-switcher`) is held. Whatever the page had made inert itself
+  is left as it was.
+- **The nav stays live.** `AppNav` is outside `<main>`, and a tap on it opens
+  a new page whose pill and list come from the same load, so nothing it lands
+  on shows one context over another's things.
+- **Coming back to a tab is not held.** Until the `visibilitychange` refresh
+  lands, the pill and the page still agree on the context they were rendered
+  in, so a tap acts on what it shows; holding would dim the page every time
+  the app came to the front. A card's link (`followInContext`) is not held
+  either: the tap is itself the choice of context, and the page it leaves is
+  about to be replaced.
+
 **Where it is drawn.** The pill sits in the page header, but the fan is drawn
 against the app shell (`data-app-shell` on the `(app)` layout's shell), whose
 rectangle is measured when the fan opens: the shell is fitted to the visual
@@ -196,6 +231,15 @@ list.
   `SpaceColourForm`), which re-checks that the viewer is in a linked
   partnership and writes only their own row.
 
+## Everyone is live
+
+An Everyone list is as live as a list of one space, on one stream: the
+notebook list and the messages board watch the viewer's own realtime room,
+`user:<id>`, to which every space they are in fans its list events out, rather
+than a stream per partnership ([realtime.md](realtime.md#everyone-one-stream-not-one-per-space),
+[notebook.md](notebook.md#the-list-in-every-context),
+[messaging.md](messaging.md#realtime)).
+
 ## Files
 
 | Path | What |
@@ -210,11 +254,6 @@ list.
 
 ## Not built yet
 
-- A live Everyone list: the notebook list and the messages board refresh when
-  looked at again rather than holding a stream per partnership. Fanning list
-  events out to each member's own room would let one stream cover it
-  ([notebook.md](notebook.md#the-list-in-every-context),
-  [messaging.md](messaging.md#realtime)).
 - A dot on the control for something unread in another context.
 - An unread badge on the nav's Messages tab. Nothing the app shell already
   loads says how many threads are unread, and counting them in the layout

@@ -295,6 +295,12 @@ export type VaultRowView = {
 export type VaultListingView = {
 	/** The user's own recipient, as the server has it. */
 	recipient: string;
+	/**
+	 * The user's solo space: where their own vault is made, and what every
+	 * request about it names (`/api/spaces/[spaceId]/vault/…`). A
+	 * partnership's vault is in the shared space with the partnership's id.
+	 */
+	soloSpaceId: string;
 	/** Null until the first device creates it. */
 	self:
 		| (VaultRowView & {

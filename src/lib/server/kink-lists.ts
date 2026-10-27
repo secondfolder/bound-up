@@ -11,7 +11,7 @@ import {
 	sealedIsAcceptable,
 	selfVaultIdFor
 } from './sealed-content';
-import { soloSpaceIdOf } from './spaces';
+import { requireSpaceMember, soloSpaceIdOf } from './spaces';
 
 /**
  * Every database access for kink lists. See docs/kink-list.md.
@@ -34,6 +34,28 @@ export type KinkListRefusal =
 export type KinkListResult<T = object> =
 	| ({ ok: true } & T)
 	| { ok: false; reason: KinkListRefusal };
+
+/**
+ * The scope a space's list is in, for `userId`: their own list in their solo
+ * space, their copy for the partnership in a shared one, which has the
+ * partnership's id. Null when they are not in the space, which the API
+ * answers like a space that does not exist.
+ *
+ * The API names spaces; the rows still store `'self'` or the partnership's
+ * id in `scope`, which is what saved lists are found by, so this is the one
+ * place the two meet.
+ */
+export async function kinkListScopeIn(
+	db: Db,
+	spaceId: string,
+	userId: string
+): Promise<KinkListScope | null> {
+	const space = await requireSpaceMember(db, spaceId, userId);
+	if (!space) {
+		return null;
+	}
+	return space.kind === 'solo' ? 'self' : { partnershipId: spaceId };
+}
 
 function scopeKey(scope: KinkListScope): string {
 	return scope === 'self' ? 'self' : scope.partnershipId;

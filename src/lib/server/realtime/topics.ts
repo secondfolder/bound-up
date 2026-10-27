@@ -1,7 +1,8 @@
 import { NOTEBOOK_LIST_TOPIC } from '../../notebook';
 import type { Db } from '../db';
 import { requireMembership } from '../messaging';
-import { getEntryContext } from '../notebook';
+import { getEntryContext, scopeForSpace } from '../notebook';
+import { requireSpaceMember } from '../spaces';
 import { type RoomKey, roomScope } from './index';
 import { MESSAGES_TOPIC } from './messaging';
 
@@ -13,6 +14,12 @@ import { MESSAGES_TOPIC } from './messaging';
  * opening a stream, for the room and then for every topic the page names,
  * and refuses the lot if any one fails. A topic cannot be added to an open
  * stream, so nothing reaches a stream that was not checked here.
+ *
+ * A space's room is open to its members (`requireSpaceMember`), and an
+ * account's room to that account alone. What an account's room carries is
+ * only ever what was also published to a space its holder is in
+ * (`fanOutRooms` in `./index.ts`), so letting them hear its list topics
+ * gives them nothing their spaces' rooms would not.
  *
  * Not alias-free, unlike the rest of this directory: the Durable Object never
  * imports it. Only the endpoints do.
@@ -26,15 +33,21 @@ async function mayEnterRoom(db: Db, userId: string, room: RoomKey): Promise<bool
 	if (kind === 'user') {
 		return id === userId;
 	}
-	return (await requireMembership(db, id, userId)) !== null;
+	return (await requireSpaceMember(db, id, userId)) !== null;
 }
 
 /** Whether `userId`, already allowed in `room`, may hear `topic` there. */
 async function mayHear(db: Db, userId: string, room: RoomKey, topic: string): Promise<boolean> {
 	const { kind, id } = roomScope(room);
+	if (kind === 'user') {
+		// One account's view across its spaces: the list topics, fanned out to
+		// it by every space it is in. An entry's edits stay in the entry's own
+		// space's room.
+		return topic === MESSAGES_TOPIC || topic === NOTEBOOK_LIST_TOPIC;
+	}
 	if (topic === MESSAGES_TOPIC) {
-		// Messaging only exists between partners.
-		return kind === 'partnership';
+		// Messaging only exists between partners, once linked.
+		return (await requireMembership(db, id, userId)) !== null;
 	}
 	if (topic === NOTEBOOK_LIST_TOPIC) {
 		return true;
@@ -42,14 +55,13 @@ async function mayHear(db: Db, userId: string, room: RoomKey, topic: string): Pr
 	const match: RegExpExecArray | null = ENTRY_TOPIC.exec(topic);
 	const entryId = match?.groups?.entryId;
 	if (entryId) {
-		// The entry must be in this room's scope, and readable by this viewer: an
+		// The entry must be in this room's space, and readable by this viewer: an
 		// entry hidden from them is refused like one that does not exist.
-		const context = await getEntryContext(
-			db,
-			entryId,
-			userId,
-			kind === 'user' ? { kind: 'self' } : { kind: 'partnership', partnershipId: id }
-		);
+		const membership = await requireSpaceMember(db, id, userId);
+		if (!membership) {
+			return false;
+		}
+		const context = await getEntryContext(db, entryId, userId, scopeForSpace(membership));
 		return context !== null && context.room === room;
 	}
 	return false;

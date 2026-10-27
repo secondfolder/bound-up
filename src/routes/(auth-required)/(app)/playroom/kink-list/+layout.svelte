@@ -14,7 +14,7 @@
 	// and an `invalidate()` handing over a newer `data` must not replace it
 	// (AGENTS.md, on effects that read `data`).
 	// svelte-ignore state_referenced_locally
-	const store = new AccountKinkList(data.list);
+	const store = new AccountKinkList(data.soloSpaceId, data.list);
 
 	setKinkListContext({
 		store,

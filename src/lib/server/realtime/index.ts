@@ -8,9 +8,12 @@
  * all. Production gets a Durable Object; dev gets a module-level `Map`, which
  * is genuinely correct there because dev is one Node process.
  *
- * **One room per scope, many topics per room.** A room is a partnership
- * (`partnership:<id>`) or one account (`user:<id>`), and every realtime feature
- * shares it: partner messaging and the notebook today. A stream names the
+ * **One room per space, many topics per room.** A room is a space
+ * (`space:<id>`, solo or shared) or one account (`user:<id>`), and every
+ * realtime feature shares it: partner messaging and the notebook today. A
+ * space's list-level events are also fanned out to each member's own
+ * `user:<id>` room, so a page showing every space at once (the Everyone
+ * context) needs one stream rather than one per space. A stream names the
  * topics it wants and is sent only those, so a device with a notebook entry
  * open is neither sent message events nor counted as watching the board. One
  * class rather than one per feature because a Durable Object is billed per
@@ -48,15 +51,22 @@
  */
 
 /**
- * Which room: a partnership, or one account on its own.
+ * Which room: a space, or one account on its own.
  *
- * The key is what `idFromName` hashes, so both partners' devices (or all of
+ * The key is what `idFromName` hashes, so every member's devices (or all of
  * one account's) derive the same object without an id being stored anywhere.
+ *
+ * - **`space:<id>`** is everything in one space, solo or shared: a list of
+ *   one space, an entry, a thread, a board of one partnership.
+ * - **`user:<id>`** is one account's view across every space it is in. A
+ *   publisher fans a space's list-level events out to each member's room as
+ *   well as the space's (`fanOutRooms`), so an Everyone list watches this one
+ *   room instead of one per space. Nothing is ever published *only* here.
  */
-export type RoomKey = `partnership:${string}` | `user:${string}`;
+export type RoomKey = `space:${string}` | `user:${string}`;
 
-export function partnershipRoom(partnershipId: string): RoomKey {
-	return `partnership:${partnershipId}`;
+export function spaceRoom(spaceId: string): RoomKey {
+	return `space:${spaceId}`;
 }
 
 export function userRoom(userId: string): RoomKey {
@@ -64,10 +74,10 @@ export function userRoom(userId: string): RoomKey {
 }
 
 /**
- * Partnership ids are UUIDs; user ids are Better Auth's, which are not, so the
- * id half is any short run of URL-safe characters rather than a UUID.
+ * Space ids are UUIDs; user ids are Better Auth's, which are not, so the id
+ * half is any short run of URL-safe characters rather than a UUID.
  */
-const ROOM_PATTERN = /^(?:partnership|user):[A-Za-z0-9_-]{1,64}$/;
+const ROOM_PATTERN = /^(?:space|user):[A-Za-z0-9_-]{1,64}$/;
 
 /** A room key from a request, or `null` for anything that is not one. */
 export function parseRoomKey(value: string | null): RoomKey | null {
@@ -75,12 +85,40 @@ export function parseRoomKey(value: string | null): RoomKey | null {
 }
 
 /** The two halves of a room key, for authorising it. */
-export function roomScope(room: RoomKey): { kind: 'partnership' | 'user'; id: string } {
+export function roomScope(room: RoomKey): { kind: 'space' | 'user'; id: string } {
 	const separator = room.indexOf(':');
 	return {
-		kind: room.slice(0, separator) as 'partnership' | 'user',
+		kind: room.slice(0, separator) as 'space' | 'user',
 		id: room.slice(separator + 1)
 	};
+}
+
+/**
+ * Every room a space's list-level event goes to: the space's own, and each
+ * member's. One publish per room, so a space of two costs three Durable
+ * Object requests per event rather than one — paid per write, which is rare,
+ * instead of a stream per space held open by every Everyone page, which is
+ * not (docs/realtime.md, "Everyone").
+ */
+export function fanOutRooms(spaceId: string, memberIds: readonly string[]): RoomKey[] {
+	return [spaceRoom(spaceId), ...[...new Set(memberIds)].map(userRoom)];
+}
+
+/**
+ * Publishes one frame to every room `fanOutRooms` names, and returns everyone
+ * watching the topic in any of them. Never throws, because `publish` does not.
+ */
+export async function publishFanOut(
+	notifier: Notifier,
+	spaceId: string,
+	memberIds: readonly string[],
+	topic: string,
+	data: string
+): Promise<Watcher[]> {
+	const watched = await Promise.all(
+		fanOutRooms(spaceId, memberIds).map((room) => notifier.publish(room, topic, data))
+	);
+	return watched.flat();
 }
 
 /**

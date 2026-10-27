@@ -85,6 +85,47 @@ test.describe('messages in every context', () => {
 		}
 	});
 
+	/**
+	 * An Everyone board of several partnerships watches one stream, Bo's own
+	 * room, which each partnership fans its board events out to
+	 * (docs/realtime.md, "Everyone"). No reload, so it cannot pass on a
+	 * refetch.
+	 */
+	test('an Everyone board updates live when a partner writes, on one stream', async ({
+		browser
+	}) => {
+		const { ada, bo, cy } = await boWithTwoPartners(browser);
+		try {
+			await showContext(bo.page, 'all');
+			const streams: string[] = [];
+			bo.page.on('request', (request) => {
+				if (request.url().includes('/api/realtime/events')) {
+					streams.push(new URL(request.url()).searchParams.get('room') ?? '');
+				}
+			});
+			await bo.page.goto('/messages');
+			await waitForHydration(bo.page);
+			await expect(control(bo.page)).toHaveAccessibleName(/^Showing Everyone/);
+			const unread = bo.page.getByRole('list', { name: 'Unread' });
+			await expect(unread.getByRole('listitem')).toHaveCount(2);
+			await expect.poll(() => streams.length).toBeGreaterThan(0);
+
+			// Each partner writes a new thread; Bo's open board grows by one each.
+			await openBoard(cy.page, 'Bo');
+			await writeThread(cy.page, 'again from Cy');
+			await expect(unread.getByRole('listitem')).toHaveCount(3, { timeout: 15_000 });
+			await openBoard(ada.page, 'Bo');
+			await writeThread(ada.page, 'again from Ada');
+			await expect(unread.getByRole('listitem')).toHaveCount(4, { timeout: 15_000 });
+			await expect(unread.getByRole('link', { name: /with Ada/ })).toHaveCount(2);
+
+			expect(new Set(streams).size).toBe(1);
+			expect(streams[0]).toMatch(/^user:/);
+		} finally {
+			await closeAll(ada, bo, cy);
+		}
+	});
+
 	test('Me offers to switch, and switching shows that partner’s board', async ({ browser }) => {
 		const { ada, bo, cy } = await boWithTwoPartners(browser);
 		try {

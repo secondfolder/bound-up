@@ -45,28 +45,33 @@ import {
 	wrapVaultKey
 } from './vault';
 
-export type VaultCreation =
-	| {
-			kind: 'self';
-			id: string;
-			keyCheck: string;
-			wraps: { userId: string; ciphertext: string; forRecipient: string }[];
-	  }
-	| {
-			kind: 'partnership';
-			id: string;
-			partnershipId: string;
-			keyCheck: string;
-			wraps: { userId: string; ciphertext: string; forRecipient: string }[];
-	  };
+/**
+ * A vault about to be made. Which space it is for is `create`'s first
+ * argument: the request names its space in the path, as every scoped write
+ * does (docs/spaces.md). `kind` is what the vault is, for the device's own
+ * bookkeeping; the server works it out from the space.
+ */
+export type VaultCreation = {
+	kind: 'self' | 'partnership';
+	id: string;
+	keyCheck: string;
+	wraps: { userId: string; ciphertext: string; forRecipient: string }[];
+};
 
+/**
+ * The network, passed in. Every call names the space it acts in: the own
+ * vault's is the listing's `soloSpaceId`, and a partnership's vault is in the
+ * shared space whose id is the partnership's (docs/spaces.md, "Ids are the
+ * partnership's").
+ */
 export type EnsureVaultsDeps = {
 	userId: string;
 	identity: { recipient: string; identity: CryptoKey | string };
 	list: () => Promise<VaultListingView>;
 	/** `created`, or `exists` when another device won the race. */
-	create: (vault: VaultCreation) => Promise<'created' | 'exists'>;
+	create: (spaceId: string, vault: VaultCreation) => Promise<'created' | 'exists'>;
 	putWrap: (
+		spaceId: string,
 		vaultId: string,
 		wrap: { userId: string; ciphertext: string; forRecipient: string }
 	) => Promise<void>;
@@ -81,17 +86,26 @@ export type EnsureVaultsDeps = {
 	) => Promise<boolean>;
 	/** For a vault this device should be able to open and cannot: logged, not thrown. */
 	report: (message: string) => void;
-	/** The user's own vault held in escrow by their partners. See `escrow.ts`. */
+	/**
+	 * The user's own vault held in escrow by their partners. See `escrow.ts`.
+	 * Each names the user's solo space, which is where their own vault is.
+	 */
 	escrow: {
 		/** The server's share for a new escrow id. */
-		issueShare: (escrowId: string) => Promise<string>;
-		put: (escrow: { id: string; partnershipId: string; ciphertext: string }) => Promise<void>;
+		issueShare: (soloSpaceId: string, escrowId: string) => Promise<string>;
+		/** Held in `heldInSpaceId`: the shared space of the partner holding it. */
+		put: (
+			soloSpaceId: string,
+			escrow: { id: string; heldInSpaceId: string; ciphertext: string }
+		) => Promise<void>;
 		/** After a partner-assisted sign-in: the relays partners passed on, with the server's share of each. */
-		release: () => Promise<{ escrowId: string; ciphertext: string; share: string }[]>;
+		release: (
+			soloSpaceId: string
+		) => Promise<{ escrowId: string; ciphertext: string; share: string }[]>;
 		/** Replaces nothing: drops every escrow, so they are made again under new shares. */
-		deleteAll: () => Promise<void>;
+		deleteAll: (soloSpaceId: string) => Promise<void>;
 		/** Deletes an own vault nothing can bring back. False while something still might. */
-		deleteLostSelfVault: () => Promise<boolean>;
+		deleteLostSelfVault: (soloSpaceId: string) => Promise<boolean>;
 	};
 	newId?: () => string;
 };
@@ -143,6 +157,7 @@ async function pass(
 		throw new StaleIdentityError();
 	}
 
+	const { soloSpaceId } = listing;
 	let lostRace = false;
 	const opened: OpenedVaults = { self: null, partnerships: {} };
 	/**
@@ -170,7 +185,7 @@ async function pass(
 				opened.self = await vaultFromKey(unwrapped.raw, listing.self);
 				selfRaw = unwrapped.raw;
 				if (unwrapped.legacy) {
-					await upgradeSelfWrap(deps, listing.self.id, unwrapped.raw);
+					await upgradeSelfWrap(deps, soloSpaceId, listing.self.id, unwrapped.raw);
 				}
 			} else {
 				deps.report('the self vault has a wrap for this key that does not open');
@@ -179,15 +194,15 @@ async function pass(
 			// No wrap for this key: a partner-assisted sign-in replaced it. The
 			// escrow is the only way back (`recoverSelfVault`); when nothing can
 			// ever bring the vault back, it is replaced with a new one.
-			const recovered = await recoverSelfVault(deps, listing.self);
+			const recovered = await recoverSelfVault(deps, soloSpaceId, listing.self);
 			if (recovered) {
 				opened.self = await vaultFromKey(recovered, listing.self);
 				selfRaw = recovered;
 				// Every share of the old escrows has now been released, so they
 				// are made again below, under new ids and so new shares.
-				await deps.escrow.deleteAll();
+				await deps.escrow.deleteAll(soloSpaceId);
 				escrowed = new Set();
-			} else if (mayCreate && (await deps.escrow.deleteLostSelfVault())) {
+			} else if (mayCreate && (await deps.escrow.deleteLostSelfVault(soloSpaceId))) {
 				createSelf = true;
 			}
 		}
@@ -196,7 +211,7 @@ async function pass(
 		const raw = generateVaultKey();
 		const { keyCheck } = await deriveVaultKeys(raw);
 		const id = newId();
-		const result = await deps.create({
+		const result = await deps.create(soloSpaceId, {
 			kind: 'self',
 			id,
 			keyCheck,
@@ -249,11 +264,12 @@ async function pass(
 			const raw = selfRaw;
 			if (raw) {
 				const escrowId = newId();
-				const share = await deps.escrow.issueShare(escrowId);
+				const share = await deps.escrow.issueShare(soloSpaceId, escrowId);
 				const inner = await sealUnderShare({ raw, share, vault: opened.self });
-				await deps.escrow.put({
+				await deps.escrow.put(soloSpaceId, {
 					id: escrowId,
-					partnershipId,
+					// The partnership's shared space has the partnership's id.
+					heldInSpaceId: partnershipId,
 					ciphertext: await encryptBytesTo(inner, recipients.theirs)
 				});
 				escrowed.add(partnershipId);
@@ -285,7 +301,7 @@ async function pass(
 					vault
 				});
 				if (raw) {
-					await deps.putWrap(vault.id, {
+					await deps.putWrap(partnershipId, vault.id, {
 						userId: partnerId,
 						ciphertext: await wrapVaultKey({
 							vaultId: vault.id,
@@ -311,10 +327,10 @@ async function pass(
 			ciphertext: await wrapVaultKey({ vaultId: id, raw, recipient }),
 			forRecipient: recipient
 		});
-		const result = await deps.create({
+		// A partnership's shared space has the partnership's id.
+		const result = await deps.create(partnershipId, {
 			kind: 'partnership',
 			id,
-			partnershipId,
 			keyCheck,
 			// The device's own key, not `recipients.mine` — equal by now, but this
 			// is the wrap that decides who holds the vault, so it names the key the
@@ -350,9 +366,10 @@ async function pass(
  */
 async function recoverSelfVault(
 	deps: EnsureVaultsDeps,
+	soloSpaceId: string,
 	self: { id: string; keyCheck: string }
 ): Promise<Uint8Array<ArrayBuffer> | null> {
-	for (const relay of await deps.escrow.release()) {
+	for (const relay of await deps.escrow.release(soloSpaceId)) {
 		const inner = await decryptBytes(relay.ciphertext, deps.identity.identity);
 		if (!inner) {
 			continue;
@@ -362,7 +379,7 @@ async function recoverSelfVault(
 			deps.report('an escrow relay for the own vault did not open');
 			continue;
 		}
-		await deps.putWrap(self.id, {
+		await deps.putWrap(soloSpaceId, self.id, {
 			userId: deps.userId,
 			ciphertext: await wrapSelfVaultKey({
 				vaultId: self.id,
@@ -385,11 +402,12 @@ async function recoverSelfVault(
  */
 async function upgradeSelfWrap(
 	deps: EnsureVaultsDeps,
+	soloSpaceId: string,
 	vaultId: string,
 	raw: Uint8Array<ArrayBuffer>
 ): Promise<void> {
 	try {
-		await deps.putWrap(vaultId, {
+		await deps.putWrap(soloSpaceId, vaultId, {
 			userId: deps.userId,
 			ciphertext: await wrapSelfVaultKey({
 				vaultId,

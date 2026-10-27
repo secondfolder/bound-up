@@ -1,7 +1,7 @@
 # Realtime
 
 How a change made on one device reaches the others while they are looking:
-one room per scope, shared by every realtime feature, with each stream
+one room per space, shared by every realtime feature, with each stream
 subscribed to the topics its page needs. Messaging and the notebook use it
 today. Feature-specific rules (what a frame may say, what a page does with
 one) are in [messaging.md](messaging.md#realtime) and
@@ -9,16 +9,20 @@ one) are in [messaging.md](messaging.md#realtime) and
 
 ## The shape of it
 
-- **A room is a scope**: `partnership:<id>` (both partners) or `user:<id>`
-  (one account's devices). The key is what `idFromName` hashes, so every
-  device derives the same Durable Object without an id being stored
-  anywhere.
+- **A room is a space or an account**: `space:<id>` (a solo space's one
+  member, or a partnership's two; [spaces.md](spaces.md)) or `user:<id>` (one
+  account's view across every space it is in, which is what an Everyone page
+  watches; see below). The key is what `idFromName` hashes, so every device
+  derives the same Durable Object without an id being stored anywhere, and the
+  Durable Object never parses it.
 - **A stream names topics** when it opens: `messages`, `notebook` (a list),
   `notebook-entry:<id>` (one entry's edits and cursors). The events endpoint,
   `GET /api/realtime/events?room=…&topic=…&stream=…`, authorises the room and
   every topic before the stream opens (`mayWatch` in
-  `server/realtime/topics.ts`), and a stream's topics never change after
-  that. Anything refused is a 404, the same as a room that does not exist,
+  `server/realtime/topics.ts`: a space's room for its members, by
+  `requireSpaceMember`, and `messages` there only for an accepted
+  partnership's; an account's room for that account, and only its list
+  topics), and a stream's topics never change after that. Anything refused is a 404, the same as a room that does not exist,
   so a refusal never confirms an id is real; that covers a notebook entry
   hidden from the viewer.
 - **A publish names one topic**, and only streams subscribed to it receive
@@ -42,14 +46,6 @@ one room opens one stream, not two. The class is still `RealtimeRoom`: renaming
 a Durable Object class takes a one-way tombstone in `exports`, and the name is
 accurate as it is.
 
-**A list in Everyone opens no stream.** The notebook list and the messages
-board each show every partnership at once in the Everyone context
-([contexts.md](contexts.md)), and watching that would take a stream per
-partnership. They reload when their tab is looked at again instead
-([notebook.md](notebook.md#the-list-in-every-context),
-[messaging.md](messaging.md#realtime)). Fanning list events out to each
-member's `user:<id>` room, so one stream covers Everyone, is not built yet.
-
 **SSE, not WebSocket**, for a decisive reason: `vite dev` cannot serve a
 WebSocket upgrade from a `+server.ts` at all, so a socket would need a second
 client code path used only in development, and the Playwright suite would then
@@ -64,7 +60,7 @@ Docker build, which is genuinely correct there because each is one process,
 and is why a self-hosted instance supports one replica only.
 
 The browser half is `watchRoom` in `src/lib/realtime/live.ts`;
-`watchPartnership` (messaging) and the notebook session wrap it.
+`watchMessages` (messaging) and the notebook session wrap it.
 
 **A queue limit in bytes as well as frames.** A client that stops reading is
 dropped once its queue is full, which is safe because reconnecting resyncs.
@@ -73,14 +69,47 @@ kilobytes, so the queue is measured in bytes (`SSE_QUEUE_BYTES`, 1 MB), with
 each frame charged at least a sixteenth of it (`queuedSize`), so sixteen small
 frames still fill it as they always did.
 
+## Everyone: one stream, not one per space
+
+The notebook list and the messages board can show every partnership at once,
+in the Everyone context ([contexts.md](contexts.md)). Watching each space's
+room would take a stream per partnership, each with its presence beacons —
+and one idle stream is already most of a day's free allowance (below).
+
+So a space's **list-level** events are **fanned out**: published to the
+space's room and to each member's own `user:<id>` room
+(`publishToSpace` in `server/realtime/fan-out.ts`, over `fanOutRooms` in
+`index.ts`), and an Everyone list watches the viewer's own room alone. That
+covers the `notebook` topic (an entry made, deleted, retitled or
+re-restricted) and the `messages` topic, except `read`, which only a thread
+page shows. An entry's edits and cursors, and a read receipt, stay in their
+space's room: an item has exactly one space, and its page watches it.
+
+The cost moves from reading to writing, where it is far smaller:
+
+- **Watching**: one stream and one lease per open Everyone page, however many
+  partnerships it shows — the same as a page of one space. A list of one space
+  still watches that space's room.
+- **Publishing**: one Durable Object request per room, so an event in a space
+  of two is three requests where it was one, plus one D1 read of the space's
+  members (`spaceMemberIds`, by `space_members_space_user_idx`). Events follow
+  writes — a message, a new entry, a title saved — which are rare beside the
+  25-second lease of every open page.
+
+What reaches an account's room is only ever what was also published to a
+space its holder is in, so letting them hear its list topics tells them
+nothing their spaces' rooms would not. If the members cannot be read, the
+event still reaches the space's own room, and an Everyone page catches up when
+it is next looked at, since it resyncs on becoming visible like any other.
+
 ## Hanging up when hidden is a billing necessity
 
 A Durable Object is billed at 128 MB × wall-clock for as long as it holds an
 in-flight request, and only _hibernation-eligible_ idleness is free —
 hibernation needs the WebSocket Hibernation API, which SSE cannot use. One
 permanently-open stream is roughly 10,800 GB-s a day: about **83% of the free
-plan's 13,000 GB-s daily allowance, for a single partnership idling in a
-background tab.**
+plan's 13,000 GB-s daily allowance, for a single page idling in a background
+tab.**
 
 So the client closes the stream on `visibilitychange`, and says goodbye as it
 does (see the next section), because closing alone does not end the object's

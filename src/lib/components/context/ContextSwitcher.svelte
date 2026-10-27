@@ -423,9 +423,11 @@
 {#if visible}
 	<!-- The keydown and focusout here are for Escape and tabbing away from
 	     whichever of the buttons inside has focus; the element itself is
-	     not interactive. -->
+	     not interactive. `data-context-switcher` is what the app shell leaves
+	     live while it holds the page during a switch (`holdWhileSwitching`),
+	     so the pill can fly home and take focus back. -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="switcher" bind:this={root} {onkeydown} {onfocusout}>
+	<div class="switcher" data-context-switcher bind:this={root} {onkeydown} {onfocusout}>
 		<span
 			class="anchor"
 			bind:this={anchor}

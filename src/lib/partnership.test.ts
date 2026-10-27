@@ -4,11 +4,13 @@ import {
 	type ControlAnswer,
 	canDisconnect,
 	canEditPartnership,
+	controlAnswerFor,
 	controlFromAnswer,
 	INVITE_TTL_MS,
 	isInviteUsable,
 	namesForViewer,
 	namesSourceFor,
+	offerGives,
 	type PartnershipControl,
 	type PartnershipRecord,
 	type PartnershipRole,
@@ -18,18 +20,26 @@ import {
 	type ViewerNames,
 	viewPartnership
 } from './partnership';
+import { managersFromControl } from './spaces';
 
 const INVITER = 'user-inviter';
 const INVITEE = 'user-invitee';
 const STRANGER = 'user-stranger';
 
+/**
+ * A row. Its members manage as `control` says unless `members` is given, as
+ * they do the moment an invite is accepted; a test about the two disagreeing
+ * passes both.
+ */
 function record(overrides: Partial<PartnershipRecord> = {}): PartnershipRecord {
+	const inviteeId = 'inviteeId' in overrides ? (overrides.inviteeId ?? null) : INVITEE;
 	return {
 		id: 'p1',
 		status: 'accepted',
 		inviterId: INVITER,
-		inviteeId: INVITEE,
+		inviteeId,
 		control: 'both',
+		members: managersFromControl(overrides.control ?? 'both', { inviterId: INVITER, inviteeId }),
 		namesCiphertext: null,
 		namesVaultId: null,
 		namesPayloadVersion: null,
@@ -96,6 +106,58 @@ describe('canEditPartnership', () => {
 		for (const control of ['inviter', 'invitee', 'both'] as PartnershipControl[]) {
 			expect(canEditPartnership(record({ control }), STRANGER)).toBe(false);
 		}
+	});
+
+	/**
+	 * The column is the invite's offer, kept as accepted; who manages since is
+	 * `can_manage`. A rule that read the column would let the inviter in here.
+	 */
+	it("follows the members' can_manage, not the row's control, once accepted", () => {
+		const r = record({
+			control: 'inviter',
+			members: [
+				{ userId: INVITER, canManage: false },
+				{ userId: INVITEE, canManage: true }
+			]
+		});
+		expect(canEditPartnership(r, INVITER)).toBe(false);
+		expect(canEditPartnership(r, INVITEE)).toBe(true);
+	});
+});
+
+describe('offerGives', () => {
+	it('gives control to the role it names, or to both', () => {
+		expect(offerGives('inviter', 'inviter')).toBe(true);
+		expect(offerGives('inviter', 'invitee')).toBe(false);
+		expect(offerGives('invitee', 'invitee')).toBe(true);
+		expect(offerGives('invitee', 'inviter')).toBe(false);
+		expect(offerGives('both', 'inviter')).toBe(true);
+		expect(offerGives('both', 'invitee')).toBe(true);
+	});
+});
+
+describe('controlAnswerFor', () => {
+	it("is the offer, from the viewer's side, while it is an invite", () => {
+		const pending = viewPartnership(
+			record({ status: 'pending', inviteeId: null, control: 'invitee' }),
+			INVITER
+		);
+		expect(pending.offer).toBe('invitee');
+		expect(controlAnswerFor(pending, INVITER)).toBe('them');
+	});
+
+	it('is who manages the space once accepted, whatever the row still says', () => {
+		const r = record({
+			control: 'both',
+			members: [
+				{ userId: INVITER, canManage: true },
+				{ userId: INVITEE, canManage: false }
+			]
+		});
+		expect(viewPartnership(r, INVITER).offer).toBeNull();
+		expect(controlAnswerFor(viewPartnership(r, INVITER), INVITER)).toBe('me');
+		expect(controlAnswerFor(viewPartnership(r, INVITEE), INVITEE)).toBe('them');
+		expect(controlAnswerFor(viewPartnership(record(), INVITEE), INVITEE)).toBe('mix');
 	});
 });
 

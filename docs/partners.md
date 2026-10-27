@@ -23,7 +23,7 @@ relationship, so storing them twice would let the two halves disagree.
 | `status`                             | `'pending'` or `'accepted'`. There is no declined or ended state — see below.    |
 | `names_*`                            | The names and roles, sealed in the partnership's vault. See below.               |
 | `invite_*`                           | Before the names reach the vault: sealed under the invite key. See below.        |
-| `control`                            | `'inviter'`, `'invitee'` or `'both'`. Who may change the names and roles. Read from the members' `can_manage`; see below. |
+| `control`                            | `'inviter'`, `'invitee'` or `'both'`: **the invite's offer**, who will manage once accepted. Never a permission after that; see below. |
 | `invite_token` / `invite_expires_at` | The secret in the URL and its deadline. Both cleared on acceptance.              |
 | `accepted_at`                        | When the link was made.                                                          |
 
@@ -42,9 +42,10 @@ invite later.
 ### Roles are permanent, and that is deliberate
 
 `inviter` and `invitee` are not just plumbing for the invite. They stay
-meaningful for the life of the row, because `control` is expressed in terms of
-them. That is what makes a single row readable from both ends: whoever loads it,
-`control === 'inviter'` means the same thing.
+meaningful for the life of the row, because the sealed names and the invite's
+offer (`control`) are expressed in terms of them. That is what makes a single
+row readable from both ends: whoever loads it, `control === 'inviter'` means the
+same thing.
 
 ### Names are sealed
 
@@ -63,7 +64,7 @@ them back, and can read none of them. They live under two keys in turn:
    identity can make (docs/encryption.md, "The self vault's wrap"), so the
    server cannot hand the inviter a key of its own to build the link from.
 2. **The partnership vault.** Once the invite is accepted and the device of a
-   member who holds `control` has the vault open, that device opens the names
+   member who manages it (`can_manage`) has the vault open, that device opens the names
    from the invite, seals them into the vault (kind `partnership-names`,
    columns `names_*`), and the invite and its key wrap are cleared, in one
    write: `invite-names.ts`, started by `EncryptionGate` once per partnership
@@ -71,7 +72,7 @@ them back, and can read none of them. They live under two keys in turn:
    (`inviteNamesToMove` and `moveInviteNamesIntoVault` in
    `server/partnerships.ts`). The write matches only a row whose names are not
    in the vault yet, so two devices moving them at once write them once, and
-   it can never stand in for an edit. Only a member who holds `control`,
+   it can never stand in for an edit. Only a member who manages it,
    because moving them is writing them: the server cannot compare the sealed
    copy with the invite, so a read-only member allowed to move them could
    rewrite the names. Their device is not handed them, and the names stay
@@ -98,8 +99,9 @@ a mismatch blocks accepting, and a match is pinned on the invitee's device as
 closes trust-on-first-use in that direction ([docs/encryption.md](encryption.md)).
 
 **What the server can no longer check** is what the names say. It still decides
-who may write them — `acceptInvite`, `updatePartnership` and
-`moveInviteNamesIntoVault` re-read `control` from the stored row (invariant 14)
+who may write them — `acceptInvite` re-reads the stored offer, and
+`updatePartnership` and `moveInviteNamesIntoVault` the stored members'
+`can_manage` (invariant 14)
 — but a read-only accepter whose device posted re-sealed names anyway would be
 ignored only because the server drops them, not because it compared them.
 Partners are trusted to that extent.
@@ -166,13 +168,30 @@ answerFromControl('inviter', 'invitee'); // → 'them'
 
 The round trip holds for all six combinations, and there is a test that says so.
 
-What the permission rules follow is not the column but the space's members:
-each has a `can_manage` flag, kept in step with `control` by
-`syncSharedSpaceMembers` in the same batch as every write of it, and every read
-of `control` is worked out from those flags (`partnershipControl`). `both` is
-two members who manage. A pending invite has only its inviter as a member, so
-until it is accepted `control` is read from the row, as what the invite
-offers. See [spaces.md](spaces.md#membership-and-can_manage).
+**Who manages a partnership is its space's members' `can_manage`**, one flag
+per member, and every rule on an accepted partnership reads that and nothing
+else: `canEditPartnership`, the notebook's access rules, the task and reward
+rules, where the kink list starts. `both` is two members who manage.
+
+**`partnerships.control` is only the invite's offer**: who will manage once
+the invite is accepted. It is read in two places and no others:
+
+- **While the invite is pending**, to show what it offers (the invite page,
+  the inviter's settings form) and to decide whether the accepter may change
+  it (`offerGives(control, 'invitee')`).
+- **When it is accepted**, as offered or as the accepter changed it, to set
+  every member's `can_manage` (`joinSharedSpaceStatements`). The row keeps
+  that value as a record of what was agreed, and is never written again.
+
+Before then the inviter, the space's one member, manages it when the offer
+keeps control with them (`createSharedSpace`), and editing a pending invite's
+control writes the offer and the inviter's own flag together. **Changing
+control on an accepted partnership writes `can_manage` alone**
+(`updatePartnership`, through `managersFromControl`): the form's answer is
+pair-shaped like the invite, so the one place that maps it onto members is
+`managersFromControl` in `src/lib/spaces.ts`, and the form opens on what the
+members say now (`controlAnswerFor`). See
+[spaces.md](spaces.md#membership-and-can_manage).
 The Zod schema accepts only `me` / `them` / `mix` — posting the _stored_ value
 `inviter` is rejected, so there is no way to set `control` without going through
 `controlFromAnswer`.
@@ -181,11 +200,11 @@ The Zod schema accepts only `me` / `them` / `mix` — posting the _stored_ value
 
 | Action                                                | Who may do it                                    |
 | ----------------------------------------------------- | ------------------------------------------------ |
-| Change the names, the roles, the control setting      | Whoever `control` names, or both                 |
-| Set tasks and rewards, and the other's credits        | Whoever `control` names, or both (`can_manage`)  |
+| Change the names, the roles, the control setting      | A member who manages (`can_manage`)              |
+| Set tasks and rewards, and the other's credits        | A member who manages (`can_manage`)              |
 | Complete tasks and claim rewards                      | The non-controller, or both under shared control; never what they wrote |
-| Make a notebook entry read-only or hidden for the other | Whoever `control` names; with both, the entry's creator ([notebook.md](notebook.md#access)) |
-| Rewrite the names and roles while accepting an invite | The accepter, if control is theirs or shared     |
+| Make a notebook entry read-only or hidden for the other | A member who manages; when both do, the entry's creator ([notebook.md](notebook.md#access)) |
+| Rewrite the names and roles while accepting an invite | The accepter, if the invite's offer gives them control or shares it |
 | Disconnect, or cancel a pending invite                | **Either member, always**                        |
 
 Control also sets where a partner's view of the kink list starts: whoever
@@ -203,13 +222,13 @@ A hidden input is a rendering decision, not a permission. On the read-only
 accept screen the control question is not shown at all (the page text instead
 says what accepting would hand over — tasks, rewards and punishments), but every
 field is still posted as hidden inputs so the payload satisfies the same Zod
-schema — and `acceptInvite` then re-reads the stored row and ignores anything
-submitted by someone who does not hold control, `control` included. Accepting an
+schema — and `acceptInvite` then re-reads the stored offer and ignores anything
+submitted by an accepter it does not give control to, `control` included. Accepting an
 invite is never a way to seize control of it.
 
-The edit action does the same: it re-checks `control` against the database
-rather than trusting that the page hid the form, because control can have
-changed since the page was rendered.
+The edit action does the same: it re-checks the members' `can_manage` against
+the database rather than trusting that the page hid the form, because control
+can have changed since the page was rendered.
 
 ### Privacy boundaries matter here
 
@@ -281,8 +300,7 @@ switcher names the partnership or Everyone ([contexts.md](contexts.md)).
 Today's Tasks and Rewards cards in the partnership's context lead there, in
 that context.
 
-They follow `control` through the members' `can_manage`, never by reading the
-column:
+They follow the members' `can_manage`, never the `control` column:
 
 - Whoever manages sets tasks and rewards for the other member, edits the ones
   they set, picks whose timezone a scheduled task runs in, and sets the other

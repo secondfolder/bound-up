@@ -1,6 +1,7 @@
 /**
  * A signed-in person's own kink list: one sealed record in their vault
- * (`kinkListKind`), saved through `api/kink-lists/self`.
+ * (`kinkListKind`), saved through `api/spaces/[spaceId]/kink-list` with their
+ * solo space's id.
  *
  * BROWSER ONLY at run time: it seals with `crypto/sealed.ts`, and is only ever
  * opened after hydration, once the vaults are worked out.
@@ -14,6 +15,7 @@ import { sealForSubmit } from '../sealed-forms';
 import { kinkListKind } from '../sealed-kinds/kink-list';
 import type { KinkListView } from '../types';
 import { emptyList, type ListPayload, mergeLists } from './answers';
+import { kinkListPath } from './api';
 import { KinkListStore, type SaveState } from './store.svelte';
 
 /** What a page says when the saved list will not open here. */
@@ -26,6 +28,8 @@ export class AccountKinkList extends KinkListStore {
 	readonly kind = 'account';
 	#saved: Saved;
 	readonly #view: KinkListView | null;
+	/** The person's solo space, which every save and fetch of their own list names. */
+	readonly #spaceId: string;
 
 	/**
 	 * Called after each save with what was saved, so the copies shared with
@@ -51,9 +55,13 @@ export class AccountKinkList extends KinkListStore {
 		return this.#saved.revision;
 	}
 
-	/** `view` is the page's load data: the saved list, or null before the first save. */
-	constructor(view: KinkListView | null) {
+	/**
+	 * `spaceId` is the person's solo space; `view` is the page's load data: the
+	 * saved list, or null before the first save.
+	 */
+	constructor(spaceId: string, view: KinkListView | null) {
 		super();
+		this.#spaceId = spaceId;
 		this.#view = view;
 		this.#saved = { id: view?.id ?? crypto.randomUUID(), revision: view?.revision ?? null };
 	}
@@ -118,7 +126,7 @@ export class AccountKinkList extends KinkListStore {
 			if (!sealed.ok) {
 				return { status: 'failed', error: sealed.error };
 			}
-			const response = await tryFetch('/api/kink-lists/self', {
+			const response = await tryFetch(kinkListPath(this.#spaceId), {
 				method: 'PUT',
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({
@@ -142,7 +150,7 @@ export class AccountKinkList extends KinkListStore {
 			}
 			// Another device saved first. Take its list, keep whichever answer
 			// changed last for each kink, and try again on top of it.
-			const latest = await fetchLatest();
+			const latest = await fetchLatest(this.#spaceId);
 			if (!latest) {
 				return { status: 'failed', error: describeRequestFailure(null) };
 			}
@@ -174,8 +182,10 @@ async function openOwnListDiagnosed(sealed: KinkListView['sealed']) {
 	return await openRecordDiagnosed(kinkListKind, { ...sealed, vault });
 }
 
-async function fetchLatest(): Promise<{ view: KinkListView; list: ListPayload } | null> {
-	const response = await tryFetch('/api/kink-lists/self');
+async function fetchLatest(
+	spaceId: string
+): Promise<{ view: KinkListView; list: ListPayload } | null> {
+	const response = await tryFetch(kinkListPath(spaceId));
 	if (!response?.ok) {
 		return null;
 	}

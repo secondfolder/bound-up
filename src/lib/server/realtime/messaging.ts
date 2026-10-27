@@ -1,4 +1,6 @@
-import { type Notifier, partnershipRoom, type Watcher } from './index';
+import type { Db } from '../db';
+import { publishToSpace } from './fan-out';
+import { type Notifier, spaceRoom, type Watcher } from './index';
 
 /**
  * The `messages` topic: partner messaging's live feed.
@@ -38,20 +40,41 @@ export type MessagingEvent = {
 };
 
 /**
- * Announces a messaging change, and returns who was watching the board.
+ * A frame as it is sent: the event, and which partnership's space it is in,
+ * so an Everyone board hearing it in the viewer's own room
+ * (`user:<id>`) knows which of its boards to reload. Like the thread id, the
+ * space id is already known to everyone allowed to receive it.
+ */
+export type MessagingFrame = MessagingEvent & { spaceId: string };
+
+/**
+ * Announces a messaging change, and returns who was watching a board that
+ * shows it.
+ *
+ * Sent to the partnership's space room, where its board and thread pages
+ * listen, and fanned out to each member's own room, where an Everyone board
+ * listens (docs/realtime.md, "Everyone"). A `read` event is the exception: it
+ * moves a read receipt, which only a thread page shows, so it goes to the
+ * space's room only and costs no fan-out.
  *
  * Only `messages` watchers are returned, so a device that merely has a
- * notebook page of the same partnership open still gets its push.
+ * notebook page of the same partnership open still gets its push; a device
+ * on an Everyone board is watching this partnership's board, and is counted.
  */
-export function publishMessagingEvent(
+export async function publishMessagingEvent(
 	notifier: Notifier,
+	db: Db,
 	partnershipId: string,
 	event: MessagingEvent
 ): Promise<Watcher[]> {
 	// Rebuilt field by field rather than passed through, so nothing a caller
 	// happens to attach to the object can ride along.
-	const frame: MessagingEvent = event.threadId
-		? { kind: event.kind, threadId: event.threadId }
-		: { kind: event.kind };
-	return notifier.publish(partnershipRoom(partnershipId), MESSAGES_TOPIC, JSON.stringify(frame));
+	const frame: MessagingFrame = event.threadId
+		? { kind: event.kind, threadId: event.threadId, spaceId: partnershipId }
+		: { kind: event.kind, spaceId: partnershipId };
+	const data = JSON.stringify(frame);
+	if (event.kind === 'read') {
+		return await notifier.publish(spaceRoom(partnershipId), MESSAGES_TOPIC, data);
+	}
+	return await publishToSpace(notifier, db, partnershipId, MESSAGES_TOPIC, data);
 }

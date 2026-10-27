@@ -47,6 +47,21 @@ function fakeServer() {
 		['jun', JUN_RECIPIENT]
 	]);
 	const partnershipId = 'p1';
+	/** Each user's solo space: a space id of its own, never the user's id. */
+	const soloSpaceOf = (userId: string) => `solo-${userId}`;
+
+	/**
+	 * The real server 404s a request naming a space the vault is not in, and
+	 * the device then fails; failing loudly here is what catches a request
+	 * sent to the wrong space.
+	 */
+	function inSpace(spaceId: string, vault: Pick<Stored, 'kind' | 'owner' | 'partnershipId'>) {
+		const expected =
+			vault.kind === 'self' ? soloSpaceOf(vault.owner ?? '') : (vault.partnershipId ?? '');
+		if (spaceId !== expected) {
+			throw new Error(`asked in space ${spaceId}, but the vault is in ${expected}`);
+		}
+	}
 
 	function currentWrap(vault: Stored, userId: string) {
 		const wrap = vault.wraps.get(userId);
@@ -65,6 +80,7 @@ function fakeServer() {
 		const partnerId = userId === 'ada' ? 'jun' : 'ada';
 		return {
 			recipient: defined(recipients.get(userId), 'recipient'),
+			soloSpaceId: soloSpaceOf(userId),
 			self: self
 				? {
 						id: self.id,
@@ -111,11 +127,17 @@ function fakeServer() {
 			userId,
 			identity: { recipient: defined(recipients.get(userId), 'recipient'), identity },
 			list: () => Promise.resolve(listing(userId)),
-			create: (vault) => {
+			create: (spaceId, vault) => {
+				const scope = {
+					kind: vault.kind,
+					owner: vault.kind === 'self' ? userId : null,
+					partnershipId: vault.kind === 'partnership' ? spaceId : null
+				};
+				inSpace(spaceId, scope);
 				const scopeTaken = vaults.some((v) =>
 					vault.kind === 'self'
 						? v.kind === 'self' && v.owner === userId
-						: v.partnershipId === vault.partnershipId
+						: v.partnershipId === scope.partnershipId
 				);
 				if (scopeTaken) {
 					return Promise.resolve('exists');
@@ -123,37 +145,50 @@ function fakeServer() {
 				created.push(vault);
 				vaults.push({
 					id: vault.id,
-					kind: vault.kind,
-					owner: vault.kind === 'self' ? userId : null,
-					partnershipId: vault.kind === 'partnership' ? vault.partnershipId : null,
+					...scope,
 					keyCheck: vault.keyCheck,
 					wraps: new Map(vault.wraps.map((wrap) => [wrap.userId, wrap]))
 				});
 				return Promise.resolve('created');
 			},
-			putWrap: (vaultId, wrap) => {
-				vaults.find((v) => v.id === vaultId)?.wraps.set(wrap.userId, wrap);
+			putWrap: (spaceId, vaultId, wrap) => {
+				const vault = vaults.find((v) => v.id === vaultId);
+				if (vault) {
+					inSpace(spaceId, vault);
+					vault.wraps.set(wrap.userId, wrap);
+				}
 				return Promise.resolve();
 			},
 			trustAllows: () => Promise.resolve(true),
 			report: () => undefined,
 			escrow: {
-				issueShare: (escrowId) => share(escrowId),
-				put: (escrow) => {
+				issueShare: (soloSpaceId, escrowId) => {
+					inSpace(soloSpaceId, { kind: 'self', owner: userId, partnershipId: null });
+					return share(escrowId);
+				},
+				put: (soloSpaceId, escrow) => {
+					inSpace(soloSpaceId, { kind: 'self', owner: userId, partnershipId: null });
+					if (escrow.heldInSpaceId !== partnershipId) {
+						throw new Error(`escrow held in ${escrow.heldInSpaceId}, not the partner's space`);
+					}
 					escrows.set(userId, { id: escrow.id, ciphertext: escrow.ciphertext });
 					return Promise.resolve();
 				},
-				release: async () =>
-					await Promise.all(
+				release: async (soloSpaceId) => {
+					inSpace(soloSpaceId, { kind: 'self', owner: userId, partnershipId: null });
+					return await Promise.all(
 						relays
 							.filter((relay) => relay.owner === userId)
 							.map(async (relay) => ({ ...relay, share: await share(relay.escrowId) }))
-					),
-				deleteAll: () => {
+					);
+				},
+				deleteAll: (soloSpaceId) => {
+					inSpace(soloSpaceId, { kind: 'self', owner: userId, partnershipId: null });
 					escrows.delete(userId);
 					return Promise.resolve();
 				},
-				deleteLostSelfVault: () => {
+				deleteLostSelfVault: (soloSpaceId) => {
+					inSpace(soloSpaceId, { kind: 'self', owner: userId, partnershipId: null });
 					const index = vaults.findIndex((v) => v.kind === 'self' && v.owner === userId);
 					const vault = vaults[index];
 					if (!vault || currentWrap(vault, userId) || escrows.has(userId)) {
@@ -201,13 +236,13 @@ describe('ensureVaults', () => {
 		const ada = server.deps('ada', ADA_IDENTITY);
 		const { create } = ada;
 		let raced = false;
-		ada.create = async (vault) => {
+		ada.create = async (spaceId, vault) => {
 			if (vault.kind === 'partnership' && !raced) {
 				// Jun's device gets there between Ada's listing and Ada's create.
 				raced = true;
 				await ensureVaults(jun);
 			}
-			return await create(vault);
+			return await create(spaceId, vault);
 		};
 		const opened = await ensureVaults(ada);
 		expect(raced).toBe(true);

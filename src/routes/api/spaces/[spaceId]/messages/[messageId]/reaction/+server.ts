@@ -34,7 +34,7 @@ export const PUT: RequestHandler = async (event) => {
 	}
 
 	const notifier = await createNotifier({ platform });
-	const watching = await publishMessagingEvent(notifier, params.spaceId, {
+	const watching = await publishMessagingEvent(notifier, locals.db, params.spaceId, {
 		kind: 'reaction',
 		threadId: result.threadId
 	});
@@ -65,7 +65,7 @@ export const DELETE: RequestHandler = async ({ locals, params, platform }) => {
 	}
 
 	const notifier = await createNotifier({ platform });
-	await publishMessagingEvent(notifier, params.spaceId, {
+	await publishMessagingEvent(notifier, locals.db, params.spaceId, {
 		kind: 'reaction',
 		threadId: result.threadId
 	});

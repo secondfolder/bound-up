@@ -45,8 +45,11 @@
 		journal: NotebookEntryView[];
 		notes: NotebookEntryView[];
 		scenes: NotebookEntryView[];
-		/** The room of the one space shown; null for several. */
-		room: RoomKey | null;
+		/**
+		 * The room the list watches: the one space's, or for several the
+		 * viewer's own, where each of their spaces fans its list events out.
+		 */
+		room: RoomKey;
 		today: string;
 		viewerId: string;
 		/** The spaces the list shows, in the switcher's order. */
@@ -193,24 +196,12 @@
 		}
 	};
 	$effect(() => {
-		const key = roomKey;
-		if (key === null) {
-			// Several spaces: no stream, but the list is fresh whenever it is
-			// looked at again. See docs/notebook.md, "The list in every context".
-			const onVisible = () => {
-				if (document.visibilityState === 'visible') {
-					refresh();
-				}
-			};
-			document.addEventListener('visibilitychange', onVisible);
-			window.addEventListener('focus', refresh);
-			return () => {
-				document.removeEventListener('visibilitychange', onVisible);
-				window.removeEventListener('focus', refresh);
-			};
-		}
+		// One stream either way. An Everyone list's room is the viewer's own,
+		// which hears every space they are in (docs/notebook.md, "The list in
+		// every context"); `watchRoom` resyncs it when the page is looked at
+		// again, as it does any other.
 		return watchRoom({
-			room: key,
+			room: roomKey,
 			topics: [NOTEBOOK_LIST_TOPIC],
 			onFrame: refresh,
 			onResync: refresh

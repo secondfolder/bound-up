@@ -261,9 +261,9 @@ The size hints at roughly how much has been filled in.
 things:
 
 - the envelope
-- that the record is sealed under the vault its scope must use: the owner's
-  own vault for `'self'`, or the partnership's for a shared copy, plus
-  membership
+- that the record is sealed under the vault its space must use: the owner's
+  own vault for their own list, or the partnership's for a shared copy, plus
+  membership of the space
 - who is asking
 
 Edits are compare-and-swap on `revision`.
@@ -279,8 +279,9 @@ screens are.
 - **`AccountKinkList`** ([`account-store.svelte.ts`](../src/lib/kink-list/account-store.svelte.ts))
   opens the sealed list once the vaults are worked out. Until then the layout
   shows the usual "…", never content.
-  - It seals and saves through `PUT /api/kink-lists/self` a moment after each
-    change.
+  - It seals and saves through `PUT /api/spaces/[spaceId]/kink-list`, naming
+    the person's solo space, a moment after each change. The layout's load
+    hands it that id (`soloSpaceFor`).
   - **If another device saved first** (409), it fetches the latest, merges
     per key, and tries again.
   - **A list this device cannot open** is left alone: the store refuses
@@ -307,6 +308,21 @@ screens are.
 
 The layout builds the store once, so moving between the list and quick fill
 never reopens it or drops an unsaved answer.
+
+**The endpoints name a space**, never `self` or a partnership as such:
+
+| Endpoint                                     | What                                                              |
+| -------------------------------------------- | ----------------------------------------------------------------- |
+| `GET`, `PUT /api/spaces/[spaceId]/kink-list` | Your list in the space: your own in your solo space, your copy for the partner in a shared one |
+| `GET /api/spaces/[spaceId]/kink-list/partner` | The other member's copy in a shared space, or `null`             |
+
+`kinkListScopeIn` (`server/kink-lists.ts`) turns the space into the scope the
+rows are stored under — `'self'`, or the partnership's id, which is its shared
+space's id — so saved lists are found exactly as before. A space the caller is
+not in is a 404, the same as one that does not exist, and so is a solo space
+on `/partner`, which has nobody else in it. The partner stores pass the
+partnership id they already have, since it is the space's
+(`kinkListPath` in [`api.ts`](../src/lib/kink-list/api.ts)).
 
 **Nothing typed is lost.** [`SaveStatus`](../src/lib/components/kink-list/SaveStatus.svelte)
 shows Saved, Saving… or the failure with a retry. While anything is unsaved,
@@ -480,9 +496,9 @@ on a phone.
 - **On your own list** it is a setting, `settings.side`, and starts on Both:
   there is nothing to guess it from.
 - **In a partner's view** it starts from that partnership's "Who's in
-  control" (`sideFromControl`, from `answerFromControl` in `partnership.ts`):
-  whoever holds control starts on Dom, the other on Sub, and shared control
-  on Both. Changing it lasts for the visit, kept in `PartnerKinkList`: it is
+  control" (`sideFromControl`, from `controlAnswerFor` in `partnership.ts`,
+  which reads who manages the space, `can_manage`): whoever holds control
+  starts on Dom, the other on Sub, and shared control on Both. Changing it lasts for the visit, kept in `PartnerKinkList`: it is
   a lens on the list, not part of it, so it is neither sealed nor shared, and
   the next visit starts from control again.
 
@@ -560,7 +576,9 @@ Like the IQ test, the kink list works signed out, at `/kink-list/…`
   load [`adopt.svelte.ts`](../src/lib/kink-list/adopt.svelte.ts) through
   `await import()`, so the shell carries no sealing code for everyone else.
   - The device list is merged into the account's per kink (newest wins) and
-    saved.
+    saved, in the person's solo space, which the shell takes from its
+    `contextSpaces` (the solo space is always there, and its id never
+    changes, so this is not the context deciding where a write goes).
   - The device copy is removed only after that save succeeds; a failure
     leaves it for the next load.
   - The kink list then says how many answers were added (`adopted.svelte.ts`).
@@ -844,6 +862,10 @@ visit shows the button from the next load.
   - preset fitting, and coverage of the most used lists
   - JSON and CSV round trips, other spreadsheets, and answer words
   - applying an import
+- **`api/spaces/[spaceId]/kink-list/server.test.ts`:** which space means
+  which list, a list sealed in the other space's vault refused, and a 404 for
+  a space the caller is not in (another member's solo space included), a
+  pending invite's, and a solo space's `/partner`.
 - **`server/kink-lists.test.ts`:** saving, compare-and-swap, vaults, and who
   may write a scope; reading a partner's copy (members only, and only the
   other member's), and listing shared copies; versions kept after a quiet

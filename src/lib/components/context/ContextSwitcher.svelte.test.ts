@@ -22,6 +22,7 @@ const invalidate = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidate }));
 
 const { default: ContextSwitcher } = await import('./ContextSwitcher.svelte');
+const { HELD_ATTRIBUTE, holdWhileSwitching } = await import('$lib/context-client.svelte');
 
 const SOLO = '11111111-1111-4111-8111-111111111111';
 const JUN = '22222222-2222-4222-8222-222222222222';
@@ -212,5 +213,100 @@ describe('the fan', () => {
 		await new Promise((done) => requestAnimationFrame(() => done(null)));
 		await new Promise((done) => requestAnimationFrame(() => done(null)));
 		expect(screen.queryByRole('button', { name: 'Show Me' })).toBeNull();
+	});
+});
+
+describe('the page while a switch is under way', () => {
+	/**
+	 * The app shell's `<main>`, held as the layout holds it, with the switcher
+	 * in its page's header beside the title and a card below.
+	 */
+	function renderInPage() {
+		const main = document.createElement('main');
+		main.innerHTML = `
+			<header><h1>Today</h1><div class="corner"></div></header>
+			<section><a href="/tasks">Tasks</a></section>
+			<p inert>Already held by the page</p>`;
+		document.body.append(main);
+		const corner = defined(main.querySelector<HTMLElement>('.corner'), 'the corner');
+		render(ContextSwitcher, {
+			target: corner,
+			props: { spaces: [solo, jun], context: { kind: 'all' }, you: 'Ada Lovelace' }
+		});
+		const stop = $effect.root(() => {
+			$effect(() => holdWhileSwitching(main));
+		});
+		const part = (selector: string) => defined(main.querySelector<HTMLElement>(selector), selector);
+		return {
+			main,
+			title: part('h1'),
+			card: part('section'),
+			alreadyInert: part('p'),
+			done: () => {
+				stop();
+				main.remove();
+			}
+		};
+	}
+
+	async function pickWithKeyboard(name: string) {
+		trigger().focus();
+		await userEvent.keyboard('{Enter}');
+		const slot = await vi.waitFor(() => screen.getByRole('button', { name: `Show ${name}` }));
+		slot.focus();
+		await userEvent.keyboard('{Enter}');
+	}
+
+	it('holds everything but the switcher until the new context’s data is in, and keeps focus on the pill', async () => {
+		const arrival = Promise.withResolvers<void>();
+		invalidate.mockImplementationOnce(() => arrival.promise);
+		const shell = renderInPage();
+		try {
+			expect(shell.main).not.toHaveAttribute('aria-busy');
+			await pickWithKeyboard('Me');
+
+			await vi.waitFor(() => expect(invalidate).toHaveBeenCalledWith('app:context'));
+			expect(shell.main).toHaveAttribute('aria-busy', 'true');
+			expect(shell.card.inert).toBe(true);
+			expect(shell.card).toHaveAttribute(HELD_ATTRIBUTE);
+			expect(shell.title.inert).toBe(true);
+			// The pill, and the header around it, stay live: the pill names the
+			// new context already, and its close hands focus back to it.
+			expect(trigger().closest('[inert]')).toBeNull();
+			expect(trigger()).toHaveAccessibleName(/^Showing Me/);
+			await vi.waitFor(() => expect(trigger()).toHaveAttribute('aria-expanded', 'false'));
+			await vi.waitFor(() => expect(trigger()).toHaveFocus());
+			expect(shell.main).toHaveAttribute('aria-busy', 'true');
+
+			arrival.resolve();
+			await vi.waitFor(() => expect(shell.main).not.toHaveAttribute('aria-busy'));
+			expect(shell.card.inert).toBe(false);
+			expect(shell.card).not.toHaveAttribute(HELD_ATTRIBUTE);
+			expect(shell.title.inert).toBe(false);
+			// What the page had made inert itself, it still has.
+			expect(shell.alreadyInert.inert).toBe(true);
+		} finally {
+			shell.done();
+		}
+	});
+
+	it('lets go when the server refuses the switch', async () => {
+		const response = Promise.withResolvers<Response>();
+		fetchMock.mockImplementationOnce(() => response.promise);
+		const shell = renderInPage();
+		try {
+			await pickWithKeyboard('Jun');
+			await vi.waitFor(() => expect(shell.main).toHaveAttribute('aria-busy', 'true'));
+			expect(shell.card.inert).toBe(true);
+
+			response.resolve(new Response(null, { status: 500 }));
+			await vi.waitFor(() => expect(shell.main).not.toHaveAttribute('aria-busy'));
+			expect(shell.card.inert).toBe(false);
+			expect(invalidate).not.toHaveBeenCalled();
+			// And the pill goes back to what the page's data says.
+			await vi.waitFor(() => expect(trigger()).toHaveAccessibleName(/^Showing Everyone/));
+		} finally {
+			shell.done();
+		}
 	});
 });

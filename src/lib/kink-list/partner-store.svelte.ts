@@ -34,6 +34,7 @@ import {
 	type TriageValue,
 	type YourSide
 } from './answers';
+import { kinkListPath } from './api';
 import {
 	answerTarget,
 	effectiveList,
@@ -234,7 +235,7 @@ export class PartnerKinkList extends KinkListStore {
 			if (!sealed.ok) {
 				return { status: 'failed', error: sealed.error };
 			}
-			const response = await tryFetch(`/api/kink-lists/${encodeURIComponent(this.partnershipId)}`, {
+			const response = await tryFetch(kinkListPath(this.partnershipId), {
 				method: 'PUT',
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({
@@ -267,7 +268,7 @@ export class PartnerKinkList extends KinkListStore {
 	}
 
 	async #fetchOwnCopy(): Promise<{ view: KinkListView; partner: PartnerPayload } | null> {
-		const response = await tryFetch(`/api/kink-lists/${encodeURIComponent(this.partnershipId)}`);
+		const response = await tryFetch(kinkListPath(this.partnershipId));
 		if (!response?.ok) {
 			return null;
 		}

@@ -69,6 +69,18 @@ describe('generateInviteToken', () => {
 	});
 });
 
+/**
+ * Whether Ada (the inviter) and Jun (the invitee) each manage a partnership's
+ * space, in that order whatever order the members joined in (two joining in
+ * the same millisecond are ordered by a random id).
+ */
+async function managersOf(id: string): Promise<boolean[]> {
+	const view = defined(await getPartnershipForUser(db, id, ada.id), 'the partnership');
+	return [ada.id, jun.id].map(
+		(userId) => view.members.find((member) => member.userId === userId)?.canManage ?? false
+	);
+}
+
 describe('createInvite', () => {
 	it('stores a pending row with a live token', async () => {
 		const now = new Date('2026-03-01T12:00:00Z');
@@ -279,6 +291,8 @@ describe('acceptInvite', () => {
 			const row = await readPartnershipRow(db, invite.id);
 			expect(row.inviteCiphertext).toBe(resealed);
 			expect(row.control).toBe('invitee');
+			// The offer as accepted is who manages the space from now on.
+			expect(await managersOf(invite.id)).toEqual([false, true]);
 			// The key is unchanged, so the inviter's wrap of it still opens the new seal.
 			expect(row.inviteKeyWrap).toBe(FAKE_INVITE_KEY_WRAP);
 		});
@@ -310,6 +324,7 @@ describe('acceptInvite', () => {
 			// The control setting itself is the most important thing not to hand
 			// over: accepting must not be a way to seize it.
 			expect(row.control).toBe('inviter');
+			expect(await managersOf(invite.id)).toEqual([true, false]);
 			// ...but the link is still made.
 			expect(row.status).toBe('accepted');
 		});
@@ -489,6 +504,11 @@ describe('updatePartnership', () => {
 		};
 	}
 
+	/** Who manages the space, inviter (Ada) then invitee (Jun): what every rule reads. */
+	async function managers(id: string): Promise<boolean[]> {
+		return await managersOf(id);
+	}
+
 	it('applies an edit from the side that holds control', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
 		const names = await sealedNames(id);
@@ -499,7 +519,9 @@ describe('updatePartnership', () => {
 		expect(row.namesCiphertext).toBe(names.ciphertext);
 		expect(row.namesVaultId).toBe(names.vaultId);
 		expect(row.namesRevision).toBe(1);
-		expect(row.control).toBe('both');
+		expect(await managers(id)).toEqual([true, true]);
+		// The row keeps the offer as it was accepted: it is not a permission now.
+		expect(row.control).toBe('inviter');
 	});
 
 	it('moves the names into the vault, clearing the invite', async () => {
@@ -517,7 +539,8 @@ describe('updatePartnership', () => {
 		expect(await updatePartnership(db, id, ada.id, { control: 'invitee' })).toEqual({ ok: true });
 
 		const row = await readPartnershipRow(db, id);
-		expect(row.control).toBe('invitee');
+		expect(await managers(id)).toEqual([false, true]);
+		expect(row.control).toBe(before.control);
 		expect(row.inviteCiphertext).toBe(before.inviteCiphertext);
 		expect(row.namesRevision).toBe(before.namesRevision);
 	});
@@ -532,7 +555,7 @@ describe('updatePartnership', () => {
 		expect(result).toEqual({ ok: false, reason: 'forbidden' });
 		const row = await readPartnershipRow(db, id);
 		expect(row.namesCiphertext).toBeNull();
-		expect(row.control).toBe('inviter');
+		expect(await managers(id)).toEqual([true, false]);
 	});
 
 	it('lets either side edit when control is shared', async () => {
@@ -559,7 +582,7 @@ describe('updatePartnership', () => {
 		// Ada gave control to Jun, so her next edit must be refused.
 		const second = await updatePartnership(db, id, ada.id, { control: 'inviter' });
 		expect(second).toEqual({ ok: false, reason: 'forbidden' });
-		expect((await readPartnershipRow(db, id)).control).toBe('invitee');
+		expect(await managers(id)).toEqual([false, true]);
 	});
 
 	describe('the sealed names', () => {
@@ -579,7 +602,8 @@ describe('updatePartnership', () => {
 			const row = await readPartnershipRow(db, id);
 			expect(row.namesCiphertext).toBe(adas.ciphertext);
 			expect(row.namesRevision).toBe(1);
-			expect(row.control).toBe('both');
+			// The lost compare-and-swap took its control answer down with it.
+			expect(await managers(id)).toEqual([true, true]);
 		});
 
 		it('are refused when sealed in another partnership’s vault', async () => {
@@ -644,6 +668,23 @@ describe('updatePartnership', () => {
 			// Same key, so the link already sent still opens the new seal.
 			expect(row.inviteToken).toBe(invite.inviteToken);
 			expect(row.inviteKeyWrap).toBe(FAKE_INVITE_KEY_WRAP);
+		});
+
+		it("change the offer, and the inviter's own say with it", async () => {
+			const invite = await createTestInvite(db, ada, { control: 'mix' });
+			expect(await updatePartnership(db, invite.id, ada.id, { control: 'invitee' })).toEqual({
+				ok: true
+			});
+
+			expect((await readPartnershipRow(db, invite.id)).control).toBe('invitee');
+			const view = defined(await getPartnershipForUser(db, invite.id, ada.id), 'the invite');
+			expect(view.offer).toBe('invitee');
+			// Offered away, so the inviter no longer edits the invite either.
+			expect(view.canEdit).toBe(false);
+
+			// And accepting it hands the say over, exactly as offered.
+			await acceptInvite(db, { token: invite.inviteToken, inviteeId: jun.id });
+			expect(await managersOf(invite.id)).toEqual([false, true]);
 		});
 
 		it('are refused once the invite has been accepted', async () => {

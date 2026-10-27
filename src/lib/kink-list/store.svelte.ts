@@ -5,7 +5,7 @@
  *
  * - **`AccountKinkList`** (`account-store.svelte.ts`) — signed in. The list
  *   is one sealed record in the person's own vault, saved through
- *   `api/kink-lists/self`.
+ *   `api/spaces/[spaceId]/kink-list` with their solo space's id.
  * - **`DeviceKinkList`** (`device-store.svelte.ts`) — signed out. The same
  *   payload in `localStorage`, for someone without an account
  *   (docs/kink-list.md, "Without an account").

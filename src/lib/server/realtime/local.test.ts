@@ -3,9 +3,9 @@ import { defined } from '$lib/testing/defined';
 import {
 	encodeSseFrame,
 	PRESENCE_TTL_MS,
-	partnershipRoom,
 	type RoomKey,
 	SSE_PREAMBLE,
+	spaceRoom,
 	userRoom,
 	type Watcher
 } from './index';
@@ -54,11 +54,11 @@ async function subscribe(
 describe('the local notifier', () => {
 	it('delivers an event to every subscriber of that partnership', async () => {
 		const notifier = createLocalNotifier();
-		const a = await subscribe(notifier, partnershipRoom('p-fanout'));
-		const b = await subscribe(notifier, partnershipRoom('p-fanout'));
+		const a = await subscribe(notifier, spaceRoom('p-fanout'));
+		const b = await subscribe(notifier, spaceRoom('p-fanout'));
 
 		await notifier.publish(
-			partnershipRoom('p-fanout'),
+			spaceRoom('p-fanout'),
 			'messages',
 			JSON.stringify({ kind: 'message', threadId: 't-1' })
 		);
@@ -80,14 +80,10 @@ describe('the local notifier', () => {
 	 */
 	it('never delivers across partnerships', async () => {
 		const notifier = createLocalNotifier();
-		const mine = await subscribe(notifier, partnershipRoom('p-mine'));
-		const theirs = await subscribe(notifier, partnershipRoom('p-theirs'));
+		const mine = await subscribe(notifier, spaceRoom('p-mine'));
+		const theirs = await subscribe(notifier, spaceRoom('p-theirs'));
 
-		await notifier.publish(
-			partnershipRoom('p-theirs'),
-			'messages',
-			JSON.stringify({ kind: 'thread' })
-		);
+		await notifier.publish(spaceRoom('p-theirs'), 'messages', JSON.stringify({ kind: 'thread' }));
 
 		// Their stream got it...
 		const got = await theirs.reader.read();
@@ -110,17 +106,17 @@ describe('the local notifier', () => {
 
 	it('forgets a subscriber that hangs up, and empties the room', async () => {
 		const notifier = createLocalNotifier();
-		const one = await subscribe(notifier, partnershipRoom('p-hangup'));
-		const two = await subscribe(notifier, partnershipRoom('p-hangup'));
-		expect(localRoomSize(partnershipRoom('p-hangup'))).toBe(2);
+		const one = await subscribe(notifier, spaceRoom('p-hangup'));
+		const two = await subscribe(notifier, spaceRoom('p-hangup'));
+		expect(localRoomSize(spaceRoom('p-hangup'))).toBe(2);
 
 		await one.release();
-		expect(localRoomSize(partnershipRoom('p-hangup'))).toBe(1);
+		expect(localRoomSize(spaceRoom('p-hangup'))).toBe(1);
 
 		await two.release();
 		// The room itself goes, not just its members — otherwise a long-lived dev
 		// server accumulates an empty Map per partnership ever opened.
-		expect(localRoomSize(partnershipRoom('p-hangup'))).toBe(0);
+		expect(localRoomSize(spaceRoom('p-hangup'))).toBe(0);
 	});
 
 	/**
@@ -130,7 +126,7 @@ describe('the local notifier', () => {
 	it('is a no-op when nobody is listening', async () => {
 		const notifier = createLocalNotifier();
 		await expect(
-			notifier.publish(partnershipRoom('p-empty'), 'messages', JSON.stringify({ kind: 'reaction' }))
+			notifier.publish(spaceRoom('p-empty'), 'messages', JSON.stringify({ kind: 'reaction' }))
 		).resolves.toEqual([]);
 	});
 
@@ -143,12 +139,12 @@ describe('the local notifier', () => {
 		const notifier = createLocalNotifier();
 		const adaWatcher = { userId: 'ada', deviceId: 'd-ada', streamId: 's-ada' };
 		const boWatcher = { userId: 'bo', deviceId: null, streamId: 's-bo' };
-		const ada = await subscribe(notifier, partnershipRoom('p-watchers'), adaWatcher);
-		const bo = await subscribe(notifier, partnershipRoom('p-watchers'), boWatcher);
+		const ada = await subscribe(notifier, spaceRoom('p-watchers'), adaWatcher);
+		const bo = await subscribe(notifier, spaceRoom('p-watchers'), boWatcher);
 
 		expect(
 			await notifier.publish(
-				partnershipRoom('p-watchers'),
+				spaceRoom('p-watchers'),
 				'messages',
 				JSON.stringify({ kind: 'thread' })
 			)
@@ -157,7 +153,7 @@ describe('the local notifier', () => {
 		await ada.release();
 		expect(
 			await notifier.publish(
-				partnershipRoom('p-watchers'),
+				spaceRoom('p-watchers'),
 				'messages',
 				JSON.stringify({ kind: 'thread' })
 			)
@@ -181,20 +177,16 @@ describe('the local notifier: presence', () => {
 
 	it('stops reporting a stream once its page says goodbye, and closes it', async () => {
 		const notifier = createLocalNotifier();
-		const side = await subscribe(notifier, partnershipRoom('p-goodbye'), phone);
+		const side = await subscribe(notifier, spaceRoom('p-goodbye'), phone);
 
-		await notifier.presence(partnershipRoom('p-goodbye'), {
+		await notifier.presence(spaceRoom('p-goodbye'), {
 			userId: 'ada',
 			streamId: 's-phone',
 			present: false
 		});
 
 		expect(
-			await notifier.publish(
-				partnershipRoom('p-goodbye'),
-				'messages',
-				JSON.stringify({ kind: 'thread' })
-			)
+			await notifier.publish(spaceRoom('p-goodbye'), 'messages', JSON.stringify({ kind: 'thread' }))
 		).toEqual([]);
 		// Closed rather than just forgotten, so the stream is not held open.
 		expect((await side.reader.read()).done).toBe(true);
@@ -202,9 +194,9 @@ describe('the local notifier: presence', () => {
 
 	it('ignores a goodbye naming somebody else’s stream', async () => {
 		const notifier = createLocalNotifier();
-		const side = await subscribe(notifier, partnershipRoom('p-not-yours'), phone);
+		const side = await subscribe(notifier, spaceRoom('p-not-yours'), phone);
 
-		await notifier.presence(partnershipRoom('p-not-yours'), {
+		await notifier.presence(spaceRoom('p-not-yours'), {
 			userId: 'bo',
 			streamId: 's-phone',
 			present: false
@@ -212,7 +204,7 @@ describe('the local notifier: presence', () => {
 
 		expect(
 			await notifier.publish(
-				partnershipRoom('p-not-yours'),
+				spaceRoom('p-not-yours'),
 				'messages',
 				JSON.stringify({ kind: 'thread' })
 			)
@@ -223,29 +215,25 @@ describe('the local notifier: presence', () => {
 	it('closes a stream whose page stopped renewing it, without a goodbye', async () => {
 		vi.useFakeTimers();
 		const notifier = createLocalNotifier();
-		const side = await subscribe(notifier, partnershipRoom('p-lapsed'), phone);
+		const side = await subscribe(notifier, spaceRoom('p-lapsed'), phone);
 
 		await vi.advanceTimersByTimeAsync(PRESENCE_TTL_MS + 1);
 
 		expect(
-			await notifier.publish(
-				partnershipRoom('p-lapsed'),
-				'messages',
-				JSON.stringify({ kind: 'thread' })
-			)
+			await notifier.publish(spaceRoom('p-lapsed'), 'messages', JSON.stringify({ kind: 'thread' }))
 		).toEqual([]);
-		expect(localRoomSize(partnershipRoom('p-lapsed'))).toBe(0);
+		expect(localRoomSize(spaceRoom('p-lapsed'))).toBe(0);
 		await side.release();
 	});
 
 	it('keeps a stream whose page keeps renewing it', async () => {
 		vi.useFakeTimers();
 		const notifier = createLocalNotifier();
-		const side = await subscribe(notifier, partnershipRoom('p-renewed'), phone);
+		const side = await subscribe(notifier, spaceRoom('p-renewed'), phone);
 
 		for (let elapsed = 0; elapsed < PRESENCE_TTL_MS * 3; elapsed += 25_000) {
 			await vi.advanceTimersByTimeAsync(25_000);
-			await notifier.presence(partnershipRoom('p-renewed'), {
+			await notifier.presence(spaceRoom('p-renewed'), {
 				userId: 'ada',
 				streamId: 's-phone',
 				present: true
@@ -253,11 +241,7 @@ describe('the local notifier: presence', () => {
 		}
 
 		expect(
-			await notifier.publish(
-				partnershipRoom('p-renewed'),
-				'messages',
-				JSON.stringify({ kind: 'thread' })
-			)
+			await notifier.publish(spaceRoom('p-renewed'), 'messages', JSON.stringify({ kind: 'thread' }))
 		).toEqual([phone]);
 		await side.release();
 	});
@@ -270,7 +254,7 @@ describe('the local notifier: presence', () => {
 describe('the local notifier: topics', () => {
 	it('sends a frame only to streams subscribed to its topic, and reports only them', async () => {
 		const notifier = createLocalNotifier();
-		const key = partnershipRoom('p-topics');
+		const key = spaceRoom('p-topics');
 		const boardWatcher = { userId: 'ada', deviceId: 'd-ada', streamId: 's-board' };
 		const board = await subscribe(notifier, key, boardWatcher, ['messages']);
 		const notebook = await subscribe(
@@ -298,7 +282,7 @@ describe('the local notifier: topics', () => {
 		const notifier = createLocalNotifier();
 		const mine = await subscribe(notifier, userRoom('u-solo'), undefined, ['notebook']);
 
-		await notifier.publish(partnershipRoom('u-solo'), 'notebook', '{}');
+		await notifier.publish(spaceRoom('u-solo'), 'notebook', '{}');
 
 		const pending = await Promise.race([
 			mine.reader.read().then(() => 'delivered'),
@@ -310,7 +294,7 @@ describe('the local notifier: topics', () => {
 
 	it("evicts one user's streams on one topic and leaves the rest", async () => {
 		const notifier = createLocalNotifier();
-		const key = partnershipRoom('p-evict');
+		const key = spaceRoom('p-evict');
 		const topic = 'notebook-entry:11111111-1111-1111-1111-111111111111';
 		const bo = { userId: 'bo', deviceId: null, streamId: 's-bo' };
 		const ada = { userId: 'ada', deviceId: null, streamId: 's-ada' };

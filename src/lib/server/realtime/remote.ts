@@ -2,7 +2,7 @@ import type { RealtimeNamespace } from './binding';
 import type { Notifier, RoomKey, Watcher } from './index';
 
 /**
- * The production notifier: a Durable Object per room (a partnership, or one
+ * The production notifier: a Durable Object per room (a space, or one
  * account).
  *
  * This is the *worker* side — it talks to the object over `fetch`. The object

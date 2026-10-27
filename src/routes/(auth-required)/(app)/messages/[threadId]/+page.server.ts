@@ -64,7 +64,7 @@ export const load: PageServerLoad = async ({ locals, params, depends, platform }
 	// `publish` never throws.
 	if (readMoved) {
 		const notifier = await createNotifier({ platform });
-		await publishMessagingEvent(notifier, partnershipId, {
+		await publishMessagingEvent(notifier, locals.db, partnershipId, {
 			kind: 'read',
 			threadId: params.threadId
 		});

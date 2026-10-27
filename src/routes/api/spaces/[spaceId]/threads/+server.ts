@@ -75,7 +75,7 @@ export const POST: RequestHandler = async (event) => {
 	// own errors, because the message is already stored and a fan-out problem
 	// must not turn into a retryable 500 for a send that worked.
 	const notifier = await createNotifier({ platform });
-	const watching = await publishMessagingEvent(notifier, params.spaceId, {
+	const watching = await publishMessagingEvent(notifier, locals.db, params.spaceId, {
 		kind: 'thread',
 		threadId: result.threadId
 	});

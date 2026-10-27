@@ -30,11 +30,14 @@ export type SpaceMembership = {
 };
 
 /**
- * Who manages a shared space, from the partnership's `control`.
+ * Who manages a shared space, from a "who's in control?" answer stored
+ * against the inviter and invitee roles (`PartnershipControl`).
  *
- * `control` is stored against the permanent inviter/invitee roles; this is
- * the one place it becomes per-member flags. A pending invite has no invitee
- * yet, so only the inviter's flag is returned for it.
+ * The one place a role-shaped answer becomes per-member flags: an invite's
+ * offer when it is made and when it is accepted, and the partner settings
+ * form, whose answer is pair-shaped like the invite (docs/spaces.md, "Still
+ * pair-shaped"). A pending invite has no invitee yet, so only the inviter's
+ * flag is returned for it.
  */
 export function managersFromControl(
 	control: PartnershipControl,

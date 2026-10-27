@@ -16,6 +16,7 @@
 		readCookie,
 		serialiseContext
 	} from '$lib/context';
+	import { holdWhileSwitching } from '$lib/context-client.svelte';
 	import { currentVaults } from '$lib/crypto/vaults.svelte';
 	import { hasFeature } from '$lib/features';
 	import { DEVICE_LIST_KEY } from '$lib/kink-list/device-key';
@@ -45,8 +46,15 @@
 		} catch {
 			// Storage the browser will not let us read holds no list either.
 		}
-		if (waiting) {
-			void import('$lib/kink-list/adopt.svelte').then(({ adoptDeviceList }) => adoptDeviceList());
+		// Saved in the person's own space. The switcher's list always has it
+		// first; the id never changes, so this is not the context deciding
+		// where a write goes (docs/contexts.md). Without it the device copy
+		// simply waits for the next load.
+		const soloSpaceId = data.contextSpaces.find((space) => space.kind === 'solo')?.id;
+		if (waiting && soloSpaceId) {
+			void import('$lib/kink-list/adopt.svelte').then(({ adoptDeviceList }) =>
+				adoptDeviceList(soloSpaceId)
+			);
 		}
 	});
 
@@ -65,6 +73,12 @@
 	 * another tab — refreshes what depends on it, so the switcher never
 	 * claims one context over a list of another. Compared as a primitive, so
 	 * a refresh does not re-add the listener.
+	 *
+	 * Not held as a switch is (`holdWhileSwitching`): until the refresh lands,
+	 * the pill and the page still agree on the context they were rendered in,
+	 * so a tap acts on what it shows — and on a card that is a deliberate
+	 * choice of that card's context. Holding would dim the page every time
+	 * the app came back to the front, for nothing.
 	 */
 	// `page.data`, not this layout's own `data`: a page that follows the
 	// context returns the one it was read in, which a client-side navigation
@@ -144,7 +158,12 @@
 <!-- `data-app-shell` is what the context switcher measures its fan against:
      the screen's top-right corner, as this shell is fitted to it. -->
 <div class="shell" data-app-shell {@attach fitVisualViewport}>
-	<main>
+	<!-- Held, all but the context switcher, while a switch is under way, so
+	     nothing the old context drew can be tapped (docs/contexts.md,
+	     "Picking"). The nav below stays live: the page it opens is a new
+	     one, whose pill and list come from the same load, so nothing there
+	     shows one context over another's things. -->
+	<main {@attach holdWhileSwitching}>
 		{#if showTimezoneWarning}
 			<TimezoneWarning user={data.user} />
 		{/if}
@@ -218,6 +237,19 @@
 			   of a phone. */
 			> :global(*) {
 				inline-size: 100%;
+			}
+
+			/* What a context switch holds (`holdWhileSwitching`) dims, so the
+			   page reads as on its way rather than broken. After a beat, so a
+			   quick switch does not flicker. */
+			:global([data-context-held]) {
+				opacity: 0.5;
+				transition: opacity 200ms ease 150ms;
+
+				/* No fade, but the same beat: a step, not a movement. */
+				@media (prefers-reduced-motion: reduce) {
+					transition-duration: 0s;
+				}
 			}
 		}
 	}

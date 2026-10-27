@@ -308,10 +308,8 @@ describe('getRecipientsForPartnership', () => {
 		const junKeys = await createTestUserKeys(harness.db, jun);
 		const partnership = await createTestPartnership(harness.db, ada, jun);
 		const keyCheck = 'C'.repeat(43);
-		await createVault(harness.db, ada.id, {
-			kind: 'partnership',
+		await createVault(harness.db, ada.id, partnership.id, {
 			id: '00000000-0000-4000-8000-000000000001',
-			partnershipId: partnership.id,
 			keyCheck,
 			wraps: [
 				{ userId: ada.id, ciphertext: 'd3JhcA==', forRecipient: adaKeys.recipient },

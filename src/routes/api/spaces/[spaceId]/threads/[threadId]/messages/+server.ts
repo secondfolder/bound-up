@@ -55,7 +55,7 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	const notifier = await createNotifier({ platform });
-	const watching = await publishMessagingEvent(notifier, params.spaceId, {
+	const watching = await publishMessagingEvent(notifier, locals.db, params.spaceId, {
 		kind: 'message',
 		threadId: params.threadId
 	});

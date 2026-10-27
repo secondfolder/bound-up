@@ -94,14 +94,14 @@ function newEntry(
 const ids = (entries: { id: string }[]) => entries.map((entry) => entry.id);
 
 describe('load', () => {
-	it('shows only the viewer’s own notebook in Me, live on their own room', async () => {
+	it('shows only the viewer’s own notebook in Me, live on their solo space’s room', async () => {
 		const own = await createTestNotebookEntry(harness.db, ada);
 		await createTestNotebookEntry(harness.db, ada, { partnershipId });
 
 		const data = await runLoad(load(at(ada, { context: adaSolo })));
 
 		expect(ids(data.notes)).toEqual([own.id]);
-		expect(data.room).toBe(`user:${ada.id}`);
+		expect(data.room).toBe(`space:${adaSolo}`);
 		expect(data.spaceIds).toEqual([adaSolo]);
 		expect(data.dependency).toBe('notebook:self');
 	});
@@ -114,11 +114,11 @@ describe('load', () => {
 		const data = await runLoad(load(at(bo, { context: partnershipId })));
 
 		expect(ids(data.notes)).toEqual([shared.id]);
-		expect(data.room).toBe(`partnership:${partnershipId}`);
+		expect(data.room).toBe(`space:${partnershipId}`);
 		expect(data.dependency).toBe(`notebook:${partnershipId}`);
 	});
 
-	it('shows every space at once in Everyone, each row saying whose, with no stream', async () => {
+	it('shows every space at once in Everyone, each row saying whose, live on the viewer’s own room', async () => {
 		const own = await createTestNotebookEntry(harness.db, ada);
 		const shared = await createTestNotebookEntry(harness.db, bo, { partnershipId });
 
@@ -131,7 +131,8 @@ describe('load', () => {
 		expect(data.notes.find((entry: NotebookEntryView) => entry.id === shared.id)?.spaceId).toBe(
 			partnershipId
 		);
-		expect(data.room).toBeNull();
+		// One stream for every space: each fans its list events out to here.
+		expect(data.room).toBe(`user:${ada.id}`);
 		expect(data.spaceIds).toEqual([adaSolo, partnershipId]);
 		expect(data.dependency).toBe('notebook:all');
 	});
@@ -183,7 +184,7 @@ describe('load', () => {
 		await createTestNotebookEntry(harness.db, stranger);
 		const data = await runLoad(load(at(stranger, { context: partnershipId, cookies })));
 		expect(data.spaceIds).toHaveLength(1);
-		expect(data.room).toBe(`user:${stranger.id}`);
+		expect(data.room).toBe(`space:${defined(data.spaceIds[0], 'their solo space')}`);
 		expect(cookies[CONTEXT_COOKIE]).toBeUndefined();
 	});
 

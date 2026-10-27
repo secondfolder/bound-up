@@ -59,23 +59,23 @@ export function soloSpaceIdOf(userId: string): SQL<string | null> {
 }
 
 /**
- * The partnership's `control`, as its space's members' `can_manage` says it.
- *
- * Every read of `control` goes through this rather than the column, so
- * `can_manage` is what the permission rules actually follow while they are
- * still written in terms of `control`. A pending invite has one member, so
- * what it offers the invitee can only be read from the row's own `control`,
- * which is part of the invite (docs/spaces.md, "Still pair-shaped").
+ * A partnership's space's members and who manages it, as a column of a
+ * partnership query: what every permission on an accepted partnership reads
+ * (`canEditPartnership`), rather than the row's `control`, which is only the
+ * invite's offer. One subquery, aggregated to JSON, so a list of partnerships
+ * stays one statement.
  */
-export function partnershipControl(): SQL<PartnershipControl> {
-	const manages = (who: SQLiteColumn) =>
-		sql`exists (select 1 from ${spaceMembers} where ${spaceMembers.spaceId} = ${partnerships.id}
-			and ${spaceMembers.userId} = ${who} and ${spaceMembers.canManage} = 1)`;
-	return sql<PartnershipControl>`(case
-		when ${partnerships.status} <> 'accepted' then ${partnerships.control}
-		when ${manages(partnerships.inviterId)} and ${manages(partnerships.inviteeId)} then 'both'
-		when ${manages(partnerships.inviterId)} then 'inviter'
-		else 'invitee' end)`;
+export function partnershipMembers(): SQL<SpaceMember[]> {
+	// A derived table, so the members come out in the order they joined. The
+	// outer `partnerships` row is referred to from inside it.
+	return sql`(select json_group_array(json_object('userId', "members"."user_id", 'canManage', "members"."can_manage"))
+		from (select "user_id", "can_manage" from "space_members" where "space_id" = ${partnerships.id}
+			order by "created_at", "id") as "members")`.mapWith((value: string): SpaceMember[] =>
+		(JSON.parse(value) as { userId: string; canManage: number | boolean }[]).map((member) => ({
+			userId: member.userId,
+			canManage: Boolean(member.canManage)
+		}))
+	);
 }
 
 /** The space `userId` is in, and what they may do there, or null when they are not in it. */
@@ -106,6 +106,19 @@ export async function listSpacesForUser(db: Db, userId: string): Promise<SpaceMe
 		.innerJoin(spaces, eq(spaces.id, spaceMembers.spaceId))
 		.where(eq(spaceMembers.userId, userId))
 		.orderBy(sql`${spaces.kind} = 'shared'`, spaces.createdAt, spaces.id);
+}
+
+/**
+ * The user ids of everyone in a space, for fanning a realtime event out to
+ * each member's own room (`server/realtime/fan-out.ts`). Read by
+ * `space_members_space_user_idx`, so it is one index range.
+ */
+export async function spaceMemberIds(db: Db, spaceId: string): Promise<string[]> {
+	const rows = await db
+		.select({ userId: spaceMembers.userId })
+		.from(spaceMembers)
+		.where(eq(spaceMembers.spaceId, spaceId));
+	return rows.map((row) => row.userId);
 }
 
 /** A member of a space as the task and reward pages need them: with the time zone their dates are in. */
@@ -238,22 +251,54 @@ export function createSharedSpace(
 }
 
 /**
- * Brings a shared space's members into line with its partnership row: adds
- * the invitee once there is one, and sets every member's `can_manage` from
- * `control`. For the caller to batch after any write to the row's invitee or
- * control, so the two never disagree.
+ * The statements that set who manages a space, one member at a time: each
+ * listed member's `can_manage`, for the caller to batch.
  *
- * LEGACY-SPACES: `partnerships.control` is still written because the
- * partner settings form, the invite it offers and the task, reward and
- * notebook rules are written in terms of it. Reads take it back from
- * `can_manage` (`partnershipControl`). When those rules are written against
- * members, the column and this sync go. See docs/temporary-code.md.
- *
- * Reads the row inside the statements rather than taking values, so a write
- * that matched nothing — an invite accepted by someone else a moment
- * earlier — leaves the members exactly as they were.
+ * `onlyIf`, when given, is a condition every statement also requires, so a
+ * write it follows that matched nothing — a names edit that lost its
+ * compare-and-swap, an accept that lost a race — leaves the members as they
+ * were.
  */
-export function syncSharedSpaceMembers(db: Db, partnershipId: string): Batch {
+export function setManagersStatements(
+	db: Db,
+	spaceId: string,
+	members: readonly SpaceMember[],
+	onlyIf?: SQL
+): Batch | null {
+	const now = new Date();
+	const statements = members.map((member) =>
+		db
+			.update(spaceMembers)
+			.set({ canManage: member.canManage, updatedAt: now })
+			.where(
+				and(
+					eq(spaceMembers.spaceId, spaceId),
+					eq(spaceMembers.userId, member.userId),
+					...(onlyIf ? [onlyIf] : [])
+				)
+			)
+	);
+	const [first, ...rest] = statements;
+	return first ? [first, ...rest] : null;
+}
+
+/**
+ * The statements that make an invite's accepter a member of its space, with
+ * everyone's `can_manage` from the offer as accepted: for the caller to batch
+ * after the update that accepts it.
+ *
+ * Every statement requires the partnership row to name this invitee, which
+ * only that update can have made it do, so an accept that lost a race to
+ * someone else changes nobody's membership.
+ */
+export function joinSharedSpaceStatements(
+	db: Db,
+	partnership: { id: string; inviterId: string; inviteeId: string; control: PartnershipControl }
+): Batch {
+	const accepted = sql`exists (select 1 from ${partnerships} where ${partnerships.id} = ${partnership.id}
+		and ${partnerships.inviteeId} = ${partnership.inviteeId} and ${partnerships.status} = 'accepted')`;
+	const managers = managersFromControl(partnership.control, partnership);
+	const invitee = managers.find((member) => member.userId === partnership.inviteeId);
 	const now = Date.now();
 	return [
 		db
@@ -264,28 +309,22 @@ export function syncSharedSpaceMembers(db: Db, partnershipId: string): Batch {
 						id: sql<string>`${crypto.randomUUID()}`.as('id'),
 						spaceId: partnerships.id,
 						userId: sql<string>`${partnerships.inviteeId}`.as('user_id'),
-						canManage: sql<boolean>`0`.as('can_manage'),
+						canManage: sql<boolean>`${invitee?.canManage ? 1 : 0}`.as('can_manage'),
 						colour: sql<null>`null`.as('colour'),
 						createdAt: sql<Date>`${now}`.as('created_at'),
 						updatedAt: sql<Date>`${now}`.as('updated_at')
 					})
 					.from(partnerships)
 					.where(
-						and(eq(partnerships.id, partnershipId), sql`${partnerships.inviteeId} is not null`)
+						and(
+							eq(partnerships.id, partnership.id),
+							eq(partnerships.inviteeId, partnership.inviteeId),
+							eq(partnerships.status, 'accepted')
+						)
 					)
 			)
 			.onConflictDoNothing(),
-		db
-			.update(spaceMembers)
-			.set({
-				canManage: sql`(select case ${partnerships.control}
-					when 'both' then 1
-					when 'inviter' then ${spaceMembers.userId} = ${partnerships.inviterId}
-					else ${spaceMembers.userId} = ${partnerships.inviteeId} end
-					from ${partnerships} where ${partnerships.id} = ${spaceMembers.spaceId})`,
-				updatedAt: new Date(now)
-			})
-			.where(eq(spaceMembers.spaceId, partnershipId))
+		...(setManagersStatements(db, partnership.id, managers, accepted) ?? [])
 	];
 }
 

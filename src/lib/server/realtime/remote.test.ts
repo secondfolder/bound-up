@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defined } from '$lib/testing/defined';
 import type { RealtimeNamespace } from './binding';
-import { partnershipRoom } from './index';
+import { spaceRoom } from './index';
 import { createDurableObjectNotifier } from './remote';
 
 /**
@@ -39,7 +39,7 @@ describe('createDurableObjectNotifier().stream', () => {
 		const { namespace } = fakeNamespace(
 			async () => await fetch('data:text/event-stream,:ok%0A%0A')
 		);
-		const response = await createDurableObjectNotifier(namespace).stream(partnershipRoom('p-1'), {
+		const response = await createDurableObjectNotifier(namespace).stream(spaceRoom('p-1'), {
 			watcher: { userId: 'u-1', deviceId: null, streamId: 's-1' },
 			topics: ['messages']
 		});
@@ -52,7 +52,7 @@ describe('createDurableObjectNotifier().stream', () => {
 
 	it('names the user, device and stream to the room', async () => {
 		const { namespace, requested } = fakeNamespace(async () => new Response(''));
-		await createDurableObjectNotifier(namespace).stream(partnershipRoom('p-1'), {
+		await createDurableObjectNotifier(namespace).stream(spaceRoom('p-1'), {
 			watcher: { userId: 'u-1', deviceId: 'd-1', streamId: 's-1' },
 			topics: ['messages', 'notebook']
 		});
@@ -74,18 +74,18 @@ describe('createDurableObjectNotifier().stream', () => {
 			},
 			get: () => ({ fetch: async () => await Promise.resolve(new Response('')) })
 		};
-		await createDurableObjectNotifier(namespace).stream(partnershipRoom('p-1'), {
+		await createDurableObjectNotifier(namespace).stream(spaceRoom('p-1'), {
 			watcher: { userId: 'u-1', deviceId: null, streamId: 's-1' },
 			topics: ['messages']
 		});
-		expect(names).toEqual(['partnership:p-1']);
+		expect(names).toEqual(['space:p-1']);
 	});
 });
 
 describe('createDurableObjectNotifier().presence', () => {
 	it('passes the update on to the room', async () => {
 		const { namespace, requested } = fakeNamespace(async () => new Response(null, { status: 204 }));
-		await createDurableObjectNotifier(namespace).presence(partnershipRoom('p-1'), {
+		await createDurableObjectNotifier(namespace).presence(spaceRoom('p-1'), {
 			userId: 'u-1',
 			streamId: 's-1',
 			present: false
@@ -98,7 +98,7 @@ describe('createDurableObjectNotifier().presence', () => {
 		vi.spyOn(console, 'error').mockImplementation(() => undefined);
 		const { namespace } = fakeNamespace(() => Promise.reject(new Error('room unavailable')));
 		await expect(
-			createDurableObjectNotifier(namespace).presence(partnershipRoom('p-1'), {
+			createDurableObjectNotifier(namespace).presence(spaceRoom('p-1'), {
 				userId: 'u-1',
 				streamId: 's-1',
 				present: true
@@ -122,7 +122,7 @@ describe('createDurableObjectNotifier().publish', () => {
 			})
 		};
 		const watching = await createDurableObjectNotifier(namespace).publish(
-			partnershipRoom('p-1'),
+			spaceRoom('p-1'),
 			'notebook',
 			'{"kind":"created"}'
 		);
@@ -134,7 +134,7 @@ describe('createDurableObjectNotifier().publish', () => {
 describe('createDurableObjectNotifier().evict', () => {
 	it('passes the eviction on to the room', async () => {
 		const { namespace, requested } = fakeNamespace(async () => new Response(null, { status: 204 }));
-		await createDurableObjectNotifier(namespace).evict(partnershipRoom('p-1'), {
+		await createDurableObjectNotifier(namespace).evict(spaceRoom('p-1'), {
 			userId: 'u-1',
 			topic: 'notebook-entry:00000000-0000-0000-0000-000000000000'
 		});
@@ -145,7 +145,7 @@ describe('createDurableObjectNotifier().evict', () => {
 		vi.spyOn(console, 'error').mockImplementation(() => undefined);
 		const { namespace } = fakeNamespace(() => Promise.reject(new Error('room unavailable')));
 		await expect(
-			createDurableObjectNotifier(namespace).evict(partnershipRoom('p-1'), {
+			createDurableObjectNotifier(namespace).evict(spaceRoom('p-1'), {
 				userId: 'u-1',
 				topic: 'notebook'
 			})

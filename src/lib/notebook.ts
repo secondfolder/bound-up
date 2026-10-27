@@ -8,7 +8,7 @@
  * docs/notebook.md.
  */
 
-import { type PartnershipControl, roleOf } from './partnership';
+import type { SpaceMember } from './spaces';
 
 /**
  * Journal entries are dated; notes are free pages; scenes are plans for play,
@@ -24,11 +24,12 @@ export function isNotebookKind(value: unknown): value is NotebookKind {
 }
 
 /**
- * What a partnership entry allows the member who did not set it.
+ * What a partnership entry allows every member other than the one who set
+ * it.
  *
  * `edit` is the default: a shared notebook both people write in. A member who
- * holds control may make an entry `read` only, or `hidden`, for the other
- * one. Hidden is withheld by the server, not by cryptography: the other
+ * manages the space may make an entry `read` only, or `hidden`, for the
+ * others. Hidden is withheld by the server, not by cryptography: the other
  * partner holds the partnership vault's key. Partners are trusted, and the
  * doc says so plainly.
  */
@@ -49,45 +50,53 @@ export type EntryForAccess =
 	| {
 			scope: 'partnership';
 			partnerAccess: PartnerAccess;
-			/** Who restricted it; the restriction applies to the other member. */
+			/** Who restricted it; the restriction applies to every other member. */
 			accessSetByUserId: string | null;
 			/**
-			 * Who wrote it first. With control shared, only they may restrict
-			 * it; null once their account is gone.
+			 * Who wrote it first. When more than one member manages the space,
+			 * only they may restrict it; null once their account is gone.
 			 */
 			createdByUserId: string | null;
 	  };
 
-/** A partnership as the rules need it. */
-export type PartnershipForAccess = {
-	control: PartnershipControl;
-	inviterId: string;
-	inviteeId: string | null;
-};
+/**
+ * A shared space as the rules need it: its members, and which of them manage
+ * it (`space_members.can_manage`). Never the partnership's `control`, which
+ * is only the invite's offer (docs/partners.md).
+ */
+export type SpaceForAccess = { members: readonly SpaceMember[] };
 
-/** Whether `userId` holds the partnership's control. */
-export function holdsControl(partnership: PartnershipForAccess, userId: string): boolean {
-	const role = roleOf(partnership, userId);
-	return role !== null && (partnership.control === 'both' || partnership.control === role);
+function isMember(space: SpaceForAccess, userId: string): boolean {
+	return space.members.some((member) => member.userId === userId);
+}
+
+/** Whether `userId` manages the space: the "control" the copy talks about. */
+export function holdsControl(space: SpaceForAccess, userId: string): boolean {
+	return space.members.some((member) => member.userId === userId && member.canManage);
+}
+
+/** Whether more than one member manages the space: control shared, in the copy's words. */
+function sayIsShared(space: SpaceForAccess): boolean {
+	return space.members.filter((member) => member.canManage).length > 1;
 }
 
 /**
  * What `viewerId` may do with `entry`.
  *
- * A partnership entry needs `partnership` (the accepted link it belongs to),
- * and anyone who is not a member of it gets `none`. The restriction binds
- * only the member who did not set it: the member who restricted an entry can
- * always still edit it.
+ * A partnership entry needs `space` (the accepted partnership's space it
+ * belongs to), and anyone who is not a member of it gets `none`. The
+ * restriction binds every member but the one who set it: the member who
+ * restricted an entry can always still edit it.
  */
 export function entryAccessFor(
 	entry: EntryForAccess,
 	viewerId: string,
-	partnership?: PartnershipForAccess
+	space?: SpaceForAccess
 ): EntryAccess {
 	if (entry.scope === 'self') {
 		return entry.ownerId === viewerId ? 'edit' : 'none';
 	}
-	if (!partnership || roleOf(partnership, viewerId) === null) {
+	if (!(space && isMember(space, viewerId))) {
 		return 'none';
 	}
 	if (entry.partnerAccess === 'edit' || entry.accessSetByUserId === viewerId) {
@@ -98,8 +107,8 @@ export function entryAccessFor(
 
 /**
  * Whether `userId` is the member who decides who else may see or edit
- * `entry`: whoever holds the partnership's control, or, when control is
- * shared, the member who created the entry.
+ * `entry`: a member who manages the space, or, when more than one does
+ * (control shared), the member who created the entry.
  *
  * Shared control used to let either member restrict any entry, and the other
  * could not undo it, so two people who had agreed to share control could
@@ -111,12 +120,17 @@ export function entryAccessFor(
 export function holdsAccessAuthority(
 	entry: Extract<EntryForAccess, { scope: 'partnership' }>,
 	userId: string,
-	partnership: PartnershipForAccess
+	space: SpaceForAccess
 ): boolean {
-	if (!holdsControl(partnership, userId)) {
+	if (!holdsControl(space, userId)) {
 		return false;
 	}
-	if (partnership.control !== 'both' || entry.createdByUserId === null) {
+	// The creator's say needs the creator still to be here to use it.
+	if (
+		!sayIsShared(space) ||
+		entry.createdByUserId === null ||
+		!isMember(space, entry.createdByUserId)
+	) {
 		return true;
 	}
 	return entry.createdByUserId === userId;
@@ -135,9 +149,9 @@ export function holdsAccessAuthority(
 export function canSetAccess(
 	entry: Extract<EntryForAccess, { scope: 'partnership' }>,
 	viewerId: string,
-	partnership: PartnershipForAccess
+	space: SpaceForAccess
 ): boolean {
-	if (!holdsAccessAuthority(entry, viewerId, partnership)) {
+	if (!holdsAccessAuthority(entry, viewerId, space)) {
 		return false;
 	}
 	const restrictedByOther =
@@ -147,7 +161,7 @@ export function canSetAccess(
 	if (!restrictedByOther) {
 		return true;
 	}
-	return !holdsAccessAuthority(entry, entry.accessSetByUserId as string, partnership);
+	return !holdsAccessAuthority(entry, entry.accessSetByUserId as string, space);
 }
 
 /** Whether `access` lets its holder write. */

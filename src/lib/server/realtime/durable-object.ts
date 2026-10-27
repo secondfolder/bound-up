@@ -13,8 +13,10 @@ import {
 } from './index';
 
 /**
- * One room per scope (a partnership, or one account), holding only the open
- * connections watching it and the topics each was let in to.
+ * One room per space (`space:<id>`), or per account (`user:<id>`), holding
+ * only the open connections watching it and the topics each was let in to.
+ * The room never parses its own name: which rooms exist, and who may enter
+ * one, is decided before a request reaches it (`server/realtime/topics.ts`).
  *
  * **This file is a second alias-free zone.** It is bundled by wrangler's esbuild
  * rather than by vite — the `sveltekit-cloudflare-do` plugin appends
@@ -104,7 +106,7 @@ export class RealtimeRoom {
 	 * slowest client on the other side of the internet — which would block the
 	 * broadcast, and with it the `/publish` request that the sender's own HTTP
 	 * request is sitting on. One stalled reader would stall sending for the
-	 * whole partnership. (A test that awaited two writes before reading either
+	 * whole space. (A test that awaited two writes before reading either
 	 * deadlocked outright, which is how this was found.)
 	 *
 	 * Ordering per client is still guaranteed: writes queue on the writable in

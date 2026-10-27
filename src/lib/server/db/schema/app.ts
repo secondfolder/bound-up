@@ -159,6 +159,15 @@ export const partnerships = sqliteTable(
 		/** Who accepted it. NULL exactly while `status` is 'pending'. */
 		inviteeId: text('invitee_id').references(() => user.id, { onDelete: 'cascade' }),
 		status: text('status').$type<PartnershipStatus>().notNull().default('pending'),
+		/**
+		 * The invite's offer: who will manage the partnership once it is
+		 * accepted, against the inviter/invitee roles. Read only while the
+		 * invite is pending and at the moment it is accepted, when it sets the
+		 * members' `space_members.can_manage`; once accepted it records what
+		 * was agreed then, is never written again, and is never a permission —
+		 * changing control afterwards writes `can_manage` alone. See
+		 * docs/partners.md, "Control".
+		 */
 		control: text('control').$type<PartnershipControl>().notNull(),
 		/**
 		 * The secret in the invite URL, stored in the clear rather than hashed.
@@ -240,11 +249,10 @@ export const spaces = sqliteTable('spaces', {
 /**
  * Who is in a space, and whether they manage it.
  *
- * `can_manage` replaces the partnership's `control` as what the server reads:
- * a flag per member rather than an inviter/invitee/both enum, so nothing in
- * the database assumes a space has two members. `partnerships.control` is
- * still written, in the same batch, by `server/spaces.ts` — see the
- * LEGACY-SPACES note there.
+ * `can_manage` is what every permission reads: a flag per member rather than
+ * an inviter/invitee/both enum, so nothing in the database assumes a space
+ * has two members. A partnership's `control` is only its invite's offer,
+ * which sets these flags when the invite is made and when it is accepted.
  */
 export const spaceMembers = sqliteTable(
 	'space_members',

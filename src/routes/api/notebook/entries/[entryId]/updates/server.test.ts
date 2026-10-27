@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { entryTopic } from '$lib/notebook';
 import { createNotifier } from '$lib/server/realtime/backend';
-import { partnershipRoom } from '$lib/server/realtime/index';
+import { spaceRoom } from '$lib/server/realtime/index';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { defined } from '$lib/testing/defined';
 import { fakeEvent, runAndCatch } from '$lib/testing/events';
@@ -65,7 +65,7 @@ function sealed(vaultId: string, label = 'edit') {
 /** Opens a stream on the entry's topic, as a page would, and returns its next frame. */
 async function listen(entryId: string, user: TestUser) {
 	const notifier = await createNotifier({});
-	const response = await notifier.stream(partnershipRoom(partnershipId), {
+	const response = await notifier.stream(spaceRoom(partnershipId), {
 		watcher: { userId: user.id, deviceId: null, streamId: crypto.randomUUID() },
 		topics: [entryTopic(entryId)]
 	});

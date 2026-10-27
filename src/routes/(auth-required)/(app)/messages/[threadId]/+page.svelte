@@ -16,8 +16,9 @@
 		trustFor
 	} from '$lib/crypto/trust.svelte';
 	import { hasFeature } from '$lib/features';
-	import { watchPartnership } from '$lib/messaging/live';
+	import { watchMessages } from '$lib/messaging/live';
 	import { partnerName } from '$lib/partner-names.svelte';
+	import { spaceRoom } from '$lib/realtime/live';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -66,8 +67,8 @@
 	$effect(() => {
 		const partnership = partnershipId;
 		const thread = threadId;
-		return watchPartnership({
-			partnershipId: partnership,
+		return watchMessages({
+			room: spaceRoom(partnership),
 			onChange: (event) => {
 				if (event?.threadId && event.threadId !== thread) {
 					if (event.kind === 'thread' || event.kind === 'message') {

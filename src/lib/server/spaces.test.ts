@@ -21,7 +21,6 @@ import {
 	ensureTestPartnershipVault,
 	ensureTestSelfVault,
 	fakeSealed,
-	setTestPartnershipControl,
 	type TestUser
 } from '../testing/fixtures';
 import { createLibraryItem } from './daydreams';
@@ -101,18 +100,22 @@ describe('shared spaces', () => {
 	});
 
 	it.each([
-		['inviter', true, false],
-		['invitee', false, true],
-		['both', true, true]
+		['me', true, false],
+		['them', false, true],
+		['mix', true, true]
 	] as const)(
-		'keeps can_manage in step with control set to %s',
+		'sets can_manage from the offer as accepted (%s, from the inviter)',
 		async (control, inviter, invitee) => {
-			const { id } = await createTestPartnership(db, ada, jun);
-			await setTestPartnershipControl(db, id, control);
+			const { id } = await createTestPartnership(db, ada, jun, { control });
 			expect(await requireSpaceMember(db, id, ada.id)).toMatchObject({ canManage: inviter });
 			expect(await requireSpaceMember(db, id, jun.id)).toMatchObject({ canManage: invitee });
-			// And `control`, as every screen reads it, is what the members say.
-			expect((await getPartnershipForUser(db, id, ada.id))?.control).toBe(control);
+			// And every screen reads who manages from the members.
+			expect(new Set((await getPartnershipForUser(db, id, ada.id))?.members)).toEqual(
+				new Set([
+					{ userId: ada.id, canManage: inviter },
+					{ userId: jun.id, canManage: invitee }
+				])
+			);
 		}
 	);
 
@@ -225,7 +228,7 @@ async function fillSpaces(partnershipId: string) {
 	});
 	const escrowed = await putEscrow(db, ada.id, {
 		id: crypto.randomUUID(),
-		partnershipId,
+		heldInSpaceId: partnershipId,
 		ciphertext: 'd3JhcA=='
 	});
 	if (!escrowed) {

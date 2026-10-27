@@ -2,7 +2,7 @@ import { error, fail as kitFail, redirect } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { inviteUrl } from '$lib/invite-url';
-import { answerFromControl, controlFromAnswer, isInviteUsable } from '$lib/partnership';
+import { controlAnswerFor, controlFromAnswer, isInviteUsable } from '$lib/partnership';
 import {
 	formFields,
 	partnerEditFormSchema,
@@ -74,7 +74,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 				yourName: '',
 				partnerRole: null,
 				yourRole: null,
-				control: answerFromControl(partnership.control, partnership.role)
+				// The invite's offer while pending; who manages the space once accepted.
+				control: controlAnswerFor(partnership, locals.user.id)
 			},
 			zod4(partnerEditFormSchema),
 			{ errors: false }

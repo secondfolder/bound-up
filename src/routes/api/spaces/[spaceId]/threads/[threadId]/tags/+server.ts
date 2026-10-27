@@ -27,7 +27,7 @@ export const PUT: RequestHandler = async ({ locals, params, request, platform })
 		error(404, 'Not found');
 	}
 	const notifier = await createNotifier({ platform });
-	await publishMessagingEvent(notifier, params.spaceId, {
+	await publishMessagingEvent(notifier, locals.db, params.spaceId, {
 		kind: 'tags',
 		threadId: params.threadId
 	});

@@ -7,7 +7,7 @@ import {
 	entryAccessFor,
 	type NotebookKind,
 	type PartnerAccess,
-	type PartnershipForAccess
+	type SpaceForAccess
 } from '../notebook';
 import {
 	notebookEntryKind,
@@ -16,9 +16,9 @@ import {
 } from '../sealed-kinds/notebook';
 import type { NotebookEntryView, NotebookVersionView, WidgetItemView } from '../types';
 import type { Db } from './db';
-import { notebookEntries, notebookUpdates, notebookVersions, partnerships } from './db/schema';
+import { notebookEntries, notebookUpdates, notebookVersions } from './db/schema';
 import { type MediaStore, notebookEntryPrefix, notebookSnapshotKey } from './media';
-import { partnershipRoom, type RoomKey, userRoom } from './realtime/index';
+import { type RoomKey, spaceRoom } from './realtime/index';
 import {
 	partnershipVaultIdFor,
 	type SealedWrite,
@@ -26,7 +26,7 @@ import {
 	sealedRef,
 	selfVaultIdFor
 } from './sealed-content';
-import { isSpaceMember, partnershipControl, soloSpaceFor, soloSpaceIdOf } from './spaces';
+import { loadItemSpace, soloSpaceFor, soloSpaceIdOf } from './spaces';
 
 /**
  * Every database access for the notebook. See docs/notebook.md.
@@ -55,31 +55,24 @@ export type ResolvedScope = {
 	spaceId: string;
 	/** The vault every record in this scope must be sealed under, or null while there is none yet. */
 	vaultId: string | null;
-	partnership: PartnershipForAccess | null;
+	/** A partnership's space and who manages it; null for the viewer's own. */
+	partnership: SpaceForAccess | null;
+	/** The space's realtime room: its list's stream, and its entries'. */
 	room: RoomKey;
 };
 
-async function partnershipForAccess(
+/**
+ * An accepted partnership's space, with its members and which of them manage
+ * it, if `userId` is one of them. The rules follow `can_manage`, never the
+ * partnership's `control` column, which is only the invite's offer.
+ */
+async function sharedSpaceForAccess(
 	db: Db,
 	partnershipId: string,
 	userId: string
-): Promise<PartnershipForAccess | null> {
-	const [row] = await db
-		.select({
-			control: partnershipControl(),
-			inviterId: partnerships.inviterId,
-			inviteeId: partnerships.inviteeId
-		})
-		.from(partnerships)
-		.where(
-			and(
-				eq(partnerships.id, partnershipId),
-				eq(partnerships.status, 'accepted'),
-				isSpaceMember(partnerships.id, userId)
-			)
-		)
-		.limit(1);
-	return row ?? null;
+): Promise<SpaceForAccess | null> {
+	const space = await loadItemSpace(db, userId, partnershipId);
+	return space?.kind === 'shared' ? { members: space.members } : null;
 }
 
 /**
@@ -105,10 +98,10 @@ export async function resolveScope(
 			spaceId,
 			vaultId,
 			partnership: null,
-			room: userRoom(userId)
+			room: spaceRoom(spaceId)
 		};
 	}
-	const partnership = await partnershipForAccess(db, scope.partnershipId, userId);
+	const partnership = await sharedSpaceForAccess(db, scope.partnershipId, userId);
 	if (!partnership) {
 		return null;
 	}
@@ -117,7 +110,7 @@ export async function resolveScope(
 		spaceId: scope.partnershipId,
 		vaultId: await partnershipVaultIdFor(db, scope.partnershipId),
 		partnership,
-		room: partnershipRoom(scope.partnershipId)
+		room: spaceRoom(scope.partnershipId)
 	};
 }
 
@@ -181,7 +174,9 @@ export type EntryContext = {
 	access: EntryAccess;
 	/** Whether the viewer may change who else can see or edit it. Always false for a solo entry. */
 	canSetAccess: boolean;
-	partnership: PartnershipForAccess | null;
+	/** The partnership's space a shared entry is in; null for a solo entry. */
+	partnership: SpaceForAccess | null;
+	/** Its space's room, where its edits and cursors are relayed. */
 	room: RoomKey;
 };
 
@@ -216,7 +211,7 @@ export async function getEntryContext(
 		}
 	}
 	const partnership = row.partnershipId
-		? await partnershipForAccess(db, row.partnershipId, userId)
+		? await sharedSpaceForAccess(db, row.partnershipId, userId)
 		: null;
 	const access = entryAccessFor(forAccess(row), userId, partnership ?? undefined);
 	if (access === 'none') {
@@ -238,7 +233,7 @@ export async function getEntryContext(
 				partnership
 			),
 		partnership,
-		room: row.partnershipId ? partnershipRoom(row.partnershipId) : userRoom(row.ownerId ?? '')
+		room: spaceRoom(entrySpaceId(row))
 	};
 }
 
@@ -864,7 +859,7 @@ export async function liftHiddenEntry(
 	userId: string,
 	partnershipId: string
 ): Promise<NotebookResult> {
-	const partnership = await partnershipForAccess(db, partnershipId, userId);
+	const partnership = await sharedSpaceForAccess(db, partnershipId, userId);
 	if (!partnership) {
 		return { ok: false, reason: 'not-found' };
 	}

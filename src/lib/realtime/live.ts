@@ -2,7 +2,7 @@
  * Watching a realtime room, from the browser.
  *
  * BROWSER ONLY. Opens an `EventSource` against `/api/realtime/events` for one
- * room (a partnership, or the viewer's own account) and a few topics, and
+ * room (a space, or the viewer's own account) and a few topics, and
  * hands each frame to the caller by topic. What a frame may say is each
  * feature's business: message frames are metadata only, notebook frames are
  * sealed ciphertext. This file never looks inside one. See docs/realtime.md.
@@ -13,7 +13,7 @@
  * in-flight request, and only *hibernation-eligible* idleness is free;
  * hibernation needs the WebSocket Hibernation API, which SSE cannot use. So one
  * permanently-open stream is roughly 10,800 GB-s a day: about 83% of the free
- * plan's 13,000 GB-s daily allowance, for a single partnership sitting idle in a
+ * plan's 13,000 GB-s daily allowance, for a single page sitting idle in a
  * background tab.
  *
  * Hanging up on `visibilitychange` turns that into "billed while someone is
@@ -55,11 +55,15 @@
 
 import { storedPushDeviceId } from '$lib/push-client';
 
-/** A room, as the server names it: `partnership:<id>` or `user:<id>`. */
-export type RoomKey = `partnership:${string}` | `user:${string}`;
+/**
+ * A room, as the server names it: `space:<id>` (one space, solo or shared) or
+ * `user:<id>` (one account across every space it is in: what an Everyone
+ * list watches, since each space fans its list events out to it).
+ */
+export type RoomKey = `space:${string}` | `user:${string}`;
 
-export function partnershipRoom(partnershipId: string): RoomKey {
-	return `partnership:${partnershipId}`;
+export function spaceRoom(spaceId: string): RoomKey {
+	return `space:${spaceId}`;
 }
 
 export function userRoom(userId: string): RoomKey {

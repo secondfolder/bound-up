@@ -1,6 +1,6 @@
 import { error, json } from '@sveltejs/kit';
 import { notebookHeaderSchema } from '$lib/schemas/notebook';
-import { getEntryContext, saveHeader } from '$lib/server/notebook';
+import { entrySpaceId, getEntryContext, saveHeader } from '$lib/server/notebook';
 import { publishListChange } from '$lib/server/notebook-live';
 import { createNotifier } from '$lib/server/realtime/backend';
 import type { RequestHandler } from './$types';
@@ -31,6 +31,10 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 		}
 		error(result.reason === 'read-only' ? 403 : 400, result.reason);
 	}
-	await publishListChange(await createNotifier({ platform }), context.room);
+	await publishListChange(
+		await createNotifier({ platform }),
+		locals.db,
+		entrySpaceId(context.entry)
+	);
 	return json({ revision: result.revision });
 };

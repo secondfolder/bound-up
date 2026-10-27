@@ -260,6 +260,47 @@ test.describe('contexts', () => {
 		return url;
 	}
 
+	/**
+	 * An Everyone list watches one stream, the viewer's own room, which every
+	 * space they are in fans its list events out to (docs/realtime.md,
+	 * "Everyone"). Asserted with no reload, so it cannot pass on a refetch.
+	 */
+	test('an Everyone list updates live when a partner adds an entry, on one stream', async ({
+		browser
+	}) => {
+		const { ada, bo, partnershipId } = await sharedNotebook(browser);
+		try {
+			const tag = crypto.randomUUID().slice(0, 6);
+			await showContext(bo.page, 'all');
+			const streams: string[] = [];
+			bo.page.on('request', (request) => {
+				if (request.url().includes('/api/realtime/events')) {
+					streams.push(new URL(request.url()).searchParams.get('room') ?? '');
+				}
+			});
+			await bo.page.goto('/notebook');
+			await waitForHydration(bo.page);
+			await expect(control(bo.page)).toHaveAccessibleName(/^Showing Everyone/);
+			await bo.page.getByRole('tab', { name: 'Notes' }).click();
+			await expect.poll(() => streams.length).toBeGreaterThan(0);
+
+			await ada.page.goto('/notebook');
+			await titled(ada.page, 'note', `Live ${tag}`);
+
+			await expect(bo.page.getByRole('link', { name: new RegExp(`Live ${tag}`) })).toContainText(
+				'Ada',
+				{ timeout: 15_000 }
+			);
+			// One stream, on Bo's own room, however many spaces the list shows.
+			expect(new Set(streams).size).toBe(1);
+			expect(streams[0]).toMatch(/^user:/);
+			expect(streams[0]).not.toContain(partnershipId);
+		} finally {
+			await ada.close();
+			await bo.close();
+		}
+	});
+
 	test('switching keeps the page and re-filters it; Everyone shows both, each saying whose', async ({
 		browser
 	}) => {

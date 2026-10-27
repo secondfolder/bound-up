@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { entryTopic } from '$lib/notebook';
 import { createNotifier } from '$lib/server/realtime/backend';
-import { partnershipRoom } from '$lib/server/realtime/index';
+import { spaceRoom } from '$lib/server/realtime/index';
 import { soloSpaceFor } from '$lib/server/spaces';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { defined } from '$lib/testing/defined';
@@ -85,7 +85,7 @@ describe('setAccess', () => {
 	it('hides an entry from the other partner and closes their open copy at once', async () => {
 		const entry = await createTestNotebookEntry(harness.db, ada, { partnershipId });
 		const notifier = await createNotifier({});
-		const bosPage = await notifier.stream(partnershipRoom(partnershipId), {
+		const bosPage = await notifier.stream(spaceRoom(partnershipId), {
 			watcher: { userId: bo.id, deviceId: null, streamId: crypto.randomUUID() },
 			topics: [entryTopic(entry.id)]
 		});
@@ -192,7 +192,7 @@ describe('the entry’s own space', () => {
 		const data = await runLoad(load(at(ada, entry.id, undefined, adaSolo)));
 
 		expect(data.space).toEqual({ id: partnershipId, kind: 'shared', partnershipId });
-		expect(data.room).toBe(`partnership:${partnershipId}`);
+		expect(data.room).toBe(`space:${partnershipId}`);
 		// The partnership's own actions follow the partnership: Ada holds its
 		// control, so she may restrict the entry, from her own context too.
 		expect(data.entry.canSetAccess).toBe(true);

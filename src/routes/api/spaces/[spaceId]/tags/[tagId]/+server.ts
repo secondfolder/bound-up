@@ -31,6 +31,6 @@ export const PATCH: RequestHandler = async ({ locals, params, request, platform 
 	}
 	const notifier = await createNotifier({ platform });
 	// Board-level: a renamed or recoloured tag can be on any thread.
-	await publishMessagingEvent(notifier, params.spaceId, { kind: 'tags' });
+	await publishMessagingEvent(notifier, locals.db, params.spaceId, { kind: 'tags' });
 	return json(result.tag);
 };

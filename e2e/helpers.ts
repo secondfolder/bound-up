@@ -507,23 +507,27 @@ export async function openBoard(page: Page, partnerName: string): Promise<void> 
  * fan and picks `name` ("Everyone", "Me" or a partner's name), then waits for
  * the page's loads to re-run in the new context.
  *
- * The pill is not the signal: it shows the picked context as soon as it is
- * picked, before the page's data has caught up, and a click on a card in that
- * window followed the card of the context before. So this waits for the
- * re-run's data too; a caller that then clicks something should still wait
- * for something the new context draws (Today's partner header, say).
+ * The pill shows the picked context as soon as it is picked, before the
+ * page's data has caught up, so it is not the signal on its own. The app
+ * shell holds `<main>` (`aria-busy`, and inert but for the switcher) until
+ * the re-run lands, so nothing of the old context can be clicked meanwhile
+ * (docs/contexts.md, "Picking"): waiting for the pill and then for the hold
+ * to lift is waiting for the new context's page. The pill first, because it
+ * changes in the same update that starts the hold. (A plain `click()` on held
+ * content waits out the hold by itself too, since Playwright retries until
+ * the element can take the pointer; this makes the wait explicit for callers
+ * that read the page rather than click it.)
  */
 export async function switchTo(page: Page, name: string): Promise<void> {
 	const control = page.getByRole('button', { name: /^Showing / });
 	// Partner names are sealed, so the pill reads "…" until they open.
 	await expect(control).not.toHaveAccessibleName(/…/);
 	if (!(await control.getAttribute('aria-label'))?.startsWith(`Showing ${name}.`)) {
-		const reloaded = page.waitForResponse((response) => response.url().includes('/__data.json'));
 		await control.click();
 		await page.getByRole('button', { name: `Show ${name}`, exact: true }).click();
-		await reloaded;
 	}
 	await expect(control).toHaveAccessibleName(new RegExp(`^Showing ${name}\\.`));
+	await expect(page.locator('main')).not.toHaveAttribute('aria-busy', 'true');
 }
 
 /**

@@ -8,6 +8,7 @@ import {
 	newAccounts,
 	newSide,
 	openBoard,
+	settle,
 	switchTo,
 	waitForHydration,
 	writeThread
@@ -96,6 +97,79 @@ test.describe('Today', () => {
 			// Still Jun's on coming back: the context is the device's, not the page's.
 			await ada.page.goto('/today');
 			await expect(ada.page.getByRole('button', { name: /^Showing Jun\./ })).toBeVisible();
+		} finally {
+			await ada.close();
+			await jun.close();
+		}
+	});
+
+	test('nothing of the old context can be followed while a switch is loading', async ({
+		browser
+	}) => {
+		// The race this guards: the pill names the picked context at once, but
+		// Today's cards are the old context's until the re-run's data arrives,
+		// and the tasks card in Everyone, tapped in that window, stored
+		// Everyone again and opened the tasks in it.
+		const ada = await newSide(browser, 'Ada');
+		const jun = await newSide(browser, 'Jun');
+		try {
+			await newAccounts(ada, jun);
+			await linkAccounts(ada, jun);
+			const { page } = ada;
+			await page.goto('/today');
+			await waitForHydration(page);
+			const control = page.getByRole('button', { name: /^Showing / });
+			await expect(control).toHaveAccessibleName(/^Showing Everyone\./);
+			const main = page.locator('main');
+			const tasksCard = main.getByRole('link', { name: 'Tasks', exact: true });
+			await expect(tasksCard).toBeVisible();
+
+			// Every context the device stores from here on.
+			const stored: string[] = [];
+			page.on('request', (request) => {
+				if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/context') {
+					stored.push(request.postData() ?? '');
+				}
+			});
+			// The re-run's data, held until the click has been tried.
+			const held = Promise.withResolvers<void>();
+			let reloads = 0;
+			const isData = (url: URL) => url.pathname.endsWith('/__data.json');
+			await page.route(isData, async (route) => {
+				reloads += 1;
+				await held.promise;
+				await route.continue();
+			});
+
+			await control.click();
+			await page.getByRole('button', { name: 'Show Me', exact: true }).click();
+			await expect(control).toHaveAccessibleName(/^Showing Me\./);
+			await expect.poll(() => reloads).toBe(1);
+			// The fan has gone home: the tap below lands on the page, not on it.
+			await expect(page.getByRole('group', { name: 'Whose to show' })).toHaveCount(0);
+
+			// Held: busy, and the old card out of reach.
+			await expect(main).toHaveAttribute('aria-busy', 'true');
+			expect(await tasksCard.evaluate((link) => link.closest('[inert]') !== null)).toBe(true);
+			// A real tap where the card is drawn, as quick fingers would: forced
+			// past Playwright's own wait, which would otherwise sit out the hold.
+			await tasksCard.click({ force: true });
+			await settle(page);
+			await expect(page).toHaveURL(/\/today$/);
+			// Only the switch's own request: the card did not store Everyone.
+			expect(stored).toHaveLength(1);
+			expect(JSON.parse(stored[0] ?? '{}').context).not.toBe('all');
+
+			held.resolve();
+			await expect(main).not.toHaveAttribute('aria-busy', 'true');
+			await expect(control).toHaveAccessibleName(/^Showing Me\./);
+			await expect.poll(() => cards(page)).toEqual(['Tasks', 'Rewards', 'Notebook', 'Playroom']);
+
+			// And once it has landed, the card is Me's, and opens the tasks in Me.
+			await page.unroute(isData);
+			await tasksCard.click();
+			await page.waitForURL(/\/tasks$/);
+			await expect(control).toHaveAccessibleName(/^Showing Me\./);
 		} finally {
 			await ada.close();
 			await jun.close();

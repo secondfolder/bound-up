@@ -828,7 +828,7 @@ record can only be made by someone holding the vault key.
 | `.../attachments/[attachmentId]`    | `GET`, streams ciphertext. `410` once the media has self-destructed.        |
 | `.../restore`                       | `POST` the vault wrapped for the requester's new key, `DELETE` to decline.  |
 | `.../messages/[messageId]/metadata` | `PUT` a sealed sidecar, beside a sealed body only.                          |
-| `api/realtime/events`               | `GET`, the SSE feed, on the partnership's room and the `messages` topic. See [realtime.md](realtime.md). |
+| `api/realtime/events`               | `GET`, the SSE feed, on the partnership's space room (or the viewer's own, for Everyone) and the `messages` topic. See [realtime.md](realtime.md). |
 | `api/realtime/presence`             | `POST`, a stream's lease renewal or goodbye. See [realtime.md](realtime.md#a-stream-is-a-lease). |
 
 **The API is under the space, `/api/spaces/[spaceId]/…`**, where it was under
@@ -912,38 +912,44 @@ primary key, so a client-chosen id cannot reach or overwrite an existing row.
 ## Realtime
 
 A board of one partnership, and a thread page, watch that partnership's
-realtime room on the **`messages` topic** (an Everyone board of several does
-not; see below) and, on anything arriving, call `invalidate()` on the `depends()` key
-the load already declares. So a live update takes exactly the same authorised
-path as a navigation. The room itself (one per partnership, shared with the
-notebook, with streams that are leases closed while the page is hidden) is
-described in [realtime.md](realtime.md); this section is what messaging adds.
+space's realtime room (`space:<id>`) on the **`messages` topic**; an Everyone
+board of several watches the viewer's own room (`user:<id>`) instead (see
+below). On anything arriving, the page calls `invalidate()` on the
+`depends()` key the load already declares, so a live update takes exactly the
+same authorised path as a navigation. The rooms themselves (one per space,
+shared with the notebook, with streams that are leases closed while the page
+is hidden) are described in [realtime.md](realtime.md); this section is what
+messaging adds.
 
 **Message frames carry metadata only, and that is a rule rather than a
-convention.** A frame is `{ kind, threadId }`, never a sender and never a
-byte of content. The room relays any string it is given (notebook frames are
+convention.** A frame is `{ kind, threadId, spaceId }` (`MessagingFrame`),
+never a sender and never a byte of content; the space id, like the thread id,
+is already known to everyone allowed to hear it, and tells an Everyone board
+which partnership's board to reload. The room relays any string it is given (notebook frames are
 sealed ciphertext), so the rule lives with messaging: every publisher goes
 through `publishMessagingEvent` (`server/realtime/messaging.ts`), whose
 `MessagingEvent` type has nowhere to put a body, and which rebuilds the frame
 field by field so nothing else can ride along. A future event wanting to carry
 a body is a reason to stop and reconsider, not a small extension.
 
-**An Everyone board of several partnerships is not live.** Watching it would
-take one stream per partnership — a Durable Object request each, and a presence
-lease each — for a page that is mostly glanced at
-([realtime.md](realtime.md#hanging-up-when-hidden-is-a-billing-necessity)). It reloads instead whenever its tab
-comes back to the front or its window regains focus, ringing anything that
-arrived meanwhile the same way a live board does (`newlyArrived`), and a device
-with it open is not counted as watching, so it still gets its push. An
-Everyone board of one partnership, and every thread page, watch the one room as
-before. Fanning list events out to each member's own room, so one stream could
-cover Everyone, is a later step ([contexts.md](contexts.md#not-built-yet)).
+**An Everyone board of several partnerships is live on one stream.**
+`publishMessagingEvent` sends each event to the partnership's space room and
+fans it out to each member's own room, so the board watches `user:<id>` alone
+rather than a stream (and a presence lease) per partnership
+([realtime.md](realtime.md#everyone-one-stream-not-one-per-space)). A frame's
+`spaceId` says which board to reload; a resync, which says nothing, reloads
+them all. A **`read`** event is not fanned out: it moves a read receipt, which
+only a thread page shows, so it goes to the space's room alone. A device with
+an Everyone board open is counted as watching every partnership it shows, so
+it is not also pushed a message it is showing. An Everyone board of one
+partnership is that partnership's board, on its space's room.
 
 **Who is listening** is the one thing a room knows about its streams: the
 viewer's user id, from the session, and their push device id, if the browser
 has one. `publishMessagingEvent` returns the streams watching the `messages`
-topic only, so a push notification is not also sent to a device already
-showing the board, while a device that merely has a notebook page of the same
+topic only, in the space's room and the members' own, so a push notification
+is not also sent to a device already showing a board with that partnership on
+it, while a device that merely has a notebook page of the same
 partnership open still gets one. See
 [notifications.md](notifications.md#not-telling-a-device-what-it-is-showing).
 

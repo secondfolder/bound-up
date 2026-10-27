@@ -16,6 +16,7 @@ import { sealForSubmit } from '../sealed-forms';
 import { kinkListPartnerKind } from '../sealed-kinds/kink-list';
 import type { KinkListView } from '../types';
 import type { ListPayload } from './answers';
+import { kinkListPath } from './api';
 import { resolvedFor } from './partner';
 import { openPartnerCopy } from './partner-store.svelte';
 
@@ -49,7 +50,8 @@ async function syncOne(
 	if (!sealed.ok) {
 		return null;
 	}
-	const response = await tryFetch(`/api/kink-lists/${encodeURIComponent(view.scope)}`, {
+	// A shared copy's scope is its partnership's id, which is its space's.
+	const response = await tryFetch(kinkListPath(view.scope), {
 		method: 'PUT',
 		headers: { 'content-type': 'application/json' },
 		body: JSON.stringify({

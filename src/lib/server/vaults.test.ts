@@ -25,6 +25,7 @@ import {
 	vaultWraps
 } from './db/schema';
 import { restoreVaultAccess } from './messaging';
+import { soloSpaceFor } from './spaces';
 import { completeTask } from './tasks';
 import {
 	createVault,
@@ -65,19 +66,21 @@ beforeEach(async () => {
 
 afterEach(() => harness.close());
 
-const selfVault = (user: TestUser, recipient: string, vaultId = id(1)) =>
-	createVault(harness.db, user.id, {
-		kind: 'self',
+/** A user's solo space: where their own vault is, and what its requests name. */
+const soloOf = async (user: TestUser) =>
+	defined(await soloSpaceFor(harness.db, user.id), `${user.name}'s solo space`);
+
+const selfVault = async (user: TestUser, recipient: string, vaultId = id(1)) =>
+	createVault(harness.db, user.id, await soloOf(user), {
 		id: vaultId,
 		keyCheck: KEY_CHECK,
 		wraps: [{ userId: user.id, ciphertext: WRAP, forRecipient: recipient }]
 	});
 
+// A partnership's shared space has the partnership's id.
 const partnershipVault = (actor: TestUser, partnershipId: string, vaultId = id(2)) =>
-	createVault(harness.db, actor.id, {
-		kind: 'partnership',
+	createVault(harness.db, actor.id, partnershipId, {
 		id: vaultId,
-		partnershipId,
 		keyCheck: KEY_CHECK,
 		wraps: [
 			{ userId: ada.id, ciphertext: WRAP, forRecipient: adaKey },
@@ -92,6 +95,8 @@ describe('listVaultsForUser', () => {
 
 		const forAda = defined(await listVaultsForUser(harness.db, ada.id), 'listing');
 		expect(forAda.recipient).toBe(adaKey);
+		// What the device names in every request about its own vault.
+		expect(forAda.soloSpaceId).toBe(await soloOf(ada));
 		expect(forAda.self).toBeNull();
 		// The pending invite is not there: it has nobody to share a vault with.
 		expect(forAda.partnerships).toEqual([
@@ -173,10 +178,8 @@ describe('createVault', () => {
 		expect(await selfVault(ada, junKey)).toEqual({ ok: false, reason: 'invalid-wraps' });
 		const { id: partnershipId } = await createTestPartnership(harness.db, ada, jun);
 		expect(
-			await createVault(harness.db, ada.id, {
-				kind: 'partnership',
+			await createVault(harness.db, ada.id, partnershipId, {
 				id: id(2),
-				partnershipId,
 				keyCheck: KEY_CHECK,
 				wraps: [
 					{ userId: ada.id, ciphertext: WRAP, forRecipient: adaKey },
@@ -188,13 +191,44 @@ describe('createVault', () => {
 
 	it('refuses a self vault wrapped for someone else', async () => {
 		expect(
-			await createVault(harness.db, ada.id, {
-				kind: 'self',
+			await createVault(harness.db, ada.id, await soloOf(ada), {
 				id: id(1),
 				keyCheck: KEY_CHECK,
 				wraps: [{ userId: jun.id, ciphertext: WRAP, forRecipient: junKey }]
 			})
 		).toEqual({ ok: false, reason: 'invalid-wraps' });
+	});
+
+	/**
+	 * The space decides the kind of vault, not the body: there is no asking
+	 * for one kind in another's space, and no making a vault in a space you
+	 * are not in.
+	 */
+	it('makes the kind of vault its space has, and none in a space the actor is not in', async () => {
+		const { id: partnershipId } = await createTestPartnership(harness.db, ada, jun);
+		// One wrap, as for an own vault, in a shared space: not every member.
+		expect(
+			await createVault(harness.db, ada.id, partnershipId, {
+				id: id(1),
+				keyCheck: KEY_CHECK,
+				wraps: [{ userId: ada.id, ciphertext: WRAP, forRecipient: adaKey }]
+			})
+		).toEqual({ ok: false, reason: 'invalid-wraps' });
+		// Someone else's solo space reads like one that does not exist.
+		expect(
+			await createVault(harness.db, ada.id, await soloOf(jun), {
+				id: id(1),
+				keyCheck: KEY_CHECK,
+				wraps: [{ userId: ada.id, ciphertext: WRAP, forRecipient: adaKey }]
+			})
+		).toEqual({ ok: false, reason: 'not-found' });
+		expect(await harness.db.select({ id: vaults.id }).from(vaults)).toEqual([]);
+
+		expect(await selfVault(ada, adaKey)).toEqual({ ok: true });
+		const [row] = await harness.db
+			.select({ kind: vaults.kind, ownerUserId: vaults.ownerUserId, spaceId: vaults.spaceId })
+			.from(vaults);
+		expect(row).toEqual({ kind: 'self', ownerUserId: ada.id, spaceId: await soloOf(ada) });
 	});
 
 	it('will not create a vault for a partnership the actor is not in, or one still pending', async () => {
@@ -250,7 +284,8 @@ describe('putVaultWrap', () => {
 	it('lets a member re-wrap for a partner whose wrap is for a key they no longer have', async () => {
 		const fresh = await giveJunANewKey();
 		expect(
-			await putVaultWrap(harness.db, ada.id, id(2), {
+			await putVaultWrap(harness.db, ada.id, partnershipId, {
+				vaultId: id(2),
 				userId: jun.id,
 				ciphertext: OTHER_WRAP,
 				forRecipient: fresh
@@ -265,7 +300,8 @@ describe('putVaultWrap', () => {
 
 	it('will not replace a partner’s wrap that still opens', async () => {
 		expect(
-			await putVaultWrap(harness.db, ada.id, id(2), {
+			await putVaultWrap(harness.db, ada.id, partnershipId, {
+				vaultId: id(2),
 				userId: jun.id,
 				ciphertext: OTHER_WRAP,
 				forRecipient: junKey
@@ -275,7 +311,8 @@ describe('putVaultWrap', () => {
 
 	it('lets a member replace their own', async () => {
 		expect(
-			await putVaultWrap(harness.db, ada.id, id(2), {
+			await putVaultWrap(harness.db, ada.id, partnershipId, {
+				vaultId: id(2),
 				userId: ada.id,
 				ciphertext: OTHER_WRAP,
 				forRecipient: adaKey
@@ -286,7 +323,8 @@ describe('putVaultWrap', () => {
 	it('refuses a wrap for a recipient the member does not have', async () => {
 		await giveJunANewKey();
 		expect(
-			await putVaultWrap(harness.db, ada.id, id(2), {
+			await putVaultWrap(harness.db, ada.id, partnershipId, {
+				vaultId: id(2),
 				userId: jun.id,
 				ciphertext: OTHER_WRAP,
 				forRecipient: adaKey
@@ -296,21 +334,24 @@ describe('putVaultWrap', () => {
 
 	it('is not found for a stranger, a stranger as the target, or a vault that does not exist', async () => {
 		expect(
-			await putVaultWrap(harness.db, stranger.id, id(2), {
+			await putVaultWrap(harness.db, stranger.id, partnershipId, {
+				vaultId: id(2),
 				userId: stranger.id,
 				ciphertext: WRAP,
 				forRecipient: adaKey
 			})
 		).toEqual({ ok: false, reason: 'not-found' });
 		expect(
-			await putVaultWrap(harness.db, ada.id, id(2), {
+			await putVaultWrap(harness.db, ada.id, partnershipId, {
+				vaultId: id(2),
 				userId: stranger.id,
 				ciphertext: WRAP,
 				forRecipient: adaKey
 			})
 		).toEqual({ ok: false, reason: 'invalid-wrap' });
 		expect(
-			await putVaultWrap(harness.db, ada.id, id(99), {
+			await putVaultWrap(harness.db, ada.id, partnershipId, {
+				vaultId: id(99),
 				userId: ada.id,
 				ciphertext: WRAP,
 				forRecipient: adaKey
@@ -320,13 +361,51 @@ describe('putVaultWrap', () => {
 
 	it('will not let anyone but the owner touch a self vault', async () => {
 		await selfVault(jun, junKey, id(7));
+		const junsWrap = { vaultId: id(7), userId: jun.id, ciphertext: WRAP, forRecipient: junKey };
+		// Named by a space Ada is in that the vault is not: not found.
+		for (const spaceId of [partnershipId, await soloOf(ada)]) {
+			expect(await putVaultWrap(harness.db, ada.id, spaceId, junsWrap)).toEqual({
+				ok: false,
+				reason: 'not-found'
+			});
+		}
+		// Named by its own space, which Ada is not in: not found either.
+		expect(await putVaultWrap(harness.db, ada.id, await soloOf(jun), junsWrap)).toEqual({
+			ok: false,
+			reason: 'not-found'
+		});
+	});
+
+	/** A member of two spaces cannot reach one's vault through the other. */
+	it('is not found when the vault is not the named space’s', async () => {
+		await selfVault(ada, adaKey, id(8));
+		// The partnership's vault, named by Ada's solo space.
 		expect(
-			await putVaultWrap(harness.db, ada.id, id(7), {
-				userId: jun.id,
-				ciphertext: WRAP,
-				forRecipient: junKey
+			await putVaultWrap(harness.db, ada.id, await soloOf(ada), {
+				vaultId: id(2),
+				userId: ada.id,
+				ciphertext: OTHER_WRAP,
+				forRecipient: adaKey
 			})
 		).toEqual({ ok: false, reason: 'not-found' });
+		// Ada's own vault, named by the partnership's space.
+		expect(
+			await putVaultWrap(harness.db, ada.id, partnershipId, {
+				vaultId: id(8),
+				userId: ada.id,
+				ciphertext: OTHER_WRAP,
+				forRecipient: adaKey
+			})
+		).toEqual({ ok: false, reason: 'not-found' });
+		// And by its own space, it is Ada's to rewrap.
+		expect(
+			await putVaultWrap(harness.db, ada.id, await soloOf(ada), {
+				vaultId: id(8),
+				userId: ada.id,
+				ciphertext: OTHER_WRAP,
+				forRecipient: adaKey
+			})
+		).toEqual({ ok: true });
 	});
 });
 
@@ -373,7 +452,11 @@ describe('escrow', () => {
 		expect(await issueEscrowShare(harness.db, Secret, ada.id, escrowId)).toBe(
 			await escrowShare(Secret, escrowId)
 		);
-		await putEscrow(harness.db, ada.id, { id: escrowId, partnershipId, ciphertext: WRAP });
+		await putEscrow(harness.db, ada.id, {
+			id: escrowId,
+			heldInSpaceId: partnershipId,
+			ciphertext: WRAP
+		});
 		// A stolen session plus a willing partner must not be enough.
 		expect(await issueEscrowShare(harness.db, Secret, ada.id, escrowId)).toBeNull();
 		// And nobody without an own vault gets one at all.
@@ -382,10 +465,22 @@ describe('escrow', () => {
 
 	it('is held only with a partner the user really has, one per partner', async () => {
 		expect(
-			await putEscrow(harness.db, stranger.id, { id: id(30), partnershipId, ciphertext: WRAP })
+			await putEscrow(harness.db, stranger.id, {
+				id: id(30),
+				heldInSpaceId: partnershipId,
+				ciphertext: WRAP
+			})
 		).toBe(false);
-		await putEscrow(harness.db, ada.id, { id: id(30), partnershipId, ciphertext: WRAP });
-		await putEscrow(harness.db, ada.id, { id: id(32), partnershipId, ciphertext: OTHER_WRAP });
+		await putEscrow(harness.db, ada.id, {
+			id: id(30),
+			heldInSpaceId: partnershipId,
+			ciphertext: WRAP
+		});
+		await putEscrow(harness.db, ada.id, {
+			id: id(32),
+			heldInSpaceId: partnershipId,
+			ciphertext: OTHER_WRAP
+		});
 		const rows = await harness.db.select({ id: vaultEscrows.id }).from(vaultEscrows);
 		expect(rows).toEqual([{ id: id(32) }]);
 		const listing = defined(await listVaultsForUser(harness.db, ada.id), 'listing');
@@ -395,7 +490,11 @@ describe('escrow', () => {
 	describe('release', () => {
 		/** Ada's escrow with Jun, and Jun's relay of it, as a restore leaves them. */
 		async function relayed() {
-			await putEscrow(harness.db, ada.id, { id: id(30), partnershipId, ciphertext: WRAP });
+			await putEscrow(harness.db, ada.id, {
+				id: id(30),
+				heldInSpaceId: partnershipId,
+				ciphertext: WRAP
+			});
 			const request = await completedRecovery();
 			const restored = await restoreVaultAccess(harness.db, {
 				partnershipId,
@@ -441,7 +540,11 @@ describe('escrow', () => {
 			expect(await escrowed()).toEqual([]);
 
 			// Its replacement, under a new id, counts again.
-			await putEscrow(harness.db, ada.id, { id: id(33), partnershipId, ciphertext: OTHER_WRAP });
+			await putEscrow(harness.db, ada.id, {
+				id: id(33),
+				heldInSpaceId: partnershipId,
+				ciphertext: OTHER_WRAP
+			});
 			expect(await escrowed()).toEqual([partnershipId]);
 		});
 
@@ -460,10 +563,8 @@ describe('escrow', () => {
 			const cas = await createTestUser(harness.db, { name: 'Cas' });
 			const casKey = (await createTestUserKeys(harness.db, cas)).recipient;
 			const other = await createTestPartnership(harness.db, ada, cas);
-			await createVault(harness.db, ada.id, {
-				kind: 'partnership',
+			await createVault(harness.db, ada.id, other.id, {
 				id: id(40),
-				partnershipId: other.id,
 				keyCheck: KEY_CHECK,
 				wraps: [
 					{ userId: ada.id, ciphertext: WRAP, forRecipient: adaKey },
@@ -472,7 +573,7 @@ describe('escrow', () => {
 			});
 			await putEscrow(harness.db, ada.id, {
 				id: id(41),
-				partnershipId: other.id,
+				heldInSpaceId: other.id,
 				ciphertext: WRAP
 			});
 			const request = await completedRecovery();
@@ -522,7 +623,11 @@ describe('escrow', () => {
 		});
 
 		it('waits while an escrow could still bring it back, and not after', async () => {
-			await putEscrow(harness.db, ada.id, { id: id(30), partnershipId, ciphertext: WRAP });
+			await putEscrow(harness.db, ada.id, {
+				id: id(30),
+				heldInSpaceId: partnershipId,
+				ciphertext: WRAP
+			});
 			const request = await completedRecovery();
 			await finish(request.recoveryRequestId);
 			await loseAdasKey();

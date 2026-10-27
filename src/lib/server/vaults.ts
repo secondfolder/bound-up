@@ -1,6 +1,6 @@
 import { and, desc, eq, gt, isNotNull, notExists, or } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
-import type { CreateVaultInput, VaultWrapInput } from '../schemas/vault';
+import type { CreateVaultInput, PutVaultWrapInput, VaultWrapInput } from '../schemas/vault';
 import type { VaultListingView, VaultWrapView } from '../types';
 import { ESCROW_RELEASE_WINDOW_MS, ESCROW_SHARE_PURPOSE } from '../vault';
 import type { Db } from './db';
@@ -19,7 +19,7 @@ import {
 } from './db/schema';
 import { keyedHash } from './keyed-hash';
 import { selfVaultIdFor } from './sealed-content';
-import { isSpaceMember, soloSpaceIdOf } from './spaces';
+import { isSpaceMember, requireSpaceMember, soloSpaceFor } from './spaces';
 
 /**
  * Every database access for vaults. See docs/encryption.md, "Vaults".
@@ -43,19 +43,21 @@ function wrapOrNull(ciphertext: string | null, forRecipient: string | null): Vau
 
 /**
  * Every vault this user can reach, what they hold of each, and what is
- * missing. Three reads, run together; nothing here is per-partnership, so a
+ * missing. Four reads, run together; nothing here is per-partnership, so a
  * user with several partners costs the same.
  *
- * Null when the user has no keys at all, which every account has from signup,
- * so it is broken data rather than a state.
+ * Null when the user has no keys or no solo space, which every account has
+ * from signup, so it is broken data rather than a state.
  */
 export async function listVaultsForUser(db: Db, userId: string): Promise<VaultListingView | null> {
-	const [keysRows, selfRows, partnershipRows] = await Promise.all([
+	const [keysRows, soloSpaceId, selfRows, partnershipRows] = await Promise.all([
 		db
 			.select({ recipient: userKeys.recipient })
 			.from(userKeys)
 			.where(eq(userKeys.userId, userId))
 			.limit(1),
+		// What the device names in every request about its own vault.
+		soloSpaceFor(db, userId),
 		db
 			.select({
 				id: vaults.id,
@@ -131,7 +133,9 @@ export async function listVaultsForUser(db: Db, userId: string): Promise<VaultLi
 	]);
 
 	const [keys] = keysRows;
-	if (!keys) {
+	// No solo space is broken data just as no keys is: the trigger that makes
+	// it runs for every account however it is inserted (docs/spaces.md).
+	if (!(keys && soloSpaceId)) {
 		return null;
 	}
 	const [self] = selfRows;
@@ -171,6 +175,7 @@ export async function listVaultsForUser(db: Db, userId: string): Promise<VaultLi
 
 	return {
 		recipient: keys.recipient,
+		soloSpaceId,
 		self: self
 			? {
 					id: self.id,
@@ -207,15 +212,42 @@ export async function listVaultsForUser(db: Db, userId: string): Promise<VaultLi
 	};
 }
 
+type VaultScope = { kind: 'self' } | { kind: 'partnership'; partnershipId: string };
+
+/**
+ * Which vault scope a space is, for `actorId`: their own vault in their solo
+ * space, the partnership's in a shared one (which has the partnership's id).
+ * Null when they are not in the space, which the caller answers exactly like a
+ * space that does not exist, so a refusal never confirms an id is real.
+ */
+async function scopeOfSpace(db: Db, spaceId: string, actorId: string): Promise<VaultScope | null> {
+	const space = await requireSpaceMember(db, spaceId, actorId);
+	if (!space) {
+		return null;
+	}
+	return space.kind === 'solo' ? { kind: 'self' } : { kind: 'partnership', partnershipId: spaceId };
+}
+
+/**
+ * Whether `spaceId` is `userId`'s own solo space: the one space whose vault
+ * the escrow endpoints and deleting a lost vault act on. A shared space, or
+ * one they are not in, is false, and the routes answer it with a 404.
+ */
+export async function isOwnSoloSpace(db: Db, spaceId: string, userId: string): Promise<boolean> {
+	return (await requireSpaceMember(db, spaceId, userId))?.kind === 'solo';
+}
+
 /**
  * The members of a vault's scope and the recipient each has now, if `actorId`
  * is one of them. Null otherwise — the caller 404s, so a stranger cannot tell
- * a vault or partnership id is real.
+ * a vault or partnership id is real. A shared space's members are checked here
+ * as well as by `scopeOfSpace`, because a partnership's vault also needs it
+ * accepted, with both members' keys.
  */
 async function membersFor(
 	db: Db,
 	actorId: string,
-	scope: { kind: 'self' } | { kind: 'partnership'; partnershipId: string }
+	scope: VaultScope
 ): Promise<Map<string, string> | null> {
 	if (scope.kind === 'self') {
 		const [row] = await db
@@ -268,7 +300,11 @@ export type CreateVaultResult =
 	| { ok: false; reason: 'not-found' | 'invalid-wraps' | 'exists' };
 
 /**
- * Creates a vault with a wrap for every member, in one batch.
+ * Creates a vault for a space, with a wrap for every member, in one batch.
+ *
+ * The space decides what kind of vault it is: the actor's own in their solo
+ * space, the partnership's in a shared one. The body names no scope, so a
+ * request cannot ask for one vault kind in another kind's space.
  *
  * The vault and its wraps go in together because a vault nobody can open is
  * worse than none: every device would find it, fail to open it, and have no
@@ -282,12 +318,13 @@ export type CreateVaultResult =
 export async function createVault(
 	db: Db,
 	actorId: string,
+	spaceId: string,
 	input: CreateVaultInput
 ): Promise<CreateVaultResult> {
-	const scope =
-		input.kind === 'self'
-			? ({ kind: 'self' } as const)
-			: ({ kind: 'partnership', partnershipId: input.partnershipId } as const);
+	const scope = await scopeOfSpace(db, spaceId, actorId);
+	if (!scope) {
+		return { ok: false, reason: 'not-found' };
+	}
 	const members = await membersFor(db, actorId, scope);
 	if (!members) {
 		return { ok: false, reason: 'not-found' };
@@ -300,11 +337,10 @@ export async function createVault(
 		await db.batch([
 			db.insert(vaults).values({
 				id: input.id,
-				kind: input.kind,
-				ownerUserId: input.kind === 'self' ? actorId : null,
-				partnershipId: input.kind === 'partnership' ? input.partnershipId : null,
-				// A partnership's space has the partnership's id.
-				spaceId: input.kind === 'self' ? soloSpaceIdOf(actorId) : input.partnershipId,
+				kind: scope.kind,
+				ownerUserId: scope.kind === 'self' ? actorId : null,
+				partnershipId: scope.kind === 'partnership' ? scope.partnershipId : null,
+				spaceId,
 				keyCheck: input.keyCheck
 			}),
 			db.insert(vaultWraps).values(
@@ -323,9 +359,9 @@ export async function createVault(
 			.where(
 				or(
 					eq(vaults.id, input.id),
-					input.kind === 'self'
+					scope.kind === 'self'
 						? eq(vaults.ownerUserId, actorId)
-						: eq(vaults.partnershipId, input.partnershipId)
+						: eq(vaults.partnershipId, scope.partnershipId)
 				)
 			)
 			.limit(1);
@@ -351,35 +387,38 @@ export type PutVaultWrapResult =
  * break it — a device bug, or a partner's, would otherwise be one request
  * from locking someone out of their own vault. A member may always replace
  * their own.
+ *
+ * The vault must be the named space's: a member of one space cannot reach
+ * another's vault by its id. Matched on the vault's own scope columns, as
+ * `vaultIdForSpace` does, rather than its later `space_id`.
  */
 export async function putVaultWrap(
 	db: Db,
 	actorId: string,
-	vaultId: string,
-	wrap: VaultWrapInput
+	spaceId: string,
+	input: PutVaultWrapInput
 ): Promise<PutVaultWrapResult> {
+	const { vaultId, ...wrap } = input;
+	const scope = await scopeOfSpace(db, spaceId, actorId);
+	if (!scope) {
+		return { ok: false, reason: 'not-found' };
+	}
 	const [vault] = await db
-		.select({
-			kind: vaults.kind,
-			partnershipId: vaults.partnershipId,
-			ownerUserId: vaults.ownerUserId
-		})
+		.select({ id: vaults.id })
 		.from(vaults)
-		.where(eq(vaults.id, vaultId))
+		.where(
+			and(
+				eq(vaults.id, vaultId),
+				scope.kind === 'self'
+					? eq(vaults.ownerUserId, actorId)
+					: eq(vaults.partnershipId, scope.partnershipId)
+			)
+		)
 		.limit(1);
 	if (!vault) {
 		return { ok: false, reason: 'not-found' };
 	}
-	if (vault.kind === 'self' && vault.ownerUserId !== actorId) {
-		return { ok: false, reason: 'not-found' };
-	}
-	const members = await membersFor(
-		db,
-		actorId,
-		vault.kind === 'self'
-			? { kind: 'self' }
-			: { kind: 'partnership', partnershipId: vault.partnershipId ?? '' }
-	);
+	const members = await membersFor(db, actorId, scope);
 	if (!members) {
 		return { ok: false, reason: 'not-found' };
 	}
@@ -460,22 +499,27 @@ export async function issueEscrowShare(
  * Stores the user's own vault in escrow with one partner, replacing any
  * escrow already held with them. Only for an accepted partnership the user is
  * in, into their own vault.
+ *
+ * `heldInSpaceId` is the shared space of the partner holding it, which has
+ * the partnership's id, so it is stored as both the escrow's partnership and
+ * its space.
  */
 export async function putEscrow(
 	db: Db,
 	userId: string,
-	input: { id: string; partnershipId: string; ciphertext: string }
+	input: { id: string; heldInSpaceId: string; ciphertext: string }
 ): Promise<boolean> {
 	const vaultId = await selfVaultIdFor(db, userId);
 	if (!vaultId) {
 		return false;
 	}
+	const partnershipId = input.heldInSpaceId;
 	const [partnership] = await db
 		.select({ id: partnerships.id })
 		.from(partnerships)
 		.where(
 			and(
-				eq(partnerships.id, input.partnershipId),
+				eq(partnerships.id, partnershipId),
 				eq(partnerships.status, 'accepted'),
 				isSpaceMember(partnerships.id, userId)
 			)
@@ -487,10 +531,14 @@ export async function putEscrow(
 	await db.batch([
 		db
 			.delete(vaultEscrows)
-			.where(
-				and(eq(vaultEscrows.vaultId, vaultId), eq(vaultEscrows.partnershipId, input.partnershipId))
-			),
-		db.insert(vaultEscrows).values({ ...input, vaultId, spaceId: input.partnershipId })
+			.where(and(eq(vaultEscrows.vaultId, vaultId), eq(vaultEscrows.partnershipId, partnershipId))),
+		db.insert(vaultEscrows).values({
+			id: input.id,
+			ciphertext: input.ciphertext,
+			vaultId,
+			partnershipId,
+			spaceId: partnershipId
+		})
 	]);
 	return true;
 }

@@ -25,7 +25,8 @@
 	import type { ItemTarget } from '$lib/item-target';
 	import { newlyArrived } from '$lib/messaging';
 	import { type ComposedMessage, sendMessage } from '$lib/messaging/client';
-	import { watchPartnership } from '$lib/messaging/live';
+	import { watchMessages } from '$lib/messaging/live';
+	import { spaceRoom, userRoom } from '$lib/realtime/live';
 	import { spaceColourValue } from '$lib/space-colours';
 	import type { BoardPartnershipView, ContextSpaceView } from '$lib/types';
 	import type { PageData } from './$types';
@@ -72,15 +73,15 @@
 	});
 
 	/**
-	 * The live feed, for as long as a board of one partnership is on screen.
+	 * The live feed, for as long as a board is on screen.
 	 *
-	 * The callback is a plain `invalidate` of this board's own key, so an event
+	 * The callback is a plain `invalidate` of a board's own key, so an event
 	 * re-runs the load through the same authorised path as a navigation — the
 	 * event itself carries no content and is not trusted for anything beyond
 	 * "something changed". It is also called speculatively on reconnect, which
 	 * is why it has to be idempotent.
 	 *
-	 * The effect depends on `liveId`, a `$derived` of a **string**, and not on
+	 * The effect depends on `liveRoom` and `boardIds`, `$derived` **strings**, and not on
 	 * `data` — that detail is the difference between one long-lived stream and
 	 * one per message. `invalidate()` reassigns the `data` prop, so an effect
 	 * that read `data` directly re-ran on every arriving event and tore the
@@ -99,15 +100,25 @@
 	 * the board does not show, and reloading for it would cost a board load
 	 * every time either partner opens a thread.
 	 *
-	 * An Everyone board of several partnerships opens no stream at all: one
-	 * per partnership is a Durable Object request each, and their presence
-	 * leases, for a page that is mostly glanced at (docs/realtime.md). It
-	 * refreshes when it is looked at again instead — below.
+	 * An Everyone board of several partnerships opens one stream too, on the
+	 * viewer's own room (`user:<id>`), where every partnership fans its board
+	 * events out: one stream however many partners, rather than one per
+	 * partnership with a presence lease each (docs/realtime.md, "Everyone").
+	 * Its frames say which partnership's space changed, so only that board
+	 * reloads; a resync, which says nothing, reloads them all.
 	 */
-	const liveId = $derived(only?.id ?? null);
+	const liveRoom = $derived.by(() => {
+		if (only) {
+			return spaceRoom(only.id);
+		}
+		return several ? userRoom(user.id) : null;
+	});
+	/** The boards shown, as one string, for a resync to reload them all. */
+	const boardIds = $derived(boards.map((board) => board.id).join(' '));
 	$effect(() => {
-		const id = liveId;
-		if (!id) {
+		const room = liveRoom;
+		const ids = boardIds;
+		if (!room) {
 			return;
 		}
 		// Whether the board is still here when a refresh it started finishes.
@@ -116,14 +127,16 @@
 		// the board had gone, read `data.threads` from a destroyed component,
 		// found it undefined, and threw "after is not iterable".
 		let mounted = true;
-		const stop = watchPartnership({
-			partnershipId: id,
+		const stop = watchMessages({
+			room,
 			onChange: (event) => {
 				if (event?.kind === 'read') {
 					return;
 				}
+				const shown = ids.split(' ');
+				const changed = event?.spaceId && shown.includes(event.spaceId) ? [event.spaceId] : shown;
 				const before = data.threads;
-				void invalidate(`messages:board:${id}`).then(() => {
+				void Promise.all(changed.map((id) => invalidate(`messages:board:${id}`))).then(() => {
 					if (mounted) {
 						void highlight(newlyArrived(before, data.threads));
 					}
@@ -133,39 +146,6 @@
 		return () => {
 			mounted = false;
 			stop();
-		};
-	});
-
-	/**
-	 * Everyone, over several partnerships: not live, but never stale for
-	 * long. Coming back to the tab, or to the window, reloads the board and
-	 * rings whatever arrived meanwhile. Keyed on a string of the ids, for the
-	 * reason the stream above is.
-	 */
-	const refreshedIds = $derived(several ? boards.map((board) => board.id).join(' ') : '');
-	$effect(() => {
-		const ids = refreshedIds;
-		if (!ids) {
-			return;
-		}
-		let mounted = true;
-		const refresh = () => {
-			if (document.visibilityState !== 'visible') {
-				return;
-			}
-			const before = data.threads;
-			void Promise.all(ids.split(' ').map((id) => invalidate(`messages:board:${id}`))).then(() => {
-				if (mounted) {
-					void highlight(newlyArrived(before, data.threads));
-				}
-			});
-		};
-		document.addEventListener('visibilitychange', refresh);
-		addEventListener('focus', refresh);
-		return () => {
-			mounted = false;
-			document.removeEventListener('visibilitychange', refresh);
-			removeEventListener('focus', refresh);
 		};
 	});
 

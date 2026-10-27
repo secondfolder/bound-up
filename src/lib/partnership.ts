@@ -11,7 +11,17 @@
  * component, where they only decide what to render.
  */
 
-/** Who may change the names, the label, and the control setting itself. */
+import { managesSpace, type SpaceMember } from './spaces';
+
+/**
+ * Who an invite offers control to, once accepted: stored against the
+ * permanent roles as `partnerships.control`.
+ *
+ * Only the invite's offer. Once a partnership is accepted, who manages it is
+ * each member's `space_members.can_manage`, and every rule reads that
+ * (docs/partners.md, "Control"); the column is read only while the invite is
+ * pending and at the moment it is accepted.
+ */
 export type PartnershipControl = 'inviter' | 'invitee' | 'both';
 
 export type PartnershipStatus = 'pending' | 'accepted';
@@ -72,7 +82,10 @@ export type PartnershipRecord = {
 	status: PartnershipStatus;
 	inviterId: string;
 	inviteeId: string | null;
+	/** The invite's offer; see `PartnershipControl`. Not a permission once accepted. */
 	control: PartnershipControl;
+	/** The partnership's space's members and who manages it: what every permission reads. */
+	members: SpaceMember[];
 	namesCiphertext: string | null;
 	namesVaultId: string | null;
 	namesPayloadVersion: number | null;
@@ -105,7 +118,10 @@ export type PartnershipView = {
 	id: string;
 	status: PartnershipStatus;
 	role: PartnershipRole;
-	control: PartnershipControl;
+	/** Who manages the partnership's space: the inviter alone while it is an invite. */
+	members: SpaceMember[];
+	/** What a pending invite offers once accepted; null once it has been. */
+	offer: PartnershipControl | null;
 	names: PartnerNamesSource;
 	/** Null while the invite is still pending — there is no other person yet. */
 	counterpart: PartnershipCounterpart | null;
@@ -128,20 +144,27 @@ export function roleOf(
 }
 
 /**
- * True when `userId` may edit the shared settings.
+ * True when `userId` may edit the shared settings: they manage the
+ * partnership's space (`can_manage`). A pending invite's only member is its
+ * inviter, who manages it when the offer keeps control with them.
  *
  * Note this is NOT the rule for disconnecting: leaving a link is never gated,
  * or a user handed control away could not get out. See `canDisconnect`.
  */
 export function canEditPartnership(
-	record: Pick<PartnershipRecord, 'control' | 'inviterId' | 'inviteeId'>,
+	record: Pick<PartnershipRecord, 'members'>,
 	userId: string
 ): boolean {
-	const role = roleOf(record, userId);
-	if (!role) {
-		return false;
-	}
-	return record.control === 'both' || record.control === role;
+	return managesSpace({ kind: 'shared', members: record.members }, userId);
+}
+
+/**
+ * Whether an invite's offer gives `role` control once it is accepted. The
+ * invite's own rule, for before there is a member to ask: what the invitee
+ * may change while accepting, and who manages the space the moment they do.
+ */
+export function offerGives(control: PartnershipControl, role: PartnershipRole): boolean {
+	return control === 'both' || control === role;
 }
 
 /** Either member may always disconnect, whoever holds control. */
@@ -216,7 +239,8 @@ export function viewPartnership(
 		id: record.id,
 		status: record.status,
 		role,
-		control: record.control,
+		members: record.members,
+		offer: record.status === 'pending' ? record.control : null,
 		names: namesSourceFor(record, role),
 		counterpart,
 		canEdit: canEditPartnership(record, userId)
@@ -241,7 +265,31 @@ export function controlFromAnswer(
 	return answer === 'me' ? answerRole : otherRole;
 }
 
-/** The inverse of `controlFromAnswer`, for pre-filling an edit form. */
+/**
+ * The "who's in control?" answer as `viewerId` would give it now, for
+ * pre-filling a form: from the offer while it is an invite, and from who
+ * manages the space once it is not.
+ */
+export function controlAnswerFor(
+	view: Pick<PartnershipView, 'offer' | 'members' | 'role'>,
+	viewerId: string
+): ControlAnswer {
+	if (view.offer !== null) {
+		return answerFromControl(view.offer, view.role);
+	}
+	const viewerManages = view.members.some(
+		(member) => member.userId === viewerId && member.canManage
+	);
+	const othersManage = view.members.some(
+		(member) => member.userId !== viewerId && member.canManage
+	);
+	if (viewerManages && othersManage) {
+		return 'mix';
+	}
+	return viewerManages ? 'me' : 'them';
+}
+
+/** The inverse of `controlFromAnswer`, for an invite's offer. */
 export function answerFromControl(
 	control: PartnershipControl,
 	answerRole: PartnershipRole

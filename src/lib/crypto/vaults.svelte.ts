@@ -121,6 +121,20 @@ async function request(path: string, init?: RequestInit): Promise<Response> {
 }
 
 /**
+ * Where a space's vault is reached: `/api/spaces/[spaceId]/vault`, and what
+ * hangs off it. Every vault request names the space, never a vault id or
+ * `self` alone, so the server checks membership of the space first and then
+ * that the vault is that space's (docs/encryption.md, "Vaults").
+ */
+function spaceVaultPath(
+	spaceId: string,
+	rest?: 'wraps' | 'escrows' | 'escrow-share' | 'escrow-release'
+): string {
+	const base = `/api/spaces/${encodeURIComponent(spaceId)}/vault`;
+	return rest ? `${base}/${rest}` : base;
+}
+
+/**
  * Opens every vault this user can reach, creating what is missing.
  *
  * Runs once per user per page load; a second call while one is in flight joins
@@ -149,10 +163,12 @@ export async function initialiseVaults(
 			}
 			return (await response.json()) as VaultListingView;
 		},
-		async create(vault) {
-			const response = await request('/api/vaults', {
+		async create(spaceId, vault) {
+			// `kind` stays on the device: the server works it out from the space.
+			const { id, keyCheck, wraps } = vault;
+			const response = await request(spaceVaultPath(spaceId), {
 				method: 'POST',
-				body: JSON.stringify(vault)
+				body: JSON.stringify({ id, keyCheck, wraps })
 			});
 			if (response.status === 409) {
 				return 'exists';
@@ -162,10 +178,10 @@ export async function initialiseVaults(
 			}
 			return 'created';
 		},
-		async putWrap(vaultId, wrap) {
-			const response = await request(`/api/vaults/${vaultId}/wraps`, {
+		async putWrap(spaceId, vaultId, wrap) {
+			const response = await request(spaceVaultPath(spaceId, 'wraps'), {
 				method: 'PUT',
-				body: JSON.stringify(wrap)
+				body: JSON.stringify({ vaultId, ...wrap })
 			});
 			// 409: the partner's own device got there first. Nothing to do.
 			if (!response.ok && response.status !== 409) {
@@ -173,8 +189,8 @@ export async function initialiseVaults(
 			}
 		},
 		escrow: {
-			async issueShare(escrowId) {
-				const response = await request('/api/vaults/self/escrow-share', {
+			async issueShare(soloSpaceId, escrowId) {
+				const response = await request(spaceVaultPath(soloSpaceId, 'escrow-share'), {
 					method: 'POST',
 					body: JSON.stringify({ escrowId })
 				});
@@ -183,8 +199,8 @@ export async function initialiseVaults(
 				}
 				return ((await response.json()) as { share: string }).share;
 			},
-			async put(escrow) {
-				const response = await request('/api/vaults/self/escrows', {
+			async put(soloSpaceId, escrow) {
+				const response = await request(spaceVaultPath(soloSpaceId, 'escrows'), {
 					method: 'PUT',
 					body: JSON.stringify(escrow)
 				});
@@ -192,8 +208,10 @@ export async function initialiseVaults(
 					throw new Error(`Could not store an escrow (${response.status})`);
 				}
 			},
-			async release() {
-				const response = await request('/api/vaults/self/escrow-release', { method: 'POST' });
+			async release(soloSpaceId) {
+				const response = await request(spaceVaultPath(soloSpaceId, 'escrow-release'), {
+					method: 'POST'
+				});
 				if (!response.ok) {
 					throw new Error(`Could not ask for the escrow back (${response.status})`);
 				}
@@ -203,14 +221,16 @@ export async function initialiseVaults(
 					}
 				).relays;
 			},
-			async deleteAll() {
-				const response = await request('/api/vaults/self/escrows', { method: 'DELETE' });
+			async deleteAll(soloSpaceId) {
+				const response = await request(spaceVaultPath(soloSpaceId, 'escrows'), {
+					method: 'DELETE'
+				});
 				if (!response.ok) {
 					throw new Error(`Could not replace escrows (${response.status})`);
 				}
 			},
-			async deleteLostSelfVault() {
-				const response = await request('/api/vaults/self', { method: 'DELETE' });
+			async deleteLostSelfVault(soloSpaceId) {
+				const response = await request(spaceVaultPath(soloSpaceId), { method: 'DELETE' });
 				return response.ok;
 			}
 		},

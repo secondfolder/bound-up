@@ -100,16 +100,86 @@ export async function storeContext(context: AppContext): Promise<boolean> {
 	return true;
 }
 
+/** Switches under way: a count, so a second pick before the first lands keeps the page held. */
+let switches = $state(0);
+
 /**
  * Switches this device's context and re-runs every load that depends on it,
  * in place: same page, new filter. False when the server did not take it.
+ * The page is held (`holdWhileSwitching`) from the first moment to the last,
+ * a refusal included.
  */
 export async function switchContext(context: AppContext): Promise<boolean> {
-	if (!(await storeContext(context))) {
-		return false;
+	switches += 1;
+	try {
+		if (!(await storeContext(context))) {
+			return false;
+		}
+		await invalidate(CONTEXT_DEPENDENCY);
+		return true;
+	} finally {
+		switches -= 1;
 	}
-	await invalidate(CONTEXT_DEPENDENCY);
-	return true;
+}
+
+/** Marks what the app shell holds, for its dim and for nothing else. */
+export const HELD_ATTRIBUTE = 'data-context-held';
+
+/**
+ * Holds the page still while a switch is under way: `{@attach
+ * holdWhileSwitching}` on the app shell's `<main>`. See docs/contexts.md,
+ * "Picking".
+ *
+ * The switcher shows the picked context at once, but the page under it is
+ * the old context's until the re-run loads arrive, and a quick tap on a card
+ * there acted on what it showed: Today's tasks card in Everyone, tapped just
+ * after picking Me, stored Everyone again and opened the tasks in it. So
+ * until the switch settles, `<main>` is `aria-busy` and everything in it but
+ * the switcher is `inert` — out of reach of a pointer, the keyboard and
+ * assistive tech alike, which a transparent overlay or a click guard would
+ * not be. Holding back the new label instead would not have closed the race:
+ * the stale page would still be live, its clicks racing the switch's own
+ * request for the cookie.
+ *
+ * The switcher stays live because it is inside `<main>` (in the page's
+ * header) and its own close puts focus back on the pill: under an inert
+ * ancestor that focus would fall to `<body>`. `inert` cannot be undone by a
+ * descendant, so rather than holding `<main>` itself this holds each sibling
+ * along the way down to the switcher. What a page had made inert already is
+ * left as it was, so letting go does not wake it.
+ *
+ * Reads the switch count, so the attachment re-runs, holding or letting go,
+ * as it changes.
+ */
+export function holdWhileSwitching(main: HTMLElement): (() => void) | undefined {
+	if (switches === 0) {
+		return;
+	}
+	const keep = [...main.querySelectorAll('[data-context-switcher]')];
+	const held: HTMLElement[] = [];
+	const holdWithin = (parent: Element) => {
+		for (const child of parent.children) {
+			if (keep.includes(child)) {
+				continue;
+			}
+			if (keep.some((kept) => child.contains(kept))) {
+				holdWithin(child);
+			} else if (child instanceof HTMLElement && !child.inert) {
+				child.inert = true;
+				child.setAttribute(HELD_ATTRIBUTE, '');
+				held.push(child);
+			}
+		}
+	};
+	holdWithin(main);
+	main.setAttribute('aria-busy', 'true');
+	return () => {
+		main.removeAttribute('aria-busy');
+		for (const element of held) {
+			element.inert = false;
+			element.removeAttribute(HELD_ATTRIBUTE);
+		}
+	};
 }
 
 /**

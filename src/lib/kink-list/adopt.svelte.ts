@@ -16,29 +16,31 @@ import type { KinkListView } from '../types';
 import { AccountKinkList } from './account-store.svelte';
 import { adopted } from './adopted.svelte';
 import { answeredCount } from './answers';
+import { kinkListPath } from './api';
 import { clearDeviceList, readDeviceList } from './device-store.svelte';
 
 let running: Promise<void> | null = null;
 
-export function adoptDeviceList(): Promise<void> {
-	running ??= adopt().finally(() => {
+/** `soloSpaceId` is the signed-in person's own space, where their list is saved. */
+export function adoptDeviceList(soloSpaceId: string): Promise<void> {
+	running ??= adopt(soloSpaceId).finally(() => {
 		running = null;
 	});
 	return running;
 }
 
-async function adopt(): Promise<void> {
+async function adopt(soloSpaceId: string): Promise<void> {
 	const device = readDeviceList();
 	if (!device) {
 		return;
 	}
 	const count = answeredCount(device);
-	const response = await tryFetch('/api/kink-lists/self');
+	const response = await tryFetch(kinkListPath(soloSpaceId));
 	if (!response?.ok) {
 		return;
 	}
 	const { list: view } = (await response.json()) as { list: KinkListView | null };
-	const store = new AccountKinkList(view);
+	const store = new AccountKinkList(soloSpaceId, view);
 	await store.open();
 	if (store.state !== 'ready') {
 		// A list this device cannot open is not overwritten; the device copy waits.

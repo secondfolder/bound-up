@@ -1,8 +1,11 @@
 import { entryTopic, NOTEBOOK_LIST_TOPIC, type NotebookFrame } from '../notebook';
+import type { Db } from './db';
+import { publishToSpace } from './realtime/fan-out';
 import type { Notifier, RoomKey } from './realtime/index';
 
 /**
- * The notebook's two realtime topics, in the room the entry's scope has.
+ * The notebook's two realtime topics: an entry's, in its space's room, and
+ * the list's, in its space's room and each member's own.
  *
  * An entry's topic carries its edits and cursors live, as sealed records
  * the server cannot open, because co-editing cannot wait for a refetch per
@@ -20,7 +23,17 @@ export function publishEntryFrame(
 	return notifier.publish(room, entryTopic(entryId), JSON.stringify(frame));
 }
 
-/** Tells any open list that an entry came, went, or changed who can see it. */
-export function publishListChange(notifier: Notifier, room: RoomKey): Promise<unknown> {
-	return notifier.publish(room, NOTEBOOK_LIST_TOPIC, JSON.stringify({ kind: 'changed' }));
+/**
+ * Tells any open list that an entry in `spaceId` came, went, or changed who
+ * can see it: a list of that space in the space's room, and an Everyone list
+ * in each member's own room (docs/realtime.md, "Everyone").
+ */
+export function publishListChange(notifier: Notifier, db: Db, spaceId: string): Promise<unknown> {
+	return publishToSpace(
+		notifier,
+		db,
+		spaceId,
+		NOTEBOOK_LIST_TOPIC,
+		JSON.stringify({ kind: 'changed' })
+	);
 }

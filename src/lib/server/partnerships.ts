@@ -1,9 +1,9 @@
 import { and, desc, eq, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import {
-	canEditPartnership,
 	INVITE_TTL_MS,
 	isInviteUsable,
+	offerGives,
 	type PartnerNamesSource,
 	type PartnershipControl,
 	type PartnershipRecord,
@@ -12,6 +12,7 @@ import {
 	viewPartnership
 } from '../partnership';
 import { partnershipInviteKind, partnershipNamesKind } from '../sealed-kinds/partnerships';
+import { managersFromControl } from '../spaces';
 import type { PartnerView } from '../types';
 import type { Db } from './db';
 import { partnerships, user } from './db/schema';
@@ -20,9 +21,10 @@ import {
 	createSharedSpace,
 	deleteSpace,
 	isSpaceMember,
-	partnershipControl,
-	spaceExists,
-	syncSharedSpaceMembers
+	joinSharedSpaceStatements,
+	partnershipMembers,
+	setManagersStatements,
+	spaceExists
 } from './spaces';
 
 const BASE64_PADDING = /[=]+$/;
@@ -48,8 +50,10 @@ const partnershipColumns = {
 	status: partnerships.status,
 	inviterId: partnerships.inviterId,
 	inviteeId: partnerships.inviteeId,
-	// What the members' `can_manage` says, not the column; see `partnershipControl`.
-	control: partnershipControl(),
+	// The invite's offer: read for a pending invite only. Who manages an
+	// accepted partnership is `members`.
+	control: partnerships.control,
+	members: partnershipMembers(),
 	namesCiphertext: partnerships.namesCiphertext,
 	namesVaultId: partnerships.namesVaultId,
 	namesPayloadVersion: partnerships.namesPayloadVersion,
@@ -314,8 +318,8 @@ export type AcceptInviteInput = {
 	inviteeId: string;
 	/**
 	 * The names as the accepter left them, sealed again under the same invite
-	 * key, and the control answer. Only honoured when the accepter is allowed
-	 * to edit; see the action.
+	 * key, and the control answer. Only honoured when the offer lets the
+	 * accepter edit; see the action.
 	 */
 	invite?: { ciphertext: string; payloadVersion: number };
 	control?: PartnershipControl;
@@ -361,14 +365,14 @@ export async function acceptInvite(
 		return { ok: false, reason: 'already-linked' };
 	}
 
-	// The accepter may only rewrite the names when control is theirs or shared.
-	// Checked here as well as in the action so the rule cannot be bypassed by a
-	// future caller that forgets. What the server cannot check is what the
-	// re-sealed names say — only that this accepter may write them at all.
-	const accepterMayEdit = canEditPartnership(
-		{ ...existing, inviteeId: input.inviteeId },
-		input.inviteeId
-	);
+	// The accepter may only rewrite the names, or the offer, when the offer
+	// gives them control or shares it. Checked here as well as in the action
+	// so the rule cannot be bypassed by a future caller that forgets. What the
+	// server cannot check is what the re-sealed names say — only that this
+	// accepter may write them at all.
+	const accepterMayEdit = offerGives(existing.control, 'invitee');
+	// The offer as accepted: what sets who manages the space from now on.
+	const control = accepterMayEdit ? (input.control ?? existing.control) : existing.control;
 
 	const [rows] = await db.batch([
 		db
@@ -381,23 +385,27 @@ export async function acceptInvite(
 				// index, so the same inviter can send another invite later.
 				inviteToken: null,
 				inviteExpiresAt: null,
-				...(accepterMayEdit
+				// Recorded as accepted, and never written again: from here on who
+				// manages is `can_manage` alone (docs/partners.md, "Control").
+				control,
+				...(accepterMayEdit && input.invite
 					? {
-							control: input.control ?? existing.control,
-							...(input.invite
-								? {
-										inviteCiphertext: input.invite.ciphertext,
-										invitePayloadVersion: input.invite.payloadVersion
-									}
-								: {})
+							inviteCiphertext: input.invite.ciphertext,
+							invitePayloadVersion: input.invite.payloadVersion
 						}
 					: {})
 			})
 			.where(and(eq(partnerships.inviteToken, input.token), eq(partnerships.status, 'pending')))
 			.returning({ id: partnerships.id }),
-		// The invitee joins the space in the same batch, and only if the
-		// update above is what made them the invitee.
-		...syncSharedSpaceMembers(db, existing.id)
+		// The invitee joins the space in the same batch, and everyone's
+		// `can_manage` is set from the offer, only if the update above is what
+		// made them the invitee.
+		...joinSharedSpaceStatements(db, {
+			id: existing.id,
+			inviterId: existing.inviterId,
+			inviteeId: input.inviteeId,
+			control
+		})
 	]);
 
 	const [row] = rows;
@@ -426,6 +434,12 @@ export async function partnershipExistsBetween(db: Db, a: string, b: string): Pr
 }
 
 export type UpdatePartnershipInput = {
+	/**
+	 * Who manages, as the form's "who's in control?" answer is stored against
+	 * the roles (`controlFromAnswer`). For a pending invite it is the offer;
+	 * for an accepted partnership it becomes the members' `can_manage`
+	 * (`managersFromControl`), and the row's `control` is left as accepted.
+	 */
 	control: PartnershipControl;
 	/**
 	 * The names, sealed in the partnership's vault, and the revision the editor
@@ -442,12 +456,17 @@ export type UpdatePartnershipResult =
 	| { ok: false; reason: 'forbidden' | 'bad-names' | 'conflict' };
 
 /**
- * Applies an edit, re-checking the permission against the stored row.
+ * Applies an edit, re-checking the permission against the stored rows.
  *
- * Refused when the viewer is not a member or does not hold control — the page
- * hides the form in that case, but the action must not rely on that. The
+ * Refused when the viewer is not a member or does not manage the space — the
+ * page hides the form in that case, but the action must not rely on that. The
  * names are compare-and-swap on their revision, so one member's edit cannot
  * silently replace the other's: the server cannot merge what it cannot read.
+ *
+ * Control is written where it lives: while the link is an invite, the offer
+ * on the row, and the inviter's own `can_manage` with it (they are the space's
+ * one member, and whether they may go on editing the invite follows it); once
+ * accepted, every member's `can_manage`, and never the row.
  */
 export async function updatePartnership(
 	db: Db,
@@ -460,33 +479,52 @@ export async function updatePartnership(
 		return { ok: false, reason: 'forbidden' };
 	}
 	const { names, invite } = input;
-	if (invite) {
-		// Only the inviter holds the invite key, and only while it is an invite.
-		if (current.status !== 'pending' || current.role !== 'inviter' || !inviteIsAcceptable(invite)) {
+	if (current.status === 'pending') {
+		// Only the inviter holds the invite key, and a pending invite has no vault.
+		if (names || (invite && (current.role !== 'inviter' || !inviteIsAcceptable(invite)))) {
 			return { ok: false, reason: 'bad-names' };
 		}
+		const pending = and(eq(partnerships.id, id), eq(partnerships.status, 'pending'));
+		const [inviter] = managersFromControl(input.control, { inviterId: userId, inviteeId: null });
 		await db.batch([
 			db
 				.update(partnerships)
 				.set({
 					control: input.control,
-					inviteCiphertext: invite.ciphertext,
-					invitePayloadVersion: invite.payloadVersion
+					...(invite
+						? { inviteCiphertext: invite.ciphertext, invitePayloadVersion: invite.payloadVersion }
+						: {})
 				})
-				.where(and(eq(partnerships.id, id), eq(partnerships.status, 'pending'))),
-			...syncSharedSpaceMembers(db, id)
+				.where(pending),
+			// Not if it was accepted a moment ago: then the accept set everyone's.
+			...(setManagersStatements(
+				db,
+				id,
+				inviter ? [inviter] : [],
+				sql`exists (select 1 from ${partnerships} where ${pending})`
+			) ?? [])
 		]);
 		return { ok: true };
 	}
+	// An accepted link's names live in its vault; the invite key opens nothing now.
+	const partner = current.counterpart?.userId;
+	if (invite || !partner) {
+		return { ok: false, reason: 'bad-names' };
+	}
+	const managers = managersFromControl(
+		input.control,
+		current.role === 'inviter'
+			? { inviterId: userId, inviteeId: partner }
+			: { inviterId: partner, inviteeId: userId }
+	);
 	if (!names) {
-		await db.batch([
-			db.update(partnerships).set({ control: input.control }).where(eq(partnerships.id, id)),
-			...syncSharedSpaceMembers(db, id)
-		]);
+		const statements = setManagersStatements(db, id, managers);
+		if (statements) {
+			await db.batch(statements);
+		}
 		return { ok: true };
 	}
 	if (
-		current.status !== 'accepted' ||
 		names.vaultId !== (await partnershipVaultIdFor(db, id)) ||
 		!sealedIsAcceptable(partnershipNamesKind, names.ciphertext, names.payloadVersion)
 	) {
@@ -496,7 +534,6 @@ export async function updatePartnership(
 		db
 			.update(partnerships)
 			.set({
-				control: input.control,
 				namesCiphertext: names.ciphertext,
 				namesVaultId: names.vaultId,
 				namesPayloadVersion: names.payloadVersion,
@@ -509,8 +546,18 @@ export async function updatePartnership(
 			})
 			.where(and(eq(partnerships.id, id), eq(partnerships.namesRevision, names.expectedRevision)))
 			.returning({ id: partnerships.id }),
-		// A lost compare-and-swap left `control` as it was, so this then changes nothing.
-		...syncSharedSpaceMembers(db, id)
+		// Only if the compare-and-swap above won: a lost one changes nothing.
+		// The revision alone cannot say so — the write that beat this one moved
+		// it to the same number — but this edit's ciphertext can, since a seal
+		// is never repeated.
+		...(setManagersStatements(
+			db,
+			id,
+			managers,
+			sql`exists (select 1 from ${partnerships} where ${partnerships.id} = ${id}
+				and ${partnerships.namesRevision} = ${names.expectedRevision + 1}
+				and ${partnerships.namesCiphertext} = ${names.ciphertext})`
+		) ?? [])
 	]);
 	return rows.length > 0 ? { ok: true } : { ok: false, reason: 'conflict' };
 }
@@ -555,8 +602,8 @@ export type MoveInviteNamesResult =
  * so two devices moving them at once write them at most once between them,
  * and this can never stand in for an edit, which is compare-and-swap on the
  * revision (`updatePartnership`). `moved` is false when the other got there
- * first. `control` is re-read from the stored row, as for any write of the
- * names.
+ * first. Who manages is re-read from the stored members, as for any write
+ * of the names.
  */
 export async function moveInviteNamesIntoVault(
 	db: Db,
