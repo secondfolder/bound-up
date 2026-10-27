@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import {
 		type DaydreamCharacterCopy,
@@ -8,6 +7,7 @@
 		EMPTY_CASTING
 	} from '$lib/daydream';
 	import { deleteLibraryItem } from '$lib/daydream/client';
+	import { invalidateAll } from '$lib/navigation';
 	import {
 		openedDaydreamCharacter,
 		openedDaydreamIdea,

@@ -8,9 +8,10 @@
  */
 
 import type { Attachment } from 'svelte/attachments';
-import { goto, invalidate } from '$app/navigation';
+import { goto } from '$app/navigation';
 import { type AppContext, CONTEXT_DEPENDENCY, serialiseContext } from './context';
 import { initialsFor } from './initials';
+import { invalidate } from './navigation';
 import { partnerName } from './partner-names.svelte';
 import { reportRequestFailure, tryFetch } from './request-failure.svelte';
 import { spaceColourValue } from './space-colours';

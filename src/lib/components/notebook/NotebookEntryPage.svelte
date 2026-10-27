@@ -1,9 +1,9 @@
 <script lang="ts">
 	import type { LexicalEditor } from 'lexical';
 	import type { Snippet } from 'svelte';
-	import { invalidate } from '$app/navigation';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import SidePanelLayout from '$lib/components/SidePanelLayout.svelte';
+	import { invalidate } from '$lib/navigation';
 	import type { NotebookKind, PartnerAccess } from '$lib/notebook';
 	import type { CursorLabel } from '$lib/notebook/collab';
 	import { entrySession } from '$lib/notebook/entry-session.svelte';

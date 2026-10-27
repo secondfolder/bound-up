@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { invalidate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import NotificationSettings from '$lib/components/NotificationSettings.svelte';
+	import { invalidate } from '$lib/navigation';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

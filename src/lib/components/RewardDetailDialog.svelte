@@ -1,10 +1,10 @@
 <script lang="ts">
 	import type { SubmitFunction } from '@sveltejs/kit';
-	import { enhance } from '$app/forms';
 	import ResponsiveDialog from '$lib/components/ResponsiveDialog.svelte';
 	import RichText from '$lib/components/RichText.svelte';
 	import { creditsLabel } from '$lib/credits';
 	import { type ContentSaveTarget, descriptionSaver } from '$lib/description-ticks';
+	import { enhance } from '$lib/enhance';
 	import type { ItemAction } from '$lib/item-action.svelte';
 	import type { RewardEntry, RewardListMode } from '$lib/reward-list';
 	import { type RewardContent, rewardKind } from '$lib/sealed-kinds/tasks';

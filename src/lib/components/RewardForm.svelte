@@ -3,10 +3,10 @@
 	import type { Attachment } from 'svelte/attachments';
 	import { defaults } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
-	import { invalidateAll } from '$app/navigation';
 	import CheckboxField from '$lib/components/CheckboxField.svelte';
 	import InputField from '$lib/components/InputField.svelte';
 	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
+	import { invalidateAll } from '$lib/navigation';
 	import { DOCUMENT_FEATURES } from '$lib/richtext-editor';
 	import { rewardEditorFormSchema } from '$lib/schemas/rewardForm';
 	import { replaceWithSealed, type SealScope, sealForSubmit } from '$lib/sealed-forms';

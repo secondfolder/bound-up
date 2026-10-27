@@ -186,7 +186,9 @@ lives in one place rather than in each page.
   is left as it was.
 - **The nav stays live.** `AppNav` is outside `<main>`, and a tap on it opens
   a new page whose pill and list come from the same load, so nothing it lands
-  on shows one context over another's things.
+  on shows one context over another's things. A tap made before the switch's
+  own refresh has started is followed, not dropped: the refresh waits for the
+  navigation and then re-runs the page it landed on (below).
 - **Coming back to a tab is not held.** Until the `visibilitychange` refresh
   lands, the pill and the page still agree on the context they were rendered
   in, so a tap acts on what it shows; holding would dim the page every time
@@ -240,6 +242,32 @@ than a stream per partnership ([realtime.md](realtime.md#everyone-one-stream-not
 [notebook.md](notebook.md#the-list-in-every-context),
 [messaging.md](messaging.md#realtime)).
 
+## A refresh never drops a tap
+
+Pages that follow the context refresh themselves a lot: a switch, a tab
+coming back, a realtime event on an Everyone list, a save. SvelteKit's own
+`invalidate` and `invalidateAll` take over from a navigation already under
+way: they re-run the page being left, and the navigation is abandoned when
+its data arrives, silently. A link tapped while a save was still answering
+went nowhere — "Add a reward" just after setting credits on `/rewards`, seen
+under `wrangler dev`, whose answers are slow enough to land inside the
+navigation.
+
+So every refresh goes through `$lib/navigation` (`invalidate`,
+`invalidateAll`), which waits for any navigation under way to land and then
+refreshes the page it landed on; and every `use:enhance` comes from
+`$lib/enhance`, whose `update()` refreshes the same way. Biome's
+`noRestrictedImports` refuses SvelteKit's own anywhere else. Waiting loses
+nothing: the new page loads after whatever the refresh was for, and the
+refresh then re-runs its layouts too, so the list under a sheet catches up. A
+navigation that starts *after* a refresh needs nothing: SvelteKit lets it win
+and carries the invalidation into it. `e2e/rewards.spec.ts` orders a save's
+answer inside a navigation by hand, and `src/lib/navigation.test.ts` covers
+the waiting.
+
+superforms calls SvelteKit's `invalidateAll` itself after a successful submit
+that does not redirect, so it is the one refresh this does not cover.
+
 ## Files
 
 | Path | What |
@@ -248,6 +276,7 @@ than a stream per partnership ([realtime.md](realtime.md#everyone-one-stream-not
 | `src/lib/space-colours.ts` | The palette, its labels, `resolveSpaceColours`. Alias-free: the schema imports `SpaceColour` |
 | `src/lib/server/context.ts` | `listContextSpaces`, the per-request resolver, the cookie, `setSpaceColour`, `contextSpaceViews`, `contextSpaceIds` |
 | `src/lib/context-client.svelte.ts` | Names and avatars for the browser, `switchContext`, `storeContext` and `followInContext` |
+| `src/lib/navigation.ts`, `src/lib/enhance.ts` | Refreshes and `use:enhance` that wait for a navigation under way rather than dropping it |
 | `src/lib/components/context/` | `ContextSwitcher`, `ContextAvatar`, `SpaceChip`, `SpaceColourForm` |
 | `src/routes/api/context/+server.ts` | Switching |
 | `drizzle/0050_add_space_member_colour.sql` | `space_members.colour`, a plain `ADD COLUMN` |

@@ -419,6 +419,14 @@ which is ciphertext presented as if it were the text. And `signed-out` is not
 `unknown` on purpose: the gate re-resolves `unknown`, and doing that during a
 sign-out raced the sign-out's redirect with one of its own.
 
+**A refresh never drops a navigation.** SvelteKit's `invalidate` and
+`invalidateAll` take over from a navigation already under way, silently
+abandoning it, so a link tapped while a save was answering went nowhere.
+Refresh through `invalidate` / `invalidateAll` from `$lib/navigation` and
+`enhance` from `$lib/enhance`, which wait for the navigation to land first;
+Biome refuses SvelteKit's own. superforms' own refresh is the gap. See
+[docs/contexts.md](docs/contexts.md#a-refresh-never-drops-a-tap).
+
 **Auth state flows one way: server load → `page.data`.** Better Auth's cookies
 are httpOnly, there is no client-side auth store, and there must not be one.
 `src/lib/auth-client.ts` exists only for the passkey ceremonies, which have to

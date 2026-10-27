@@ -57,8 +57,12 @@ their last compound alone, so it reported one design's `::before` as
 The first override also carries the one rule that is configured rather than
 switched off: `noRestrictedImports` refuses `superForm` from
 `sveltekit-superforms`, so every form goes through `$lib/superform` and shows
-a failed submit (see [request-failures.md](request-failures.md)). The wrapper
-is the only file allowed the import, with a `biome-ignore` saying so.
+a failed submit (see [request-failures.md](request-failures.md)). It also
+refuses `invalidate` and `invalidateAll` from `$app/navigation` and `enhance`
+from `$app/forms`, so every refresh goes through `$lib/navigation` and
+`$lib/enhance`, which wait for a navigation under way instead of dropping it
+(see [contexts.md](contexts.md#a-refresh-never-drops-a-tap)). Each wrapper is
+the only file allowed its import, with a `biome-ignore` saying so.
 
 Per-site suppressions are `biome-ignore` comments with a real reason. A
 diagnostic reported against an **attribute** rather than an element (the iframe

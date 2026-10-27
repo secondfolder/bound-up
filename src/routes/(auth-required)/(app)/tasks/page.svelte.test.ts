@@ -18,7 +18,9 @@ vi.mock('$lib/crypto/vaults.svelte', async (importOriginal) => ({
 	vaultById: (id: string) => ({ id })
 }));
 vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
-vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidate: vi.fn(), invalidateAll: vi.fn() }));
+// superforms imports SvelteKit's own `invalidateAll`; the page's refreshes are `$lib/navigation`'s.
+vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn() }));
+vi.mock('$lib/navigation', () => import('$lib/testing/navigation'));
 /** The list is the route's layout, which reads an action's answer from `page`. */
 vi.mock('$app/state', () => ({ page: { form: null, data: {} } }));
 

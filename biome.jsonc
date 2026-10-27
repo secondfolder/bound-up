@@ -153,6 +153,14 @@
 									"sveltekit-superforms": {
 										"importNames": ["superForm"],
 										"message": "Import superForm from $lib/superform, which shows a failed submit instead of only logging it."
+									},
+									"$app/navigation": {
+										"importNames": ["invalidate", "invalidateAll"],
+										"message": "Import invalidate and invalidateAll from $lib/navigation, which wait for a navigation under way instead of dropping it."
+									},
+									"$app/forms": {
+										"importNames": ["enhance"],
+										"message": "Import enhance from $lib/enhance, whose update() waits for a navigation under way instead of dropping it."
 									}
 								}
 							}

@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { invalidate, invalidateAll } from '$app/navigation';
 	import { recoveryCode } from '$lib/crypto/fingerprint';
 	import { trustRecoveredKey } from '$lib/crypto/trust.svelte';
 	import { declineHistoryRestore, runHistoryRestore } from '$lib/messaging/restore';
+	import { invalidate, invalidateAll } from '$lib/navigation';
 	import type { RestoreRequestView } from '$lib/types';
 	import SafetyNumber from './SafetyNumber.svelte';
 

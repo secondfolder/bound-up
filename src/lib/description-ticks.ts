@@ -13,7 +13,7 @@
  */
 
 import { deserialize } from '$app/forms';
-import { invalidateAll } from '$app/navigation';
+import { invalidateAll } from './navigation';
 import { reportRequestFailure, tryFetch } from './request-failure.svelte';
 import type { SealedKind } from './sealed';
 import { type SealScope, sealForSubmit } from './sealed-forms';

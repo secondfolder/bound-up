@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { SuperValidated } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
-	import { invalidateAll } from '$app/navigation';
 	import TaskForm from '$lib/components/TaskForm.svelte';
+	import { invalidateAll } from '$lib/navigation';
 	import { taskEditorFormSchema } from '$lib/schemas/taskEditorForm';
 	import { replaceWithSealed, type SealScope, sealForSubmit } from '$lib/sealed-forms';
 	import { type TaskContent, taskKind } from '$lib/sealed-kinds/tasks';

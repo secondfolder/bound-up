@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import type { Attachment } from 'svelte/attachments';
-	import { goto, invalidateAll } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { authClient } from '$lib/auth-client';
 	import AuthBox from '$lib/components/AuthBox.svelte';
@@ -13,6 +13,7 @@
 	import { buildIdentitySubmission } from '$lib/crypto/setup';
 	import { stashUnlock } from '$lib/crypto/stash';
 	import { normaliseEmail } from '$lib/encryption';
+	import { invalidateAll } from '$lib/navigation';
 	import { MIN_PASSWORD_LENGTH, scorePassword } from '$lib/password-strength';
 
 	/**

@@ -1,6 +1,6 @@
 import type { SubmitFunction } from '@sveltejs/kit';
-import { invalidateAll } from '$app/navigation';
 import { reportRequestFailure } from '$lib/request-failure.svelte';
+import { invalidateAll } from './navigation';
 
 /**
  * `use:enhance` for a form posting to `/settings?/debug`: the settings switch

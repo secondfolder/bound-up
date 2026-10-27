@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import DebugInfo from '$lib/components/DebugInfo.svelte';
 	import { lock } from '$lib/crypto/session.svelte';
 	import { submitDebugToggle } from '$lib/debug-toggle';
+	import { enhance } from '$lib/enhance';
 	import { hasFeature } from '$lib/features';
 	import { disablePush } from '$lib/push-client';
 	import { reportRequestFailure } from '$lib/request-failure.svelte';

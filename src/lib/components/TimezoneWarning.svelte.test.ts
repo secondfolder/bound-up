@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 let deviceTimezone = 'America/New_York';
 const invalidateAll = vi.fn().mockResolvedValue(undefined);
 
-vi.mock('$app/navigation', () => ({ invalidateAll }));
+vi.mock('$lib/navigation', () => ({ invalidate: vi.fn(), invalidateAll }));
 vi.mock('$lib/timezone', () => ({
 	currentTimeZoneOrUtc: () => deviceTimezone,
 	timezoneBannerStorageKey: (userId: string) => `bound-up:timezone-banner:${userId}`

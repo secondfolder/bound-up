@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { invalidate } from '$app/navigation';
 	import { unlockedIdentity } from '$lib/crypto/session.svelte';
 	import type { ComposedMessage } from '$lib/messaging/client';
 	import { type DraftSession, openDraft } from '$lib/messaging/drafts';
+	import { invalidate } from '$lib/navigation';
 	import type { TagView } from '$lib/types';
 	import MessageComposer from './MessageComposer.svelte';
 	import TagPicker from './TagPicker.svelte';

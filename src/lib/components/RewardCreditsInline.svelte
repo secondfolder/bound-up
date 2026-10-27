@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { prefersReducedMotion, Tween } from 'svelte/motion';
-	import { enhance } from '$app/forms';
+	import { enhance } from '$lib/enhance';
 
 	type EditableCredit = {
 		action: string;

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import { afterNavigate, goto, invalidate, pushState, replaceState } from '$app/navigation';
+	import { afterNavigate, goto, pushState, replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import ContextSwitcher from '$lib/components/context/ContextSwitcher.svelte';
@@ -26,6 +26,7 @@
 	import { newlyArrived } from '$lib/messaging';
 	import { type ComposedMessage, sendMessage } from '$lib/messaging/client';
 	import { watchMessages } from '$lib/messaging/live';
+	import { invalidate } from '$lib/navigation';
 	import { spaceRoom, userRoom } from '$lib/realtime/live';
 	import { spaceColourValue } from '$lib/space-colours';
 	import type { BoardPartnershipView, ContextSpaceView } from '$lib/types';

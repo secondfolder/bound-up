@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { invalidate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import SpaceChip from '$lib/components/context/SpaceChip.svelte';
@@ -17,6 +16,7 @@
 	} from '$lib/crypto/trust.svelte';
 	import { hasFeature } from '$lib/features';
 	import { watchMessages } from '$lib/messaging/live';
+	import { invalidate } from '$lib/navigation';
 	import { partnerName } from '$lib/partner-names.svelte';
 	import { spaceRoom } from '$lib/realtime/live';
 	import type { PageData } from './$types';

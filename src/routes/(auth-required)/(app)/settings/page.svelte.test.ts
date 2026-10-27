@@ -19,6 +19,7 @@ vi.mock('$app/state', () => ({
 }));
 
 vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
+vi.mock('$lib/navigation', () => import('$lib/testing/navigation'));
 
 const { default: Page } = await import('./+page.svelte');
 

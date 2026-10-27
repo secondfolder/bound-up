@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import AddPasskeyFlow from '$lib/components/AddPasskeyFlow.svelte';
@@ -10,6 +9,7 @@
 	import ThisDevice from '$lib/components/ThisDevice.svelte';
 	import { WEBCRYPTO_UNAVAILABLE, webCryptoAvailable } from '$lib/crypto/kdf';
 	import { buildPasswordChange } from '$lib/crypto/setup';
+	import { invalidateAll } from '$lib/navigation';
 	import { MIN_PASSWORD_LENGTH, scorePassword } from '$lib/password-strength';
 	import { NETWORK_FAILURE, tryFetch } from '$lib/request-failure.svelte';
 	import { superForm } from '$lib/superform';

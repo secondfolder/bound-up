@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import DaydreamSetupForm from '$lib/components/DaydreamSetupForm.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
+	import { enhance } from '$lib/enhance';
 	import { reportRequestFailure } from '$lib/request-failure.svelte';
 	import { openedDaydreamSetup, PENDING_TEXT, UNREADABLE_TEXT } from '$lib/sealed-views.svelte';
 	import type { PageData } from './$types';

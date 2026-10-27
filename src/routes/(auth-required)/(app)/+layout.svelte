@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount, type Snippet } from 'svelte';
-	import { invalidate } from '$app/navigation';
 	import { page } from '$app/state';
 	import AppNav from '$lib/components/AppNav.svelte';
 	import EncryptionGate from '$lib/components/EncryptionGate.svelte';
@@ -20,6 +19,7 @@
 	import { currentVaults } from '$lib/crypto/vaults.svelte';
 	import { hasFeature } from '$lib/features';
 	import { DEVICE_LIST_KEY } from '$lib/kink-list/device-key';
+	import { invalidate } from '$lib/navigation';
 	import { resyncPush } from '$lib/push-client';
 	import { fitVisualViewport } from '$lib/visual-viewport';
 	import type { LayoutData } from './$types';

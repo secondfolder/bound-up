@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { LexicalEditor } from 'lexical';
-	import { invalidate } from '$app/navigation';
+	import { invalidate } from '$lib/navigation';
 	import type { CursorLabel } from '$lib/notebook/collab';
 	import { entrySession } from '$lib/notebook/entry-session.svelte';
 	import type { RoomKey } from '$lib/realtime/live';

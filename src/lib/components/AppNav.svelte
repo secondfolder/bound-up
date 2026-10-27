@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { submitDebugToggle } from '$lib/debug-toggle';
+	import { enhance } from '$lib/enhance';
 
 	let {
 		debugAvailable = false,

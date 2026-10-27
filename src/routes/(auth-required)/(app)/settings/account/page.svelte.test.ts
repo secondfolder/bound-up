@@ -26,6 +26,7 @@ vi.mock('$app/state', () => ({
 }));
 
 vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
+vi.mock('$lib/navigation', () => import('$lib/testing/navigation'));
 
 vi.mock('$app/navigation', () => ({
 	// Unused by the page, but superforms imports it, and a real browser refuses

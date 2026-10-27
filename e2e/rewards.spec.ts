@@ -7,6 +7,7 @@ import {
 	fillRichText,
 	newAccount,
 	newSide,
+	settle,
 	typeRichText,
 	waitForHydration,
 	waitForSheetClosed
@@ -57,6 +58,70 @@ test.describe('rewards', () => {
 		await title.fill('Longer bath');
 		await typeRichText(page.locator('.add-form'), ' and a book');
 		await expect(title).toHaveValue('Longer bath');
+	});
+
+	/**
+	 * A link tapped while a save is still answering has to be followed.
+	 *
+	 * SvelteKit's `invalidate()` takes over from a navigation already under way
+	 * and re-runs the page the navigation was leaving, so a save's refresh
+	 * landing mid-navigation dropped the tap: the page stayed where it was,
+	 * with no error anywhere. It surfaced as this file's partner test, now and
+	 * then under `wrangler dev`, where the action answers slowly enough to land
+	 * inside the navigation. Here the two are ordered by hand: the save is held
+	 * until the navigation has asked for its data, and that data until the
+	 * save has answered and its refresh begun.
+	 */
+	test('a link followed while a save is answering is not dropped by its refresh', async ({
+		page
+	}) => {
+		await newAccount(page, account('Ada'));
+		await page.goto('/rewards');
+		await waitForHydration(page);
+
+		let navigationAsked: () => void = () => undefined;
+		const navigationStarted = new Promise<void>((resolve) => {
+			navigationAsked = resolve;
+		});
+		let saveAnswered: () => void = () => undefined;
+		const saved = new Promise<void>((resolve) => {
+			saveAnswered = resolve;
+		});
+		await page.route(
+			(url) => url.search === '?/setCredits',
+			async (route) => {
+				await navigationStarted;
+				const response = await route.fetch();
+				await route.fulfill({ response });
+				saveAnswered();
+			}
+		);
+		// The refresh SvelteKit's own `update()` sends: of the page being left.
+		const refreshed = page
+			.waitForRequest((request) => new URL(request.url()).pathname === '/rewards/__data.json')
+			.catch(() => undefined);
+		let held = false;
+		await page.route('**/rewards/add/__data.json*', async (route) => {
+			if (!held) {
+				held = true;
+				navigationAsked();
+				await saved;
+				// Until the save's refresh has begun, or, now that it waits for
+				// the navigation, until the page has done all it will with the answer.
+				await Promise.race([refreshed, settle(page)]);
+			}
+			await route.continue();
+		});
+
+		await page.getByRole('button', { name: 'Edit your reward credits' }).click();
+		await page.getByLabel('Set your reward credits').fill('4');
+		await page.getByRole('button', { name: 'Save your reward credits' }).click();
+		await page.getByRole('link', { name: 'Add a reward' }).click();
+
+		await expect(page).toHaveURL(/\/rewards\/add$/);
+		await expect(page.locator('.add-form')).toBeVisible();
+		// And the refresh still happened: the list under the sheet has the new balance.
+		await expect(page.locator('.balances li').filter({ hasText: 'Yours' })).toContainText('4');
 	});
 
 	test('a user can manage and claim self rewards from Today', async ({ browser }) => {

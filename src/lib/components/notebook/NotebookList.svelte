@@ -3,12 +3,12 @@
 	import { defaults } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import { z } from 'zod';
-	import { invalidate } from '$app/navigation';
 	import { navigating } from '$app/state';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import SelectField from '$lib/components/SelectField.svelte';
 	import { SOLO_NAME, shownSpace } from '$lib/context-client.svelte';
+	import { invalidate } from '$lib/navigation';
 	import { groupByMonth, NOTEBOOK_LIST_TOPIC, type NotebookKind } from '$lib/notebook';
 	import { type RoomKey, watchRoom } from '$lib/realtime/live';
 	import type { SealScope } from '$lib/sealed-forms';

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { SubmitFunction } from '@sveltejs/kit';
-	import { enhance } from '$app/forms';
 	import ItemRow from '$lib/components/ItemRow.svelte';
+	import { enhance } from '$lib/enhance';
 	import { reportRequestFailure } from '$lib/request-failure.svelte';
 
 	/**

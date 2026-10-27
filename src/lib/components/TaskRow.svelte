@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
 	import ItemRow from '$lib/components/ItemRow.svelte';
+	import { enhance } from '$lib/enhance';
 	import type { ItemAction } from '$lib/item-action.svelte';
 	import { openedTask, shownTitle } from '$lib/sealed-views.svelte';
 	import { opensLater, quotaText, type TaskEntry, type TaskListMode } from '$lib/task-list';

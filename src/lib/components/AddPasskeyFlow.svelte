@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
 	import { WEBCRYPTO_UNAVAILABLE, webCryptoAvailable } from '$lib/crypto/kdf';
 	import { describePasskeyFailure } from '$lib/crypto/passkey';
 	import {
@@ -8,6 +7,7 @@
 		renamePasskey
 	} from '$lib/crypto/passkey-ceremony';
 	import { openIdentityWithPassword } from '$lib/crypto/setup';
+	import { invalidateAll } from '$lib/navigation';
 	import { providerForAaguid } from '$lib/passkey-providers';
 	import type { KeyWrapView } from '$lib/types';
 	import PasswordField from './PasswordField.svelte';

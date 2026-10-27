@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import InputField from '$lib/components/InputField.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import SavedNote from '$lib/components/SavedNote.svelte';
 	import TimezoneSelect from '$lib/components/TimezoneSelect.svelte';
+	import { invalidateAll } from '$lib/navigation';
 	import { accountFormSchema } from '$lib/schemas/accountForm';
 	import { superForm } from '$lib/superform';
 	import { currentTimeZoneOrUtc } from '$lib/timezone';

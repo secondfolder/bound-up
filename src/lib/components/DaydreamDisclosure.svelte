@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
+	import { enhance } from '$lib/enhance';
+	import { invalidateAll } from '$lib/navigation';
 	import { reportRequestFailure } from '$lib/request-failure.svelte';
 
 	/**

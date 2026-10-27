@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { invalidate } from '$app/navigation';
 	import type { MessageMetadataPayload } from '$lib/crypto/messages';
 	import { unlockedIdentity } from '$lib/crypto/session.svelte';
 	import { writeGrantFor } from '$lib/crypto/trust.svelte';
@@ -19,6 +18,7 @@
 		sendMessage
 	} from '$lib/messaging/client';
 	import { openDraft } from '$lib/messaging/drafts';
+	import { invalidate } from '$lib/navigation';
 	import { reportRequestFailure, tryFetch } from '$lib/request-failure.svelte';
 	import { followEnd } from '$lib/scroll-parent';
 	import type { MessageView, TagView, ThreadView } from '$lib/types';

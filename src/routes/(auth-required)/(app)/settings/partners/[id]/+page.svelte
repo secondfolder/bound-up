@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import SpaceColourForm from '$lib/components/context/SpaceColourForm.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import SealedPartnerEditForm from '$lib/components/SealedPartnerEditForm.svelte';
 	import { inviteFragment } from '$lib/crypto/invite';
+	import { enhance } from '$lib/enhance';
 	import { initialsFor } from '$lib/initials';
 	import { openedNames, partnerName, viewerNames } from '$lib/partner-names.svelte';
 	import { inviterInviteKey, sealInvite } from '$lib/partner-sealing';

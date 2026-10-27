@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { invalidateAll } from '$app/navigation';
+	import { invalidateAll } from '$lib/navigation';
 	import { currentTimeZoneOrUtc, timezoneBannerStorageKey } from '$lib/timezone';
 
 	let {

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { Infer, SuperValidated } from 'sveltekit-superforms';
-	import { goto, invalidateAll } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import {
 		deriveAuthSecret,
@@ -15,6 +15,7 @@
 	import type { PasskeySecrets } from '$lib/crypto/passkey-wraps';
 	import { type SignInReason, stashUnlock } from '$lib/crypto/stash';
 	import { MASTER_KEY_VERSIONS } from '$lib/encryption';
+	import { invalidateAll } from '$lib/navigation';
 	import { type LoginFormSchema, loginFormSchema } from '$lib/schemas/loginForm';
 	import { takeSignInEmail } from '$lib/sign-in-again';
 	import { superForm } from '$lib/superform';
