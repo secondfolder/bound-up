@@ -20,6 +20,8 @@ Josefin Sans: Google Fonts (https://fonts.google.com/specimen/Josefin+Sans), OFL
 Jost: Google Fonts (https://fonts.google.com/specimen/Jost), OFL
 Kalam: Google Fonts (https://fonts.google.com/specimen/Kalam), OFL
 La Belle Aurore: Google Fonts (https://fonts.google.com/specimen/La+Belle+Aurore), OFL
+M PLUS Rounded 1c: Google Fonts (https://fonts.google.com/specimen/M+PLUS+Rounded+1c), OFL
+Mochiy Pop One: Google Fonts (https://fonts.google.com/specimen/Mochiy+Pop+One), OFL
 Monoton: Google Fonts (https://fonts.google.com/specimen/Monoton), OFL
 Oswald: Google Fonts (https://fonts.google.com/specimen/Oswald), OFL
 Pinyon Script: Google Fonts (https://fonts.google.com/specimen/Pinyon+Script), OFL

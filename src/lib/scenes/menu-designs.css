@@ -2157,10 +2157,12 @@
 			linear-gradient(var(--collar-shine) 0 35%, var(--collar) 35%);
 		box-shadow: 0 4px 0 rgb(45 53 80 / 12%);
 	}
-	/* The tag, hanging from the collar's middle over the gap to the menu. */
+	/* The tag, hanging from the collar's middle over the gap to the menu: a
+	   pixel right of it, so that its ring, swung aside by the tag's tilt,
+	   is in the middle. */
 	& .menu-art > i:nth-child(1) {
 		inset-block-start: -2.1rem;
-		inset-inline-start: 50%;
+		inset-inline-start: calc(50% + 1px);
 		z-index: 1;
 		inline-size: 2.1rem;
 		aspect-ratio: 44 / 52;
@@ -2171,11 +2173,13 @@
 	& .menu-sheet {
 		gap: 0.9rem;
 	}
+	/* The pup and the title together in the middle, wherever the title's
+	   length puts them; the empty columns either side take what is left,
+	   so a long subtitle, which spans them all, moves neither. */
 	& .menu-head {
 		display: grid;
-		grid-template-columns: auto auto;
-		grid-template-areas: 'pup title' 'pup note' 'orders orders';
-		justify-content: center;
+		grid-template-columns: 1fr auto auto 1fr;
+		grid-template-areas: '. pup title .' '. pup note .' 'orders orders orders orders';
 		align-items: center;
 		column-gap: 0.5rem;
 	}
@@ -2223,12 +2227,15 @@
 		font-size: 0.95rem;
 		letter-spacing: 0.04em;
 	}
+	/* A pill, rounded only as far as one line is tall, so a long subtitle
+	   wrapped onto more stays inside its corners. */
 	& .menu-subtitle {
 		grid-area: orders;
 		justify-self: center;
 		margin-block-start: 0.5rem;
 		padding: 0.1rem 0.7rem;
-		border-radius: 999px;
+		border-radius: 0.8rem;
+		text-align: center;
 		background: #fff;
 		color: #3b6fa8;
 		font-weight: 700;
@@ -2373,6 +2380,789 @@
 		}
 		& .menu-title {
 			font-size: 2.8rem;
+		}
+	}
+}
+
+/* ── Decora ────────────────────────────────────────────────────────────── */
+
+/* A frame's dots, the one half and the other, and its checks' two shades:
+   registered so each can be animated while the card is pointed at. Pixels,
+   since a registered starting value cannot be relative. */
+@property --dot-a {
+	syntax: '<length>';
+	inherits: false;
+	initial-value: 1.8px;
+}
+@property --dot-b {
+	syntax: '<length>';
+	inherits: false;
+	initial-value: 1.8px;
+}
+@property --check-a {
+	syntax: '<color>';
+	inherits: false;
+	initial-value: #a86bff;
+}
+@property --check-b {
+	syntax: '<color>';
+	inherits: false;
+	initial-value: #d4b8ff;
+}
+
+/* After Harajuku's decora kei, whose rule is more is more: plastic snap
+   clips piled along the top as they are worn in the hair, hot pink with
+   polka dots and rainbow sprinkles falling, a title in rainbow letters
+   between a star and a heart sticker, the subtitle strung as a kandi
+   bracelet of letter cubes (`MenuDesign.subtitleBeads`), and each course a
+   white card in a loud frame of its own with a die-cut sticker on its
+   left edge, which can be changed, and on some, two plasters crossed into
+   an X. A rating is pony beads on a string. The pointer is a pink arrow
+   with a star. */
+.design-decora {
+	--surprise-text: 'a gacha surprise!';
+	--menu-ink: #3a2340;
+	--rate-off-opacity: 0.25;
+	--string: linear-gradient(#5b3a63, #5b3a63) center / 100% 1.5px no-repeat;
+	/* Its pointers: an arrow, an I-beam where words are written, and a
+	   pointing hand for what can be tapped. */
+	--cursor-arrow: url('/menu-art/decora-cursor.svg') 3 2, auto;
+	--cursor-text: url('/menu-art/decora-cursor-text.svg') 16 16, text;
+	--cursor-pointer: url('/menu-art/decora-cursor-pointer.svg') 12 2, pointer;
+	/* For the sprinkles to fall behind the courses but over the pink. */
+	isolation: isolate;
+	padding: 0 1.1rem 1.4rem;
+	background:
+		radial-gradient(rgb(255 255 255 / 50%) 22%, transparent 24%) 0 0 / 1.7rem 1.7rem,
+		radial-gradient(rgb(255 255 255 / 50%) 22%, transparent 24%) 0.85rem 0.85rem / 1.7rem 1.7rem,
+		#ff7ec0;
+	color: #3a2340;
+	font-family: 'M PLUS Rounded 1c', sans-serif;
+	cursor: var(--cursor-arrow);
+
+	/* Through the menu itself, to outrank the editor's own pointers. */
+	&.scene-menu :is(button, a) {
+		cursor: var(--cursor-pointer);
+	}
+	&.scene-menu
+		[contenteditable='true']:is(.menu-title, .menu-subtitle, .menu-key-label, .menu-copy) {
+		cursor: var(--cursor-text);
+	}
+
+	/* The clips, along the top edge as if the menu were hair, each its own
+	   (`MenuDesign.spinners`), so that each spins as the pointer sweeps it
+	   (`spinners.ts`): in fives, a pink and a yellow crossed into an X, a
+	   blue and a green side by side, and a purple with a star charm. */
+	& .menu-spinners {
+		display: flex;
+		block-size: 2.8rem;
+		margin-inline: -1.1rem;
+		padding-inline-start: 0.2rem;
+		filter: drop-shadow(0 2px 1px rgb(90 0 60 / 30%));
+
+		& > i {
+			flex: none;
+			inline-size: 2.6rem;
+			block-size: 2.8rem;
+			background: url('/menu-art/decora-clip-pink.svg') no-repeat center / 2.6rem auto;
+			rotate: 28deg;
+		}
+		& > i:nth-child(5n + 1) {
+			margin-inline-end: -2.6rem;
+		}
+		& > i:nth-child(5n + 2) {
+			background-image: url('/menu-art/decora-clip-yellow.svg');
+			rotate: -28deg;
+		}
+		& > i:nth-child(5n + 3) {
+			margin-inline-end: -1.7rem;
+			background-image: url('/menu-art/decora-clip-blue.svg');
+			rotate: 62deg;
+		}
+		& > i:nth-child(5n + 4) {
+			margin-inline-end: -0.8rem;
+			background-image: url('/menu-art/decora-clip-green.svg');
+			rotate: 62deg;
+		}
+		& > i:nth-child(5n + 5) {
+			background-image: url('/menu-art/decora-clip-purple.svg');
+			rotate: -66deg;
+		}
+	}
+	& .menu-sheet {
+		gap: 1rem;
+	}
+	/* Rainbow sprinkles and the odd white star, falling slowly behind
+	   everything (`MenuDesign.confetti`): as many as the menu's size calls
+	   for, each placed, timed and coloured by `confetti.ts`, which hands
+	   them over as custom properties. A size container, so a fall can be
+	   the menu's height (`cqh`). Scattered and still for anyone who asked
+	   for less motion. */
+	& .menu-confetti {
+		position: absolute;
+		inset: 0;
+		z-index: -1;
+		overflow: hidden;
+		container-type: size;
+		pointer-events: none;
+
+		& > i {
+			position: absolute;
+			inset-block-start: -1.5rem;
+			inset-inline-start: var(--x);
+			translate: var(--drift) calc(var(--y) * 1cqh);
+			rotate: var(--turn);
+		}
+		& > .sprinkle {
+			inline-size: 0.65rem;
+			block-size: 0.22rem;
+			border-radius: 0.1rem;
+			background: var(--colour);
+		}
+		& > .star::before {
+			content: '✦';
+			display: block;
+			color: #fff;
+			font-size: 0.8rem;
+			font-style: normal;
+			line-height: 1;
+		}
+	}
+	/* The title between its two stickers, whatever its length, and the
+	   bracelet under it. The sides share what is left over, so a long
+	   bracelet, which spans all three, widens neither and leaves the
+	   stickers beside the title. */
+	& .menu-head {
+		display: grid;
+		grid-template-columns: 1fr auto 1fr;
+		grid-template-areas: 'star title heart' 'subtitle subtitle subtitle';
+		align-items: center;
+		column-gap: 0.4rem;
+		/* Clear of a descender (a "p") under the title's thick outline. */
+		row-gap: 0.85rem;
+		margin-block-start: 0.5rem;
+		text-align: center;
+	}
+	/* The stickers either side of the title, a star and a heart unless
+	   others were picked (`MenuDesign.pictures`): each a button in the
+	   editor, which offers the others, and placed in the heading's grid
+	   itself. The picture is drawn inside, so that its bob (below) leaves
+	   the button, which the picker's popover is anchored to, still.
+	   Lowered to the middle of the letters, which sit high in their line. */
+	& .menu-pictures {
+		display: contents;
+	}
+	& .menu-picture {
+		position: relative;
+		inline-size: 2.8rem;
+		block-size: auto;
+		aspect-ratio: 1;
+		margin: 0.5rem 0 0;
+		padding: 0;
+		border: 0;
+		background: none;
+		filter: drop-shadow(0 2px 1px rgb(90 0 60 / 30%));
+
+		&::before {
+			content: '';
+			position: absolute;
+			inset: 0;
+			background: var(--picture) no-repeat center / contain;
+		}
+	}
+	& .menu-picture:nth-child(1) {
+		grid-area: star;
+		justify-self: end;
+
+		&::before {
+			rotate: -14deg;
+		}
+	}
+	& .menu-picture:nth-child(2) {
+		grid-area: heart;
+		justify-self: start;
+		inline-size: 2.5rem;
+
+		&::before {
+			rotate: 12deg;
+		}
+	}
+	&.scene-menu button.menu-picture {
+		cursor: var(--cursor-pointer);
+
+		&:hover,
+		&:focus-visible {
+			outline: 2px dashed #fff;
+			outline-offset: 2px;
+		}
+	}
+	/* Bubble letters outlined in white, each a solid colour of the rainbow
+	   in turn (`MenuDesign.titleLetters`: a span each, since no selector
+	   reaches a letter), counting letters only, so a space uses up no
+	   colour. */
+	& .menu-title {
+		grid-area: title;
+		color: #ff5fa2;
+		caret-color: #d6337f;
+		font-family: 'Mochiy Pop One', sans-serif;
+		font-weight: 400;
+		font-size: 2.2rem;
+		line-height: 1.15;
+		-webkit-text-stroke: 0.42rem #fff;
+		paint-order: stroke fill;
+	}
+	/* A box each, to hop in turn (below); a space stays inline, where the
+	   title can wrap and a lone space still takes room. */
+	& .title-letter:not(.gap) {
+		display: inline-block;
+	}
+	& .title-letter:nth-child(6n + 2 of :not(.gap)) {
+		color: #ff9f1c;
+	}
+	& .title-letter:nth-child(6n + 3 of :not(.gap)) {
+		color: #f5c400;
+	}
+	& .title-letter:nth-child(6n + 4 of :not(.gap)) {
+		color: #2fc979;
+	}
+	& .title-letter:nth-child(6n + 5 of :not(.gap)) {
+		color: #3fa7ff;
+	}
+	& .title-letter:nth-child(6n + 6 of :not(.gap)) {
+		color: #a86bff;
+	}
+	/* The subtitle as a kandi bracelet: a white cube for each letter, and
+	   each word on the string with a pony bead at either end
+	   (`.bead-word`), its last bead lying exactly under the next word's
+	   first, so that one bead is the gap between words and the string runs
+	   on without a break. A space is nothing to see. Wrapped, every line is
+	   a bracelet of its own, its first and last beads showing and the
+	   string's loose ends curling out past them (`bracelet.ts` marks which
+	   words those are). Through the heading, to outrank the editor's own
+	   look for words that can be rewritten. */
+	& .menu-head > .menu-subtitle {
+		--pony-width: 0.62rem;
+		--pony-gap: 2px;
+		display: flex;
+		flex-wrap: wrap;
+		grid-area: subtitle;
+		justify-content: center;
+		justify-self: center;
+		row-gap: 0.3rem;
+		max-inline-size: 100%;
+		/* Each line's last bead hangs past its end by the overlap; this puts
+		   the line back in the middle. */
+		padding-inline-end: var(--pony-width);
+		border-radius: 3px;
+		font-family: 'Mochiy Pop One', sans-serif;
+		font-size: 0.68rem;
+		text-transform: uppercase;
+		white-space: pre;
+	}
+	& .bead-word {
+		--end-a: #ff5fa2;
+		--end-b: #ffd23f;
+		display: inline-flex;
+		align-items: center;
+		gap: var(--pony-gap);
+		margin-inline-end: calc(-1 * var(--pony-width));
+		background: var(--string);
+
+		&::before,
+		&::after {
+			content: '';
+			flex: none;
+			inline-size: var(--pony-width);
+			block-size: 0.78rem;
+			border-radius: 45%;
+			background:
+				radial-gradient(circle at 32% 28%, rgb(255 255 255 / 85%) 0 18%, transparent 30%),
+				var(--end-a);
+		}
+		&::after {
+			background:
+				radial-gradient(circle at 32% 28%, rgb(255 255 255 / 85%) 0 18%, transparent 30%),
+				var(--end-b);
+		}
+	}
+	/* The loose ends, out of the flow so that drawing them moves no word
+	   onto another line, and under the end beads. */
+	& .bead-word[data-line-start] > .bead:first-child::before,
+	& .bead-word[data-line-end] > .bead:last-child::after {
+		content: '';
+		position: absolute;
+		z-index: -1;
+		inset-block-start: 50%;
+		inline-size: 1.1rem;
+		block-size: 1.22rem;
+		background: no-repeat center / contain;
+		translate: 0 -50%;
+	}
+	& .bead-word[data-line-start] > .bead:first-child::before {
+		inset-inline-end: calc(100% + var(--pony-gap) + var(--pony-width) - 3px);
+		background-image: url('/menu-art/decora-string-start.svg');
+	}
+	& .bead-word[data-line-end] > .bead:last-child::after {
+		inset-inline-start: calc(100% + var(--pony-gap) + var(--pony-width) - 3px);
+		background-image: url('/menu-art/decora-string-end.svg');
+	}
+	& .bead-word:nth-child(3n + 2 of .bead-word) {
+		--end-a: #3ddc84;
+		--end-b: #3fa7ff;
+	}
+	& .bead-word:nth-child(3n + 3 of .bead-word) {
+		--end-a: #a86bff;
+		--end-b: #ff9f1c;
+	}
+	/* A block, not a grid, though a grid would centre its letter: a grid
+	   draws no whitespace-only text, which left a space nowhere for the
+	   caret. */
+	& .bead {
+		position: relative;
+		display: inline-block;
+		min-inline-size: 1.2rem;
+		block-size: 1.25rem;
+		padding-inline: 0.1rem;
+		border-radius: 3px;
+		background: #fff;
+		color: #3a2340;
+		line-height: 1.25rem;
+		text-align: center;
+		box-shadow:
+			inset 0 -2px 0 #e4dcec,
+			0 1px 1px rgb(90 0 60 / 30%);
+	}
+	& .bead.gap {
+		min-inline-size: 0;
+		inline-size: 0;
+		padding: 0;
+		background: none;
+		box-shadow: none;
+	}
+	& .scene-menu-courses {
+		display: grid;
+		gap: 1.9rem;
+	}
+	/* A white card in a loud frame: the frame is the border, painted with
+	   the course's pattern, and outlined in white like a sticker. A pattern
+	   in tiles is laid from the card's white and fitted to it in whole tiles
+	   (`round`), so it meets every edge of the frame alike. */
+	& .scene-menu-course {
+		--ink: #e8590c;
+		position: relative;
+		padding: 0.55rem 0.8rem 0.7rem;
+		border: 0.5rem solid transparent;
+		border-radius: 1.2rem;
+		background:
+			linear-gradient(#fff, #fff) padding-box,
+			repeating-linear-gradient(45deg, #ffd23f 0 0.5rem, #ff9f1c 0.5rem 1rem) border-box;
+		box-shadow:
+			0 0 0 3px #fff,
+			0 6px 0 3px rgb(120 0 80 / 22%);
+		rotate: -1.2deg;
+		/* Room for the sticker over its left edge. */
+		margin-inline-start: 0.6rem;
+
+		/* Its sticker, on the left edge level with its title: the course's
+		   picture, the next in turn or the one picked
+		   (`MenuDesign.courseArt`), a button in the editor, which offers the
+		   others. Centred on the frame's band. The picture is drawn inside
+		   it, so that its wiggle (below) leaves the button still: the
+		   picker's popover is anchored to the button, and followed it. */
+		& > .menu-course-art {
+			position: absolute;
+			z-index: 1;
+			inset-block-start: 0.15rem;
+			inset-inline-start: -1.45rem;
+			inline-size: 2.4rem;
+			block-size: auto;
+			aspect-ratio: 1;
+			margin: 0;
+			padding: 0;
+			border: 0;
+			border-radius: 50%;
+			background: none;
+			filter: drop-shadow(0 2px 1px rgb(90 0 60 / 30%));
+
+			&::before {
+				content: '';
+				position: absolute;
+				inset: 0;
+				background: var(--course-art) no-repeat center / contain;
+				rotate: -12deg;
+			}
+		}
+		& > button.menu-course-art {
+			cursor: var(--cursor-pointer);
+
+			&:hover,
+			&:focus-visible {
+				outline: 2px dashed var(--ink);
+				outline-offset: 2px;
+			}
+		}
+	}
+	& .scene-menu-course:nth-child(even) {
+		rotate: 1deg;
+
+		& > .menu-course-art::before {
+			rotate: 10deg;
+		}
+	}
+	/* Polka dots a band apart, so a row of them runs down the middle of
+	   each side: in two halves, every other dot (`--dot-a`, `--dot-b`), each
+	   half two dots to a tile a band and a half apart. */
+	& .scene-menu-course:nth-child(4n + 2) {
+		--ink: #11935a;
+		background:
+			linear-gradient(#fff, #fff) padding-box,
+			radial-gradient(circle at 25% 25%, #fff var(--dot-a), transparent calc(var(--dot-a) + 0.6px))
+			padding-box border-box 0 0 / 1rem 1rem round,
+			radial-gradient(circle at 75% 75%, #fff var(--dot-a), transparent calc(var(--dot-a) + 0.6px))
+			padding-box border-box 0 0 / 1rem 1rem round,
+			radial-gradient(circle at 75% 25%, #fff var(--dot-b), transparent calc(var(--dot-b) + 0.6px))
+			padding-box border-box 0 0 / 1rem 1rem round,
+			radial-gradient(circle at 25% 75%, #fff var(--dot-b), transparent calc(var(--dot-b) + 0.6px))
+			padding-box border-box 0 0 / 1rem 1rem round,
+			#3ddc84 border-box;
+	}
+	/* Checks a band wide. */
+	& .scene-menu-course:nth-child(4n + 3) {
+		--ink: #7a3fd6;
+		background:
+			linear-gradient(#fff, #fff) padding-box,
+			repeating-conic-gradient(var(--check-a) 0 25%, var(--check-b) 0 50%) padding-box border-box 0
+			0 / 1rem 1rem round;
+		rotate: -0.8deg;
+	}
+	/* Rainbow stripes across the band all the way round: down the top and
+	   bottom, and turned along the sides. Each a repeating tile of one turn
+	   of the rainbow, so they can run on round (below). */
+	& .scene-menu-course:nth-child(4n + 4) {
+		--ink: #1c7fd6;
+		--stripes:
+			#ff5fa2 0 0.4rem, #ffd23f 0.4rem 0.8rem, #3ddc84 0.8rem 1.2rem, #3fa7ff 1.2rem 1.6rem,
+			#a86bff 1.6rem 2rem;
+		background:
+			linear-gradient(#fff, #fff) padding-box,
+			linear-gradient(180deg, var(--stripes)) border-box 0 0 / 0.5rem 2rem repeat-y,
+			linear-gradient(180deg, var(--stripes)) border-box 100% 0 / 0.5rem 2rem repeat-y,
+			linear-gradient(90deg, var(--stripes)) border-box 0 0 / 2rem 100% repeat-x;
+		rotate: 1.3deg;
+	}
+	/* Two plasters crossed, stuck across the frame of a few cards, here and
+	   there as if at random: three courses in every seven, each somewhere
+	   else on its frame and never by the sticker. Centred on the band, and
+	   no further in than the card's padding, so they cover no words. */
+	& .scene-menu-course:is(:nth-child(7n + 1), :nth-child(7n + 3), :nth-child(7n + 6))::after {
+		content: '';
+		position: absolute;
+		z-index: 1;
+		inline-size: 2.2rem;
+		aspect-ratio: 1;
+		background: url('/menu-art/decora-plasters.svg') no-repeat center / contain;
+		filter: drop-shadow(0 1px 1px rgb(90 0 60 / 30%));
+		pointer-events: none;
+	}
+	& .scene-menu-course:nth-child(7n + 1)::after {
+		inset-block-end: -1.35rem;
+		inset-inline-end: 22%;
+		rotate: 8deg;
+	}
+	& .scene-menu-course:nth-child(7n + 3)::after {
+		inset-block-start: 38%;
+		inset-inline-end: -1.35rem;
+		rotate: -20deg;
+	}
+	& .scene-menu-course:nth-child(7n + 6)::after {
+		inset-block-end: -1.35rem;
+		inset-inline-start: 40%;
+		rotate: 25deg;
+	}
+	/* Its title and its items on one edge, a little in from the frame for
+	   the sticker. */
+	& .scene-menu-line.heading {
+		padding-inline-start: 0.3rem;
+		color: var(--ink);
+		font-family: 'Mochiy Pop One', sans-serif;
+		font-size: 1.15rem;
+	}
+	& .scene-menu-line.item {
+		padding-block: 0.1rem;
+		padding-inline-start: 0.3rem;
+		font-weight: 500;
+		font-size: 0.92rem;
+		line-height: 1.35;
+	}
+	& .scene-menu-line.item + .scene-menu-line.item {
+		border-block-start: 2px dotted #f3d3e6;
+	}
+	/* Where words are written, the usual caret, not the arrow. */
+	& .scene-menu-line:where([contenteditable='true'] *) {
+		cursor: var(--cursor-text);
+	}
+	& .menu-line-extras {
+		align-self: center;
+		color: #b05a8f;
+	}
+	/* Its rating in pony beads, each a colour of the rainbow, on a string:
+	   a length behind each bead, which stays put when the beads play. */
+	& .menu-rates {
+		gap: 0;
+		padding-inline: 0.15rem;
+	}
+	& .menu-rate {
+		display: inline-block;
+		padding-inline: 0.5px;
+		background: linear-gradient(#5b3a63, #5b3a63) center / 100% 1px no-repeat;
+	}
+	& .menu-rate::before,
+	& .menu-rate.on::before {
+		content: '';
+		display: inline-block;
+		inline-size: 0.5rem;
+		block-size: 0.64rem;
+		border-radius: 45%;
+		background:
+			radial-gradient(circle at 32% 28%, rgb(255 255 255 / 85%) 0 18%, transparent 30%),
+			radial-gradient(ellipse at 50% 50%, rgb(0 0 0 / 28%) 0 14%, transparent 18%),
+			var(--pony, #ff5fa2);
+		box-shadow: inset 0 -1px 2px rgb(0 0 0 / 20%);
+		vertical-align: middle;
+	}
+	/* Only the bead fades when off, not its length of string. */
+	& .menu-rate:not(.on) {
+		opacity: 1;
+
+		&::before {
+			opacity: 0.25;
+		}
+	}
+	& .menu-rate:nth-child(5n + 2) {
+		--pony: #ffd23f;
+	}
+	& .menu-rate:nth-child(5n + 3) {
+		--pony: #3ddc84;
+	}
+	& .menu-rate:nth-child(5n + 4) {
+		--pony: #3fa7ff;
+	}
+	& .menu-rate:nth-child(5n + 5) {
+		--pony: #a86bff;
+	}
+	& .menu-key {
+		color: #fff;
+		font-weight: 800;
+		text-shadow: 0 1px 0 rgb(120 0 80 / 40%);
+	}
+}
+
+@container scene-page (width >= 32rem) {
+	.design-decora {
+		& .scene-menu-courses {
+			grid-template-columns: 1fr 1fr;
+			gap: 2rem 1.7rem;
+		}
+		& .menu-title {
+			font-size: 2.9rem;
+		}
+		& .menu-picture:nth-child(1) {
+			inline-size: 3.5rem;
+		}
+		& .menu-picture:nth-child(2) {
+			inline-size: 3.2rem;
+		}
+	}
+}
+
+@container scene-page (width >= 52rem) {
+	.design-decora .scene-menu-courses {
+		grid-template-columns: repeat(4, 1fr);
+	}
+}
+
+/* Joyful, gently: the confetti falls and spins, the stickers bob and
+   wiggle, and what is pointed at plays: the clips spin (`spinners.ts`), the
+   title's letters hop in a wave, a card's frame moves in its own way, and
+   an item's beads swell in turn along their string. */
+@media (prefers-reduced-motion: no-preference) {
+	@keyframes decora-fall {
+		from {
+			translate: var(--drift) -1rem;
+		}
+		to {
+			translate: calc(var(--drift) * -1) calc(100cqh + 2rem);
+		}
+	}
+	@keyframes decora-spin {
+		to {
+			rotate: calc(var(--turn) + 360deg);
+		}
+	}
+	@keyframes decora-bob {
+		50% {
+			translate: 0 -0.25rem;
+			scale: 1.06;
+		}
+	}
+	@keyframes decora-wiggle {
+		25% {
+			transform: rotate(-8deg);
+		}
+		75% {
+			transform: rotate(8deg);
+		}
+	}
+	@keyframes decora-hop {
+		0%,
+		40%,
+		100% {
+			translate: 0 0;
+		}
+		20% {
+			translate: 0 -0.3rem;
+		}
+	}
+	/* A bead swelling and settling, early in a long cycle, so a wave passes
+	   along the string and rests before the next. */
+	@keyframes decora-pop {
+		0%,
+		20%,
+		100% {
+			scale: 1;
+		}
+		10% {
+			scale: 1.4;
+		}
+	}
+	/* A card's frame, pointed at, plays in its own way, slowly: the
+	   diagonal stripes drift along, the dots swell and shrink by halves, the
+	   checks trade shades, and the rainbow runs on round. Each moves its
+	   pattern by one whole repeat, so it loops without a jump; it pauses
+	   wherever it has got to when the pointer leaves (below). */
+	@keyframes decora-drift {
+		to {
+			background-position:
+				0 0,
+				1.41421rem 0;
+		}
+	}
+	/* From the dots as they are at rest, so pointing at the card the first
+	   time eases into the swell rather than jumping to it. */
+	@keyframes decora-dots {
+		0%,
+		50%,
+		100% {
+			--dot-a: 1.8px;
+			--dot-b: 1.8px;
+		}
+		25% {
+			--dot-a: 2.6px;
+			--dot-b: 1.1px;
+		}
+		75% {
+			--dot-a: 1.1px;
+			--dot-b: 2.6px;
+		}
+	}
+	@keyframes decora-checks {
+		50% {
+			--check-a: #d4b8ff;
+			--check-b: #a86bff;
+		}
+	}
+	@keyframes decora-round {
+		to {
+			background-position:
+				0 0,
+				0 -2rem,
+				100% 2rem,
+				2rem 0;
+		}
+	}
+
+	.design-decora {
+		& .menu-confetti > i {
+			animation:
+				decora-fall var(--fall) linear var(--delay) infinite,
+				decora-spin var(--spin) linear infinite;
+			animation-direction: normal, var(--spin-way);
+		}
+
+		/* The same rhythm, half a beat apart. */
+		& .menu-picture:nth-child(1)::before {
+			animation: decora-bob 2.6s ease-in-out infinite;
+		}
+		& .menu-picture:nth-child(2)::before {
+			animation: decora-bob 2.6s ease-in-out -1.3s infinite;
+		}
+		& .menu-course-art::before {
+			animation: decora-wiggle 3.2s ease-in-out infinite;
+		}
+		& .scene-menu-course:nth-child(4n + 2) > .menu-course-art::before {
+			animation-delay: -0.8s;
+		}
+		& .scene-menu-course:nth-child(4n + 3) > .menu-course-art::before {
+			animation-delay: -1.9s;
+		}
+		& .scene-menu-course:nth-child(4n + 4) > .menu-course-art::before {
+			animation-delay: -2.6s;
+		}
+		/* One wave along the whole title, letter by letter by its place
+		   (`--letter`), a long title holding more than one at a time. */
+		& .menu-title[data-playing] .title-letter {
+			animation: decora-hop 1.2s ease-in-out calc(var(--letter) * 0.1s) infinite;
+		}
+		/* Still while it is being typed in. */
+		& .menu-title:focus .title-letter {
+			animation: none;
+		}
+		/* A card's frame plays only while pointed at, and stops where it is
+		   when the pointer goes, to go on from there when it comes back. */
+		& .scene-menu-course {
+			animation-play-state: paused;
+		}
+		& .scene-menu-course:hover {
+			animation-play-state: running;
+		}
+		& .scene-menu-course:nth-child(4n + 1) {
+			animation-name: decora-drift;
+			animation-duration: 6s;
+			animation-timing-function: linear;
+			animation-iteration-count: infinite;
+		}
+		& .scene-menu-course:nth-child(4n + 2) {
+			animation-name: decora-dots;
+			animation-duration: 3.2s;
+			animation-timing-function: ease-in-out;
+			animation-iteration-count: infinite;
+		}
+		& .scene-menu-course:nth-child(4n + 3) {
+			animation-name: decora-checks;
+			animation-duration: 4s;
+			animation-timing-function: ease-in-out;
+			animation-iteration-count: infinite;
+		}
+		& .scene-menu-course:nth-child(4n + 4) {
+			animation-name: decora-round;
+			animation-duration: 8s;
+			animation-timing-function: linear;
+			animation-iteration-count: infinite;
+		}
+		& .scene-menu-line.item[data-playing] .menu-rate::before {
+			animation: decora-pop 2.4s ease-in-out infinite;
+		}
+		& .scene-menu-line.item[data-playing] .menu-rate:nth-child(2)::before {
+			animation-delay: 0.08s;
+		}
+		& .scene-menu-line.item[data-playing] .menu-rate:nth-child(3)::before {
+			animation-delay: 0.16s;
+		}
+		& .scene-menu-line.item[data-playing] .menu-rate:nth-child(4)::before {
+			animation-delay: 0.24s;
+		}
+		& .scene-menu-line.item[data-playing] .menu-rate:nth-child(5)::before {
+			animation-delay: 0.32s;
 		}
 	}
 }

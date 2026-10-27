@@ -924,6 +924,50 @@ describe('a menu’s words written on the menu itself', () => {
 		expect(caret?.anchorOffset).toBe('PATIENT'.length);
 	});
 
+	it('strings a beaded subtitle a word at a time as it is typed, spaces where they were put', async () => {
+		const { editor } = await menuWith('decora');
+		const subtitle = frame(editor, '.menu-subtitle');
+		const strung = () =>
+			[...subtitle.children].map((each) =>
+				each.classList.contains('gap') ? '_' : each.textContent
+			);
+		expect(strung()).toEqual(['MORE', '_', 'IS', '_', 'MORE']);
+
+		// A space typed into a word splits it in two at the caret, and the
+		// caret stays after the space.
+		subtitle.focus();
+		const is = defined(subtitle.querySelectorAll('.bead-word .bead')[4]?.firstChild, 'the I');
+		is.textContent = 'I ';
+		globalThis.getSelection()?.collapse(is, 2);
+		subtitle.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
+		await settled(editor);
+		expect(strung()).toEqual(['MORE', '_', 'I', '_', 'S', '_', 'MORE']);
+		const caret = globalThis.getSelection();
+		expect(caret?.anchorNode?.parentElement).toBe(subtitle.querySelectorAll(':scope > .gap')[1]);
+		expect(firstBlock(editor)).toMatchObject({ subtitle: 'MORE I S MORE' });
+	});
+
+	it('draws a lettered title a letter at a time, as the design’s and as it is typed', async () => {
+		const { editor } = await menuWith('decora');
+		const title = frame(editor, '.menu-title');
+		const letters = () =>
+			[...title.querySelectorAll('.title-letter')].map((each) => each.textContent);
+		expect(letters()).toEqual([...'Pile It On!']);
+
+		title.focus();
+		const last = defined(title.querySelector('.title-letter:last-child')?.firstChild, 'the !');
+		last.textContent = '!!';
+		globalThis.getSelection()?.collapse(last, 2);
+		title.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
+		await settled(editor);
+		expect(letters()).toEqual([...'Pile It On!!']);
+		expect(firstBlock(editor)).toMatchObject({ title: 'Pile It On!!' });
+
+		// Another design's title is plain words.
+		const { editor: memo } = await menuWith('office');
+		expect(frame(memo, '.menu-title').children).toHaveLength(0);
+	});
+
 	it('starts a new line in copy that is fields on Enter, a label until it has a colon', async () => {
 		const { editor } = await menuWith('clinic');
 		const patient = frame(editor, '[data-copy="patient"]');

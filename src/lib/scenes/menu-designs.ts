@@ -28,6 +28,7 @@ export const MENU_DESIGN_IDS = [
 	'ticket',
 	'facts',
 	'pet',
+	'decora',
 	'letter',
 	'clinic',
 	'soft',
@@ -143,6 +144,24 @@ export type MenuDesign = {
 	name: string;
 	/** The heading the menu shows above its courses. */
 	title: string;
+	/**
+	 * Its title is drawn a character at a time (`.title-letter`), for a
+	 * design that colours each letter its own way.
+	 */
+	titleLetters?: true;
+	/**
+	 * Its subtitle is drawn a bead at a time (`.bead`, each word's together
+	 * in a `.bead-word`, a space a `.bead.gap`), for a design that strings
+	 * it like the letter cubes of a kandi bracelet.
+	 */
+	subtitleBeads?: true;
+	/** Confetti falling behind it, as thick as its size calls for (`confetti.ts`). */
+	confetti?: true;
+	/**
+	 * How many pieces it has along its top edge that spin when the pointer
+	 * sweeps over them (`spinners.ts`), each a `.menu-spinners > i`.
+	 */
+	spinners?: number;
 	/** The line under the title a menu has when it has none of its own; none if absent. */
 	subtitle?: string;
 	/** Its own words, in the order they are placed. */
@@ -158,6 +177,18 @@ export type MenuDesign = {
 	/** The mark that stands for the number in the menu's key, beside what it means: "$". */
 	valueKey: string;
 };
+
+/** Decora's die-cut stickers, for its title and its courses alike. */
+const DECORA_STICKERS: readonly MenuArtChoice[] = [
+	{ id: 'strawberry', name: 'Strawberry', url: '/menu-art/decora-strawberry.svg' },
+	{ id: 'capsule', name: 'Gacha capsule', url: '/menu-art/decora-capsule.svg' },
+	{ id: 'smiley', name: 'Smiley', url: '/menu-art/decora-smiley.svg' },
+	{ id: 'star', name: 'Star', url: '/menu-art/decora-star.svg' },
+	{ id: 'heart', name: 'Heart', url: '/menu-art/decora-heart.svg' },
+	{ id: 'cherries', name: 'Cherries', url: '/menu-art/decora-cherries.svg' },
+	{ id: 'ice-cream', name: 'Ice cream', url: '/menu-art/decora-ice-cream.svg' },
+	{ id: 'rainbow', name: 'Rainbow', url: '/menu-art/decora-rainbow.svg' }
+];
 
 export const MENU_DESIGNS: Record<MenuDesignId, MenuDesign> = {
 	fine: {
@@ -335,6 +366,23 @@ export const MENU_DESIGNS: Record<MenuDesignId, MenuDesign> = {
 			]
 		}
 	},
+	decora: {
+		id: 'decora',
+		name: 'Decora',
+		title: 'Pile It On!',
+		titleLetters: true,
+		// Decora's own motto, on a friendship bracelet.
+		subtitle: 'MORE IS MORE',
+		subtitleBeads: true,
+		// Enough hair clips for the widest page.
+		spinners: 48,
+		confetti: true,
+		value: (n) => `¥${n}`,
+		valueKey: '¥',
+		// The stickers beside the title and on each course, from the same sheet.
+		pictures: { label: 'Sticker', slots: ['star', 'heart'], choices: DECORA_STICKERS },
+		courseArt: { label: 'Sticker', choices: DECORA_STICKERS }
+	},
 	letter: {
 		id: 'letter',
 		name: 'Love letter',
@@ -492,6 +540,35 @@ export const MENU_DESIGNS: Record<MenuDesignId, MenuDesign> = {
 					url: '/menu-art/flower-lily.svg',
 					caption: 'Lilium lentum',
 					tint: '#f5ece2'
+				},
+				{
+					id: 'wisteria',
+					name: 'Wisteria',
+					url: '/menu-art/flower-wisteria.svg',
+					caption: 'Wisteria languens',
+					tint: '#ece6f5'
+				},
+				{
+					id: 'orchid',
+					name: 'Orchid',
+					url: '/menu-art/flower-orchid.svg',
+					caption: 'Phalaenopsis blanda',
+					// Leafy, so its pale petals stand out.
+					tint: '#d7e6cc'
+				},
+				{
+					id: 'hydrangea',
+					name: 'Hydrangea',
+					url: '/menu-art/flower-hydrangea.svg',
+					caption: 'Hydrangea mollis',
+					tint: '#e4eaf6'
+				},
+				{
+					id: 'dahlia',
+					name: 'Dahlia',
+					url: '/menu-art/flower-dahlia.svg',
+					caption: 'Dahlia flagrans',
+					tint: '#f7e2e6'
 				}
 			]
 		}

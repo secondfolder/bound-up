@@ -19,6 +19,8 @@ import {
 	type MenuExtras,
 	type MenuHeading
 } from '$lib/scenes/blocks';
+import { markBraceletLines } from '$lib/scenes/bracelet';
+import { CONFETTI_CLASS, keepConfetti } from '$lib/scenes/confetti';
 import {
 	chosenPerDesign,
 	DEFAULT_MENU_DESIGN,
@@ -47,6 +49,8 @@ import {
 	type ShownMascot,
 	type ShownPictures
 } from '$lib/scenes/menu-frame';
+import { playWhilePointedAt } from '$lib/scenes/play-on-hover';
+import { SPINNERS_CLASS, spinWhenSwept } from '$lib/scenes/spinners';
 import { drawSurprise, sceneViewerOf } from './viewer';
 
 /**
@@ -158,8 +162,30 @@ export class MenuNode extends ElementNode {
 			copy: menuCopy(design, this.__copy),
 			mascot: this.#mascot(),
 			mascotButton: !surprise,
-			pictures: this.#pictures()
+			pictures: this.#pictures(),
+			titleLetters: design.titleLetters === true,
+			subtitleBeads: design.subtitleBeads === true,
+			spinners: design.spinners ?? 0,
+			confetti: design.confetti === true
 		});
+		const subtitle = element.querySelector<HTMLElement>('.menu-subtitle');
+		if (design.subtitleBeads && subtitle && !surprise) {
+			// Stops itself once the menu is drawn afresh and this one goes.
+			markBraceletLines(subtitle);
+		}
+		if (!surprise) {
+			// Lives as long as the element: the listeners are on it alone.
+			playWhilePointedAt(element);
+		}
+		const confetti = element.querySelector<HTMLElement>(`.${CONFETTI_CLASS}`);
+		if (confetti && !surprise) {
+			// Stops itself once the menu is drawn afresh and this one goes.
+			keepConfetti(confetti);
+		}
+		if (design.spinners && !surprise) {
+			// Lives as long as the element: the listeners are on it alone.
+			spinWhenSwept(element);
+		}
 		// Only in the editor, and shown only while the caret is in the menu
 		// (`caret-in`): a way to add a course that does not need knowing a
 		// heading starts one. `scene-blocks.ts` answers it.
@@ -195,7 +221,7 @@ export class MenuNode extends ElementNode {
 		element.append(remove);
 		// The frame is the menu's own, not its courses': Lexical leaves it be.
 		for (const fixed of element.querySelectorAll<HTMLElement>(
-			`.menu-filters, .menu-art, .menu-head, .menu-intro, .${ADD_COURSE_CLASS}, .menu-key, .menu-foot, .${RESET_COPY_CLASS}, .${DELETE_MENU_CLASS}`
+			`.menu-filters, .${CONFETTI_CLASS}, .${SPINNERS_CLASS}, .menu-art, .menu-head, .menu-intro, .${ADD_COURSE_CLASS}, .menu-key, .menu-foot, .${RESET_COPY_CLASS}, .${DELETE_MENU_CLASS}`
 		)) {
 			setDOMUnmanaged(fixed);
 		}

@@ -108,6 +108,8 @@
 		color: inherit;
 		font: inherit;
 		font-size: var(--wa-font-size-2xs);
+		/* Close enough that a name on two lines ("Gacha capsule") reads as one. */
+		line-height: 1.15;
 		white-space: normal;
 		text-align: center;
 		cursor: pointer;

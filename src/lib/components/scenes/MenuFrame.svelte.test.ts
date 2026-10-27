@@ -1,7 +1,7 @@
 import { render } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { MENU_DESIGNS, mascotFor, menuCopy } from '$lib/scenes/menu-designs';
+import { MENU_DESIGNS, mascotFor, menuCopy, picturesFor } from '$lib/scenes/menu-designs';
 import { buildMenuFrame } from '$lib/scenes/menu-frame';
 import { defined } from '$lib/testing/defined';
 import MenuFrame from './MenuFrame.svelte';
@@ -33,12 +33,15 @@ describe('a menu’s frame', () => {
 		['office', 'Intensity', 'Price'],
 		['facts', null, 'Price'],
 		['clinic', 'Dose', null],
-		['pet', null, null]
+		['pet', null, null],
+		['decora', 'Intensity', null]
 	] as const) {
 		it(`is the same in the editor and out of it (${id}, key: ${scale ?? 'none'})`, () => {
 			const design = MENU_DESIGNS[id];
 			// One of its copy rewritten, where it has any.
-			const copy = { office: { memo: 'TO: Whoever is reading\nFROM: Me' } };
+			const copy = {
+				office: { memo: 'TO: Whoever is reading\nFROM: Me' }
+			};
 			const { container } = render(MenuFrame, {
 				design,
 				subtitle: 'For two',
@@ -51,11 +54,18 @@ describe('a menu’s frame', () => {
 			const built = document.createElement('section');
 			buildMenuFrame(built, {
 				title: design.title,
+				titleLetters: design.titleLetters === true,
+				subtitleBeads: design.subtitleBeads === true,
+				spinners: design.spinners ?? 0,
+				confetti: design.confetti === true,
 				subtitle: 'For two',
 				key: { scale, value, valueKey: design.valueKey },
 				copy: menuCopy(design, copy),
 				mascot: design.mascot
 					? { ...defined(mascotFor(design, {}), 'its mascot'), label: design.mascot.label }
+					: null,
+				pictures: design.pictures
+					? { label: design.pictures.label, shown: picturesFor(design, {}) }
 					: null
 			});
 

@@ -402,6 +402,33 @@ test.describe('menu designs', () => {
 			).toHaveText(' The night shift');
 			await bo.page.getByRole('button', { name: 'Reset' }).click();
 			await expect(labels).toHaveText(['TO:', 'RE:', 'FROM:']);
+
+			// Decora strings its subtitle as a kandi bracelet, a word at a time.
+			// It sways while pointed at, which Playwright would wait out as
+			// never stable.
+			await bo.page.emulateMedia({ reducedMotion: 'reduce' });
+			await options.getByRole('button', { name: 'Decora', exact: true }).click();
+			// Its confetti is drawn after the menu is, which Lexical once took
+			// out again as not its own.
+			await expect(surface(ada.page).locator('.menu-confetti > i').first()).toBeAttached();
+			await surface(bo.page).locator('.menu-subtitle').click();
+			await bo.page.keyboard.press('ControlOrMeta+a');
+			await bo.page.keyboard.type('Bo picks');
+			await expect(surface(ada.page).locator('.menu-subtitle .bead-word')).toHaveText([
+				'Bo',
+				'picks'
+			]);
+
+			// Its stickers either side of the title are picked as a course's are.
+			await surface(bo.page).locator('.menu-picture').first().click();
+			await bo.page
+				.locator('wa-popover.art-picker')
+				.getByRole('button', { name: 'Rainbow' })
+				.click();
+			await expect(surface(ada.page).locator('.menu-picture').first()).toHaveAttribute(
+				'data-art',
+				'rainbow'
+			);
 		} finally {
 			await ada.close();
 			await bo.close();

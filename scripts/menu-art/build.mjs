@@ -535,6 +535,172 @@ draw(
 	'<path d="M8 10 Q18 1 30 4 Q36 6 38 10 Q36 14 30 16 Q18 19 8 10 Z"/><path d="M9 10 L2 4 L2 16 Z"/>'
 );
 
+/* ── Decora ────────────────────────────────────────────────────────────── */
+
+// Die-cut stickers, as decora wearers cover everything in: the drawing,
+// with a white edge traced round its whole outline, leaves and all. The
+// edge is its silhouette blurred and cut off hard, which rounds it as a
+// cutter would; a fat stroke round one shape missed whatever stuck out of
+// it, and a dilation squared its curves.
+const dieCut = (body) =>
+	`<defs><filter id="cut" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur in="SourceAlpha" stdDeviation="1.6"/><feComponentTransfer><feFuncA type="linear" slope="14" intercept="-0.6"/></feComponentTransfer><feComposite in="SourceAlpha" operator="arithmetic" k2="1" k3="1"/><feComponentTransfer result="edge"><feFuncR type="linear" slope="0" intercept="1"/><feFuncG type="linear" slope="0" intercept="1"/><feFuncB type="linear" slope="0" intercept="1"/></feComponentTransfer><feMerge><feMergeNode in="edge"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><g filter="url(#cut)">${body}</g>`;
+const kawaiiFace = (x, y, scale = 1) =>
+	`<g transform="translate(${x} ${y}) scale(${scale})"><ellipse cx="-5" cy="0" rx="1.6" ry="2.2" fill="#3a2340"/><ellipse cx="5" cy="0" rx="1.6" ry="2.2" fill="#3a2340"/><path d="M-2.4 3 Q0 5.6 2.4 3" fill="none" stroke="#3a2340" stroke-width="1.3" stroke-linecap="round"/><ellipse cx="-8.5" cy="3.4" rx="2.4" ry="1.4" fill="#ff7aa8" opacity=".7"/><ellipse cx="8.5" cy="3.4" rx="2.4" ry="1.4" fill="#ff7aa8" opacity=".7"/></g>`;
+const starPath = (cx, cy, outer, inner) =>
+	`M${Array.from({ length: 10 }, (_, index) => {
+		const angle = -Math.PI / 2 + (index * Math.PI) / 5;
+		const r = index % 2 ? inner : outer;
+		return `${fixed(cx + r * Math.cos(angle))} ${fixed(cy + r * Math.sin(angle))}`;
+	}).join(' L')} Z`;
+const DECORA_RAINBOW = ['#ff5fa2', '#ff9f1c', '#ffd23f', '#3ddc84', '#3fa7ff', '#a86bff'];
+/** A shape with its corners softened by a stroke of its own colour. */
+const soft = (d, fill) =>
+	`<path d="${d}" fill="${fill}" stroke="${fill}" stroke-width="2.4" stroke-linejoin="round"/>`;
+
+draw(
+	'decora-star',
+	'0 0 50 50',
+	dieCut(soft(starPath(25, 27, 20, 9.5), '#ffd23f') + kawaiiFace(25, 28, 0.85))
+);
+draw(
+	'decora-heart',
+	'0 0 50 50',
+	dieCut(
+		soft(
+			'M25 42 C11 33 6 25 6 17 C6 10.5 10.5 7 15.5 7 C20 7 23 9.5 25 13 C27 9.5 30 7 34.5 7 C39.5 7 44 10.5 44 17 C44 25 39 33 25 42 Z',
+			'#ff5fa2'
+		) + kawaiiFace(25, 20, 0.85)
+	)
+);
+draw(
+	'decora-strawberry',
+	'0 0 50 50',
+	dieCut(
+		soft(
+			'M25 44 C15 40 9 30 10 21 C11 15.5 16 13.5 25 14.5 C34 13.5 39 15.5 40 21 C41 30 35 40 25 44 Z',
+			'#ff4d6d'
+		) +
+			`<g fill="#ffe9a8">${[
+				[18, 22],
+				[25, 21],
+				[32, 22],
+				[15, 29],
+				[22, 28],
+				[29, 29],
+				[35, 29],
+				[19, 35],
+				[27, 36],
+				[24, 41]
+			]
+				.map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx="1" ry="1.6"/>`)
+				.join('')}</g>` +
+			'<path d="M25 17 L16 11 L22.5 12.5 L25 5 L27.5 12.5 L34 11 Z" fill="#3ddc84" stroke="#2bb36a" stroke-width="1.2" stroke-linejoin="round"/>'
+	)
+);
+// A gacha capsule, the toy machines' plastic egg: a clear top, a white base.
+draw(
+	'decora-capsule',
+	'0 0 50 50',
+	dieCut(
+		`<path d="M7 25 A18 18 0 0 1 43 25 Z" fill="#7fd4ff"/><path d="M7 25 A18 18 0 0 0 43 25 Z" fill="#f4f1fb"/><rect x="6.5" y="23" width="37" height="4" rx="1.5" fill="#a86bff"/><circle cx="25" cy="25" r="18" fill="none" stroke="#b9b2cf" stroke-width="1.2"/><path d="M14 16 Q19 10 26 10" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" opacity=".85"/>${kawaiiFace(25, 34, 0.7)}`
+	)
+);
+draw(
+	'decora-smiley',
+	'0 0 50 50',
+	dieCut(`<circle cx="25" cy="25" r="18" fill="#3ddc84"/>${kawaiiFace(25, 25, 1.15)}`)
+);
+draw(
+	'decora-cherries',
+	'0 0 50 50',
+	dieCut(
+		'<path d="M16 34 Q22 15 33 8 M34 34 Q32 19 33 8" fill="none" stroke="#2bb36a" stroke-width="2.4" stroke-linecap="round"/><path d="M33 8 Q41 5 43 11 Q37 13 33 8 Z" fill="#3ddc84"/><circle cx="16" cy="35" r="8.5" fill="#ff3b6b"/><circle cx="34" cy="35" r="8.5" fill="#ff3b6b"/><circle cx="13" cy="32" r="2.2" fill="#fff" opacity=".8"/><circle cx="31" cy="32" r="2.2" fill="#fff" opacity=".8"/>'
+	)
+);
+draw(
+	'decora-ice-cream',
+	'0 0 50 50',
+	dieCut(
+		`${soft('M16 25 L25 45 L34 25 Z', '#f2b45c')}<path d="M19 30 L31 28 M21 36 L29 34" stroke="#d68a2c" stroke-width="1.4" stroke-linecap="round"/>${soft('M12 25 C10 15 16.5 7 25 7 C33.5 7 40 15 38 25 Z', '#ffa8d4')}${repeat(5, (index) => `<rect x="${15 + index * 4.4}" y="${12 + (index % 2) * 5}" width="3.4" height="1.4" rx=".7" fill="${DECORA_RAINBOW[index + 1]}" transform="rotate(${index * 35 - 40} ${16.7 + index * 4.4} ${12.7 + (index % 2) * 5})"/>`)}${kawaiiFace(25, 18, 0.65)}`
+	)
+);
+// A rainbow from a cloud at each end.
+draw(
+	'decora-rainbow',
+	'0 0 50 44',
+	dieCut(
+		`${repeat(5, (index) => `<path d="M${6 + index * 3} 32 A${19 - index * 3} ${19 - index * 3} 0 0 1 ${44 - index * 3} 32" fill="none" stroke="${DECORA_RAINBOW[index]}" stroke-width="3.2"/>`)}<g fill="#fff" stroke="#e4dcec" stroke-width="1"><circle cx="8" cy="34" r="4.5"/><circle cx="13" cy="33" r="4"/><circle cx="37" cy="33" r="4"/><circle cx="42" cy="34" r="4.5"/></g>`
+	)
+);
+// The pointer over a decora menu: a candy-pink arrow edged in white and
+// then plum, so it shows on the pink and on a white card alike, with a
+// star at its tail. Sized, as a cursor must be; its tip is at (3, 2).
+draw(
+	'decora-cursor',
+	'0 0 32 32',
+	'<path d="M3 2 L3 23 L8.5 18 L12.5 26.5 L16.5 24.8 L12.6 16.4 L20 16.4 Z" fill="#ff5fa2" stroke="#3a2340" stroke-width="4" stroke-linejoin="round" paint-order="stroke"/><path d="M3 2 L3 23 L8.5 18 L12.5 26.5 L16.5 24.8 L12.6 16.4 L20 16.4 Z" fill="#ff5fa2" stroke="#fff" stroke-width="1.8" stroke-linejoin="round" paint-order="stroke"/><path d="M5.5 7 L5.5 13" stroke="#fff" stroke-width="1.4" stroke-linecap="round" opacity=".8"/>' +
+		`<path d="${starPath(24.5, 25, 6, 2.8)}" fill="#ffd23f" stroke="#3a2340" stroke-width="3" stroke-linejoin="round" paint-order="stroke"/><path d="${starPath(24.5, 25, 6, 2.8)}" fill="#ffd23f" stroke="#fff" stroke-width="1.2" stroke-linejoin="round" paint-order="stroke"/>`,
+	'width="32" height="32"'
+);
+// The rest of decora's pointers, in the same candy pink edged in white and
+// plum: an I-beam for writing, its middle at (16, 16), and a pointing hand
+// for what can be tapped, its fingertip at (12, 2). Each shape is drawn
+// three times, plum, white and then pink, so the edges trace the outline
+// of them all together and none shows between them.
+const edged = (shapes) =>
+	`<g stroke="#3a2340" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">${shapes}</g><g stroke="#fff" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round">${shapes}</g><g stroke="none">${shapes}</g>`;
+draw(
+	'decora-cursor-text',
+	'0 0 32 32',
+	'<g fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4 H12.5 Q16 4 16 7.5 Q16 4 19.5 4 H22 M16 7.5 V24.5 M10 28 H12.5 Q16 28 16 24.5 Q16 28 19.5 28 H22" stroke="#3a2340" stroke-width="6"/><path d="M10 4 H12.5 Q16 4 16 7.5 Q16 4 19.5 4 H22 M16 7.5 V24.5 M10 28 H12.5 Q16 28 16 24.5 Q16 28 19.5 28 H22" stroke="#fff" stroke-width="4"/><path d="M10 4 H12.5 Q16 4 16 7.5 Q16 4 19.5 4 H22 M16 7.5 V24.5 M10 28 H12.5 Q16 28 16 24.5 Q16 28 19.5 28 H22" stroke="#ff5fa2" stroke-width="2"/></g>' +
+		`<path d="${starPath(25.5, 9, 4.6, 2.1)}" fill="#ffd23f" stroke="#3a2340" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke"/><path d="${starPath(25.5, 9, 4.6, 2.1)}" fill="#ffd23f" stroke="#fff" stroke-width="1" stroke-linejoin="round" paint-order="stroke"/>`,
+	'width="32" height="32"'
+);
+draw(
+	'decora-cursor-pointer',
+	'0 0 32 32',
+	`<g fill="#ff5fa2">${edged('<rect x="9.5" y="2" width="5" height="16" rx="2.5"/><rect x="14.3" y="10" width="4.6" height="9" rx="2.3"/><rect x="18.7" y="11.4" width="4.4" height="8" rx="2.2"/><rect x="22.9" y="13" width="4" height="7" rx="2"/><rect x="9" y="15" width="18" height="13" rx="5"/><ellipse cx="8" cy="19.5" rx="4.2" ry="2.5" transform="rotate(38 8 19.5)"/>')}</g><path d="M11 5 V10" stroke="#fff" stroke-width="1.2" stroke-linecap="round" opacity=".8"/><path d="M14.4 13 V17 M18.8 14 V18 M22.9 15.5 V18.5" stroke="#d6337f" stroke-width="1" stroke-linecap="round" opacity=".6"/><path d="M19 25.5 C16.6 24 16 23 16 22.1 C16 21.2 16.6 20.8 17.3 20.8 C18 20.8 18.6 21.3 19 21.9 C19.4 21.3 20 20.8 20.7 20.8 C21.4 20.8 22 21.2 22 22.1 C22 23 21.4 24 19 25.5 Z" fill="#fff"/>`,
+	'width="32" height="32"'
+);
+// The loose ends of a bracelet's string, past the bead at each end of a
+// line: a lazy curl, left and right, the string's own thickness and plum.
+const stringEnd = (d) =>
+	`<path d="${d}" fill="none" stroke="#5b3a63" stroke-width="1.5" stroke-linecap="round"/>`;
+draw(
+	'decora-string-end',
+	'0 0 18 20',
+	stringEnd('M0 10 C3 10 4 7.5 7 8.5 C10 9.5 9 13 12.5 12.5 C15 12 15.5 9.5 17 10.5')
+);
+draw(
+	'decora-string-start',
+	'0 0 18 20',
+	stringEnd('M18 10 C15 10 13.5 12.5 10.5 11.5 C7.5 10.5 8.5 7 5.5 7.5 C3 8 2.5 10.5 1 9.5')
+);
+// Two plasters crossed into an X, as decora wearers stick them on a cheek:
+// pink, with a heart on each pad.
+const plaster = (turn) =>
+	`<g transform="rotate(${turn} 35 35)"><rect x="1" y="24" width="68" height="22" rx="11" fill="#ffb3cb" stroke="#f592b3" stroke-width="1"/><g fill="#f592b3">${[8, 13, 18, 52, 57, 62].map((x) => `<circle cx="${x}" cy="31" r=".9"/><circle cx="${x}" cy="39" r=".9"/>`).join('')}</g><rect x="25" y="28" width="20" height="14" rx="3" fill="#fff7fa"/><path d="M35 39 C31 36.5 30 35 30 33.5 C30 32 31 31.3 32.2 31.3 C33.4 31.3 34.3 32 35 33 C35.7 32 36.6 31.3 37.8 31.3 C39 31.3 40 32 40 33.5 C40 35 39 36.5 35 39 Z" fill="#ff5fa2"/></g>`;
+draw('decora-plasters', '0 0 70 70', plaster(40) + plaster(-40));
+// The plastic snap clips decora piles into the hair, crossed into Xs and
+// stacked in rows, one with a star charm.
+const snapClip = (cx, cy, angle, colour, charm = '') =>
+	`<g transform="translate(${cx} ${cy}) rotate(${angle}) scale(.8) translate(-28 -7)"><path d="M3 7 C3 2.5 7 1 12 1 L52 5 C55.5 5.4 55.5 8.6 52 9 L12 13 C7 13 3 11.5 3 7 Z M10 7 C10 8.8 11.5 9.4 14 9.4 L44 7.6 C45 7.4 45 6.6 44 6.4 L14 4.6 C11.5 4.6 10 5.2 10 7 Z" fill="${colour}" fill-rule="evenodd" stroke="rgba(60,20,60,.35)" stroke-width=".8"/><path d="M6 4.2 Q16 2.4 30 3.4" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round" opacity=".7"/>${charm}</g>`;
+// One clip to a file, lying flat across the middle so it spins about its
+// own centre (`MenuDesign.spinners`); the design tilts and crosses them.
+for (const [name, colour, charm] of [
+	['pink', '#ff5fa2', ''],
+	['yellow', '#ffd23f', ''],
+	['blue', '#3fa7ff', ''],
+	['green', '#3ddc84', ''],
+	[
+		'purple',
+		'#a86bff',
+		`<path d="${starPath(8, 7, 7, 3.2)}" fill="#fff36b" stroke="#e0b800" stroke-width=".8" stroke-linejoin="round"/>`
+	]
+]) {
+	draw(`decora-clip-${name}`, '0 0 48 48', snapClip(24, 24, 0, colour, charm));
+}
+
 /* ── Love letter and royal decree ──────────────────────────────────────── */
 
 function waxSeal(name, letter, color) {
@@ -923,7 +1089,8 @@ draw(
 draw(
 	'flower-iris',
 	'0 0 80 80',
-	`${flowerStem('M40 46 V78')}${flowerLeaf('M40 76 Q30 54 34 40 Q38 58 40 76')}<path d="M40 10 Q48 20 44 34 Q40 40 36 34 Q32 20 40 10 Z" fill="#7a63c9"/><path d="M38 34 Q22 30 16 42 Q28 46 38 38 Z" fill="#6a52b8"/><path d="M42 34 Q58 30 64 42 Q52 46 42 38 Z" fill="#6a52b8"/><path d="M22 40 Q28 38 34 38 M58 40 Q52 38 46 38" stroke="#f2c14e" stroke-width="2" stroke-linecap="round"/><path d="M40 14 V32" stroke="#4e3a96" stroke-width="1.2"/>`
+	// The stem from under the petals, so that it meets them.
+	`${flowerStem('M40 36 V78')}${flowerLeaf('M40 76 Q30 54 34 40 Q38 58 40 76')}<path d="M40 10 Q48 20 44 34 Q40 40 36 34 Q32 20 40 10 Z" fill="#7a63c9"/><path d="M38 34 Q22 30 16 42 Q28 46 38 38 Z" fill="#6a52b8"/><path d="M42 34 Q58 30 64 42 Q52 46 42 38 Z" fill="#6a52b8"/><path d="M22 40 Q28 38 34 38 M58 40 Q52 38 46 38" stroke="#f2c14e" stroke-width="2" stroke-linecap="round"/><path d="M40 14 V32" stroke="#4e3a96" stroke-width="1.2"/>`
 );
 draw(
 	'flower-bluebell',
@@ -943,7 +1110,15 @@ draw(
 draw(
 	'flower-forget-me-not',
 	'0 0 80 80',
-	`${flowerStem('M40 50 Q38 64 40 78')}${flowerLeaf('M39 64 Q26 58 22 64 Q30 70 39 66')}${[
+	// A stalk from the stem to each flower, under the petals.
+	`${flowerStem('M40 50 Q38 64 40 78')}${[
+		'M40 54 Q32 40 30 28',
+		'M40 54 Q48 38 50 26',
+		'M40 54 Q30 52 24 45',
+		'M40 54 Q50 52 56 45'
+	]
+		.map((d) => `<path d="${d}" stroke="#5f8a42" stroke-width="1.6" fill="none"/>`)
+		.join('')}${flowerLeaf('M39 64 Q26 58 22 64 Q30 70 39 66')}${[
 		[30, 26, 9],
 		[50, 24, 9],
 		[40, 40, 10],
@@ -959,10 +1134,11 @@ draw(
 draw(
 	'flower-blossom',
 	'0 0 80 80',
-	`<path d="M8 70 Q30 56 44 58 Q60 60 74 46" stroke="#6b4a32" stroke-width="3.5" fill="none" stroke-linecap="round"/>${[
-		[30, 38, 11],
-		[56, 34, 10],
-		[44, 18, 8]
+	// The flowers sit on the branch, two over it and one on a short twig.
+	`<path d="M8 70 Q30 56 44 58 Q60 60 74 46" stroke="#6b4a32" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M44 58 Q41 50 43 42" stroke="#6b4a32" stroke-width="2" fill="none" stroke-linecap="round"/>${[
+		[28, 53, 11],
+		[57, 50, 10],
+		[43, 40, 8]
 	]
 		.map(
 			([x, y, r]) =>
@@ -979,6 +1155,122 @@ draw(
 	'flower-lily',
 	'0 0 80 80',
 	`${flowerStem('M40 46 Q42 62 40 78')}${flowerLeaf('M41 66 Q56 58 60 64 Q52 70 41 68')}${repeat(6, (i) => `<path d="M40 34 Q34 20 40 6 Q46 20 40 34 Z" fill="#fbf3ea" stroke="#e6c9b8" stroke-width="1" transform="rotate(${i * 60} 40 34)"/>`)}${repeat(6, (i) => `<path d="M40 34 L40 18" stroke="#f0a35e" stroke-width="1.2" transform="rotate(${i * 60 + 30} 40 34)"/><circle cx="40" cy="18" r="1.6" fill="#b5532b" transform="rotate(${i * 60 + 30} 40 34)"/>`)}`
+);
+
+// Wisteria: long hanging clusters of little pea flowers from a twisting
+// woody vine with feathery leaves. Each flower is a pale, hooded banner
+// petal with a yellow spot at its base over darker wings. They open from
+// the top of the cluster down, so along it they grow steadily smaller,
+// further apart and paler, with no sudden change; each hangs to one side
+// or the other in turn, so the cluster's outline is bumpy, not a cone.
+const mix = (from, to, t) =>
+	`#${[0, 2, 4]
+		.map((at) => {
+			const a = Number.parseInt(from.slice(at + 1, at + 3), 16);
+			const b = Number.parseInt(to.slice(at + 1, at + 3), 16);
+			return Math.round(a + (b - a) * t)
+				.toString(16)
+				.padStart(2, '0');
+		})
+		.join('')}`;
+const wisteriaFlower = (x, y, side, scale, t) =>
+	`<g transform="translate(${fixed(x)} ${fixed(y)}) rotate(${side * 28}) scale(${fixed(scale)})"><ellipse cx="0" cy="1.8" rx="2.1" ry="1.7" fill="${mix('#7553c2', '#a990de', t)}"/><ellipse cx="0" cy="0" rx="2.8" ry="2.3" fill="${mix('#c7b2ee', '#e0d6f6', t)}"/><ellipse cx="0" cy="0.8" rx="0.8" ry="0.6" fill="#f2d36b"/></g>`;
+const wisteriaCluster = (top, x, length, sway) => {
+	const along = (t) => x + Math.sin(t * Math.PI) * sway;
+	const rows = 20;
+	const flowers = repeat(rows, (n) => {
+		const t = n / (rows - 1);
+		// Further apart lower down: the rows' spacing grows along the cluster.
+		const y = top + 3 + length * t ** 1.25;
+		const side = n % 2 === 0 ? -1 : 1;
+		const wide = 3.4 * (1 - t * 0.55);
+		const scale = 1.15 - t * 0.6;
+		const centre = along(t);
+		const middle = n % 3 === 1 && t < 0.6 ? wisteriaFlower(centre, y + 1.6, 0, scale * 0.9, t) : '';
+		return `${wisteriaFlower(centre + side * wide, y, side, scale, t)}${middle}`;
+	});
+	return `<path d="M${x} ${top} Q${fixed(x + sway)} ${fixed(top + length / 2)} ${fixed(along(1))} ${fixed(top + length + 2)}" stroke="#7d8a4a" stroke-width=".9" fill="none"/>${flowers}`;
+};
+const pinnateLeaf = (d, leaflets) =>
+	`<path d="${d}" stroke="#6f9a52" stroke-width="1" fill="none"/>${leaflets.map(([x, y, turn]) => `<ellipse cx="${x}" cy="${y}" rx="3.4" ry="1.5" fill="#7fa75e" transform="rotate(${turn} ${x} ${y})"/>`).join('')}`;
+draw(
+	'flower-wisteria',
+	'0 0 80 80',
+	// Every stalk starts inside the vine's stroke, where the vine is at its
+	// x, and the leaves hang down inside the picture.
+	`${pinnateLeaf('M66 7 Q71 13 72 24', [
+		[65, 12, 40],
+		[71, 10, -30],
+		[67, 16, 40],
+		[73, 14, -30],
+		[69, 20, 40],
+		[75, 19, -30],
+		[72, 26, 80]
+	])}${pinnateLeaf('M11 11 Q7 18 7 28', [
+		[11, 16, -40],
+		[5, 15, 30],
+		[11, 21, -40],
+		[5, 21, 30],
+		[10, 26, -40],
+		[5, 27, 30],
+		[7, 31, 90]
+	])}<path d="M0 14 C14 6 26 18 42 10 S66 6 80 13" stroke="#6b4a32" stroke-width="3.2" fill="none" stroke-linecap="round"/><path d="M4 12 C18 12 28 8 42 13 S64 12 76 9" stroke="#856048" stroke-width="1.4" fill="none" stroke-linecap="round"/>${wisteriaCluster(12, 21, 50, 2)}${wisteriaCluster(10, 41, 62, -3)}${wisteriaCluster(7, 57, 46, 2.5)}`
+);
+// A moth orchid: two flowers on an arching stem, each two round petals
+// over three narrow ones, with a deep pink lip.
+const orchid = (x, y, scale) =>
+	`<g transform="translate(${x} ${y}) scale(${scale})">${[0, 120, 240].map((turn) => `<ellipse cx="0" cy="-9" rx="3.6" ry="9" fill="#f7e3f0" stroke="#e6bcd6" stroke-width=".7" transform="rotate(${turn})"/>`).join('')}<ellipse cx="-8" cy="-1" rx="8" ry="7" fill="#fbeef6" stroke="#e6bcd6" stroke-width=".7"/><ellipse cx="8" cy="-1" rx="8" ry="7" fill="#fbeef6" stroke="#e6bcd6" stroke-width=".7"/><path d="M-4 2 Q0 12 4 2 Q0 5 -4 2 Z" fill="#c2306e"/><circle cx="0" cy="0" r="2.4" fill="#f2c14e"/><path d="M-5 -2 Q-8 -1 -10 1 M5 -2 Q8 -1 10 1" stroke="#d9759f" stroke-width=".8" fill="none"/></g>`;
+draw(
+	'flower-orchid',
+	'0 0 80 80',
+	`<path d="M18 78 Q16 46 36 34 Q50 26 58 18" stroke="#5f8a42" stroke-width="2.5" fill="none"/>${flowerLeaf('M18 76 Q2 70 4 60 Q14 64 18 72')}${flowerLeaf('M19 76 Q34 74 40 64 Q28 64 19 72')}${orchid(30, 42, 1)}${orchid(56, 20, 0.85)}`
+);
+// A hydrangea: one round head of little four-petalled florets, blue
+// shading to violet, over two broad leaves.
+draw(
+	'flower-hydrangea',
+	'0 0 80 80',
+	// The stem from inside the head, so that it meets it.
+	`${flowerStem('M40 40 V78')}${flowerLeaf('M40 62 Q22 50 14 58 Q26 70 40 66')}${flowerLeaf('M40 64 Q58 52 66 60 Q54 72 40 68')}${[
+		[40, 30],
+		[30, 24],
+		[50, 24],
+		[26, 35],
+		[54, 35],
+		[34, 44],
+		[46, 44],
+		[40, 18],
+		[31, 14 + 20],
+		[49, 14 + 20],
+		[22, 26],
+		[58, 26],
+		[40, 40]
+	]
+		.map(([x, y], at) => {
+			const colour = ['#7fa6e6', '#8f95e0', '#a48bd9', '#93b4ea'][at % 4];
+			return `${repeat(4, (petal) => `<ellipse cx="${x}" cy="${y - 3.2}" rx="2.8" ry="3.4" fill="${colour}" stroke="#6f86c9" stroke-width=".5" transform="rotate(${petal * 90 + at * 20} ${x} ${y})"/>`)}<circle cx="${x}" cy="${y}" r="1" fill="#eef2fb"/>`;
+		})
+		.join('')}`
+);
+// A dahlia: rings of pointed petals, each ring smaller and deeper red,
+// round a dark heart.
+draw(
+	'flower-dahlia',
+	'0 0 80 80',
+	`${flowerStem('M40 50 Q38 64 40 78')}${flowerLeaf('M39 66 Q24 58 18 64 Q28 72 39 68')}${[
+		[16, 23, '#f27a92', 0],
+		[12, 17, '#e35477', 11],
+		[10, 12, '#cc3560', 0],
+		[8, 7, '#a8234a', 18]
+	]
+		.map(([count, reach, colour, offset]) =>
+			repeat(
+				count,
+				(petal) =>
+					`<path d="M40 30 Q${fixed(40 - reach * 0.32)} ${fixed(30 - reach * 0.6)} 40 ${fixed(30 - reach)} Q${fixed(40 + reach * 0.32)} ${fixed(30 - reach * 0.6)} 40 30 Z" fill="${colour}" stroke="#9e1f44" stroke-width=".5" transform="rotate(${fixed((petal * 360) / count + offset)} 40 30)"/>`
+			)
+		)
+		.join('')}<circle cx="40" cy="30" r="2.6" fill="#6b1430"/>`
 );
 
 /* ── Cross-stitch sampler ──────────────────────────────────────────────── */

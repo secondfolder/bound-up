@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { markBraceletLines } from '$lib/scenes/bracelet';
+	import { keepConfetti } from '$lib/scenes/confetti';
 	import {
 		copyFields,
 		designTitle,
@@ -11,7 +13,16 @@
 		picturesFor,
 		type ShownMenuCopy
 	} from '$lib/scenes/menu-designs';
-	import { ART_PIECES, COURSES_CLASS, HOLD_OPEN, MENU_FILTERS } from '$lib/scenes/menu-frame';
+	import {
+		ART_PIECES,
+		beadRuns,
+		COURSES_CLASS,
+		characters,
+		HOLD_OPEN,
+		MENU_FILTERS
+	} from '$lib/scenes/menu-frame';
+	import { playWhilePointedAt } from '$lib/scenes/play-on-hover';
+	import { spinWhenSwept } from '$lib/scenes/spinners';
 	import '$lib/scenes/scene-blocks.css';
 	import '$lib/scenes/menu-designs.css';
 
@@ -62,6 +73,8 @@
 	const words = $derived(menuCopy(design, copy));
 	const shownMascot = $derived(mascotFor(design, mascot));
 	const shownPictures = $derived(picturesFor(design, pictures));
+	const shownTitle = $derived(title || designTitle(design, mascot));
+	const shownSubtitle = $derived(subtitle || design.subtitle || '');
 	/** The design's copy placed in `place`, as `buildMenuFrame` places it. */
 	const placed = (place: string) => words.filter((each) => each.place === place);
 </script>
@@ -91,6 +104,7 @@
 	data-mascot={shownMascot?.id}
 	aria-label={surprise ? 'A surprise' : label}
 	aria-hidden={label === undefined && !surprise ? 'true' : undefined}
+	{@attach (menu: HTMLElement) => (surprise ? undefined : playWhilePointedAt(menu))}
 >
 	<svg
 		class="menu-filters"
@@ -99,6 +113,23 @@
 			svg.innerHTML = MENU_FILTERS;
 		}}
 	></svg>
+	{#if design.confetti}
+		<span
+			class="menu-confetti"
+			contenteditable="false"
+			aria-hidden="true"
+			{@attach (layer: HTMLElement) => (surprise ? undefined : keepConfetti(layer))}
+		></span>
+	{/if}
+	{#if design.spinners}
+		<span
+			class="menu-spinners"
+			contenteditable="false"
+			aria-hidden="true"
+			{@attach (row: HTMLElement) => (row.parentElement ? spinWhenSwept(row.parentElement) : undefined)}
+			>{#each Array.from({ length: design.spinners }) as _, piece (piece)}<i></i>{/each}</span
+		>
+	{/if}
 	<div class="menu-sheet">
 		<span class="menu-art" contenteditable="false">
 			{#each pieces as piece (piece)}<i
@@ -127,8 +158,23 @@
 						></span>{/each}</span
 				>
 			{/if}
-			<span class="menu-title">{title || designTitle(design, mascot)}</span>
-			<span class="menu-subtitle">{subtitle || design.subtitle || ''}</span>
+			<span class="menu-title" data-letters={design.titleLetters ? '' : undefined}
+				>{#if design.titleLetters && shownTitle !== ''}{#each characters(shownTitle) as letter, at (at)}<span
+							class={['title-letter', letter.gap && 'gap']}
+							style:--letter={at}>{letter.char}</span
+						>{/each}{:else}{shownTitle}{/if}</span
+			>
+			<span
+				class="menu-subtitle"
+				data-beads={design.subtitleBeads ? '' : undefined}
+				{@attach (subtitle: HTMLElement) =>
+					design.subtitleBeads ? markBraceletLines(subtitle) : undefined}
+				>{#if design.subtitleBeads && shownSubtitle !== ''}{#each beadRuns(shownSubtitle) as run, at (at)}{#if run.gap}<span
+							class="bead gap">{run.char}</span
+						>{:else}<span class="bead-word"
+							>{#each run.word as char, place (place)}<span class="bead">{char}</span>{/each}</span
+						>{/if}{/each}{:else}{shownSubtitle}{/if}</span
+			>
 			<span class="menu-note">{#each placed('note') as each (each.key)}{@render copyText(each)}{/each}</span>
 			{#each placed('head') as each (each.key)}{@render copyText(each)}{/each}
 		</div>

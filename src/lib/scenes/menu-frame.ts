@@ -8,6 +8,8 @@
  *
  *   .scene-menu                  the menu: the table, desk or wall it lies on
  *     svg.menu-filters           the chalk filters, below
+ *     .menu-confetti > i         confetti falling behind it, on a design with it
+ *     .menu-spinners > i × n     pieces along its top that spin, on a design with them
  *     .menu-sheet                the card, slate, page or board itself
  *       .menu-art > i × ART_PIECES  drawings over the sheet, placed by each design
  *       .menu-head               the menu's heading
@@ -36,12 +38,14 @@
  */
 
 import { MAX_RATING } from './blocks';
+import { CONFETTI_CLASS } from './confetti';
 import {
 	copyFields,
 	type MenuArtChoice,
 	type MenuMascot,
 	type ShownMenuCopy
 } from './menu-designs';
+import { SPINNERS_CLASS } from './spinners';
 
 /** How many drawings a design can place over its sheet, each with `::before` and `::after`. */
 export const ART_PIECES = 8;
@@ -90,9 +94,21 @@ export function buildMenuFrame(
 		copy,
 		mascot = null,
 		mascotButton = false,
-		pictures = null
+		pictures = null,
+		titleLetters = false,
+		subtitleBeads = false,
+		spinners = 0,
+		confetti = false
 	}: {
 		title: string;
+		/** Its title drawn a letter at a time (`MenuDesign.titleLetters`). */
+		titleLetters?: boolean;
+		/** Its subtitle drawn in beads (`MenuDesign.subtitleBeads`). */
+		subtitleBeads?: boolean;
+		/** How many pieces spin along its top (`MenuDesign.spinners`). */
+		spinners?: number;
+		/** Whether confetti falls behind it (`MenuDesign.confetti`); `confetti.ts` fills it. */
+		confetti?: boolean;
 		subtitle: string;
 		key: MenuKey;
 		copy: readonly ShownMenuCopy[];
@@ -151,11 +167,17 @@ export function buildMenuFrame(
 		}
 		head.append(row);
 	}
-	head.append(
-		element('span', 'menu-title', title),
-		element('span', 'menu-subtitle', subtitle),
-		note
-	);
+	const titleElement = element('span', 'menu-title', title);
+	if (titleLetters) {
+		titleElement.dataset.letters = '';
+		fillCopy(titleElement, title);
+	}
+	const subtitleElement = element('span', 'menu-subtitle', subtitle);
+	if (subtitleBeads) {
+		subtitleElement.dataset.beads = '';
+		fillCopy(subtitleElement, subtitle);
+	}
+	head.append(titleElement, subtitleElement, note);
 	const intro = fixed(element('div', 'menu-intro'));
 	const courses = element('div', COURSES_CLASS);
 	const scale = element('span', 'menu-key-scale');
@@ -186,7 +208,21 @@ export function buildMenuFrame(
 
 	const sheet = element('div', 'menu-sheet');
 	sheet.append(art, head, intro, courses, keyElement, foot);
-	menu.append(filters, sheet);
+	menu.append(filters);
+	if (confetti) {
+		const layer = fixed(element('span', CONFETTI_CLASS));
+		layer.setAttribute('aria-hidden', 'true');
+		menu.append(layer);
+	}
+	if (spinners > 0) {
+		const row = fixed(element('span', SPINNERS_CLASS));
+		row.setAttribute('aria-hidden', 'true');
+		for (let piece = 0; piece < spinners; piece += 1) {
+			row.append(doc.createElement('i'));
+		}
+		menu.append(row);
+	}
+	menu.append(sheet);
 	drawMenuKey(menu, key);
 	drawMenuMascot(menu, mascot);
 	drawMenuPictures(menu, pictures);
@@ -286,14 +322,83 @@ export const HOLD_OPEN = '\u200b';
 /** The class of a line of copy that is fields (`MenuCopy.fields`), and of its two halves. */
 export const COPY_LINE_CLASS = 'copy-line';
 
+/** The class of each character of a subtitle drawn in beads (`MenuDesign.subtitleBeads`). */
+export const BEAD_CLASS = 'bead';
+
+/** The class of each character of a title drawn a letter at a time (`MenuDesign.titleLetters`). */
+export const TITLE_LETTER_CLASS = 'title-letter';
+
+/** Words drawn a character at a time, each marked as a gap between words or not. */
+export function characters(text: string): { char: string; gap: boolean }[] {
+	return [...text].map((char) => ({ char, gap: char.trim() === '' }));
+}
+
+/** The class of a word's beads together (`beadRuns`). */
+export const BEAD_WORD_CLASS = 'bead-word';
+
+/** Each space on its own, kept by `split` because it is captured. */
+const EACH_SPACE = /(?<space>\s)/;
+
 /**
- * Puts a copy's words in its element: as they are, or for copy that is
+ * Words drawn in beads, a word at a time between its spaces, so that a
+ * bracelet too long for its line wraps between words rather than in one.
+ */
+export function beadRuns(
+	text: string
+): ({ gap: true; char: string } | { gap: false; word: string[] })[] {
+	return text
+		.split(EACH_SPACE)
+		.filter((piece) => piece !== '')
+		.map((piece) =>
+			piece.trim() === '' ? { gap: true, char: piece } : { gap: false, word: [...piece] }
+		);
+}
+
+/**
+ * Puts a copy's words in its element: as they are; for copy that is
  * fields (`data-fields`), a `.copy-line` per line holding a `.copy-label`
  * and a `.copy-value`, for a design to print the one and handwrite the
- * other. Spans rather than the words alone because no selector reaches
- * part of a line; `MenuFrame.svelte` draws the same.
+ * other. A title drawn a letter at a time (`data-letters`) is filled here
+ * too, a `.title-letter` each, and so is a subtitle drawn in beads
+ * (`data-beads`), a `.bead` per character, each word's together in a
+ * `.bead-word`. Spans rather than the words alone because no selector
+ * reaches part of a line; `MenuFrame.svelte` draws the same.
  */
 export function fillCopy(words: HTMLElement, text: string): void {
+	const span = (className: string, content: string) => {
+		const made = words.ownerDocument.createElement('span');
+		made.className = className;
+		made.textContent = content;
+		return made;
+	};
+	// A bead or a letter each: loose spans rather than lines, so `copyTextOf`
+	// reads them back as one run of words, and the caret is put back among
+	// them by counting characters as anywhere else.
+	if ('beads' in words.dataset && text !== '') {
+		words.replaceChildren(
+			...beadRuns(text).map((run) => {
+				if (run.gap) {
+					return span(`${BEAD_CLASS} gap`, run.char);
+				}
+				const word = span(BEAD_WORD_CLASS, '');
+				word.append(...run.word.map((char) => span(BEAD_CLASS, char)));
+				return word;
+			})
+		);
+		return;
+	}
+	if ('letters' in words.dataset && text !== '') {
+		// Each with its place in the title (`--letter`), for a design to run
+		// something along it letter by letter.
+		words.replaceChildren(
+			...characters(text).map(({ char, gap }, at) => {
+				const letter = span(gap ? `${TITLE_LETTER_CLASS} gap` : TITLE_LETTER_CLASS, char);
+				letter.style.setProperty('--letter', String(at));
+				return letter;
+			})
+		);
+		return;
+	}
 	if (!('fields' in words.dataset) || text === '') {
 		words.textContent = text;
 		// A last line still empty, just started: a line break at the very end
@@ -303,13 +408,6 @@ export function fillCopy(words: HTMLElement, text: string): void {
 		}
 		return;
 	}
-	const doc = words.ownerDocument;
-	const span = (className: string, content: string) => {
-		const made = doc.createElement('span');
-		made.className = className;
-		made.textContent = content;
-		return made;
-	};
 	words.replaceChildren(
 		...copyFields(text).map(({ label, value }) => {
 			const line = span(COPY_LINE_CLASS, '');
@@ -358,8 +456,21 @@ export function drawMenuHeading(
 	menu: HTMLElement,
 	{ title, subtitle }: { title: string; subtitle: string }
 ): void {
-	setText(menu, '.menu-title', title);
-	setText(menu, '.menu-subtitle', subtitle);
+	for (const [selector, text] of [
+		['.menu-title', title],
+		['.menu-subtitle', subtitle]
+	] as const) {
+		const found = menu.querySelector<HTMLElement>(selector);
+		// Drawn a character at a time, it is filled as copy is; not while it
+		// is typed in, as `setText`.
+		if (found && ('letters' in found.dataset || 'beads' in found.dataset)) {
+			if (copyTextOf(found) !== text && found.ownerDocument.activeElement !== found) {
+				fillCopy(found, text);
+			}
+		} else {
+			setText(menu, selector, text);
+		}
+	}
 }
 
 /**

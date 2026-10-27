@@ -317,12 +317,12 @@ it again.
 
 A menu has a design (`menu-designs.ts`), stored on it, so both partners see
 the same one, and chosen in the menu's options from previews that are each
-design itself, at half size, two to a row. There are twenty-three, from
+design itself, at half size, two to a row. There are twenty-four, from
 restaurant menus (fine dining, a diner, an izakaya, a bistro's slate, a
 trattoria, a deco lounge) to kink vibes (a dungeon board, a glossy magazine
-cover, a club ticket, a nutrition label, pet play, a love letter, a
-prescription pad, a bedtime story, a royal decree, a corkboard, a tarot
-spread, seed packets, a cross-stitch sampler, a toy chest and more). Fine
+cover, a club ticket, a nutrition label, pet play, Harajuku decora, a love
+letter, a prescription pad, a bedtime story, a royal decree, a corkboard, a
+tarot spread, seed packets, a cross-stitch sampler, a toy chest and more). Fine
 dining is the default, and an id this build does not know reads as it.
 
 - **Every menu has the same frame** (`menu-frame.ts`): a sheet with drawings
@@ -362,9 +362,38 @@ dining is the default, and an id this build does not know reads as it.
   label (`HOLD_OPEN`, never part of the words): with nothing there, the
   browser moved a caret to the end of the line before, and beside a lone
   line break drew it well below the line.
+- **A title drawn a letter at a time** (`MenuDesign.titleLetters`: decora's,
+  each letter its own colour of the rainbow) and **a subtitle drawn in
+  beads** (`MenuDesign.subtitleBeads`: decora's kandi bracelet, "MORE IS
+  MORE") are drawn a span per character (`.title-letter`, `.bead`; a space
+  is also `.gap`), since no selector reaches one letter. A beaded
+  subtitle's words are each a `.bead-word` with a pony bead at either end,
+  its last bead lying under the next word's first, so one bead is the gap
+  and the string runs unbroken; a space is nothing to see. Wrapped, it
+  breaks only between words, and every line is a bracelet of its own,
+  beaded at both ends, with the string's loose ends curling out past them.
+  Where a line ends is only known once it is laid out, so `bracelet.ts`
+  marks each line's first and last word (`data-line-start`,
+  `data-line-end`) and marks them again when the subtitle's width or words
+  change; the ends are drawn out of the flow, since moving a word onto
+  another line would change the marks, and round again. Each of a lettered
+  title's letters has its place in the title (`--letter`), for a wave to
+  run along all of it. The spans are loose rather than lines, so they
+  read back as one run of words, and they are split again as they are
+  typed, the caret put back by counting characters, as fields are. A bead
+  is a block and not a grid, though a grid would centre its letter: a grid
+  draws no whitespace-only text, so a space had nowhere for the caret, and
+  what was typed next went in before the space.
+- **Pieces that spin** (`MenuDesign.spinners`: decora's hair clips along
+  its top) are a row of `<i>`s the frame adds before the sheet. Each spins
+  on its own as the pointer comes over it (`spinners.ts`, attached by the
+  menu node and by `MenuFrame.svelte`): further the faster the pointer was
+  moving (a quarter turn to four), the way it was moving, and from wherever
+  an earlier spin has it. It comes to rest wherever the spin ends, not
+  where the design set it, so a sweep leaves its mark. Nothing spins for anyone who asked for less motion.
 - **A course's picture** (`MenuDesign.courseArt`): on a design whose courses
   each have one (the toy chest's toys, the toy on each pet card's corner,
-  and each seed packet's flower), each course shows the design's next
+  each seed packet's flower, and the sticker on each decora card), each course shows the design's next
   picture in turn by its place, or the one someone picked by tapping it
   (`MenuArtPicker`, a popover like an item's rating). The pick is kept on the
   course, per design (`art`), so it goes with the course if it moves and
@@ -378,7 +407,10 @@ dining is the default, and an id this build does not know reads as it.
   `--course-art` (`courseArtVars`).
 - **A row of pictures in the heading** (`MenuDesign.pictures`): the
   sampler's bunny, flower and fox, each of which can be changed to another
-  stitching by tapping it. The design names the default for each place in
+  stitching by tapping it, and decora's star and heart either side of its
+  title, from the same stickers as its courses (the row is
+  `display: contents`, so each picture takes its own place in the
+  heading's grid). The design names the default for each place in
   the row; what is picked is kept on the menu, per design and per place
   (`pictures`, `picturesFor`).
 - **A design's mascot** (`MenuDesign.mascot`): the pet design's pup, which
@@ -393,6 +425,44 @@ dining is the default, and an id this build does not know reads as it.
   colour, a tarot frame) repeats every four courses; the cork board tilts
   each note its own way, from two tilts in cycles of five and three courses
   added together, so the same tilt comes round only every fifteen.
+  A design may move (the bimbo's twinkles; decora's confetti, falling
+  slowly and spinning each at a pace of its own, and bobbing stickers,
+  and, only while pointed at, its clips spinning, its title's hopping
+  letters, each card's frame in a way of its own (the stripes drifting,
+  the dots swelling by halves, the checks trading shades, the rainbow
+  running round, some through registered custom properties so a gradient
+  can animate), and a wave of swelling beads along an item's rating, the
+  string staying put), only
+  under `prefers-reduced-motion: no-preference`, and a title being typed in
+  holds still. What plays while pointed at is not `:hover` but a mark,
+  `data-playing`, which `play-on-hover.ts` puts on the title or an item as
+  the pointer comes over it and, when it leaves, takes off only
+  once what the mark set going has finished the cycle it was in: a
+  `:hover` animation stops dead, snapping back from wherever it had got
+  to. So every such cycle ends as it began, and coming back before it ends
+  plays on. A card's frame is different: its animation is always there,
+  paused, and runs only while pointed at (`animation-play-state`), so it
+  stops wherever it is and goes on from there. Decora's confetti (`MenuDesign.confetti`) is a layer of
+  its own behind the menu that `confetti.ts` fills to suit its size: the
+  menu is cut into lanes across and slots down, a piece to each, and each
+  piece is worked out from its lane and slot alone (where, how fast, what:
+  mostly rainbow sprinkles, now and then a star), so the confetti is as
+  thick on any size of menu, and a menu that grows keeps the pieces it had
+  falling as they were and gains pieces only where it grew. A fall is the
+  menu's height, in `cqh` units from a size container. The layer is marked
+  unmanaged (`setDOMUnmanaged`), as the rest of the frame is, or Lexical
+  takes the pieces added to it for stray DOM and removes them. Nothing a
+  popover
+  is anchored to may move: a picture that wiggles is drawn inside its
+  button, which stays put, since the picker followed the button up and
+  down. Decora also has pointers of its own
+  over the menu (an arrow, an I-beam where words are written, a pointing
+  hand for what can be tapped: files in `static/menu-art/`), set on the
+  menu itself to outrank the editor's. Its stickers have a white edge
+  traced round their whole silhouette by an SVG filter (blurred and cut
+  off hard), since a stroke round one shape missed whatever stuck out of
+  it. A Playwright click waits for an element to stop moving, so a spec
+  that taps something animated emulates reduced motion first.
   The love letter writes each course as a sentence ("First, Starters, which
   I shall begin with this, that and the other"), in six ways from the first
   course's to the last's: the first and the last two always go first and

@@ -40,6 +40,8 @@ const FAMILIES = [
 	['Jost', 'wght@400;500', 'OFL'],
 	['Kalam', 'wght@400;700', 'OFL'],
 	['La Belle Aurore', 'wght@400', 'OFL'],
+	['M PLUS Rounded 1c', 'wght@500;800', 'OFL'],
+	['Mochiy Pop One', 'wght@400', 'OFL'],
 	['Monoton', 'wght@400', 'OFL'],
 	['Oswald', 'wght@400;600', 'OFL'],
 	['Pinyon Script', 'wght@400', 'OFL'],
