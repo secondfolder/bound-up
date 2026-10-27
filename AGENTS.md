@@ -452,6 +452,9 @@ load data is serialised into the HTML of every page. Whitelist fields, as
   `CheckboxField.svelte` for a yes or no — never a native `<input>`. A form
   whose action reads a sealed record rather than a superform still builds a
   superform, from `defaults()` in the browser, to use them (`RewardForm`).
+  A field outside any form, such as a link to copy, is `InputField` with a
+  `value` and no `superform`, and `selectOnFocus` selects all of it on a
+  click (`MenuLinkPopover`, the kink list's `ShareLink`).
 - **An `$effect` that reads the `data` prop re-runs on every `invalidate()`.**
   `data` is reassigned each time a load re-runs, so the effect's dependency is
   the whole prop rather than the field you read from it. For an effect that sets

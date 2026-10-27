@@ -48,6 +48,12 @@
 	{describeUser}
 	{cursorLabel}
 	partnerLabel={name}
+	menuHref={(menuId) =>
+		resolve('/(auth-required)/(app)/partner/[id]/notebook/[entryId]/menus/[menuId]', {
+			id: partnershipId,
+			entryId: data.entry.id,
+			menuId
+		})}
 	onGone={() =>
 		goto(resolve('/(auth-required)/(app)/partner/[id]/notebook', { id: partnershipId }))}
 />

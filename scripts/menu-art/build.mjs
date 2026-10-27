@@ -311,19 +311,64 @@ for (const [index, body] of GLASSES.entries()) {
 
 /* ── Trattoria ─────────────────────────────────────────────────────────── */
 
+/**
+ * The olive sprig: a bough curving up and over, its leaves and olives all
+ * growing from it. Each is placed by where it is along the bough (`t`), at
+ * the bough's own point there, so nothing floats free of it, however the
+ * curve is changed: a leaf starts on the bough and points along it and out
+ * to one side, and an olive hangs from it on a short stalk.
+ */
+const OLIVE_BOUGH = [
+	[6, 33],
+	[76, 7],
+	[142, 24]
+];
+function onBough(t) {
+	const [[x0, y0], [x1, y1], [x2, y2]] = OLIVE_BOUGH;
+	const u = 1 - t;
+	return {
+		x: u * u * x0 + 2 * u * t * x1 + t * t * x2,
+		y: u * u * y0 + 2 * u * t * y1 + t * t * y2,
+		// The way the bough runs there, in degrees.
+		angle:
+			(Math.atan2(2 * u * (y1 - y0) + 2 * t * (y2 - y1), 2 * u * (x1 - x0) + 2 * t * (x2 - x1)) *
+				180) /
+			Math.PI
+	};
+}
+/** A leaf growing from the bough at `t`, turned `turn` degrees off it (negative is above). */
+function oliveLeaf(t, turn, length = 20) {
+	const { x, y, angle } = onBough(t);
+	const way = angle + turn;
+	return `<ellipse cx="${fixed(length / 2)}" cy="0" rx="${fixed(length / 2)}" ry="3.6" transform="translate(${fixed(x)} ${fixed(y)}) rotate(${fixed(way)})" fill="#5d7a3a" opacity=".85"/>`;
+}
+/** An olive hanging from the bough at `t`, on a stalk to one side (`side`: 1 below, -1 above). */
+function olive(t, side) {
+	const { x, y, angle } = onBough(t);
+	const out = ((angle + side * 70) * Math.PI) / 180;
+	// An olive is an oval, longer than it is wide, hanging the way its stalk
+	// runs: its near end at the stalk's end.
+	const cx = x + 9.5 * Math.cos(out);
+	const cy = y + 9.5 * Math.sin(out);
+	return `<path d="M${fixed(x)} ${fixed(y)} L${fixed(cx)} ${fixed(cy)}" stroke="#5d7a3a" stroke-width="1.4"/><ellipse cx="0" cy="0" rx="5.6" ry="3.8" transform="translate(${fixed(cx)} ${fixed(cy)}) rotate(${fixed(angle + side * 70)})" fill="#2f3d1e"/>`;
+}
+const OLIVE_LEAVES = [
+	[0.1, 40],
+	[0.2, -40],
+	[0.31, 40],
+	[0.43, -40],
+	[0.56, 40],
+	[0.68, -40],
+	[0.8, 40],
+	[0.9, -38],
+	// The tip, carrying on the way the bough runs, drooping a little, less
+	// than the leaves below it.
+	[1, 14, 18]
+];
 draw(
 	'olive',
 	'0 0 160 40',
-	`<path d="M6 30 Q80 2 154 22" fill="none" stroke="#5d7a3a" stroke-width="2"/>${[
-		20, 40, 60, 80, 100, 120, 140
-	]
-		.map(
-			(x, i) =>
-				`<ellipse cx="${x}" cy="${i % 2 ? 26 : 12}" rx="10" ry="3.6" transform="rotate(${i % 2 ? 25 : -25} ${x} ${i % 2 ? 26 : 12})" fill="#5d7a3a" opacity=".85"/>`
-		)
-		.join(
-			''
-		)}<circle cx="52" cy="30" r="4.5" fill="#2f3d1e"/><circle cx="112" cy="9" r="4.5" fill="#2f3d1e"/>`
+	`<path d="M${OLIVE_BOUGH[0].join(' ')} Q${OLIVE_BOUGH[1].join(' ')} ${OLIVE_BOUGH[2].join(' ')}" fill="none" stroke="#5d7a3a" stroke-width="2"/>${OLIVE_LEAVES.map(([t, turn, length]) => oliveLeaf(t, turn, length)).join('')}${olive(0.435, 1)}${olive(0.79, -1)}`
 );
 draw(
 	'wine-ring',

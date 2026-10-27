@@ -138,6 +138,13 @@
 							"shippedOn": "2026-10-26"
 						},
 						{
+							"id": "scene-menu-pages",
+							"title": "A menu on its own page",
+							"summary": "Share a link to one menu, open it full screen, and tick off what you’ve done or edit it there.",
+							"status": "shipped",
+							"shippedOn": "2026-10-27"
+						},
+						{
 							"id": "scene-surprises",
 							"title": "Surprises",
 							"summary": "Keep part of a plan, or one item on the menu, hidden from your partner until the scene.",

@@ -49,6 +49,13 @@
 		}
 	});
 
+	/**
+	 * A scene menu's own page fills the screen (docs/scenes.md, "A menu's own
+	 * page"): no nav and none of the notices, which would sit over or above
+	 * the menu. The encryption gate stays, since it is what opens the menu.
+	 */
+	const fullScreen = $derived(page.route.id?.endsWith('/notebook/[entryId]/menus/[menuId]') ?? false);
+
 	const showTimezoneWarning = $derived.by(() => {
 		const routeId = page.route.id;
 		if (!routeId) {
@@ -94,30 +101,34 @@
 		     the viewport does not work in this shell, and a callout pinned over
 		     the content would cover it. -->
 		<EncryptionGate user={data.user} />
-		<HelpRequestCallout
-			requests={data.helpRequests.filter(
-				// The board shows the full request; a second callout above it
-				// pointing at the page you are on would only be noise.
-				(request) =>
-					!(
-						page.route.id === '/(auth-required)/(app)/partner/[id]/messages' &&
-						page.params.id === request.partnershipId
-					)
-			)}
-		/>
-		<HomeScreenHint />
-		<!-- Never on the screen it links to. The two hints never show together:
-		     one is for a browser tab, the other for the Home Screen app. -->
-		{#if data.pushAvailable && page.route.id !== '/(auth-required)/(app)/settings/notifications'}
-			<NotificationsHint />
+		{#if !fullScreen}
+			<HelpRequestCallout
+				requests={data.helpRequests.filter(
+					// The board shows the full request; a second callout above it
+					// pointing at the page you are on would only be noise.
+					(request) =>
+						!(
+							page.route.id === '/(auth-required)/(app)/partner/[id]/messages' &&
+							page.params.id === request.partnershipId
+						)
+				)}
+			/>
+			<HomeScreenHint />
+			<!-- Never on the screen it links to. The two hints never show together:
+			     one is for a browser tab, the other for the Home Screen app. -->
+			{#if data.pushAvailable && page.route.id !== '/(auth-required)/(app)/settings/notifications'}
+				<NotificationsHint />
+			{/if}
 		{/if}
 		{@render children()}
 	</main>
-	<AppNav
-		partners={data.partners}
-		debugAvailable={hasFeature(data.features, 'debugMode')}
-		debugOn={data.debug}
-	/>
+	{#if !fullScreen}
+		<AppNav
+			partners={data.partners}
+			debugAvailable={hasFeature(data.features, 'debugMode')}
+			debugOn={data.debug}
+		/>
+	{/if}
 </div>
 
 <style>

@@ -96,6 +96,49 @@ describe('parseRichTextDocument', () => {
 		expect(parseRichTextDocument(stored)).toBeNull();
 	});
 
+	it('keeps a menu’s id, and reads a menu from before links as having none', () => {
+		const menu = (id?: string) => ({
+			type: 'scene-menu',
+			...(id === undefined ? {} : { id }),
+			title: '',
+			subtitle: '',
+			hiddenFrom: null,
+			design: 'fine',
+			scale: null,
+			value: null,
+			copy: {},
+			mascot: {},
+			pictures: {},
+			children: [
+				{
+					type: 'scene-menu-course',
+					art: {},
+					children: [
+						{
+							type: 'scene-menu-line',
+							role: 'item',
+							rating: null,
+							value: null,
+							kinkId: null,
+							hiddenFrom: null,
+							checked: null,
+							children: [text('Rope')]
+						}
+					]
+				}
+			]
+		});
+		const read = (stored: object) => {
+			const parsed = parseRichTextDocument(
+				JSON.stringify({ root: { type: 'root', children: [stored] } })
+			);
+			const [first] = parsed?.root.children ?? [];
+			return first;
+		};
+		expect(read(menu('a-menu'))).toMatchObject({ type: 'scene-menu', id: 'a-menu' });
+		expect(read(menu())).toMatchObject({ type: 'scene-menu', id: null });
+	});
+
 	it('accepts the shape Lexical emits for a list', () => {
 		const stored = JSON.stringify(
 			doc([

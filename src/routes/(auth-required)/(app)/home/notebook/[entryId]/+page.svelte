@@ -28,5 +28,10 @@
 	}}
 	{describeUser}
 	{cursorLabel}
+	menuHref={(menuId) =>
+		resolve('/(auth-required)/(app)/home/notebook/[entryId]/menus/[menuId]', {
+			entryId: data.entry.id,
+			menuId
+		})}
 	onGone={() => goto(resolve('/(auth-required)/(app)/home/notebook'))}
 />

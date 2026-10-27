@@ -4,6 +4,7 @@
 
 <script lang="ts" generics="T extends Record<string, unknown>">
 	import type { Attachment } from 'svelte/attachments';
+	import { readable } from 'svelte/store';
 	import { type FormPathLeaves, formFieldProxy, type SuperForm } from 'sveltekit-superforms';
 	import FieldError from './FieldError.svelte';
 
@@ -13,13 +14,28 @@
 		title,
 		startText = null,
 		type,
+		value: shownValue = '',
+		selectOnFocus = false,
 		...otherProps
 	}: {
-		superform: SuperForm<T>;
-		field: FormPathLeaves<T>;
+		/**
+		 * The form the field belongs to. Without one (and `field`), the field
+		 * only shows `value` — a link to copy, say — and has no errors.
+		 */
+		superform?: SuperForm<T>;
+		field?: FormPathLeaves<T>;
 		title?: string;
 		startText?: string | null;
 		type: string;
+		/** What a field outside a form shows. A form's field shows the form's value. */
+		value?: string;
+		/**
+		 * Selects everything in the field when it is focused or clicked, for a
+		 * read-only value to copy: Web Awesome's `wa-input` has no option for
+		 * it. On a click too, since a click on a field that already has the
+		 * focus would otherwise put the caret where it landed.
+		 */
+		selectOnFocus?: boolean;
 		// Any further attributes are spread onto the underlying <wa-input>, which
 		// is how callers pass things like `autocomplete`.
 		[attribute: string]: unknown;
@@ -29,7 +45,12 @@
 	// Captures the initial `superform`/`field` on purpose: the proxies it
 	// returns are the live stores, so re-deriving them per render would
 	// rebuild every field's subscription instead.
-	const { value, errors, constraints } = formFieldProxy(superform, field);
+	const proxy = superform && field ? formFieldProxy(superform, field) : null;
+	// Stores that never change stand in for a field outside a form, so the
+	// markup below reads the same either way.
+	const value = proxy?.value ?? readable(undefined);
+	const errors = proxy?.errors ?? readable(undefined);
+	const constraints = proxy?.constraints ?? readable(undefined);
 
 	/**
 	 * `pattern` is stripped before the constraints reach the element.
@@ -91,7 +112,7 @@
 			const typed = host.input?.value ?? host.value ?? '';
 			// `as` because the proxy is typed to the field's own type; every input
 			// this component renders is a string field.
-			$value = String(typed) as typeof $value;
+			proxy?.value.set(String(typed) as never);
 		};
 		/**
 		 * A `change` can arrive while Svelte is tearing this field down.
@@ -135,9 +156,32 @@
 	 */
 	const TEXT_TYPES = new Set(['text', 'email', 'number', 'datetime-local', 'date', 'time']);
 
+	/** See `selectOnFocus`. */
+	const selectAll: Attachment<HTMLElement> = (element) => {
+		const host = element as WaInput;
+		const select = () => {
+			// The native control, once the element has upgraded and drawn it.
+			const control = host.input ?? host.shadowRoot?.querySelector('input');
+			control?.select();
+		};
+		// Chromium collapses a selection that is clicked inside once the
+		// click's own listeners have run, so on a click it is selected again
+		// in the task after.
+		const selectAfterClick = () => {
+			select();
+			setTimeout(select);
+		};
+		host.addEventListener('focus', select);
+		host.addEventListener('click', selectAfterClick);
+		return () => {
+			host.removeEventListener('focus', select);
+			host.removeEventListener('click', selectAfterClick);
+		};
+	};
+
 	// null is a legitimate stored value (an omitted relationship label), but it
 	// would render as the literal string "null".
-	const displayValue = $derived(String($value ?? ''));
+	const displayValue = $derived(proxy ? String($value ?? '') : shownValue);
 </script>
 
 <div class="field">
@@ -147,7 +191,8 @@
 			name={field}
 			{type}
 			value={displayValue}
-			{@attach follow}
+			{@attach proxy && follow}
+			{@attach selectOnFocus && selectAll}
 			password-toggle
 			aria-invalid={$errors ? 'true' : undefined}
 			{...attributes}
@@ -162,7 +207,8 @@
 			label={title || field}
 			name={field}
 			value={displayValue}
-			{@attach follow}
+			{@attach proxy && follow}
+			{@attach selectOnFocus && selectAll}
 			aria-invalid={$errors ? 'true' : undefined}
 			{...attributes}
 			{...otherProps}
@@ -173,7 +219,8 @@
 			name={field}
 			{type}
 			value={displayValue}
-			{@attach follow}
+			{@attach proxy && follow}
+			{@attach selectOnFocus && selectAll}
 			aria-invalid={$errors ? 'true' : undefined}
 			{...attributes}
 			{...otherProps}

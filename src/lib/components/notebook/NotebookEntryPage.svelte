@@ -3,11 +3,9 @@
 	import { invalidate } from '$app/navigation';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import SidePanelLayout from '$lib/components/SidePanelLayout.svelte';
-	import { currentKeyring } from '$lib/crypto/session.svelte';
 	import type { NotebookKind, PartnerAccess } from '$lib/notebook';
 	import type { CursorLabel } from '$lib/notebook/collab';
-	import { loadNotebookEditor } from '$lib/notebook/load';
-	import type { NotebookSession } from '$lib/notebook/session.svelte';
+	import { entrySession } from '$lib/notebook/entry-session.svelte';
 	import { textChange } from '$lib/notebook/text-diff';
 	import type { RoomKey } from '$lib/realtime/live';
 	import type { RichTextDocument } from '$lib/richtext';
@@ -48,6 +46,7 @@
 		describeUser,
 		cursorLabel,
 		partnerLabel = null,
+		menuHref = null,
 		onGone
 	}: {
 		entry: EntryData;
@@ -75,13 +74,28 @@
 		cursorLabel: CursorLabel;
 		/** The partner's name, for a partnership entry's access control. */
 		partnerLabel?: string | null;
+		/** A scene menu's own page (docs/scenes.md, "A menu's own page"). */
+		menuHref?: ((menuId: string) => string) | null;
 		/** The entry is gone or no longer readable: leave for the list. */
 		onGone: () => void;
 	} = $props();
 
+	const opened = entrySession(() => ({
+		entryId: entry.id,
+		vaultId: entry.vaultId,
+		canWrite: entry.canWrite,
+		room,
+		viewerId,
+		sealScope,
+		revision: entry.revision,
+		header: entry.header,
+		onAccessChanged: () => void invalidate(dependency),
+		onGone
+	}));
 	/** The live pieces, loaded in the browser only: see `loadNotebookEditor`. */
-	let live = $state<Awaited<ReturnType<typeof loadNotebookEditor>> | null>(null);
-	let session = $state<NotebookSession | null>(null);
+	const live = $derived(opened.live);
+	const session = $derived(opened.session);
+	const entryId = $derived(entry.id);
 	let editor: CollaborativeEditor | undefined = $state();
 	/** The entry's settings popover, for its Cancel to close. */
 	let settings: (HTMLElement & { open: boolean }) | undefined = $state();
@@ -91,62 +105,6 @@
 	let columnMode = $state<'prompts' | 'menu'>('prompts');
 	let historyOpen = $state(false);
 	let deleteDialog: (HTMLElement & { open: boolean }) | undefined = $state();
-
-	/**
-	 * Primitives, so a refresh of the load (which reassigns `entry`) does not
-	 * tear the session down: only a different entry, or a change in whether
-	 * this viewer may write, rebuilds it. AGENTS.md, "An `$effect` that reads
-	 * the `data` prop re-runs on every `invalidate()`".
-	 */
-	const entryId = $derived(entry.id);
-	const vaultId = $derived(entry.vaultId);
-	const canWrite = $derived(entry.canWrite);
-	const roomKey = $derived(room);
-
-	// A keyring that is not open renders the placeholder, never content
-	// (AGENTS.md), and an entry cannot be opened without it anyway.
-	const unlocked = $derived(currentKeyring().status === 'unlocked');
-
-	$effect(() => {
-		void loadNotebookEditor().then((loaded) => {
-			live = loaded;
-		});
-	});
-
-	$effect(() => {
-		const modules = live;
-		if (!(unlocked && modules)) {
-			return;
-		}
-		const created = new modules.NotebookSession({
-			entryId,
-			vaultId,
-			scope: sealScope,
-			room: roomKey,
-			userId: viewerId,
-			canWrite,
-			// Read once: the session keeps its own count from here.
-			headerRevision: entry.revision,
-			header: entry.header
-				? {
-						id: entry.header.recordId,
-						vaultId: entry.header.vaultId,
-						ciphertext: entry.header.ciphertext,
-						payloadVersion: entry.header.payloadVersion
-					}
-				: null,
-			onAccessChanged: () => void invalidate(dependency),
-			onGone
-		});
-		session = created;
-		void created.open();
-		return () => {
-			created.destroy();
-			if (session === created) {
-				session = null;
-			}
-		};
-	});
 
 	const readOnly = $derived(!session?.canWrite);
 
@@ -262,6 +220,7 @@
 					{readOnly}
 					scene={entry.kind === 'scene'}
 					partnerId={scene?.partnerId ?? null}
+					{menuHref}
 					placeholder={entry.kind === 'scene'
 						? 'Write as much or as little as you like. Ideas are beside you if you want them.'
 						: undefined}

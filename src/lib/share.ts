@@ -1,5 +1,5 @@
 /**
- * Handing an invite link to the user's own sharing UI.
+ * Handing a link to the user's own sharing UI, or to the clipboard.
  *
  * Both of the entry points that use this want the same thing: get the link onto
  * the clipboard *and* open the native share sheet if there is one. The clipboard
@@ -49,6 +49,15 @@ export async function shareInviteLink(
  * that never moves on is worse than a link that did not get copied.
  */
 const CLIPBOARD_TIMEOUT_MS = 2000;
+
+/**
+ * Puts `text` on the clipboard, and says whether it got there. Call it from
+ * the click itself, before any await: a browser may refuse a write that is
+ * not part of the user's gesture.
+ */
+export function copyText(text: string): Promise<boolean> {
+	return writeClipboard(text);
+}
 
 async function writeClipboard(text: string): Promise<boolean> {
 	if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {

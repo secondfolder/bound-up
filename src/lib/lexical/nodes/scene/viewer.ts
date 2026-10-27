@@ -41,6 +41,29 @@ export function sceneViewerOf(editor: LexicalEditor): string | null {
 	return viewers.get(editor) ?? null;
 }
 
+/**
+ * Editors whose menus' to-dos can be ticked while the editor is read-only:
+ * a menu's own page, shown to someone who could edit it (docs/scenes.md,
+ * "A menu's own page"). Ticking is a change like any other, made through
+ * `editor.update`, which a read-only editor still sends to the scene.
+ */
+const tickable = new WeakSet<LexicalEditor>();
+
+export function setTickable(editor: LexicalEditor, ticks: boolean): void {
+	if (ticks) {
+		tickable.add(editor);
+	} else {
+		tickable.delete(editor);
+	}
+	// For the stylesheet, which shows a hand over a box only where it ticks.
+	editor.getRootElement()?.classList.toggle('tickable', ticks);
+}
+
+/** Whether a to-do in `editor` can be ticked: always where it can be edited. */
+export function canTick(editor: LexicalEditor): boolean {
+	return editor.isEditable() || tickable.has(editor);
+}
+
 /** Marks an element as a surprise for this viewer: nothing in it can be read, reached or typed into. */
 export function drawSurprise(element: HTMLElement, surprise: boolean): void {
 	element.classList.toggle('surprise', surprise);

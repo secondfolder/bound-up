@@ -36,13 +36,19 @@
 		editor,
 		menu,
 		partnerId,
-		readOnly
+		readOnly,
+		convertible = true
 	}: {
 		editor: LexicalEditor;
 		menu: Extract<BlockAtCaret, { kind: 'menu' }>;
 		/** The partner a menu can be hidden from; null in a solo scene. */
 		partnerId: string | null;
 		readOnly: boolean;
+		/**
+		 * Whether to offer turning the menu back into plain text: not on a
+		 * menu's own page, where it would take away the page's menu.
+		 */
+		convertible?: boolean;
 	} = $props();
 
 	const EXTRAS: {
@@ -168,9 +174,11 @@
 				Whole menu only me
 			</button>
 		{/if}
-		<wa-button size="s" appearance="plain" disabled={readOnly} onclick={() => blockToText(editor, menu.key)}>
-			Convert menu to plain text
-		</wa-button>
+		{#if convertible}
+			<wa-button size="s" appearance="plain" disabled={readOnly} onclick={() => blockToText(editor, menu.key)}>
+				Convert menu to plain text
+			</wa-button>
+		{/if}
 	</div>
 
 	<section aria-labelledby="menu-design-heading">

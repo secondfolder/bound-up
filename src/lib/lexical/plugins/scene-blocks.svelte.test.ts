@@ -19,7 +19,9 @@ import { toStoredDocument } from '$lib/lexical/document-shape';
 import { exportEditorDocument } from '$lib/lexical/nodes';
 import {
 	$createMenuNode as createMenuNode,
-	$isMenuNode as isMenuNode
+	$isMenuNode as isMenuNode,
+	MENU_LINK_EVENT,
+	type MenuLinkRequest
 } from '$lib/lexical/nodes/scene/menu';
 import {
 	$createMenuCourseNode as createMenuCourseNode,
@@ -33,7 +35,7 @@ import {
 	type MenuExtraRequest
 } from '$lib/lexical/nodes/scene/menu-line';
 import { $createSceneSectionNode as createSceneSectionNode } from '$lib/lexical/nodes/scene/section';
-import { setSceneViewer } from '$lib/lexical/nodes/scene/viewer';
+import { setSceneViewer, setTickable } from '$lib/lexical/nodes/scene/viewer';
 import {
 	bindEditor,
 	firstEdit,
@@ -61,6 +63,7 @@ import {
 	$canMakeMenu as canMakeMenu,
 	insertMenu,
 	insertMenuFrom,
+	registerOnlyMenu,
 	selectionToMenu,
 	setCourseArt,
 	setDesign,
@@ -597,6 +600,26 @@ describe('a menu’s to-do items', () => {
 		expect(items(editor)).toEqual([['Massage', false]]);
 	});
 
+	it('ticks in a scene that cannot be edited where it is tickable, as a menu’s page is', async () => {
+		const editor = sceneEditor();
+		insertMenuFrom(editor, [{ name: 'Starters', items: ['Massage'] }]);
+		await settled(editor);
+		caretIn(editor, 'Massage', 0);
+		setSelectedChecklist(editor, true);
+		await settled(editor);
+		editor.setEditable(false);
+		setTickable(editor, true);
+
+		boxOf(editor, 'Massage').click();
+		await settled(editor);
+		expect(items(editor)).toEqual([['Massage', true]]);
+
+		setTickable(editor, false);
+		boxOf(editor, 'Massage').click();
+		await settled(editor);
+		expect(items(editor)).toEqual([['Massage', true]]);
+	});
+
 	it('is a plain item again after Backspace at its start, still in the menu', async () => {
 		const editor = sceneEditor();
 		insertMenuFrom(editor, [{ name: 'Starters', items: ['Massage', 'Blindfold'] }]);
@@ -717,6 +740,23 @@ describe('a menu’s frame in the editor', () => {
 		editor.update(() => getRoot().append(lineOf('After')).selectEnd(), { discrete: true });
 		await settled(editor);
 		expect(menuElement(editor).classList.contains('caret-in')).toBe(false);
+	});
+
+	it('is not marked as being written in where it cannot be, the caret in it or not', async () => {
+		const editor = sceneEditor();
+		insertMenu(editor);
+		await settled(editor);
+		editor.setEditable(false);
+		await settled(editor);
+		expect(menuElement(editor).classList.contains('caret-in')).toBe(false);
+
+		editor.update(() => getRoot().selectStart(), { discrete: true });
+		await settled(editor);
+		expect(menuElement(editor).classList.contains('caret-in')).toBe(false);
+
+		editor.setEditable(true);
+		await settled(editor);
+		expect(menuElement(editor).classList.contains('caret-in')).toBe(true);
 	});
 
 	it('takes the caret when its heading is tapped, from wherever it was', async () => {
@@ -1184,6 +1224,323 @@ describe('a menu’s delete button', () => {
 	});
 });
 
+/** A writer's editor, bound to a document of its own, as a scene's page binds one. */
+function collaborator(userId: string) {
+	const root = document.createElement('div');
+	root.contentEditable = 'true';
+	document.body.append(root);
+	const cursorsContainer = document.createElement('div');
+	document.body.append(cursorsContainer);
+	const { editor, destroy } = createRichTextEditor({
+		features: SCENE_FEATURES,
+		namespace: `scene-${userId}`,
+		history: false
+	});
+	editor.setRootElement(root);
+	setSceneViewer(editor, userId);
+	const doc = new Doc();
+	const awareness = new Awareness(doc);
+	const provider = providerFor(awareness);
+	const cursors = relabelledCursors(() => ({ name: 'them', color: 'red' }));
+	const bound = bindEditor(editor, doc, provider, { cursors });
+	const collaboration = registerCollaboration(editor, bound.binding, provider, {
+		userId,
+		cursors,
+		cursorsContainer
+	});
+	cleanups.push(() => {
+		collaboration.destroy();
+		bound.destroy();
+		awareness.destroy();
+		editor.setRootElement(null);
+		destroy();
+		root.remove();
+		cursorsContainer.remove();
+	});
+	return { editor, doc };
+}
+
+describe('a menu’s id', () => {
+	/** Each of the page's menus' ids, in order. */
+	function ids(editor: LexicalEditor): (string | null)[] {
+		return stored(editor).root.children.flatMap((block) =>
+			block.type === 'scene-menu' ? [block.id] : []
+		);
+	}
+
+	/** Two menus, as a page from before links has them, or as a paste of one makes them. */
+	function twoMenus(editor: LexicalEditor, first: string | null, second: string | null) {
+		build(editor, () =>
+			[first, second].map((id) =>
+				createMenuNode()
+					.setMenuId(id)
+					.append(
+						createMenuCourseNode().append(
+							createMenuLineNode('item').append(createTextNode(id ?? 'none'))
+						)
+					)
+			)
+		);
+	}
+
+	it('is made with the menu, kept when stored, and drawn on it', async () => {
+		const editor = sceneEditor();
+		insertMenu(editor);
+		await settled(editor);
+		const [id] = ids(editor);
+		expect(id).toMatch(/^[0-9a-f-]{36}$/);
+		expect(menuElement(editor).dataset.menuId).toBe(id);
+	});
+
+	it('is given to a menu from before links where it can be edited, and nowhere else', async () => {
+		const editor = sceneEditor();
+		editor.setEditable(false);
+		twoMenus(editor, null, null);
+		await settled(editor);
+		expect(ids(editor)).toEqual([null, null]);
+
+		editor.setEditable(true);
+		await settled(editor);
+		await settled(editor);
+		const given = ids(editor);
+		expect(given.every((id) => typeof id === 'string')).toBe(true);
+		expect(new Set(given).size).toBe(2);
+	});
+
+	it('is new for the second of two menus with one id, the first keeping it', async () => {
+		const editor = sceneEditor();
+		twoMenus(editor, 'same', 'same');
+		await settled(editor);
+		await settled(editor);
+		const [first, second] = ids(editor);
+		expect(first).toBe('same');
+		expect(second).not.toBe('same');
+		expect(second).toMatch(/^[0-9a-f-]{36}$/);
+	});
+
+	it('given by one writer to a menu from another, reaches them both', async () => {
+		// A reader's editor cannot give one, so the menu reaches the writer
+		// without, as a scene from before links does.
+		const reader = collaborator('ada');
+		const writer = collaborator('bo');
+		const first = await firstEdit();
+		for (const each of [reader, writer]) {
+			applyUpdate(each.doc, first, REMOTE_ORIGIN);
+			await settled(each.editor);
+		}
+		reader.editor.setEditable(false);
+		twoMenus(reader.editor, null, 'kept');
+		await settled(reader.editor);
+		applyUpdate(writer.doc, encodeStateAsUpdate(reader.doc), REMOTE_ORIGIN);
+		await settled(writer.editor);
+		await settled(writer.editor);
+		const [given] = ids(writer.editor);
+		expect(given).toMatch(/^[0-9a-f-]{36}$/);
+
+		applyUpdate(reader.doc, encodeStateAsUpdate(writer.doc), REMOTE_ORIGIN);
+		await settled(reader.editor);
+		expect(ids(reader.editor)).toEqual([given, 'kept']);
+	});
+});
+
+describe('a menu’s link button', () => {
+	function linkRequests(editor: LexicalEditor): MenuLinkRequest[] {
+		const heard: MenuLinkRequest[] = [];
+		const root = defined(editor.getRootElement(), 'the root');
+		const listen = (event: Event) => heard.push((event as CustomEvent<MenuLinkRequest>).detail);
+		root.addEventListener(MENU_LINK_EVENT, listen);
+		cleanups.push(() => root.removeEventListener(MENU_LINK_EVENT, listen));
+		return heard;
+	}
+
+	it('asks the page for the menu’s link, pointing at itself, for a reader too', async () => {
+		const editor = sceneEditor();
+		insertMenu(editor);
+		await settled(editor);
+		const heard = linkRequests(editor);
+		const button = defined(
+			menuElement(editor).querySelector<HTMLElement>('.menu-link'),
+			'the link button'
+		);
+		button.click();
+		editor.setEditable(false);
+		button.click();
+		expect(heard).toEqual([
+			{ menuId: menuElement(editor).dataset.menuId, anchor: button },
+			{ menuId: menuElement(editor).dataset.menuId, anchor: button }
+		]);
+	});
+
+	it('sits beside the delete button, in the menu’s corner', async () => {
+		const editor = sceneEditor();
+		insertMenu(editor);
+		await settled(editor);
+		const corner = defined(menuElement(editor).querySelector('.menu-tools'), 'the corner');
+		expect([...corner.children].map((button) => button.className)).toEqual([
+			'menu-link',
+			'menu-delete'
+		]);
+	});
+});
+
+describe('a menu’s own page', () => {
+	/** A scene of a line, a menu of one course, and a line. */
+	function scene(editor: LexicalEditor, id = 'the-menu') {
+		build(editor, () => [
+			lineOf('Before'),
+			createMenuNode()
+				.setMenuId(id)
+				.append(
+					createMenuCourseNode().append(
+						createMenuLineNode('heading').append(createTextNode('Mains')),
+						createMenuLineNode('item').append(createTextNode('Rope'))
+					)
+				),
+			lineOf('After')
+		]);
+	}
+
+	function onlyMenu(editor: LexicalEditor, id: string) {
+		const found: boolean[] = [];
+		cleanups.push(registerOnlyMenu(editor, id, (each) => found.push(each)));
+		return found;
+	}
+
+	function caretText(editor: LexicalEditor): string | null {
+		return editor.getEditorState().read(() => {
+			const selection = getSelection();
+			return isRangeSelection(selection) ? selection.anchor.getNode().getTextContent() : null;
+		});
+	}
+
+	it('shows the menu alone, and says it is there', async () => {
+		const editor = sceneEditor();
+		const found = onlyMenu(editor, 'the-menu');
+		scene(editor);
+		await settled(editor);
+		const root = defined(editor.getRootElement(), 'the root');
+		expect(root.classList.contains('menu-page')).toBe(true);
+		expect([...root.children].map((child) => child.classList.contains('only-menu'))).toEqual([
+			false,
+			true,
+			false
+		]);
+		expect(found).toEqual([true]);
+	});
+
+	it('is being written in all the while it can be, and never while it cannot', async () => {
+		const editor = sceneEditor();
+		onlyMenu(editor, 'the-menu');
+		scene(editor);
+		await settled(editor);
+		const menu = () =>
+			defined(editor.getRootElement()?.querySelector('.only-menu'), 'the menu shown');
+		expect(menu().classList.contains('caret-in')).toBe(true);
+
+		editor.setEditable(false);
+		await settled(editor);
+		expect(menu().classList.contains('caret-in')).toBe(false);
+		// A reader's click puts the selection in it, which marks nothing.
+		editor.update(
+			() => {
+				const text = getRoot()
+					.getAllTextNodes()
+					.find((node) => node.getTextContent() === 'Rope');
+				defined(text, 'Rope').select(0, 0);
+			},
+			{ discrete: true }
+		);
+		await settled(editor);
+		expect(menu().classList.contains('caret-in')).toBe(false);
+
+		editor.setEditable(true);
+		await settled(editor);
+		expect(menu().classList.contains('caret-in')).toBe(true);
+	});
+
+	it('says nothing until the scene is there, then that the menu is not', async () => {
+		const editor = sceneEditor();
+		const found = onlyMenu(editor, 'another');
+		expect(found).toEqual([]);
+		scene(editor);
+		await settled(editor);
+		expect(found).toEqual([false]);
+
+		scene(editor, 'another');
+		await settled(editor);
+		expect(found).toEqual([false, true]);
+	});
+
+	it('brings a caret that leaves the menu back into it', async () => {
+		const editor = sceneEditor();
+		onlyMenu(editor, 'the-menu');
+		scene(editor);
+		await settled(editor);
+		editor.update(() => getRoot().selectEnd(), { discrete: true });
+		await settled(editor);
+		await settled(editor);
+		expect(caretText(editor)).toBe('Rope');
+
+		editor.update(() => getRoot().selectStart(), { discrete: true });
+		await settled(editor);
+		await settled(editor);
+		expect(caretText(editor)).toBe('Mains');
+	});
+
+	it('cuts a selection of everything down to the menu', async () => {
+		const editor = sceneEditor();
+		onlyMenu(editor, 'the-menu');
+		scene(editor);
+		await settled(editor);
+		editor.update(() => getRoot().select(0, getRoot().getChildrenSize()), { discrete: true });
+		await settled(editor);
+		await settled(editor);
+		const selected = editor.getEditorState().read(() => getSelection()?.getTextContent() ?? '');
+		expect(selected).not.toContain('Before');
+		expect(selected).not.toContain('After');
+		expect(selected).toContain('Rope');
+	});
+
+	it('leaves nothing out of the menu, nor brings anything in, at its edges', async () => {
+		const editor = sceneEditor();
+		onlyMenu(editor, 'the-menu');
+		scene(editor);
+		await settled(editor);
+		const before = stored(editor);
+
+		editor.update(
+			() => {
+				const text = getRoot()
+					.getAllTextNodes()
+					.find((node) => node.getTextContent() === 'Mains');
+				defined(text, 'Mains').select(0, 0);
+			},
+			{ discrete: true }
+		);
+		expect(editor.dispatchCommand(KEY_BACKSPACE_COMMAND, new KeyboardEvent('keydown'))).toBe(true);
+		await settled(editor);
+		expect(stored(editor)).toEqual(before);
+
+		// An empty last line, where Enter would otherwise leave the menu.
+		addMenuItem(editor, '');
+		await settled(editor);
+		const withEmpty = stored(editor);
+		editor.update(
+			() => {
+				const menu = getRoot().getChildAtIndex(1);
+				const line = isElementNode(menu) ? menu.getLastDescendant() : null;
+				defined(line, 'the last line').selectEnd();
+			},
+			{ discrete: true }
+		);
+		editor.dispatchCommand(INSERT_PARAGRAPH_COMMAND, undefined);
+		await settled(editor);
+		expect(stored(editor).root.children.map((block) => block.type)).toEqual(
+			withEmpty.root.children.map((block) => block.type)
+		);
+	});
+});
+
 describe('sections', () => {
 	it('gathers prompts of a kind into one section', async () => {
 		const editor = sceneEditor();
@@ -1324,40 +1681,7 @@ describe('a surprise', () => {
 });
 
 describe('two writers in one menu', () => {
-	function side(userId: string) {
-		const root = document.createElement('div');
-		root.contentEditable = 'true';
-		document.body.append(root);
-		const cursorsContainer = document.createElement('div');
-		document.body.append(cursorsContainer);
-		const { editor, destroy } = createRichTextEditor({
-			features: SCENE_FEATURES,
-			namespace: `scene-${userId}`,
-			history: false
-		});
-		editor.setRootElement(root);
-		setSceneViewer(editor, userId);
-		const doc = new Doc();
-		const awareness = new Awareness(doc);
-		const provider = providerFor(awareness);
-		const cursors = relabelledCursors(() => ({ name: 'them', color: 'red' }));
-		const bound = bindEditor(editor, doc, provider, { cursors });
-		const collaboration = registerCollaboration(editor, bound.binding, provider, {
-			userId,
-			cursors,
-			cursorsContainer
-		});
-		cleanups.push(() => {
-			collaboration.destroy();
-			bound.destroy();
-			awareness.destroy();
-			editor.setRootElement(null);
-			destroy();
-			root.remove();
-			cursorsContainer.remove();
-		});
-		return { editor, doc };
-	}
+	const side = collaborator;
 
 	it('keeps both people’s items and both people’s details', async () => {
 		const ada = side('ada');

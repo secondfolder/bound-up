@@ -97,6 +97,16 @@
 	user-select: none;
 }
 
+/* …except the words on them, which can be selected and copied like any
+   words on the page, even where they cannot be rewritten (a reader's
+   scene, a menu's own page out of edit mode). Only the drawing around
+   them is left out of a selection. */
+.menu-head :is(.menu-title, .menu-subtitle, .menu-note),
+.menu-key-label,
+.menu-copy {
+	user-select: text;
+}
+
 .menu-head {
 	display: flex;
 	flex-direction: column;
@@ -346,6 +356,26 @@
 	line-height: 1;
 }
 
+/* Out of edit mode (the editor's root not editable) a rating, a number and
+   a design's pictures are only drawn, not tapped to change, so they get no
+   hand, whatever the design gives its buttons (decora's pointing hand); nor
+   does a to-do's box, unless it can still be ticked (`setTickable`). The
+   doubled class outranks every design's own cursor for these buttons, as
+   `menu-designs.css` loads after this and the designs' are as specific
+   as a single one. */
+[contenteditable='false']
+	> .scene-menu.scene-menu
+	:is(
+		button.menu-rates,
+		button.menu-value,
+		button.menu-course-art,
+		button.menu-mascot,
+		button.menu-picture
+	),
+[contenteditable='false']:not(.tickable) > .scene-menu.scene-menu button.menu-line-check {
+	cursor: var(--cursor-arrow, default);
+}
+
 /* Undoes Web Awesome's native button: a form control's height, padding and
    alignment, which would lift the marks off the line's baseline. */
 button.menu-rates,
@@ -497,16 +527,31 @@ button.menu-value {
 	}
 }
 
-/* The editor's button that deletes the whole menu, in its top corner while
-   the caret is in it (`scene-blocks.ts`), in the app's look rather than the
-   design's, like the Reset. Inside the corner, not over it: a menu clips
-   what its design draws past its edge. */
-.scene-menu > .menu-delete {
+/* The editor's corner of buttons: a link to the menu's own page, and
+   deleting the whole menu (`scene-blocks.ts`). Shown while the caret is in
+   the menu or it is pointed at, so a menu can be linked or deleted without
+   first clicking into it, and while one of them has the focus. In the app's
+   look rather than the design's, like the Reset. Inside the corner, not
+   over it: a menu clips what its design draws past its edge. */
+.scene-menu > .menu-tools {
 	position: absolute;
 	inset-block-start: 0.4rem;
 	inset-inline-end: 0.4rem;
 	z-index: 5;
 	display: none;
+	gap: 0.3rem;
+}
+
+/* Not on a menu's own page (`registerOnlyMenu`), where they are for the
+   scene and not for it. */
+:not(.menu-page)
+	> .scene-menu:is(.caret-in, .link-open, :hover, :focus-within):not(.surprise)
+	> .menu-tools {
+	display: flex;
+}
+
+.menu-tools > button {
+	display: grid;
 	place-items: center;
 	inline-size: 2rem;
 	block-size: 2rem;
@@ -519,13 +564,30 @@ button.menu-value {
 	font-size: 0.85rem;
 	box-shadow: var(--wa-shadow-s);
 	cursor: pointer;
+
+	&:is(:hover, :focus-visible) {
+		color: var(--wa-color-brand-on-quiet);
+	}
 }
 
-.scene-menu.caret-in:not(.surprise) > .menu-delete {
-	display: grid;
+.menu-tools > .menu-delete:is(:hover, :focus-visible) {
+	color: var(--wa-color-danger-on-quiet);
+}
 
-	&:hover,
-	&:focus-visible {
-		color: var(--wa-color-danger-on-quiet);
-	}
+/* A menu from before links has no id until a writer opens the scene, and
+   nothing to link to until then. */
+.scene-menu:not([data-menu-id]) > .menu-tools > .menu-link {
+	display: none;
+}
+
+/* Deleting is a writer's alone (`deleteMenu` refuses anyone else), so a
+   reader is not offered it. */
+[contenteditable='false'] > .scene-menu > .menu-tools > .menu-delete {
+	display: none;
+}
+
+/* A menu's own page (`registerOnlyMenu`): the menu, and nothing else of
+   the scene. */
+.menu-page > :not(.only-menu) {
+	display: none;
 }

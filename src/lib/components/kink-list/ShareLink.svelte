@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import InputField from '$lib/components/InputField.svelte';
 	import { answeredCount } from '$lib/kink-list/answers';
 	import { kinkListContext } from '$lib/kink-list/context';
 	import { encodeShareLink } from '$lib/kink-list/share-link';
@@ -63,13 +64,6 @@
 		node.addEventListener('input', onInput);
 		return () => node.removeEventListener('input', onInput);
 	}
-
-	function selectAll(node: WaInput) {
-		const onFocus = () =>
-			(node.shadowRoot?.querySelector('input') as HTMLInputElement | null)?.select();
-		node.addEventListener('focus', onFocus);
-		return () => node.removeEventListener('focus', onFocus);
-	}
 </script>
 
 <div class="share">
@@ -87,7 +81,7 @@
 			<p class="error">That link couldn't be made in this browser.</p>
 		{/if}
 		{#if link}
-			<wa-input label="Your link" readonly value={link} {@attach selectAll}></wa-input>
+			<InputField type="text" title="Your link" readonly value={link} selectOnFocus />
 			<div class="row">
 				<wa-button appearance="outlined" onclick={copy}>{copied ? 'Copied' : 'Copy'}</wa-button>
 			</div>

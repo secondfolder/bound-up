@@ -38,6 +38,48 @@
 /* `:where()` keeps these no more specific than each design's own rules,
    which come after. */
 
+/* However wide the page, a menu's sheet stays a width its design reads at,
+   centred on whatever the design draws around it: a menu's own page is the
+   whole window, which can be far wider than any column, card or spread was
+   drawn for. Each design sets `--menu-max-width`, generously, and never under
+   its widest `scene-page` breakpoint, since the container is the page and
+   not the sheet: a sheet narrower than a layout's breakpoint would get the
+   wide layout squeezed into it. */
+:where(.scene-menu[class*='design-']) > .menu-sheet {
+	max-inline-size: var(--menu-max-width, 72rem);
+	margin-inline: auto;
+}
+
+/* On a menu's own page the menu is at least the window's height, which is
+   the only place it is ever taller than what is on it. Where the sheet
+   sits in that height is the design's (`--menu-space-above` and
+   `--menu-space-below`, the spare height shared out between them: a card
+   on a table sits a third of the way down, a memo starts at the top of its
+   paper). Anything else in the menu's flow, before the sheet, goes above
+   it: just above by default (the dungeon's chains), or at the very top for
+   a strip along the page's top edge (`--menu-strip-align: start`: the pet
+   collar, the decora spinners). */
+.menu-page > .scene-menu[class*='design-'] {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	grid-template-rows: var(--menu-space-above, 0fr) auto var(--menu-space-below, 1fr);
+
+	/* Full width up to its limit, explicitly: a grid item with auto margins
+	   (which centre it) is otherwise only as wide as its content, which
+	   stacked the seed packets and the corkboard's notes one above the next. */
+	> .menu-sheet {
+		grid-row: 2;
+		box-sizing: border-box;
+		inline-size: 100%;
+	}
+
+	&::before,
+	> .menu-spinners {
+		grid-row: 1;
+		align-self: var(--menu-strip-align, end);
+	}
+}
+
 .scene-menu:where([class*='design-']) {
 	margin-block: var(--wa-space-m);
 	border-radius: 0;
@@ -90,6 +132,9 @@
 /* ── Fine dining ───────────────────────────────────────────────────────── */
 
 .design-fine {
+	--menu-space-above: 1fr;
+	--menu-space-below: 2fr;
+	--menu-max-width: 64rem;
 	--menu-ink: #2c2620;
 	--rate-on: '◆';
 	--rate-off: '◇';
@@ -107,6 +152,29 @@
 	& .menu-sheet {
 		gap: 1rem;
 		padding: 1.6rem 1.5rem 1.4rem;
+	}
+
+	/* On a menu's own page it is a card on the table, not the whole window:
+	   the card and its gold rules are the sheet, no wider than what is on
+	   it, with a shadow under it, and the page around it is the app's own,
+	   as for the slate and the magazine, dimmed: a pale card reads as the
+	   thing to look at against a darker table, and the app's amber wash
+	   behind it competed with the gold. */
+	.menu-page > &.scene-menu {
+		padding: clamp(0.75rem, 4vw, 3rem);
+		background: rgb(12 9 6 / 60%);
+		box-shadow: none;
+
+		& > .menu-sheet {
+			padding: 2.4rem 2.2rem 2rem;
+			background: #fbf8f1;
+			box-shadow:
+				inset 0 0 0 1px #c9b27a,
+				inset 0 0 0 6px #fbf8f1,
+				inset 0 0 0 7px #c9b27a,
+				0 1px 2px rgb(0 0 0 / 25%),
+				0 18px 44px rgb(0 0 0 / 40%);
+		}
 	}
 	& .menu-head {
 		text-align: center;
@@ -157,6 +225,9 @@
 /* ── American diner ────────────────────────────────────────────────────── */
 
 .design-diner {
+	--menu-space-above: 1fr;
+	--menu-space-below: 3fr;
+	--menu-max-width: 72rem;
 	--menu-ink: #1e1e1e;
 	--rate-on: '★';
 	--rate-off: '★';
@@ -260,6 +331,9 @@
 /* ── Izakaya ───────────────────────────────────────────────────────────── */
 
 .design-izakaya {
+	--menu-space-above: 1fr;
+	--menu-space-below: 3fr;
+	--menu-max-width: 64rem;
 	--menu-ink: #2a2018;
 	--rate-on: '●';
 	--rate-off: '○';
@@ -369,6 +443,9 @@
 /* ── Bimbo ─────────────────────────────────────────────────────────────── */
 
 .design-bimbo {
+	--menu-space-above: 1fr;
+	--menu-space-below: 3fr;
+	--menu-max-width: 64rem;
 	--menu-ink: #5b0a3a;
 	--rate-on: '♥';
 	--rate-off: '♡';
@@ -382,6 +459,28 @@
 	border: 3px solid #ff5fae;
 	border-radius: 28px;
 	box-shadow: inset 0 0 0 4px #fff;
+
+	/* On a menu's own page it is a card on a pink backdrop, as the fine
+	   dining card is on its dimmed one: the rounded frame and the gradient
+	   are the sheet's, no wider than what is on it, and the window around
+	   it is the frame's own pink. Not the frame stretched to the window,
+	   whose rounded corners left the page showing through. */
+	.menu-page > &.scene-menu {
+		padding: clamp(0.75rem, 4vw, 3rem);
+		border: 0;
+		border-radius: 0;
+		background: #ff5fae;
+		box-shadow: none;
+
+		& > .menu-sheet {
+			border: 3px solid #ff5fae;
+			border-radius: 28px;
+			background: linear-gradient(160deg, #ffd1ea, #ff8cc6 55%, #ff5fae);
+			box-shadow:
+				inset 0 0 0 4px #fff,
+				0 18px 44px rgb(120 0 60 / 35%);
+		}
+	}
 
 	& .menu-sheet {
 		gap: 1rem;
@@ -545,6 +644,9 @@
 /* ── Office after hours ────────────────────────────────────────────────── */
 
 .design-office {
+	--menu-space-above: 1fr;
+	--menu-space-below: 5fr;
+	--menu-max-width: 64rem;
 	--menu-ink: #22222a;
 	--rate-on: '■';
 	--rate-off: '□';
@@ -666,6 +768,9 @@
    syllabus under an ex-libris arch, each course a numbered lecture with the
    tutor's red marginalia. Wider, it opens into a two-page spread. */
 .design-academia {
+	--menu-space-above: 1fr;
+	--menu-space-below: 2fr;
+	--menu-max-width: 72rem;
 	--surprise-text: 'a sealed chapter';
 	--menu-ink: #2a1d14;
 	--rate-on: '◆';
@@ -938,12 +1043,16 @@
    drawings, so it stays readable; an item's words stay clear, since that is
    where someone types. */
 .design-chalk {
+	--menu-space-above: 1fr;
+	--menu-space-below: 3fr;
+	--menu-max-width: 80rem;
 	--surprise-text: '???';
 	--menu-ink: #f1efe6;
 	--rate-on: '★';
 	--rate-off: '☆';
+	--wood: url('/menu-art/wood.svg'), linear-gradient(135deg, #7a5233, #5a3a20 50%, #6e4a2c);
 	padding: 14px;
-	background: url('/menu-art/wood.svg'), linear-gradient(135deg, #7a5233, #5a3a20 50%, #6e4a2c);
+	background: var(--wood);
 	color: #f1efe6;
 	font-family: Kalam, cursive;
 	font-size: 1.12rem;
@@ -958,6 +1067,28 @@
 			inset 0 0 0 2px #3d2716,
 			inset 0 0 26px rgb(0 0 0 / 55%);
 		text-shadow: 0 0 2px rgb(255 255 255 / 28%);
+	}
+
+	/* On a menu's own page the wood is a frame, the same narrow width all
+	   round the slate, as it is in a column, and the page around it is the
+	   app's own: a frame stretched to the window's edges reads as a wall. */
+	.menu-page > &.scene-menu {
+		padding: clamp(0.75rem, 4vw, 3rem);
+		background: none;
+
+		& > .menu-sheet {
+			border: 14px solid transparent;
+			background:
+				url('/menu-art/slategrain.svg') padding-box,
+				url('/menu-art/swipes.svg') 0 0 / 100% 100% no-repeat padding-box,
+				linear-gradient(172deg, #313835, #272d2a 55%, #2b322f) padding-box,
+				url('/menu-art/wood.svg') border-box,
+				linear-gradient(135deg, #7a5233, #5a3a20 50%, #6e4a2c) border-box;
+			box-shadow:
+				inset 0 0 0 2px #3d2716,
+				inset 0 0 26px rgb(0 0 0 / 55%),
+				0 14px 36px rgb(0 0 0 / 45%);
+		}
 	}
 	& .menu-head {
 		align-items: center;
@@ -1103,6 +1234,9 @@
 /* ── Deco lounge ───────────────────────────────────────────────────────── */
 
 .design-lounge {
+	--menu-space-above: 1fr;
+	--menu-space-below: 2fr;
+	--menu-max-width: 80rem;
 	--menu-ink: #eadfbf;
 	--rate-on: '◆';
 	--rate-off: '◇';
@@ -1117,6 +1251,18 @@
 		border: 1px solid #c8a24a;
 		outline: 1px solid rgb(200 162 74 / 50%);
 		outline-offset: 5px;
+	}
+
+	/* On a menu's own page the lounge's dark is inside its gold frame, and
+	   the page around it is the app's own, dimmed, as behind the fine
+	   dining card. */
+	.menu-page > &.scene-menu {
+		background: rgb(12 9 6 / 60%);
+
+		& > .menu-sheet {
+			background: radial-gradient(ellipse at 50% 0%, #1d1a14, #0a0a0b 65%);
+			box-shadow: 0 18px 44px rgb(0 0 0 / 50%);
+		}
 	}
 	/* Stepped deco corners. */
 	& .menu-art > i:nth-child(-n + 4) {
@@ -1265,6 +1411,9 @@
 /* A handwritten sheet taped to a gingham tablecloth, an olive branch and a
    wine glass's ring. */
 .design-trattoria {
+	--menu-space-above: 1fr;
+	--menu-space-below: 2fr;
+	--menu-max-width: 64rem;
 	--surprise-text: 'sorpresa…';
 	--menu-ink: #3b2a1e;
 	--rate-on: '●';
@@ -1361,6 +1510,11 @@
 /* Stone blocks lit by torchlight; a plank board on iron chains, banded and
    riveted, each course on a slate tile, a dripping candle at each side. */
 .design-dungeon {
+	/* Its chains, on a menu's own page: see below. */
+	--menu-strip-align: stretch;
+	--menu-space-above: 1fr;
+	--menu-space-below: 3fr;
+	--menu-max-width: 68rem;
 	--surprise-text: '…sealed…';
 	--menu-ink: #ecdcb7;
 	--rate-on: '†';
@@ -1383,10 +1537,23 @@
 		content: '';
 		display: block;
 		block-size: 2.8rem;
-		margin-inline: 2.6rem;
+		/* Over the board's corners, wherever the board is: centred, and no
+		   wider than `--menu-max-width`, on a page wider than that. */
+		margin-inline: max(2.6rem, (100% - var(--menu-max-width)) / 2 + 2.6rem);
 		background:
 			url('/menu-art/chain.svg') left top / 1rem 100% no-repeat,
 			url('/menu-art/chain.svg') right top / 1rem 100% no-repeat;
+	}
+
+	/* On a menu's own page, where the board can hang lower than the top of
+	   the page, the chains reach up to it, a link at a time (one is the
+	   art's 1:4) rather than one stretched link. */
+	.menu-page > &::before {
+		block-size: auto;
+		min-block-size: 2.8rem;
+		background:
+			url('/menu-art/chain.svg') left bottom / 1rem 4rem repeat-y,
+			url('/menu-art/chain.svg') right bottom / 1rem 4rem repeat-y;
 	}
 	& .menu-sheet {
 		gap: 0.8rem;
@@ -1504,20 +1671,45 @@
    the cover story, the rest as cover lines round a heart-shaped perfume
    bottle, and a "Plus!" strip along the bottom. */
 .design-glossy {
+	--menu-space-above: 0fr;
+	--menu-space-below: 1fr;
+	--menu-max-width: 72rem;
 	--surprise-text: '…and one they won’t tell you about!';
 	--menu-ink: #fff;
 	--rate-on: '♥';
 	--rate-off: '♡';
-	padding: 0.7rem 1rem 1rem;
-	background:
+	/* The cover: its gloss, its print dots and its pink. */
+	--cover:
 		linear-gradient(115deg, transparent 38%, rgb(255 255 255 / 28%) 44%, transparent 50%),
 		radial-gradient(circle at 1px 1px, rgb(255 255 255 / 20%) 1px, transparent 1.4px) 0 0 / 7px 7px,
 		radial-gradient(ellipse at 60% 60%, #ffe3f1, #ff9ccc 36%, #f2468f 76%, #c4166a);
+	padding: 0.7rem 1rem 1rem;
+	background: var(--cover);
 	color: #fff;
 	font-family: Fredoka, sans-serif;
 
 	& .menu-sheet {
 		gap: 0.7rem;
+	}
+
+	/* On a menu's own page it is a magazine lying on something, not the
+	   whole window: the cover is the sheet, no wider than what is on it,
+	   with a shadow under it, and the page around it is the app's own. */
+	.menu-page > &.scene-menu {
+		--menu-space-above: 1fr;
+		--menu-space-below: 2fr;
+		padding: clamp(0.75rem, 4vw, 3rem);
+		/* The app's page behind it, dimmed, as behind the fine dining card. */
+		background: rgb(12 9 6 / 60%);
+
+		& > .menu-sheet {
+			padding: 0.8rem 1.4rem 1.4rem;
+			border-radius: 3px;
+			background: var(--cover);
+			box-shadow:
+				0 1px 2px rgb(0 0 0 / 30%),
+				0 18px 44px rgb(0 0 0 / 45%);
+		}
 	}
 	/* The masthead, with a starburst beside it, and the strap under both. */
 	& .menu-head {
@@ -1771,6 +1963,9 @@
 /* A VIP ticket with a holographic strip, courses billed as a lineup, and a
    perforated stub that moves to the side when wider. */
 .design-ticket {
+	--menu-space-above: 1fr;
+	--menu-space-below: 1fr;
+	--menu-max-width: 80rem;
 	--surprise-text: '[ TBA ]';
 	--menu-ink: #f2f2f2;
 	--rate-on: '▮';
@@ -1948,6 +2143,9 @@
    beside it when wider. The panel is the heading, the courses, the key and
    the footnote, joined into one white label. */
 .design-facts {
+	--menu-space-above: 1fr;
+	--menu-space-below: 3fr;
+	--menu-max-width: 72rem;
 	--surprise-text: 'Secret ingredient';
 	--menu-ink: #000;
 	--rate-on: '■';
@@ -2119,6 +2317,10 @@
    card with a toy stuck on its corner, either of which can be changed. A
    rating is counted in little bones. */
 .design-pet {
+	--menu-strip-align: start;
+	--menu-space-above: 1fr;
+	--menu-space-below: 3fr;
+	--menu-max-width: 64rem;
 	--surprise-text: 'a treat, hidden';
 	--menu-ink: #2d3550;
 	padding: 1.1rem 1rem 1.3rem;
@@ -2156,6 +2358,27 @@
 			calc(100% - 0.3rem) / 12px 2px repeat-x,
 			linear-gradient(var(--collar-shine) 0 35%, var(--collar) 35%);
 		box-shadow: 0 4px 0 rgb(45 53 80 / 12%);
+	}
+	/* On a menu's own page the collar is along the top and its tag hangs
+	   from it, at the sheet's top: so the sheet stays under the collar and
+	   reaches the page's foot, and the spare height goes inside it, a
+	   quarter above the menu and the rest below. */
+	.menu-page > &.scene-menu {
+		--menu-space-above: 0fr;
+		--menu-space-below: 0fr;
+
+		& > .menu-sheet {
+			grid-row: 2 / 4;
+
+			&::before,
+			&::after {
+				content: '';
+				flex: 1;
+			}
+			&::after {
+				flex-grow: 3;
+			}
+		}
 	}
 	/* The tag, hanging from the collar's middle over the gap to the menu: a
 	   pixel right of it, so that its ring, swung aside by the tag's tilt,
@@ -2420,6 +2643,10 @@
    an X. A rating is pony beads on a string. The pointer is a pink arrow
    with a star. */
 .design-decora {
+	--menu-strip-align: start;
+	--menu-space-above: 1fr;
+	--menu-space-below: 3fr;
+	--menu-max-width: 84rem;
 	--surprise-text: 'a gacha surprise!';
 	--menu-ink: #3a2340;
 	--rate-off-opacity: 0.25;
@@ -3173,6 +3400,9 @@
    in underneath, a wax seal on a silk ribbon and a pressed rose. Each course
    is a paragraph of it, its items running on in red ink. */
 .design-letter {
+	--menu-space-above: 1fr;
+	--menu-space-below: 2fr;
+	--menu-max-width: 56rem;
 	--surprise-text: 'something I shall not name';
 	--menu-ink: #2e1830;
 	--rate-on: '❦';
@@ -3521,6 +3751,9 @@
 /* A pad on a clipboard: a letterhead, handwritten fields, a ℞, tick-box
    prescriptions with their doses, and a scrawled signature. */
 .design-clinic {
+	--menu-space-above: 1fr;
+	--menu-space-below: 4fr;
+	--menu-max-width: 64rem;
 	--surprise-text: '[redacted]';
 	--menu-ink: #12324a;
 	--rate-on: '●';
@@ -3542,6 +3775,13 @@
 		background: url('/menu-art/clip.svg') no-repeat center / contain;
 		filter: drop-shadow(0 3px 2px rgb(18 50 74 / 35%));
 		transform: translateX(-50%);
+	}
+	/* On a menu's own page, where the paper can sit lower than the board's
+	   top, the clip holds the paper wherever it is: placed in the paper's
+	   row, as far above it as the board's top padding. */
+	.menu-page > &.scene-menu::before {
+		grid-row: 2;
+		inset-block-start: -1.4rem;
 	}
 	& .menu-sheet {
 		gap: 0.6rem;
@@ -3713,6 +3953,9 @@
    cloud: a flat base and one lumpy top, its bumps in a different place on
    each. */
 .design-soft {
+	--menu-space-above: 1fr;
+	--menu-space-below: 3fr;
+	--menu-max-width: 64rem;
 	--surprise-text: 'a little surprise';
 	--menu-ink: #3a3355;
 	--rate-on: '✦';
@@ -3850,6 +4093,9 @@
 /* A scroll with rolled ends, a crown, an illuminated capital opening the
    decree, the courses as its numbered articles, and the royal seal. */
 .design-royal {
+	--menu-space-above: 1fr;
+	--menu-space-below: 2fr;
+	--menu-max-width: 60rem;
 	--surprise-text: 'a matter held privy to the Crown';
 	--menu-ink: #3b2414;
 	--rate-on: '♛';
@@ -4012,6 +4258,9 @@
    sticky note per course, spare pins in the corner and the torn-off corner of
    an old note still under its pin. As many notes across as fit. */
 .design-cork {
+	--menu-space-above: 1fr;
+	--menu-space-below: 3fr;
+	--menu-max-width: 84rem;
 	--surprise-text: '(see me)';
 	--menu-ink: #2a2a2a;
 	--rate-on: '!';
@@ -4210,6 +4459,13 @@
    its Tan Pearl face with a dark halo, and each course a paper card in one of
    its frames (sun, star, devil, moon), which fan out at full page. */
 .design-tarot {
+	/* An item's words take only their own width, so its box, its words and
+	   its rating sit together in the card's middle, as its title does,
+	   rather than the box at one edge and the rating at the other. */
+	--words-flex: 0 1 auto;
+	--menu-space-above: 1fr;
+	--menu-space-below: 1fr;
+	--menu-max-width: 84rem;
 	--surprise-text: 'a card face down';
 	--menu-ink: #48606a;
 	--rate-on: '☾';
@@ -4405,6 +4661,9 @@
    plate, a made-up Latin name, the flower picked by tapping it. As many
    packets across as fit. */
 .design-seeds {
+	--menu-space-above: 1fr;
+	--menu-space-below: 3fr;
+	--menu-max-width: 84rem;
 	--surprise-text: 'a surprise bloom';
 	--menu-ink: #3d3a2a;
 	--rate-on: '❦';
@@ -4525,6 +4784,9 @@
    top and bottom, a bunny, a flower and a fox under the title, and every
    line in stitch-like letters. */
 .design-sampler {
+	--menu-space-above: 1fr;
+	--menu-space-below: 2fr;
+	--menu-max-width: 64rem;
 	--surprise-text: 'a secret stitch';
 	--menu-ink: #3a3550;
 	--rate-on: '×';
@@ -4653,6 +4915,9 @@
    card for the course. A rating is the toy's setting lights. One slot a row
    on a phone, two wider, four at full page. */
 .design-toys {
+	--menu-space-above: 1fr;
+	--menu-space-below: 2fr;
+	--menu-max-width: 80rem;
 	--surprise-text: 'still wrapped';
 	--menu-ink: #2a1a22;
 	padding: 1rem 0.9rem 1.1rem;
@@ -4813,10 +5078,13 @@
 
 @container scene-page (width >= 48rem) {
 	.design-toys {
+		/* Four to a row, in twelve columns rather than four, so that a last
+		   row of fewer still fills the tray (below). */
 		& .scene-menu-courses {
-			grid-template-columns: repeat(4, 1fr);
+			grid-template-columns: repeat(12, 1fr);
 		}
 		& .scene-menu-course {
+			grid-column: span 3;
 			grid-template-columns: 1fr;
 
 			& > .menu-course-art {
@@ -4834,11 +5102,22 @@
 		& .scene-menu-line {
 			grid-column: 1;
 		}
-		/* Four to a row, so alone on its row is one past a multiple of four;
-		   that wide, its gear goes beside its card again, as on a phone. */
+		/* A last row of three or two is as wide as the others, each slot
+		   wider: the first of the row is one past a multiple of four, with
+		   that many from the end. */
 		& .scene-menu-course:last-child:nth-child(odd) {
-			grid-column: auto;
+			grid-column: span 3;
 		}
+		& .scene-menu-course:nth-child(4n + 1):nth-last-child(3),
+		& .scene-menu-course:nth-child(4n + 1):nth-last-child(3) ~ .scene-menu-course {
+			grid-column: span 4;
+		}
+		& .scene-menu-course:nth-child(4n + 1):nth-last-child(2),
+		& .scene-menu-course:nth-child(4n + 1):nth-last-child(2) ~ .scene-menu-course {
+			grid-column: span 6;
+		}
+		/* Alone on its row, one past a multiple of four: that wide, its gear
+		   goes beside its card again, as on a phone. */
 		& .scene-menu-course:last-child:nth-child(4n + 1) {
 			grid-column: 1 / -1;
 			grid-template-columns: var(--gear-w) 1fr;

@@ -62,6 +62,8 @@ import { drawSurprise, sceneViewerOf } from './viewer';
 
 export type SerializedMenuNode = Spread<
 	{
+		/** Its link's handle (`menuId`); absent on a menu from before links. */
+		id?: string | null;
 		title: string;
 		subtitle: string;
 		hiddenFrom: string | null;
@@ -76,6 +78,13 @@ export type SerializedMenuNode = Spread<
 >;
 
 export class MenuNode extends ElementNode {
+	/**
+	 * What its own page is found by (docs/scenes.md, "A menu's own page").
+	 * Lexical's node keys are made afresh on every load, so a link needs one
+	 * of its own, kept with the menu. Null on a menu from before links until a
+	 * writer opens the scene, when `scene-blocks.ts` gives it one.
+	 */
+	__menuId: string | null;
 	/** Its own title, in place of the design's; empty for the design's. */
 	__title: string;
 	/** A line under the title; empty for none. */
@@ -99,6 +108,7 @@ export class MenuNode extends ElementNode {
 
 	static clone(node: MenuNode): MenuNode {
 		const clone = new MenuNode(node.__hiddenFrom, node.__key);
+		clone.__menuId = node.__menuId;
 		clone.__title = node.__title;
 		clone.__subtitle = node.__subtitle;
 		clone.__design = node.__design;
@@ -116,6 +126,10 @@ export class MenuNode extends ElementNode {
 
 	constructor(hiddenFrom: string | null = null, key?: NodeKey) {
 		super(key);
+		// Not made here: a node Yjs builds from another writer's document is
+		// made by this constructor too, and an id invented on each device
+		// would differ from device to device. `$createMenuNode` makes one.
+		this.__menuId = null;
 		this.__title = '';
 		this.__subtitle = '';
 		this.__hiddenFrom = hiddenFrom;
@@ -130,6 +144,7 @@ export class MenuNode extends ElementNode {
 	override updateFromJSON(serialised: LexicalUpdateJSON<SerializedMenuNode>): this {
 		return super
 			.updateFromJSON(serialised)
+			.setMenuId(typeof serialised.id === 'string' ? serialised.id : null)
 			.setHeading({
 				title: cut(serialised.title, MAX_MENU_TITLE) ?? '',
 				subtitle: cut(serialised.subtitle, MAX_MENU_SUBTITLE) ?? ''
@@ -156,6 +171,7 @@ export class MenuNode extends ElementNode {
 			? 'scene-block scene-menu'
 			: `scene-block scene-menu design-${design.id}`;
 		element.dataset.design = design.id;
+		drawMenuId(element, this.__menuId);
 		const courses = buildMenuFrame(element, {
 			...this.#heading(),
 			key: this.#key(),
@@ -205,23 +221,36 @@ export class MenuNode extends ElementNode {
 		reset.textContent = 'Reset';
 		reset.popover = 'manual';
 		element.append(reset);
-		// And deleting the whole menu, words and all, from its corner while
-		// the caret is in it (`scene-blocks.ts`): otherwise it takes
-		// selecting every line of it and then the frame.
+		// And, in its corner while the caret is in it or it is pointed at, a
+		// link to its own page and deleting the whole menu, words and all
+		// (`scene-blocks.ts`): otherwise deleting takes selecting every line
+		// of it and then the frame.
+		const tools = document.createElement('div');
+		tools.className = MENU_TOOLS_CLASS;
+		tools.contentEditable = 'false';
+		const link = document.createElement('button');
+		link.type = 'button';
+		link.className = MENU_LINK_CLASS;
+		link.setAttribute('aria-label', 'Copy a link to this menu');
+		link.title = 'Copy a link to this menu';
+		const chain = document.createElement('wa-icon');
+		chain.setAttribute('name', 'link');
+		chain.setAttribute('aria-hidden', 'true');
+		link.append(chain);
 		const remove = document.createElement('button');
 		remove.type = 'button';
 		remove.className = DELETE_MENU_CLASS;
-		remove.contentEditable = 'false';
 		remove.setAttribute('aria-label', 'Delete this menu');
 		remove.title = 'Delete this menu';
 		const bin = document.createElement('wa-icon');
 		bin.setAttribute('name', 'trash-can');
 		bin.setAttribute('aria-hidden', 'true');
 		remove.append(bin);
-		element.append(remove);
+		tools.append(link, remove);
+		element.append(tools);
 		// The frame is the menu's own, not its courses': Lexical leaves it be.
 		for (const fixed of element.querySelectorAll<HTMLElement>(
-			`.menu-filters, .${CONFETTI_CLASS}, .${SPINNERS_CLASS}, .menu-art, .menu-head, .menu-intro, .${ADD_COURSE_CLASS}, .menu-key, .menu-foot, .${RESET_COPY_CLASS}, .${DELETE_MENU_CLASS}`
+			`.menu-filters, .${CONFETTI_CLASS}, .${SPINNERS_CLASS}, .menu-art, .menu-head, .menu-intro, .${ADD_COURSE_CLASS}, .menu-key, .menu-foot, .${RESET_COPY_CLASS}, .${MENU_TOOLS_CLASS}`
 		)) {
 			setDOMUnmanaged(fixed);
 		}
@@ -256,7 +285,18 @@ export class MenuNode extends ElementNode {
 		drawMenuCopy(element, menuCopy(menuDesign(this.__design), this.__copy));
 		drawMenuMascot(element, this.#mascot());
 		drawMenuPictures(element, this.#pictures());
+		drawMenuId(element, this.__menuId);
 		return false;
+	}
+
+	getMenuId(): string | null {
+		return this.getLatest().__menuId;
+	}
+
+	setMenuId(menuId: string | null): this {
+		const self = this.getWritable();
+		self.__menuId = menuId;
+		return self;
 	}
 
 	/** The pictures in its design's row, if the design has one. */
@@ -395,6 +435,7 @@ export class MenuNode extends ElementNode {
 	override exportJSON(): SerializedMenuNode {
 		return {
 			...super.exportJSON(),
+			id: this.__menuId,
 			title: this.__title,
 			subtitle: this.__subtitle,
 			hiddenFrom: this.__hiddenFrom,
@@ -413,6 +454,33 @@ export const RESET_COPY_CLASS = 'menu-copy-reset';
 
 /** The class of the editor's button that deletes the whole menu. */
 export const DELETE_MENU_CLASS = 'menu-delete';
+
+/** The class of the editor's button that offers a link to the menu's own page. */
+export const MENU_LINK_CLASS = 'menu-link';
+
+/** The class of the corner holding the link and delete buttons. */
+export const MENU_TOOLS_CLASS = 'menu-tools';
+
+/**
+ * Asks for the link popover (`MenuLinkPopover.svelte`), dispatched on the
+ * editor's root when a menu's link button is pressed.
+ */
+export const MENU_LINK_EVENT = 'scene-menu-link';
+
+export type MenuLinkRequest = {
+	menuId: string;
+	/** The button pressed, for the popover to point at. */
+	anchor: HTMLElement;
+};
+
+/** Marks the menu's element with its id, for its page to find and its link to name. */
+function drawMenuId(element: HTMLElement, menuId: string | null) {
+	if (menuId) {
+		element.dataset.menuId = menuId;
+	} else {
+		delete element.dataset.menuId;
+	}
+}
 
 /** Stored copy, kept only where it is a design's and a key's strings. */
 function copyOverrides(value: unknown): MenuCopyOverrides {
@@ -441,7 +509,9 @@ function cut(value: unknown, length: number): string | null {
 }
 
 export function $createMenuNode(hiddenFrom: string | null = null): MenuNode {
-	return $applyNodeReplacement(new MenuNode(hiddenFrom));
+	const node = new MenuNode(hiddenFrom);
+	node.__menuId = crypto.randomUUID();
+	return $applyNodeReplacement(node);
 }
 
 export function $isMenuNode(node: LexicalNode | null | undefined): node is MenuNode {

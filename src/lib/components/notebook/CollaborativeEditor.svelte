@@ -9,12 +9,14 @@
 	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
 	import MenuArtPicker from '$lib/components/scenes/MenuArtPicker.svelte';
 	import MenuItemExtras from '$lib/components/scenes/MenuItemExtras.svelte';
+	import MenuLinkPopover from '$lib/components/scenes/MenuLinkPopover.svelte';
 	import '$lib/scenes/scene-blocks.css';
 	import '$lib/scenes/menu-designs.css';
 	import { toEditorDocument } from '$lib/lexical/document-shape';
-	import { sceneViewerOf, setSceneViewer } from '$lib/lexical/nodes/scene/viewer';
+	import { sceneViewerOf, setSceneViewer, setTickable } from '$lib/lexical/nodes/scene/viewer';
 	import {
 		$canMakeMenu as canMakeMenu,
+		registerOnlyMenu,
 		$selectedMenuItems as selectedMenuItems,
 		selectionToMenu,
 		setSelectedSurprise,
@@ -50,6 +52,10 @@
 		placeholder = 'Start writing…',
 		scene = false,
 		partnerId = null,
+		menuHref = null,
+		onlyMenu = null,
+		tickable = false,
+		onMenuFound,
 		onEditor
 	}: {
 		session: NotebookSession;
@@ -66,6 +72,21 @@
 		scene?: boolean;
 		/** A shared scene's partner, whom a menu item can be a surprise for. */
 		partnerId?: string | null;
+		/**
+		 * Where a scene menu's own page is, for its link button
+		 * (`MenuLinkPopover`); without it the button offers nothing.
+		 */
+		menuHref?: ((menuId: string) => string) | null;
+		/**
+		 * Shows the scene's menu with this id alone, on its own page, and keeps
+		 * every edit inside it (`registerOnlyMenu`). Read once, as the editor
+		 * is bound.
+		 */
+		onlyMenu?: string | null;
+		/** To-dos can be ticked while `readOnly` (`setTickable`): a writer reading a menu's page. */
+		tickable?: boolean;
+		/** Whether the `onlyMenu` menu is in the scene, as that changes. */
+		onMenuFound?: (found: boolean) => void;
 		/**
 		 * The bound editor once it is ready, and null once it has gone: for a
 		 * scene's prompt column, which writes into the page and reads what it
@@ -147,6 +168,9 @@
 		if (scene) {
 			setSceneViewer(editor, userId);
 		}
+		const only = onlyMenu
+			? registerOnlyMenu(editor, onlyMenu, (found) => onMenuFound?.(found))
+			: null;
 		// A scene's excerpt leaves out anything hidden from anyone: both
 		// partners' lists show the same header, so a surprise in it would not
 		// be one.
@@ -161,11 +185,20 @@
 		return () => {
 			boundEditor = null;
 			onEditor?.(null);
+			only?.();
 			collaboration.destroy();
 			bound.destroy();
 			editorRef = null;
 		};
 	}
+
+	// Followed rather than read once: whether this viewer may write can
+	// change while the page is open.
+	$effect(() => {
+		if (boundEditor) {
+			setTickable(boundEditor, tickable);
+		}
+	});
 
 	/**
 	 * Replaces the body with an earlier version's, as one ordinary edit: it
@@ -200,5 +233,8 @@
 {#if scene && boundEditor}
 	<MenuItemExtras editor={boundEditor} />
 	<MenuArtPicker editor={boundEditor} />
+	{#if menuHref && !onlyMenu}
+		<MenuLinkPopover editor={boundEditor} {menuHref} />
+	{/if}
 {/if}
 

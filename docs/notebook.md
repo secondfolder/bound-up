@@ -238,6 +238,7 @@ has to go with it.
 | --- | --- |
 | `/home/notebook`, `/partner/[id]/notebook` | Journal, Notes and Scenes tabs; a new entry; `?/create`, and `?/show` for a hidden entry the viewer may show again. |
 | `.../notebook/[entryId]` | The entry: title (its save status, Settings, History and Delete at the end of its row, or on a row above it where they do not fit), editor, presence, history; `?/setAccess` (who else can see it, in the Settings popover, for whoever has the say over that) and `?/delete`. |
+| `.../notebook/[entryId]/menus/[menuId]` | A scene's menu on a page of its own, read only until Edit, its to-dos tickable by a writer ([scenes.md](scenes.md#a-menus-own-page)). |
 | `api/notebook/entries/[entryId]/updates` | `GET` edits after a seq (with the latest version on open); `POST` a batch and/or a caret. |
 | `.../header` | `POST` the sealed header, compare-and-swap. |
 | `.../versions` | `GET` the history; `POST` a version. |

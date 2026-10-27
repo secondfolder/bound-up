@@ -10,6 +10,7 @@ import {
 	newAccounts,
 	newSide,
 	type Side,
+	settle,
 	typeRichText,
 	waitForHydration
 } from './helpers';
@@ -590,6 +591,190 @@ test.describe('blocks', () => {
 		} finally {
 			await ada.close();
 			await bo.close();
+		}
+	});
+});
+
+test.describe('a menu’s own page', () => {
+	/** A menu with one to-do in it, and a line after it, so the caret can leave it. */
+	async function menuWithToDo(page: Page) {
+		await column(page).getByRole('button', { name: 'Menu', exact: true }).click();
+		const menu = surface(page).locator('.scene-menu').first();
+		await expect(menu).toBeVisible();
+		await page.keyboard.type('[ ] Massage');
+		await expect(menu.locator('.scene-menu-line.item .menu-line-check').first()).toBeVisible();
+		// Rated, so its items have a rating to tap (or not).
+		await page
+			.getByRole('complementary', { name: 'Menu options' })
+			.getByText('Enable menu item ratings')
+			.click();
+		await expect(menu.locator('button.menu-rates').first()).toBeVisible();
+		const box = defined(await menu.boundingBox(), 'the menu');
+		await page.mouse.click(box.x + 50, box.y + box.height + 40);
+		await page.keyboard.type('After the menu');
+		await expect(page.getByText('Saved')).toBeVisible();
+		return menu;
+	}
+
+	const toDo = (page: Page) =>
+		page.locator('.scene-menu .scene-menu-line.item').filter({ hasText: 'Massage' }).first();
+
+	test('is linked from the menu’s corner, copied, and opened on a page of its own', async ({
+		browser
+	}) => {
+		const side = await newSide(browser, 'Ada');
+		try {
+			await newAccount(side.page, side.who);
+			await side.page.goto('/home/notebook');
+			const sceneUrl = await startScene(side.page);
+			const menu = await menuWithToDo(side.page);
+
+			// The caret is after the menu, so its corner shows only while it is
+			// pointed at.
+			const link = menu.locator('.menu-link');
+			await expect(link).toBeHidden();
+			await menu.hover();
+			await expect(link).toBeVisible();
+			await expect(menu.locator('.menu-delete')).toBeVisible();
+
+			await link.click();
+			const popover = side.page.locator('wa-popover.menu-link-popover');
+			await expect(popover.getByText('Link copied to your clipboard.')).toBeVisible();
+			const menuId = defined(await menu.getAttribute('data-menu-id'), 'the menu’s id');
+			const expected = `${sceneUrl}/menus/${menuId}`;
+			await expect(popover.locator('wa-input input')).toHaveValue(expected);
+			expect(await side.page.evaluate(() => navigator.clipboard.readText())).toBe(expected);
+
+			const [menuPage] = await Promise.all([
+				side.page.context().waitForEvent('page'),
+				popover.getByRole('link', { name: 'Open' }).click()
+			]);
+			await waitForHydration(menuPage);
+			expect(menuPage.url()).toBe(expected);
+			const shown = menuPage.locator('.richtext-editor .surface');
+			await expect(shown.locator('.scene-menu')).toBeVisible();
+			// The menu alone: none of the rest of the scene, and none of the app.
+			await expect(shown.getByText('After the menu')).toBeHidden();
+			await expect(menuPage.getByRole('navigation', { name: 'Primary' })).toHaveCount(0);
+			await expect(shown.locator('.menu-tools')).toBeHidden();
+			// The menu is the page, edge to edge: no column, gutter or margin
+			// around it. (A scrollbar may take a little of the width.)
+			const viewport = defined(menuPage.viewportSize(), 'the window');
+			const filled = defined(await shown.locator('.scene-menu').boundingBox(), 'the menu');
+			expect([filled.x, filled.y]).toEqual([0, 0]);
+			expect(filled.width).toBeGreaterThan(viewport.width - 20);
+			expect(filled.height).toBeGreaterThanOrEqual(viewport.height);
+			await expect(shown).toHaveAttribute('contenteditable', 'false');
+
+			// Nothing for writing shows while it is read only, even where it
+			// is clicked into; in edit mode it all shows, wherever the caret.
+			await toDo(menuPage).locator('.menu-line-words').click();
+			await expect(shown.locator('.menu-add-course')).toBeHidden();
+			// Nothing that only changes in edit mode looks pressable.
+			const cursorOf = (selector: string) =>
+				shown
+					.locator(selector)
+					.first()
+					.evaluate((element) => getComputedStyle(element).cursor);
+			expect(await cursorOf('button.menu-rates')).not.toBe('pointer');
+			expect(await cursorOf('button.menu-line-check')).toBe('pointer');
+			// Its title is not to be rewritten here, but it can be selected.
+			await expect(shown.locator('.menu-title')).toHaveAttribute('contenteditable', 'false');
+			await shown.locator('.menu-title').dblclick();
+			expect(await menuPage.evaluate(() => globalThis.getSelection()?.toString().trim())).not.toBe(
+				''
+			);
+
+			// Read only, but its to-dos tick, for the scene too.
+			await toDo(menuPage).locator('.menu-line-check').click();
+			await expect(toDo(menuPage)).toHaveClass(/\bchecked\b/);
+			await expect(toDo(side.page)).toHaveClass(/\bchecked\b/);
+
+			// Editable from its corner, and back.
+			await clickWaButton(menuPage, 'Edit');
+			await expect(shown).toHaveAttribute('contenteditable', 'true');
+			await expect(shown.locator('.menu-add-course')).toBeVisible();
+			// At the end of its words: a rated line ends in its rating, past
+			// which End does not take the caret.
+			const words = toDo(menuPage).locator('.menu-line-words');
+			const wordsBox = defined(await words.boundingBox(), 'the item’s words');
+			await words.click({ position: { x: wordsBox.width - 1, y: wordsBox.height / 2 } });
+			await menuPage.keyboard.type(' with oil');
+			await expect(toDo(side.page)).toContainText('Massage with oil');
+			// A title being written in is left by a press anywhere else on the
+			// menu, which the menu otherwise takes for itself.
+			await shown.locator('.menu-title').click();
+			await expect(shown.locator('.menu-title')).toBeFocused();
+			await menuPage.mouse.click(4, 300);
+			await expect(shown.locator('.menu-title')).not.toBeFocused();
+
+			// Selected words get the formatting toolbar, as on the scene's page.
+			await toDo(menuPage).locator('.menu-line-words').dblclick();
+			await expect(menuPage.getByRole('toolbar', { name: 'Text formatting' })).toBeVisible();
+			// Its options, in a drawer, only in edit mode: the same as the
+			// scene's column, less turning it back into text.
+			await clickWaButton(menuPage, 'Options');
+			const options = menuPage.locator('wa-drawer.menu-options-drawer');
+			await options.getByRole('button', { name: 'Dungeon board', exact: true }).click();
+			await expect(shown.locator('.scene-menu.design-dungeon')).toBeVisible();
+			await expect(side.page.locator('.scene-menu.design-dungeon')).toBeVisible();
+			await expect(options.getByText('Convert menu to plain text')).toHaveCount(0);
+			await menuPage.keyboard.press('Escape');
+			await expect(options).toHaveCount(0);
+
+			await clickWaButton(menuPage, 'Done');
+			await expect(shown).toHaveAttribute('contenteditable', 'false');
+			await expect(menuPage.getByRole('button', { name: 'Options' })).toHaveCount(0);
+		} finally {
+			await side.close();
+		}
+	});
+
+	test('is read only for a partner who may only read the scene', async ({ browser }) => {
+		const { ada, bo } = await sharedNotebook(browser);
+		try {
+			const sceneUrl = await startScene(bo.page);
+			const menu = await menuWithToDo(bo.page);
+			const menuId = defined(await menu.getAttribute('data-menu-id'), 'the menu’s id');
+
+			// Bo started it, so Bo decides who may change it.
+			await clickWaButton(bo.page, 'Settings');
+			await bo.page.locator('wa-select[name="access"]').click();
+			await bo.page.getByRole('option', { name: 'Ada can only read it' }).click();
+			await clickWaButton(bo.page, 'Save');
+			await expect(bo.page.getByText('Ada can only read this')).toBeVisible();
+			await expect(toDo(bo.page)).toBeVisible();
+
+			await ada.page.goto(`${sceneUrl}/menus/${menuId}`);
+			await waitForHydration(ada.page);
+			await expect(ada.page.locator('.surface .scene-menu')).toBeVisible();
+			await expect(ada.page.getByRole('button', { name: 'Edit' })).toHaveCount(0);
+			await toDo(ada.page).locator('.menu-line-check').click();
+			// Bo's open scene would show a tick live; give it the chance to.
+			await settle(ada.page);
+			await expect(toDo(bo.page)).not.toHaveClass(/\bchecked\b/);
+			await expect(toDo(ada.page)).not.toHaveClass(/\bchecked\b/);
+		} finally {
+			await ada.close();
+			await bo.close();
+		}
+	});
+
+	test('says so when the menu is not in the scene any more', async ({ browser }) => {
+		const side = await newSide(browser, 'Ada');
+		try {
+			await newAccount(side.page, side.who);
+			await side.page.goto('/home/notebook');
+			const sceneUrl = await startScene(side.page);
+			await typeRichText(side.page, 'No menus here');
+			await expect(side.page.getByText('Saved')).toBeVisible();
+
+			await side.page.goto(`${sceneUrl}/menus/${crypto.randomUUID()}`);
+			await expect(side.page.getByText("This menu isn't in the scene any more.")).toBeVisible();
+			await side.page.getByRole('link', { name: 'Open the scene' }).click();
+			await side.page.waitForURL(sceneUrl);
+		} finally {
+			await side.close();
 		}
 	});
 });

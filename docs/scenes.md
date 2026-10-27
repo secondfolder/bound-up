@@ -166,7 +166,8 @@ answer, or a chip:
   count in the page's text.
 - **Words written on the menu itself.** Its title, its subtitle, what its
   rating and number mean (in its key) and its design's copy (below) are
-  tapped and typed into on the menu, each a small
+  tapped and typed into on the menu (and, where they cannot be, still
+  selected and copied like any words, unlike the drawing around them), each a small
   `contenteditable` of its own inside the frame (`registerFrameText`).
   Lexical does not draw or edit them: their events are stopped at the root
   on the way down, before Lexical's listeners see them, and Lexical already
@@ -174,7 +175,10 @@ answer, or a chip:
   decorator's input). Select-all is kept to the text, since the browser's
   would take the whole page. Tapping into one moves the page's selection
   into the menu, so its options show, and what is typed is the menu's at
-  once: the options' fields follow it, as they follow the partner. Emptied,
+  once: the options' fields follow it, as they follow the partner. A press
+  anywhere else in the editor leaves it, as a press off any field does: the
+  menu takes presses on its frame for itself and cancels them, which would
+  otherwise keep the focus in the words. Emptied,
   a title or subtitle is the design's again, shown as a placeholder while
   it is typed in and drawn as soon as it is left. Rewritten copy, and a
   title or subtitle of the menu's own where the design has one, show a
@@ -184,14 +188,22 @@ answer, or a chip:
   title, its key or its drawings would land nowhere: the menu puts the caret
   in itself instead, at the start of its first line from its heading and at
   the end of its last from anywhere else, and a tap beside a line's words
-  ends that line (`registerMenuCaret`). While the caret is in a menu it is
-  marked `caret-in`, which shows its **Add a section** button under the
+  ends that line (`registerMenuCaret`). While the caret is in a menu that
+  can be edited it is marked `caret-in` (never in a read-only editor, where
+  a click still puts a selection in it), which shows its **Add a section**
+  button under the
   courses: a new course, its heading's words selected to be typed over. A
   heading typed anywhere does the same; the button is for anyone who would
-  not guess that. It shows a delete button in its top corner too, which
-  deletes the whole menu, words and all, and puts the caret in what follows
-  it (a new line if nothing does): otherwise deleting one took selecting
-  every line in it and then the frame. A press on the page below a menu or a section that ends
+  not guess that.
+- **A menu's corner** (`.menu-tools`) holds two buttons, shown while the
+  caret is in the menu, while the menu is pointed at, or while one of them
+  has the focus, so a menu can be linked or deleted without first clicking
+  into it. The **link** button copies a link to the menu's own page and
+  shows it (below). The **delete** button deletes the whole menu, words and
+  all, and puts the caret in what follows it (a new line if nothing does):
+  otherwise deleting one took selecting every line in it and then the
+  frame. A reader is offered the link and not the delete, which refuses
+  them anyway. A press on the page below a menu or a section that ends
   it starts a new line after it, since otherwise the caret would land
   back in the block and nothing could ever be written after it.
 
@@ -256,7 +268,8 @@ the item carries `checked` instead (null when it is not a to-do), stored on
 - **The box** (`.menu-line-check`, `drawLineCheck` in `menu-frame.ts`) is
   drawn beside the words, like the rating and number: a `role="checkbox"`
   button named by the item's words, unmanaged by Lexical, ticking on a tap
-  only in an editor that can be edited. It is drawn in the menu's ink, an
+  only in an editor that can be edited, or one marked tickable
+  (`setTickable` in `viewer.ts`), as a menu's own page is for a writer. It is drawn in the menu's ink, an
   outline and a tick, so it suits every design; a done item's words are
   struck through. A stored version draws the same element as a picture
   saying "Done" or "Not done".
@@ -288,6 +301,78 @@ The stored document carries the blocks as `scene-section`, `scene-menu`,
 leniently, as anything a partner's browser wrote is. A version in the history
 is drawn by `SceneBlock.svelte` with the same elements and classes the editor
 makes, so `scene-blocks.css` and `menu-designs.css` style both.
+
+### A menu's own page
+
+A menu can be shown on a page of its own, filling it:
+`/home/notebook/[entryId]/menus/[menuId]` for a solo scene and
+`/partner/[id]/notebook/[entryId]/menus/[menuId]` for a shared one.
+
+- **A menu's id.** Lexical's node keys are made afresh on every load, so a
+  link needs a handle kept with the menu: `MenuNode.__menuId`, stored as
+  `id` on `scene-menu` (null on a menu from before links). A new menu is
+  made with one. A menu without one, or with one an earlier menu in the
+  scene already has (a paste of a menu), is given a new one by any writer's
+  editor (`registerMenuIds`). That happens in an update of its own, after
+  the update that showed the problem rather than in a transform:
+  `@lexical/yjs` sends nothing a transform changes during an update that came
+  from another writer, which is how a scene from before links arrives. Two
+  writers giving one at once settle on one of them, as Yjs settles any
+  property. A reader cannot give one, so a menu from before links has no link
+  button until a writer has opened the scene.
+- **The link.** The corner's link button dispatches `MENU_LINK_EVENT` from
+  the click itself. `MenuLinkPopover.svelte` answers it by starting the
+  clipboard write there and then, before anything is awaited, because a
+  browser may refuse a write that is not part of a gesture
+  (`copyText` in `share.ts`). It then opens a popover pointing at the
+  button, which says whether the link was copied, shows it in a read-only
+  field that selects it all when clicked (`InputField`'s `selectOnFocus`),
+  and has an **Open** button that opens it in a new tab. The menu is
+  marked `link-open` while the popover is open, so its corner, and the
+  button the popover points at, stay put.
+- **The page** (`SceneMenuPage.svelte`) is in the app shell, since that is
+  where the keyring is opened (`EncryptionGate`), but the shell leaves out
+  its nav and notices for it. It opens the scene's session as the scene's
+  page does (`entrySession`), binds the same collaborative editor to the
+  whole scene, and shows the one menu (`registerOnlyMenu`). The root is
+  marked `menu-page` and the menu `only-menu`, and everything else is
+  hidden. The editor keeps every edit inside the menu, because changing
+  what nobody can see is how a page of one menu would lose a scene's words.
+  A caret that leaves it is brought back, a selection past either end is cut
+  to it, and Enter, Backspace and Delete at its edges do nothing. In edit
+  mode, selected words get the same formatting toolbar as on the scene's
+  page (surprises included, for a shared scene's partner), and an
+  **Options** button beside Done opens the menu's options in a drawer
+  (`MenuOptionsDrawer`): the same as the scene's column shows for a menu
+  the caret is in, for the page's one menu wherever the caret is
+  (`menuById`), less "Convert menu to plain text", which would take away
+  the page's menu. It is mounted closed and opened once drawn, since Web
+  Awesome shows a drawer that starts open without sliding it in. The corner's buttons and the column are left off. The menu is
+  the page, edge to edge: no column, gutter or block margin around it, and
+  it is stretched to at least the window's height, with the Edit button
+  floating over its top corner. Nothing shows while it opens, not a
+  skeleton: the page is the menu, and a skeleton shaped like no design in
+  particular only flashed up before it.
+- **Read only, and ticking.** The page opens read only. For anyone who may
+  edit the scene, its to-dos still tick (`tickable`), and an edit button in
+  its top corner (just a pen, named "Edit") makes the menu editable, turning
+  into **Done**. While
+  it is editable the menu is marked `caret-in` the whole time, wherever the
+  caret is, so Add a section and the unset ratings and numbers show without
+  clicking into it first; read only, they never do. A tick
+  is an ordinary edit, made through `editor.update`, which a read-only
+  editor still sends to the scene. Anyone who may only read the scene gets
+  neither. Out of edit mode nothing that only changes in it looks pressable:
+  ratings, numbers and a design's pictures get the ordinary cursor, and a
+  to-do's box keeps its hand only where it ticks (the root is marked
+  `tickable`).
+- **Access** is the scene's own (`loadSceneMenu` in
+  `server/notebook-pages.ts`), and anything but a scene is a 404. Whether the
+  menu is in the scene is for the browser to say, since the server cannot
+  read it. Until the scene has been applied the editor is empty, which is not
+  the same as the menu being gone, so `registerOnlyMenu` says nothing until
+  the first update after it was registered. A menu that is not there says so,
+  with a link back to the scene.
 
 ### Surprises
 
@@ -483,8 +568,41 @@ dining is the default, and an id this build does not know reads as it.
 - **Layouts respond to the menu's own width**, not the screen's: the editor
   surface is a `scene-page` container, and a design breaks into columns,
   boxes, a spread or a fanned hand of cards only where the menu has room,
-  beside the prompts or not. Every design is one column when narrow. A
-  preview is its own container, so it shows the narrow layout, at half size
+  beside the prompts or not. Every design is one column when narrow.
+- **And they stop growing.** However wide the page (a menu's own page is
+  the whole window), a design's sheet is no wider than its
+  `--menu-max-width`, centred on whatever the design draws around it: 64rem
+  for the two-column designs, 80 to 84 for the ones four across, 56 and 60
+  for the letter and the decree. Each limit is generous, and never under the
+  design's widest `scene-page` breakpoint: the container is the page, not
+  the sheet, so a sheet narrower than a breakpoint would get the wide layout
+  squeezed into it. Anything a design draws on the menu, outside its sheet,
+  that belongs to the sheet follows it (the dungeon's chains, whose inset
+  is worked out from the limit).
+- **And where they sit, on a menu's own page.** That page is the only
+  place a menu is ever taller than what is on it, so there a menu is a
+  grid of the space above, the sheet and the space below, and each design
+  says how the spare height is shared (`--menu-space-above`,
+  `--menu-space-below`). A card on a table sits a third of the way down, a
+  board on a wall a quarter, a ticket and a tarot spread in the middle, and
+  a clipboard's paper a little way down, its clip with it, and a memo a
+  little way down its paper. Anything else in the menu's flow goes above the
+  sheet: just above it, or along the top of the page for a strip
+  (`--menu-strip-align`: the pet collar, the decora clips, which there are
+  enough of for a 4K window), or reaching all the way up (the dungeon's
+  chains, a link at a time). The pet collar's tag hangs from the sheet's
+  top, so there the sheet stays under the collar and the spare height
+  goes inside it instead.
+- **Where a design's surround is part of the object** (the slate's wooden
+  frame, the magazine's cover, the fine dining card and its gold rules), a
+  menu's own page does not stretch it to the window: the slate keeps a
+  narrow frame all round, the cover and the card are no bigger than what is
+  on them, each with a shadow, and the page around them is the app's own,
+  dimmed behind the fine dining card and the magazine. The deco lounge's
+  dark goes inside its gold frame, the page dimmed around it in the same
+  way. Treat Yourself is a rounded card on a backdrop of its frame's own
+  pink (#ff5fae).
+- A preview is its own container, so it shows the narrow layout, at half size
   (`zoom`). Two things about previews cost a round each: a preview sits in
   a `<button>`, whose centred, unwrapped text (Web Awesome's) has to be
   undone or every design's lines move; and `zoom` does not scale a
@@ -533,7 +651,13 @@ through them.
   designs, a menu's title, the caret taken by a tap on the frame, "Add a
   section", the focus left in a field that changes the menu, words and key
   names written on the menu, copy kept per design and Reset, a course's
-  picture picked) and two writers in one menu.
+  picture picked, a menu's id given and kept, the link button, a menu's own
+  page keeping the caret and every edit inside the menu, a to-do ticked
+  while read only) and two writers in one menu, an id reaching both; the
+  link popover, copied or not; `InputField` outside a form selecting its
+  text.
+- **Server, a menu's page**: the scene's access, and a 404 for anything but
+  a scene.
 - **End to end** (`e2e/scenes.spec.ts`): prompts beside the page and what was
   written kept sealed; Fewer and More remembered and the column folding; story
   chips; help from the model through its agreement; a shared scene's outcomes
@@ -541,4 +665,8 @@ through them.
   both partners see; a menu's own title and subtitle, cleared back to the
   design's, and written on the menu itself; a design's copy rewritten and
   reset; a toy picked; items rated and numbered from their popover, a number
-  that is not one refused; a surprise the partner cannot read or delete.
+  that is not one refused; a surprise the partner cannot read or delete; a
+  menu's link shown on hovering, copied and opened on its own page, which
+  is read only, ticks for the scene, and edits from its Edit button; a read
+  only partner's menu page, with no Edit and no ticking; a menu that is not
+  in the scene any more.

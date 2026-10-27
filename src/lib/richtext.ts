@@ -167,6 +167,8 @@ export type RichTextBlockNode =
 	/** A scene's menu: courses, each a heading and the items under it, in one of the designs. */
 	| {
 			type: 'scene-menu';
+			/** What its own page is found by; null on a menu from before links. */
+			id: string | null;
 			/** Its own title in place of the design's; empty for the design's. */
 			title: string;
 			/** A line under the title; empty for none. */
@@ -307,6 +309,7 @@ const menuCourseNodeSchema = z.object({
 
 const sceneMenuNodeSchema = z.object({
 	type: z.literal('scene-menu'),
+	id: z.string().max(64).nullable().catch(null),
 	title: z.string().max(MAX_MENU_TITLE).catch(''),
 	subtitle: z.string().max(MAX_MENU_SUBTITLE).catch(''),
 	hiddenFrom: hiddenFromSchema,

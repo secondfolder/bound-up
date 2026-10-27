@@ -374,8 +374,11 @@ export const MENU_DESIGNS: Record<MenuDesignId, MenuDesign> = {
 		// Decora's own motto, on a friendship bracelet.
 		subtitle: 'MORE IS MORE',
 		subtitleBeads: true,
-		// Enough hair clips for the widest page.
-		spinners: 48,
+		// Enough hair clips for the widest page: a menu's own page is the
+		// whole window, and the clips run edge to edge however wide that is.
+		// A run of five is about 8rem, so 160 cover some 250rem (a 4K window);
+		// the menu clips whatever runs past its edge.
+		spinners: 160,
 		confetti: true,
 		value: (n) => `¥${n}`,
 		valueKey: '¥',

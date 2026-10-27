@@ -265,24 +265,58 @@ export async function loadNotebookEntry(
 	if (!context) {
 		error(404, 'Not found');
 	}
-	const { entry } = context;
 	return {
-		entry: {
-			id: entry.id,
-			kind: entry.kind,
-			entryDate: entry.entryDate,
-			vaultId: entry.vaultId,
-			revision: entry.revision,
-			header: sealedRef(entry.id, entry),
-			createdByUserId: entry.createdByUserId,
-			canWrite: context.access === 'edit',
-			canSetAccess: context.canSetAccess,
-			partnerAccess: entry.partnerAccess,
-			restrictedByViewer: entry.accessSetByUserId === user.id
-		},
+		entry: entryView(context, user.id),
 		room: context.room,
 		viewerId: user.id,
-		scene: entry.kind === 'scene' ? await sceneExtras(event, user.id, context) : null
+		scene: context.entry.kind === 'scene' ? await sceneExtras(event, user.id, context) : null
+	};
+}
+
+function entryView(
+	context: NonNullable<Awaited<ReturnType<typeof getEntryContext>>>,
+	userId: string
+): NotebookEntryData['entry'] {
+	const { entry } = context;
+	return {
+		id: entry.id,
+		kind: entry.kind,
+		entryDate: entry.entryDate,
+		vaultId: entry.vaultId,
+		revision: entry.revision,
+		header: sealedRef(entry.id, entry),
+		createdByUserId: entry.createdByUserId,
+		canWrite: context.access === 'edit',
+		canSetAccess: context.canSetAccess,
+		partnerAccess: entry.partnerAccess,
+		restrictedByViewer: entry.accessSetByUserId === userId
+	};
+}
+
+/**
+ * A scene menu's own page (docs/scenes.md, "A menu's own page"): the scene
+ * entry, on the entry's own access, without what the scene's prompt column
+ * needs. Whether the menu is in it is for the browser to say: the server
+ * cannot read the scene.
+ */
+export async function loadSceneMenu(
+	event: Pick<Event, 'locals' | 'params' | 'depends'>,
+	scope: NotebookScope
+): Promise<Omit<NotebookEntryData, 'scene'> & { menuId: string; partnerId: string | null }> {
+	const user = requireUser(event.locals);
+	const { entryId, menuId } = event.params;
+	event.depends(`notebook:entry:${entryId}`);
+	const context = await getEntryContext(event.locals.db, entryId, user.id, scope);
+	if (!(context && context.entry.kind === 'scene' && menuId)) {
+		error(404, 'Not found');
+	}
+	return {
+		entry: entryView(context, user.id),
+		room: context.room,
+		viewerId: user.id,
+		menuId,
+		// Who a line can be made a surprise for, from the selection's toolbar.
+		partnerId: otherMember(context.partnership, user.id)
 	};
 }
 

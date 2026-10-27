@@ -52,6 +52,9 @@ import {
 	$createMenuNode as createMenuNode,
 	DELETE_MENU_CLASS,
 	$isMenuNode as isMenuNode,
+	MENU_LINK_CLASS,
+	MENU_LINK_EVENT,
+	type MenuLinkRequest,
 	MenuNode,
 	RESET_COPY_CLASS
 } from '$lib/lexical/nodes/scene/menu';
@@ -185,20 +188,46 @@ export function blockAtCaret(editor: LexicalEditor): BlockAtCaret | null {
 			const line = isMenuLineNode(top)
 				? { key: top.getKey(), role: top.getRole(), props: top.getItemProps() }
 				: null;
-			return {
-				kind: 'menu',
-				key: container.getKey(),
-				heading: container.getHeading(),
-				design: container.getDesign(),
-				mascot: container.getMascot(),
-				pictures: container.getPictures(),
-				extras: container.getExtras(),
-				hiddenFrom: container.getHiddenFrom(),
-				line
-			};
+			return $describeMenu(container, line);
 		}
 		return null;
 	});
+}
+
+/**
+ * The menu with `menuId` as `blockAtCaret` would describe it with the caret
+ * in it, wherever the caret is: for a menu's own page, whose options are
+ * for its one menu (`MenuOptionsDrawer`). Null when it is not in the scene.
+ */
+export function menuById(
+	editor: LexicalEditor,
+	menuId: string
+): Extract<BlockAtCaret, { kind: 'menu' }> | null {
+	return editor.getEditorState().read(() => {
+		for (const child of getRoot().getChildren()) {
+			if (isMenuNode(child) && child.getMenuId() === menuId) {
+				return $describeMenu(child, null);
+			}
+		}
+		return null;
+	});
+}
+
+function $describeMenu(
+	menu: MenuNode,
+	line: Extract<BlockAtCaret, { kind: 'menu' }>['line']
+): Extract<BlockAtCaret, { kind: 'menu' }> {
+	return {
+		kind: 'menu',
+		key: menu.getKey(),
+		heading: menu.getHeading(),
+		design: menu.getDesign(),
+		mascot: menu.getMascot(),
+		pictures: menu.getPictures(),
+		extras: menu.getExtras(),
+		hiddenFrom: menu.getHiddenFrom(),
+		line
+	};
 }
 
 /**
@@ -726,7 +755,14 @@ function $addCourse(menu: MenuNode): void {
 function registerMenuCaret(editor: LexicalEditor): () => void {
 	let marked: HTMLElement | null = null;
 	const markCaret = () => {
-		const at = blockAtCaret(editor);
+		// A menu's own page marks its menu itself (`registerOnlyMenu`).
+		if (editor.getRootElement()?.classList.contains(MENU_PAGE_CLASS)) {
+			return;
+		}
+		// Only where the menu can be changed: what `caret-in` shows (adding a
+		// section, the unset ratings and numbers, copy's placeholders) is for
+		// writing, and a reader's click puts a selection in a menu too.
+		const at = editor.isEditable() ? blockAtCaret(editor) : null;
 		const element = at?.kind === 'menu' ? editor.getElementByKey(at.key) : null;
 		if (element !== marked) {
 			marked?.classList.remove('caret-in');
@@ -742,7 +778,13 @@ function registerMenuCaret(editor: LexicalEditor): () => void {
 	 * could then never have anything after it.
 	 */
 	const pressBelowBlock = (event: MouseEvent): boolean => {
-		if (event.button !== 0 || !editor.isEditable()) {
+		// Not on a menu's own page, where nothing but the menu is shown: the
+		// line would be added to the scene, out of sight.
+		if (
+			event.button !== 0 ||
+			!editor.isEditable() ||
+			editor.getRootElement()?.classList.contains(MENU_PAGE_CLASS)
+		) {
 			return false;
 		}
 		let added = false;
@@ -770,11 +812,12 @@ function registerMenuCaret(editor: LexicalEditor): () => void {
 	const press = (event: MouseEvent) => {
 		const target = event.target instanceof Element ? event.target : null;
 		// A course's picture and a menu's mascot ask for another on their
-		// click (below), and the menu's delete button deletes it on its;
-		// pressing any of them moves neither the caret nor the focus.
+		// click (below), the menu's delete button deletes it on its, and its
+		// link button offers its link; pressing any of them moves neither the
+		// caret nor the focus.
 		if (
 			target?.closest(
-				`.${COURSE_ART_CLASS}, .${DELETE_MENU_CLASS}, .${MASCOT_CLASS}, .${PICTURE_CLASS}`
+				`.${COURSE_ART_CLASS}, .${DELETE_MENU_CLASS}, .${MENU_LINK_CLASS}, .${MASCOT_CLASS}, .${PICTURE_CLASS}`
 			)
 		) {
 			event.preventDefault();
@@ -889,6 +932,31 @@ function registerMenuCaret(editor: LexicalEditor): () => void {
 		return true;
 	};
 
+	/**
+	 * The menu's link button: the page is asked to copy and show its link
+	 * (`MenuLinkPopover.svelte`). Dispatched from the click itself, so the
+	 * clipboard write that answers it still counts as the click's. For
+	 * anyone who can see the menu, writer or not: a link changes nothing.
+	 */
+	const linkMenu = (event: MouseEvent): boolean => {
+		const button =
+			event.target instanceof Element
+				? event.target.closest<HTMLElement>(`.${MENU_LINK_CLASS}`)
+				: null;
+		const menuId = button?.closest<HTMLElement>('.scene-menu')?.dataset.menuId;
+		if (!(button && menuId)) {
+			return false;
+		}
+		event.preventDefault();
+		button.dispatchEvent(
+			new CustomEvent<MenuLinkRequest>(MENU_LINK_EVENT, {
+				bubbles: true,
+				detail: { menuId, anchor: button }
+			})
+		);
+		return true;
+	};
+
 	/** One of a menu's row of pictures tapped: the page is asked to offer the others. */
 	const pickPicture = (event: MouseEvent): boolean => {
 		const button =
@@ -971,7 +1039,7 @@ function registerMenuCaret(editor: LexicalEditor): () => void {
 
 	/** A course's picture tapped: the page is asked to offer the others. */
 	const pick = (event: MouseEvent) => {
-		if (deleteMenu(event) || pickMascot(event) || pickPicture(event)) {
+		if (linkMenu(event) || deleteMenu(event) || pickMascot(event) || pickPicture(event)) {
 			return;
 		}
 		const button =
@@ -1013,6 +1081,7 @@ function registerMenuCaret(editor: LexicalEditor): () => void {
 
 	return mergeRegister(
 		editor.registerUpdateListener(markCaret),
+		editor.registerEditableListener(markCaret),
 		editor.registerRootListener((root, previous) => {
 			previous?.removeEventListener('mousedown', press);
 			previous?.removeEventListener('click', pick);
@@ -1343,8 +1412,30 @@ function registerFrameText(editor: LexicalEditor): () => void {
 	document.addEventListener('scroll', follow, { capture: true, passive: true });
 	globalThis.addEventListener('resize', follow);
 
+	/**
+	 * A press anywhere else in the editor leaves the words being written on
+	 * the frame. The browser would move the focus itself, but a press on a
+	 * menu's frame is taken by `registerMenuCaret`, which cancels it to put
+	 * the caret where it wants it, and cancelling a press keeps the focus
+	 * where it was: in the title, on a menu's own page, wherever was pressed.
+	 * Not the Reset, which is pressed to act on those words.
+	 */
+	const leave = (event: MouseEvent) => {
+		const target = event.target instanceof Node ? event.target : null;
+		if (
+			editing &&
+			target &&
+			!editing.element.contains(target) &&
+			!(target instanceof Element && target.closest(`.${RESET_COPY_CLASS}`))
+		) {
+			editing.element.blur();
+		}
+	};
+
 	return mergeRegister(
 		editor.registerRootListener((root, previous) => {
+			previous?.removeEventListener('mousedown', leave, true);
+			root?.addEventListener('mousedown', leave, true);
 			for (const type of FRAME_TEXT_EVENTS) {
 				previous?.removeEventListener(type, onEvent, true);
 				root?.addEventListener(type, onEvent, true);
@@ -1455,9 +1546,60 @@ function placeCaret(words: HTMLElement, at: number): void {
 	}
 }
 
+/**
+ * Every menu has an id of its own (`MenuNode.__menuId`), for its link: one
+ * from before links gets one, and a copy of a menu (a paste, an undo of a
+ * delete beside a copy) gets a new one, the first in the scene keeping its.
+ *
+ * In an update of its own after the one that showed the problem, not a
+ * transform: `@lexical/yjs` sends nothing a transform changes during an
+ * update that came from another writer, which is how a scene from before
+ * links arrives, so a transform's id would stay on this device alone. Only
+ * a writer gives ids; two writers giving one at once settle on one of them,
+ * as Yjs settles any property both set.
+ */
+function registerMenuIds(editor: LexicalEditor): () => void {
+	const check = () => {
+		if (!editor.isEditable()) {
+			return;
+		}
+		const lacking = editor.getEditorState().read(() => menusLackingIds().length > 0);
+		if (lacking) {
+			editor.update(() => {
+				for (const menu of menusLackingIds()) {
+					menu.setMenuId(crypto.randomUUID());
+				}
+			});
+		}
+	};
+	return mergeRegister(
+		editor.registerUpdateListener(check),
+		editor.registerEditableListener(check)
+	);
+}
+
+/** The scene's menus with no id, or with one an earlier menu already has. */
+function menusLackingIds(): MenuNode[] {
+	const seen = new Set<string>();
+	const lacking: MenuNode[] = [];
+	for (const child of getRoot().getChildren()) {
+		if (!isMenuNode(child)) {
+			continue;
+		}
+		const id = child.getMenuId();
+		if (id === null || seen.has(id)) {
+			lacking.push(child);
+		} else {
+			seen.add(id);
+		}
+	}
+	return lacking;
+}
+
 export function registerSceneBlocks(editor: LexicalEditor): () => void {
 	return mergeRegister(
 		registerTransforms(editor),
+		registerMenuIds(editor),
 		registerDesignRedraw(editor),
 		registerMenuCaret(editor),
 		registerFrameText(editor),
@@ -1466,6 +1608,211 @@ export function registerSceneBlocks(editor: LexicalEditor): () => void {
 		registerCheckBackspace(editor),
 		registerSurpriseGuard(editor)
 	);
+}
+
+/** The class on the editor's root while it shows one menu alone (`registerOnlyMenu`). */
+export const MENU_PAGE_CLASS = 'menu-page';
+
+/** The class on the one menu a menu's page shows. */
+export const ONLY_MENU_CLASS = 'only-menu';
+
+/**
+ * A menu's own page (docs/scenes.md, "A menu's own page"): the editor holds
+ * the whole scene, which is what it is bound to, but shows only the menu
+ * with `menuId`, and keeps every edit inside it. `onFound` hears whether the
+ * menu is there, on every change to that: it can be deleted, or arrive late.
+ *
+ * Register it before the scene is applied (`NotebookSession.attach`): until
+ * then the editor is empty and the menu is nowhere, which is not the same as
+ * gone. So nothing is said until the first update after this one has been
+ * made, which carries the scene with it when it is applied straight after.
+ *
+ * Kept inside it by refusing what would reach past its edges, rather than
+ * by trusting that nothing can: the rest of the scene is out of sight, and
+ * changing what nobody can see is how a page of one menu would lose a
+ * scene's words. The caret is brought back if it leaves (an arrow key past
+ * the last line), a selection past either end is cut to the menu (select
+ * all), and Enter, Backspace and Delete at its edges, which would take a
+ * line out of it or bring one in, do nothing.
+ */
+export function registerOnlyMenu(
+	editor: LexicalEditor,
+	menuId: string,
+	onFound: (found: boolean) => void
+): () => void {
+	let shown: HTMLElement | null = null;
+	let found: boolean | null = null;
+	let settled = false;
+
+	const $menu = (): MenuNode | null => {
+		for (const child of getRoot().getChildren()) {
+			if (isMenuNode(child) && child.getMenuId() === menuId) {
+				return child;
+			}
+		}
+		return null;
+	};
+
+	const mark = () => {
+		const key = editor.getEditorState().read(() => $menu()?.getKey() ?? null);
+		const element = key ? editor.getElementByKey(key) : null;
+		if (element !== shown) {
+			shown?.classList.remove(ONLY_MENU_CLASS, 'caret-in');
+			element?.classList.add(ONLY_MENU_CLASS);
+			shown = element;
+		}
+		// The menu is all there is to write in here, so while it can be
+		// edited it is always the one being written in, wherever the caret
+		// is, and never otherwise (`registerMenuCaret` leaves it alone).
+		shown?.classList.toggle('caret-in', editor.isEditable());
+		if (settled && found !== (key !== null)) {
+			found = key !== null;
+			onFound(found);
+		}
+	};
+
+	/** Brings a selection that reaches out of the menu back inside it. */
+	const keepInside = () => {
+		if (!editor.isEditable()) {
+			return;
+		}
+		const outside = editor.getEditorState().read(() => {
+			const selection = getSelection();
+			const menu = $menu();
+			return (
+				isRangeSelection(selection) &&
+				menu !== null &&
+				!(isInside(selection.anchor.getNode(), menu) && isInside(selection.focus.getNode(), menu))
+			);
+		});
+		if (!outside) {
+			return;
+		}
+		editor.update(() => {
+			const selection = getSelection();
+			const menu = $menu();
+			if (!(isRangeSelection(selection) && menu)) {
+				return;
+			}
+			for (const point of [selection.anchor, selection.focus]) {
+				const node = point.getNode();
+				if (!isInside(node, menu)) {
+					// A point on the root itself (select all) is before the menu
+					// when it is at or before the menu's place among the root's
+					// children.
+					const before = isRootNode(node)
+						? point.offset <= menu.getIndexWithinParent()
+						: (rootChildOf(node)?.isBefore(menu) ?? false);
+					const edge = $menuEdge(menu, before ? 'start' : 'end');
+					point.set(edge.key, edge.offset, edge.type);
+				}
+			}
+		});
+	};
+
+	/** Whether the caret is on the menu's first or last line, at its very edge. */
+	const atEdge = (edge: 'start' | 'end'): boolean => {
+		const selection = getSelection();
+		const menu = $menu();
+		if (!(isRangeSelection(selection) && selection.isCollapsed() && menu)) {
+			return false;
+		}
+		const point = $menuEdge(menu, edge);
+		const line = selection.anchor.getNode().getTopLevelElement();
+		const edgeLine = $getNodeByKey(point.key)?.getTopLevelElement();
+		if (!(line && edgeLine && line.is(edgeLine))) {
+			return false;
+		}
+		const words = line.getTextContent();
+		return edge === 'start'
+			? selection.anchor.offset === 0 &&
+					(selection.anchor.getNode().is(line) ||
+						selection.anchor.getNode().is(line.getFirstDescendant()))
+			: words.length === 0 ||
+					(selection.anchor.getNode().is(line.getLastDescendant()) &&
+						selection.anchor.offset === selection.anchor.getNode().getTextContentSize());
+	};
+
+	const refuse = (when: () => boolean) => (event: KeyboardEvent | null) => {
+		if (!when()) {
+			return false;
+		}
+		event?.preventDefault();
+		return true;
+	};
+
+	editor.update(() => undefined, {
+		onUpdate: () => {
+			settled = true;
+			mark();
+		}
+	});
+
+	return mergeRegister(
+		() => {
+			shown?.classList.remove(ONLY_MENU_CLASS, 'caret-in');
+		},
+		editor.registerEditableListener(mark),
+		editor.registerRootListener((root, previous) => {
+			previous?.classList.remove(MENU_PAGE_CLASS);
+			root?.classList.add(MENU_PAGE_CLASS);
+		}),
+		editor.registerUpdateListener(() => {
+			mark();
+			keepInside();
+		}),
+		editor.registerCommand(
+			INSERT_PARAGRAPH_COMMAND,
+			() => {
+				// Only the Enter that would leave the menu: an empty last line.
+				const selection = getSelection();
+				const menu = $menu();
+				if (!(isRangeSelection(selection) && menu && selection.isCollapsed())) {
+					return false;
+				}
+				const line = selection.anchor.getNode().getTopLevelElement();
+				const last = $getNodeByKey($menuEdge(menu, 'end').key)?.getTopLevelElement();
+				return Boolean(line && last && line.is(last) && line.getTextContentSize() === 0);
+			},
+			COMMAND_PRIORITY_NORMAL
+		),
+		editor.registerCommand(
+			KEY_BACKSPACE_COMMAND,
+			refuse(() => atEdge('start')),
+			COMMAND_PRIORITY_NORMAL
+		),
+		editor.registerCommand(
+			KEY_DELETE_COMMAND,
+			refuse(() => atEdge('end')),
+			COMMAND_PRIORITY_NORMAL
+		)
+	);
+}
+
+/** Whether `node` is `menu` or inside it. */
+function isInside(node: LexicalNode, menu: MenuNode): boolean {
+	return rootChildOf(node)?.is(menu) ?? false;
+}
+
+/** The point at a menu's very start or end, for a caret brought back into it. */
+function $menuEdge(
+	menu: MenuNode,
+	edge: 'start' | 'end'
+): { key: string; offset: number; type: 'text' | 'element' } {
+	const node = edge === 'start' ? menu.getFirstDescendant() : menu.getLastDescendant();
+	if (isTextNode(node)) {
+		return {
+			key: node.getKey(),
+			offset: edge === 'start' ? 0 : node.getTextContentSize(),
+			type: 'text'
+		};
+	}
+	const element = isElementNode(node) ? node : (node?.getParent() ?? menu);
+	return {
+		key: element.getKey(),
+		offset: edge === 'start' ? 0 : element.getChildrenSize(),
+		type: 'element'
+	};
 }
 
 /* ── edits ───────────────────────────────────────────────────────────────── */

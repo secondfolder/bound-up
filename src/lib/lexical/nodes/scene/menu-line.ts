@@ -22,7 +22,7 @@ import {
 	LINE_EXTRAS_CLASS
 } from '$lib/scenes/menu-frame';
 import { $isMenuNode } from './menu';
-import { drawSurprise, sceneViewerOf } from './viewer';
+import { canTick, drawSurprise, sceneViewerOf } from './viewer';
 
 /**
  * A line of a scene's menu: a heading (which starts a course), a subheading,
@@ -365,7 +365,8 @@ function listenForExtras(element: HTMLElement, key: NodeKey, editor: LexicalEdit
 }
 
 /**
- * Makes a to-do item's box tick when tapped, in an editor that can be edited.
+ * Makes a to-do item's box tick when tapped, in an editor that can be edited
+ * or whose to-dos can be ticked anyway (`setTickable`).
  * The press does nothing, so the caret stays where it was. On the line's
  * element rather than the box, as the extras are, since the box is redrawn
  * whenever the line is.
@@ -379,7 +380,7 @@ function listenForCheck(element: HTMLElement, key: NodeKey, editor: LexicalEdito
 		}
 	});
 	element.addEventListener('click', (event) => {
-		if (!(box(event) && editor.isEditable())) {
+		if (!(box(event) && canTick(editor))) {
 			return;
 		}
 		event.preventDefault();
