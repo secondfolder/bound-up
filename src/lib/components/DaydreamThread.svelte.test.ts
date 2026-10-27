@@ -68,17 +68,25 @@ vi.mock('$lib/crypto/messages', async (importOriginal) => ({
 		new Blob([ciphertext.slice(7)], { type: info.mimeType })
 }));
 
-/** The composer's restored draft, so a test can press Send without typing into Lexical. */
+/**
+ * The composer's restored draft, so a test can press Send without typing into
+ * Lexical. Prose here, stored as the document a composer would have saved.
+ */
 const draftText = vi.hoisted(() => ({ value: '' }));
-vi.mock('$lib/messaging/drafts', () => ({
-	openDraft: () =>
-		Promise.resolve({
-			initial: draftText.value ? { text: draftText.value, tagIds: [] } : null,
-			save: () => undefined,
-			clear: () => undefined,
-			settled: () => Promise.resolve()
-		})
-}));
+vi.mock('$lib/messaging/drafts', async () => {
+	const { plainTextToDocument } = await import('$lib/richtext');
+	return {
+		openDraft: () =>
+			Promise.resolve({
+				initial: draftText.value
+					? { text: JSON.stringify(plainTextToDocument(draftText.value)), tagIds: [] }
+					: null,
+				save: () => undefined,
+				clear: () => undefined,
+				settled: () => Promise.resolve()
+			})
+	};
+});
 
 type SaveInput = {
 	id: string;

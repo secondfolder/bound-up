@@ -289,8 +289,7 @@ site it applies to; go read that comment before deciding to break one.
     mapping lives only in `namesForViewer()` in `src/lib/partnership.ts`;
     screens get names through `partnerName()` / `viewerNames()` in
     `src/lib/partner-names.svelte.ts`, which open the `PartnerNamesSource` the
-    server hands over. The plaintext columns `inviter_name` … `invitee_role`
-    hold names only on links from before sealing. See
+    server hands over. See
     [docs/partners.md](docs/partners.md#names-are-sealed).
 
 13. **`src/lib/crypto/**` is browser-only.** Nothing there may be imported from
@@ -1083,7 +1082,7 @@ Four places, split on scope:
 | [docs/rich-text.md](docs/rich-text.md)                                                   | The rich-text document: Lexical serialisation, the editors, embed blocks     |
 | [docs/section-widgets.md](docs/section-widgets.md)                                       | The /home and /partner cards: the shell, the per-section bodies, the data    |
 | [docs/timezone.md](docs/timezone.md)                                                     | Account timezone storage, mismatch prompts, and device-local dismissal       |
-| [docs/temporary-code.md](docs/temporary-code.md)                                         | Temporary-code cleanup notes: the Temporal polyfill and legacy rich text     |
+| [docs/temporary-code.md](docs/temporary-code.md)                                         | Temporary-code cleanup notes: the Temporal polyfill, kink list, env settings |
 | [docs/linting-and-formatting.md](docs/linting-and-formatting.md)                         | Biome: the rule policy, the Svelte formatter gap, the GritQL plugin          |
 | [docs/features-and-admin.md](docs/features-and-admin.md)                                 | Per-account features, the admin role, the first-account admin, `/admin`      |
 | [docs/development.md](docs/development.md)                                               | Working from source: setup, deploy, the databases, tests, the script table   |

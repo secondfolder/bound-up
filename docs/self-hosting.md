@@ -287,6 +287,16 @@ The version rules:
   while the project is on 0.x. That is the one custom rule in
   `release.config.mjs`; delete it to let the next breaking change make 1.0.0.
 
+**Data from very old versions is no longer read.** Tasks, rewards, tag names
+and partnership names stored in plaintext, messages age-encrypted to both
+partners rather than sealed in the partnership vault, and message bodies stored
+as plain text rather than rich text were all moved over by the app itself, in
+the background, by a device that opened it — and that code is gone. An
+instance holding any of them must have been opened, signed in, on a version
+from before migration `0047_drop_legacy_migrations` to carry them over: that
+migration drops the plaintext columns, and a message still in the old scheme
+shows as one that cannot be read.
+
 The history before the first release carries a `v0.0.0` seed tag, so the first
 release is 0.1.0 rather than a version computed from years of pre-release
 commits.

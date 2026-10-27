@@ -100,8 +100,9 @@ Two rules carry the security weight:
    iframe URLs. `javascript:`, `data:`, `vbscript:` and similar schemes are
    rejected before rendering. That covers the metadata sidecar too: the
    sender's client writes it, so the server-side builder's checks never ran
-   on it, and `decryptMessageMetadata` drops any of its URL fields that fail
-   `isSafeHttpUrl` (`withSafeUrls` in `src/lib/embeds.ts`). The frame's
+   on it, and the `message-metadata` sealed kind drops any of its URL fields
+   that fail `isSafeHttpUrl` as every reader opens it (`withSafeUrls` in
+   `src/lib/embeds.ts`, applied in `src/lib/sealed-kinds/messages.ts`). The frame's
    sandbox allows scripts and same-origin, so a `javascript:` iframe src left
    unchecked would run on this app's origin.
 2. The app no longer renders third-party embed HTML with `{@html}`. For

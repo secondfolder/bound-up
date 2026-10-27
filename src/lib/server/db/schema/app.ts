@@ -11,7 +11,7 @@ import {
 import type { DaydreamTurnRole } from '../../../daydream';
 import type { AccountRecoveryStatus, KeyWrapParams, KeyWrapType } from '../../../encryption';
 import type { FeatureKey, FeatureSource } from '../../../features';
-import type { MessageBodyFormat, RestoreRequestStatus, ThreadIcon } from '../../../messaging';
+import type { RestoreRequestStatus, ThreadIcon } from '../../../messaging';
 import type { NotebookKind, PartnerAccess } from '../../../notebook';
 import type { PartnershipControl, PartnershipStatus } from '../../../partnership';
 import type { Intensity, Role, Vibe } from '../../../playroom/iq-test/settings';
@@ -47,9 +47,12 @@ const timestamps = {
  * The columns of a row whose content is a sealed record (docs/encryption.md,
  * "Sealed records"): the ciphertext, the vault it is sealed under, the payload
  * version, and a revision that every write bumps, so an edit or a background
- * upgrade can be compare-and-swap and never overwrite a newer write. Ciphertext
- * and vault are NULL on a row written before sealing, which still carries its
- * content in the plaintext columns until a device seals it.
+ * upgrade can be compare-and-swap and never overwrite a newer write.
+ *
+ * Ciphertext and vault are nullable only because rows from before sealing had
+ * none; every row has them now and every writer sets them. Making them NOT
+ * NULL means rebuilding the table, which on D1 cascade-deletes every row that
+ * references it (see the trap in AGENTS.md), so the code holds the line.
  */
 function sealedContent() {
 	return {
@@ -172,14 +175,6 @@ export const partnerships = sqliteTable(
 		/** Who accepted it. NULL exactly while `status` is 'pending'. */
 		inviteeId: text('invitee_id').references(() => user.id, { onDelete: 'cascade' }),
 		status: text('status').$type<PartnershipStatus>().notNull().default('pending'),
-		/** The name shown FOR the inviter — i.e. "what do they call you?". */
-		inviterName: text('inviter_name').notNull(),
-		/** The name shown FOR the invitee — i.e. "What's their name/title?". */
-		inviteeName: text('invitee_name').notNull(),
-		/** The inviter's role in the connection ("dom", "coach"). Optional. */
-		inviterRole: text('inviter_role'),
-		/** The invitee's role in the connection ("sub", "trainee"). Optional. */
-		inviteeRole: text('invitee_role'),
 		control: text('control').$type<PartnershipControl>().notNull(),
 		/**
 		 * The secret in the invite URL, stored in the clear rather than hashed.
@@ -195,10 +190,9 @@ export const partnerships = sqliteTable(
 		acceptedAt: integer('accepted_at', { mode: 'timestamp_ms' }),
 		/**
 		 * The names and roles, sealed in the partnership's vault (kind
-		 * `partnership-names`). Once set, the four name and role columns above
-		 * are empty. No foreign key on the vault: the vault and this row go
-		 * together, with the partnership. See docs/partners.md, "Names are
-		 * sealed".
+		 * `partnership-names`). No foreign key on the vault: the vault and this
+		 * row go together, with the partnership. See docs/partners.md, "Names
+		 * are sealed".
 		 */
 		namesCiphertext: text('names_ciphertext'),
 		namesVaultId: text('names_vault_id'),
@@ -257,14 +251,6 @@ export const selfRewards = sqliteTable(
 		ownerId: text('owner_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
-		/**
-		 * Plaintext until sealed; empty once the content is in `ciphertext`.
-		 * Emptied rather than NULL so the column can stay NOT NULL: making it
-		 * nullable means rebuilding the table, which on D1 cascade-deletes every
-		 * row that references it (see the trap in AGENTS.md).
-		 */
-		title: text('title').notNull(),
-		description: text('description'),
 		cost: integer('cost').notNull(),
 		active: integer('active', { mode: 'boolean' }).notNull().default(true),
 		...sealedContent(),
@@ -312,9 +298,6 @@ export const selfRewardClaims = sqliteTable(
 		rewardId: text('reward_id')
 			.notNull()
 			.references(() => selfRewards.id, { onDelete: 'cascade' }),
-		/** Plaintext snapshot until sealed; empty once it is in the sealed snapshot. */
-		rewardTitle: text('reward_title').notNull(),
-		rewardDescription: text('reward_description'),
 		rewardCost: integer('reward_cost').notNull(),
 		...sealedSnapshot(),
 		...timestamps
@@ -343,14 +326,6 @@ export const partnershipRewards = sqliteTable(
 		createdByUserId: text('created_by_user_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
-		/**
-		 * Plaintext until sealed; empty once the content is in `ciphertext`.
-		 * Emptied rather than NULL so the column can stay NOT NULL: making it
-		 * nullable means rebuilding the table, which on D1 cascade-deletes every
-		 * row that references it (see the trap in AGENTS.md).
-		 */
-		title: text('title').notNull(),
-		description: text('description'),
 		cost: integer('cost').notNull(),
 		active: integer('active', { mode: 'boolean' }).notNull().default(true),
 		...sealedContent(),
@@ -413,9 +388,6 @@ export const partnershipRewardClaims = sqliteTable(
 		createdByUserId: text('created_by_user_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
-		/** Plaintext snapshot until sealed; empty once it is in the sealed snapshot. */
-		rewardTitle: text('reward_title').notNull(),
-		rewardDescription: text('reward_description'),
 		rewardCost: integer('reward_cost').notNull(),
 		...sealedSnapshot(),
 		...timestamps
@@ -447,17 +419,8 @@ export const selfTasks = sqliteTable(
 		ownerId: text('owner_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
-		/**
-		 * Plaintext until sealed; empty once the content is in `ciphertext`.
-		 * Emptied rather than NULL so the column can stay NOT NULL: making it
-		 * nullable means rebuilding the table, which on D1 cascade-deletes every
-		 * row that references it (see the trap in AGENTS.md).
-		 */
-		title: text('title').notNull(),
-		description: text('description'),
 		active: integer('active', { mode: 'boolean' }).notNull().default(true),
 		creditsAwarded: integer('credits_awarded').notNull().default(0),
-		completionMessages: text('completion_messages', { mode: 'json' }).$type<string[]>().notNull(),
 		/**
 		 * How many completion messages the sealed content holds. Plaintext so the
 		 * server can still pick one at random on completion — an index, which the
@@ -499,11 +462,7 @@ export const selfTaskCompletions = sqliteTable(
 		taskId: text('task_id')
 			.notNull()
 			.references(() => selfTasks.id, { onDelete: 'cascade' }),
-		/** Plaintext snapshot until sealed; empty once it is in the sealed snapshot. */
-		taskTitle: text('task_title').notNull(),
-		taskDescription: text('task_description'),
 		creditsAwarded: integer('credits_awarded').notNull(),
-		completionMessage: text('completion_message'),
 		/** Which of the snapshot's completion messages was picked, or NULL for none. */
 		completionMessageIndex: integer('completion_message_index'),
 		...sealedSnapshot(),
@@ -539,17 +498,8 @@ export const partnershipTasks = sqliteTable(
 		timezoneOwnerUserId: text('timezone_owner_user_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
-		/**
-		 * Plaintext until sealed; empty once the content is in `ciphertext`.
-		 * Emptied rather than NULL so the column can stay NOT NULL: making it
-		 * nullable means rebuilding the table, which on D1 cascade-deletes every
-		 * row that references it (see the trap in AGENTS.md).
-		 */
-		title: text('title').notNull(),
-		description: text('description'),
 		active: integer('active', { mode: 'boolean' }).notNull().default(true),
 		creditsAwarded: integer('credits_awarded').notNull().default(0),
-		completionMessages: text('completion_messages', { mode: 'json' }).$type<string[]>().notNull(),
 		/**
 		 * How many completion messages the sealed content holds. Plaintext so the
 		 * server can still pick one at random on completion — an index, which the
@@ -599,11 +549,7 @@ export const partnershipTaskCompletions = sqliteTable(
 		createdByUserId: text('created_by_user_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
-		/** Plaintext snapshot until sealed; empty once it is in the sealed snapshot. */
-		taskTitle: text('task_title').notNull(),
-		taskDescription: text('task_description'),
 		creditsAwarded: integer('credits_awarded').notNull(),
-		completionMessage: text('completion_message'),
 		/** Which of the snapshot's completion messages was picked, or NULL for none. */
 		completionMessageIndex: integer('completion_message_index'),
 		...sealedSnapshot(),
@@ -822,7 +768,7 @@ export const messageThreads = sqliteTable(
 		 * have read this thread", enforced on the server rather than by the UI.
 		 *
 		 * The rejected alternative was a pair of columns keyed on the permanent
-		 * inviter/invitee roles, mirroring `inviter_name`/`invitee_name`. It works,
+		 * inviter/invitee roles, as the partnership's sealed names are. It works,
 		 * but it puts role resolution inside SQL, and invariant 12 exists
 		 * precisely because that mapping must live in exactly one place.
 		 */
@@ -856,18 +802,12 @@ export const messageTags = sqliteTable(
 		partnershipId: text('partnership_id')
 			.notNull()
 			.references(() => partnerships.id, { onDelete: 'cascade' }),
-		/**
-		 * Plaintext only on a tag written before sealing, empty after; NOT NULL
-		 * for the reason the task tables give.
-		 */
-		name: text('name').notNull(),
 		color: text('color').notNull(),
 		/**
 		 * The name, sealed in the partnership's vault (kind `tag`), and its
 		 * blind index: a keyed hash of the normalised name that only says two
 		 * tags in this partnership are called the same. What the unique index
-		 * below enforces, since the name itself is unreadable here. Both NULL
-		 * on a tag written before sealing, whose `name` is still plaintext.
+		 * below enforces, since the name itself is unreadable here.
 		 */
 		...sealedContent(),
 		nameIndex: text('name_index'),
@@ -929,19 +869,6 @@ export const messages = sqliteTable(
 			.references(() => user.id, { onDelete: 'cascade' }),
 		ciphertext: text('ciphertext').notNull(),
 		/**
-		 * LEGACY-RICHTEXT — which serialisation the body inside `ciphertext` uses.
-		 *
-		 * PLAINTEXT, and deliberately a closed two-value list: the server holds
-		 * only ciphertext, so this is the only way it can tell a message written
-		 * before rich text from one converted since. See `MESSAGE_BODY_FORMATS`
-		 * in `src/lib/messaging.ts` for why it exists and
-		 * docs/temporary-code.md for when it goes.
-		 *
-		 * Defaults to `'plain'` so every existing row is correctly labelled by
-		 * the migration that adds the column.
-		 */
-		bodyFormat: text('body_format').$type<MessageBodyFormat>().notNull().default('plain'),
-		/**
 		 * An encrypted sidecar for derived message metadata, such as cached embed
 		 * details resolved from URLs in the body.
 		 *
@@ -952,15 +879,15 @@ export const messages = sqliteTable(
 		 */
 		metadataCiphertext: text('metadata_ciphertext'),
 		/**
-		 * The partnership vault the body and its sidecar are sealed under, or
-		 * NULL for a row still in the original scheme — age-encrypted to both
-		 * partners' recipients. Rows move from the second to the first as either
-		 * partner's device migrates them; see docs/messaging.md. Nothing ever
-		 * moves back, which is what makes `vault_id IS NULL` a safe condition
-		 * for a migration write.
+		 * The partnership vault the body and its sidecar are sealed under.
+		 *
+		 * Nullable only because rows from before vaults had none, and making it
+		 * NOT NULL now means rebuilding the table, which on D1 cascade-deletes
+		 * every row that references it (see the trap in AGENTS.md). None is NULL
+		 * any more and every writer sets it; the code holds the line.
 		 */
 		vaultId: text('vault_id').references(() => vaults.id, { onDelete: 'cascade' }),
-		/** The sealed body's payload version. NULL exactly when `vault_id` is. */
+		/** The sealed body's payload version. Nullable for the reason `vault_id` is. */
 		payloadVersion: integer('payload_version'),
 		/** The sealed sidecar's payload version, when there is a sealed sidecar. */
 		metadataVersion: integer('metadata_version'),
@@ -1060,7 +987,7 @@ export const messageReactions = sqliteTable(
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
 		ciphertext: text('ciphertext').notNull(),
-		/** As on `messages`: the vault it is sealed under, or NULL for the original scheme. */
+		/** As on `messages`: the vault it is sealed under, nullable only for history. */
 		vaultId: text('vault_id').references(() => vaults.id, { onDelete: 'cascade' }),
 		payloadVersion: integer('payload_version'),
 		...timestamps
@@ -1863,9 +1790,7 @@ export type KinkListVersionRow = typeof kinkListVersions.$inferSelect;
  * (`notebook_updates`) and versions (`notebook_versions`), every one sealed in
  * the browser. The `ciphertext` on this row is the `notebook-entry` header
  * (title and list excerpt), a cache a device rewrites as the document changes,
- * sealed like everything else. Unlike tasks and rewards there is no plaintext
- * column for content to fall back on and no "plaintext until sealed" path: an
- * entry is sealed from its first byte. The id comes from the browser, because
+ * sealed like everything else, from its first byte. The id comes from the browser, because
  * the header is sealed to it.
  *
  * `partner_access` and `access_set_by_user_id` restrict a partnership entry

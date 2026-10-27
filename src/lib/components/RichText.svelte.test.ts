@@ -193,59 +193,18 @@ describe('RichText, security', () => {
 
 	it('renders what looks like markup as inert text', () => {
 		const { container } = render(RichText, {
-			props: { text: '<script>alert(1)</script> and <img src=x onerror=1>' }
+			props: {
+				text: stored([
+					{
+						type: 'paragraph',
+						children: [text('<script>alert(1)</script> and <img src=x onerror=1>')]
+					}
+				])
+			}
 		});
 		expect(container.querySelector('script')).toBeNull();
 		expect(container.querySelector('img')).toBeNull();
 		expect(container.textContent).toContain('<script>alert(1)</script>');
-	});
-});
-
-/* ── LEGACY-RICHTEXT — delete with the legacy reader ─────────────────────── */
-
-describe('RichText, legacy plain text', () => {
-	it('renders plain text with no links unchanged', () => {
-		const { container } = render(RichText, { props: { text: 'just words, no urls' } });
-		expect(container.textContent).toBe('just words, no urls');
-		expect(links(container)).toHaveLength(0);
-	});
-
-	it('turns a bare URL into an anchor with safe link attributes', () => {
-		const { container } = render(RichText, {
-			props: { text: 'look at https://example.com/page now' }
-		});
-		const [link] = links(container);
-		expect(link?.getAttribute('href')).toBe('https://example.com/page');
-		expect(link?.getAttribute('rel')).toContain('ugc');
-		expect(container.textContent).toBe('look at https://example.com/page now');
-	});
-
-	it('embeds every supported URL, not just the first', () => {
-		const { container } = render(RichText, {
-			props: {
-				text: 'https://www.redgifs.com/watch/abc123 and https://www.redgifs.com/watch/def456'
-			}
-		});
-		const srcs = [...container.querySelectorAll('iframe')].map((iframe) =>
-			iframe.getAttribute('src')
-		);
-		expect(srcs).toEqual([
-			'https://www.redgifs.com/ifr/abc123',
-			'https://www.redgifs.com/ifr/def456'
-		]);
-	});
-
-	it('embeds a direct image', () => {
-		const { container } = render(RichText, { props: { text: 'https://i.imgur.com/cat.jpg' } });
-		expect(container.querySelector('img')?.getAttribute('src')).toBe('https://i.imgur.com/cat.jpg');
-	});
-
-	it('preserves the text around a link', () => {
-		const { container } = render(RichText, {
-			props: { text: 'before https://example.com/a\nafter' }
-		});
-		expect(container.textContent).toBe('before https://example.com/aafter');
-		expect(container.querySelectorAll('br')).toHaveLength(1);
 	});
 });
 

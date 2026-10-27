@@ -193,13 +193,12 @@ export function typingTransformersFor(features: readonly RichTextFeature[]): Tra
 /* ── links ─────────────────────────────────────────────────────────────── */
 
 /**
- * The one answer to "is this a URL", shared by the editor and by the legacy
- * reader in `richtext-legacy.ts`.
+ * The one answer to "is this a URL" in the editor.
  *
  * linkifyjs rather than a regex because it is what the app linkified with
  * before rich text existed — it catches `www.` prefixes and bare domains that
- * a naive URL pattern misses. Keeping it means converted and newly typed
- * content agree about what counts as a link.
+ * a naive URL pattern misses, so what counts as a link did not change when
+ * rich text arrived.
  */
 export const linkifyMatcher: LinkMatcher = (text: string) => {
 	const match = findLinks(text).find(

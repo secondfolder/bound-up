@@ -8,16 +8,14 @@
 
 import {
 	decryptAttachment,
-	decryptMessageMetadata,
-	decryptPayload,
 	encryptAttachment,
 	type MessageAttachmentInfo,
 	type MessageMetadataPayload,
-	type MessagePayload,
-	type ReactionPayload
+	type MessagePayload
 } from '$lib/crypto/messages';
-import { openRecord, sealRecord } from '$lib/crypto/sealed';
+import { sealRecord } from '$lib/crypto/sealed';
 import type { OpenVault } from '$lib/crypto/vault';
+import { vaultById } from '$lib/crypto/vaults.svelte';
 import type { WriteGrant } from '$lib/crypto/write-grant';
 import { fetchEmbedMetadata } from '$lib/embeds';
 import { attachmentBudget } from '$lib/media-quality';
@@ -35,11 +33,13 @@ import {
 	isRichTextDocumentEmpty,
 	parseStoredRichText
 } from '$lib/richtext';
+import { sealedReader } from '$lib/sealed-cache.svelte';
 import {
 	messageBodyKind,
 	messageMetadataKind,
 	messageReactionKind
 } from '$lib/sealed-kinds/messages';
+import { type Opened, openedPart } from '$lib/sealed-views.svelte';
 import type { MessageBodyRef, ReactionView } from '$lib/types';
 
 /**
@@ -48,16 +48,6 @@ import type { MessageBodyRef, ReactionView } from '$lib/types';
  * `crypto/trust.svelte.ts`).
  */
 export type MessageWriteKeys = { vault: OpenVault; grant: WriteGrant };
-
-/**
- * What reading needs. The identity opens a row still in the original scheme;
- * the vault, one sealed into it. `vault` is `undefined` while vaults are being
- * worked out, and null when this device cannot open the partnership's.
- */
-export type MessageReadKeys = {
-	identity: CryptoKey | string;
-	vault: OpenVault | null | undefined;
-};
 
 /** One file as it is about to be encrypted: already compressed, if it was going to be. */
 export type ComposedAttachment = {
@@ -329,86 +319,77 @@ async function describeFailure(response: Response): Promise<string> {
 // ── reading ──────────────────────────────────────────────────────────────────
 
 /**
- * Opens a message body under whichever scheme the row is in.
+ * A message body, opened through `sealedReader`, in its three states:
+ * `undefined` while the vault is not open yet (a placeholder, and the answer
+ * updates when it is), null when it will not open here, and the payload.
  *
- * `undefined` while the row is sealed and the vault is not open yet — the
- * caller waits and asks again. Null when it will not open here: a row sealed
- * to a vault this device cannot open, or one in the original scheme encrypted
- * to a key the user no longer has. The UI renders that as "ask your partner to
- * restore this" rather than as a failure.
+ * Null covers a body sealed to a vault this device cannot open, which the UI
+ * renders as "ask your partner to restore this" rather than as a failure, and
+ * a row with no vault at all: the column is nullable only for history, and
+ * nothing writes one.
  */
-export async function openMessage(
-	ref: MessageBodyRef,
-	keys: MessageReadKeys
-): Promise<MessagePayload | null | undefined> {
-	if (ref.vaultId === null) {
-		return await decryptPayload<MessagePayload>(ref.ciphertext, keys.identity);
-	}
-	const vault = sealedVaultFor(ref.vaultId, keys);
-	if (!vault) {
-		return vault;
-	}
-	const body = await openRecord(messageBodyKind, {
-		recordId: ref.id,
-		ciphertext: ref.ciphertext,
-		payloadVersion: ref.payloadVersion ?? 0,
-		vault
-	});
-	return body ? { version: 1, ...body } : null;
-}
-
-/** The sidecar, in the same three states as `openMessage`. Null when there is none. */
-export async function openMessageMetadata(
-	ref: MessageBodyRef,
-	keys: MessageReadKeys
-): Promise<MessageMetadataPayload | null | undefined> {
-	if (ref.metadataCiphertext === null) {
+export function openedMessage(ref: MessageBodyRef): Opened<MessagePayload> {
+	if (ref.vaultId === null || ref.payloadVersion === null) {
 		return null;
 	}
-	if (ref.vaultId === null) {
-		return await decryptMessageMetadata(ref.metadataCiphertext, keys.identity);
-	}
-	const vault = sealedVaultFor(ref.vaultId, keys);
-	if (!vault) {
-		return vault;
-	}
-	const metadata = await openRecord(messageMetadataKind, {
-		recordId: ref.id,
-		ciphertext: ref.metadataCiphertext,
-		payloadVersion: ref.metadataVersion ?? 0,
-		vault
-	});
-	return metadata ? { version: 1, ...metadata } : null;
+	const body = sealedReader.read(
+		messageBodyKind,
+		{ recordId: ref.id, ciphertext: ref.ciphertext, payloadVersion: ref.payloadVersion },
+		vaultById(ref.vaultId)
+	);
+	return openedPart(body, (value) => withVersion(openedBodies, value));
 }
 
-/** A reaction's emoji, in the same three states as `openMessage`. */
-export async function openReaction(
-	reaction: ReactionView,
-	keys: MessageReadKeys
-): Promise<string | null | undefined> {
-	if (reaction.vaultId === null) {
-		const payload = await decryptPayload<ReactionPayload>(reaction.ciphertext, keys.identity);
-		return payload?.emoji ?? null;
+/**
+ * The opened payloads with their `version`, one object per record. The reader
+ * hands back the same opened value every time it is asked, and so must this:
+ * a screen re-derives on every `invalidate()`, and a fresh object each time
+ * would rerun everything downstream that depends on it — an attachment
+ * preview's download, for one.
+ */
+const openedBodies = new WeakMap<object, MessagePayload>();
+const openedSidecars = new WeakMap<object, MessageMetadataPayload>();
+
+function withVersion<Opened extends object, Payload extends Opened & { version: 1 }>(
+	cache: WeakMap<object, Payload>,
+	value: Opened
+): Payload {
+	let payload = cache.get(value);
+	if (!payload) {
+		payload = { version: 1, ...value } as Payload;
+		cache.set(value, payload);
 	}
-	const vault = sealedVaultFor(reaction.vaultId, keys);
-	if (!vault) {
-		return vault;
-	}
-	const opened = await openRecord(messageReactionKind, {
-		recordId: reaction.id,
-		ciphertext: reaction.ciphertext,
-		payloadVersion: reaction.payloadVersion ?? 0,
-		vault
-	});
-	return opened?.emoji ?? null;
+	return payload;
 }
 
-/** The vault a sealed row needs: undefined while waiting, null when it is not this one. */
-function sealedVaultFor(vaultId: string, keys: MessageReadKeys): OpenVault | null | undefined {
-	if (keys.vault === undefined) {
-		return undefined;
+/** The sidecar, in the same three states as `openedMessage`. Null when there is none. */
+export function openedMessageMetadata(ref: MessageBodyRef): Opened<MessageMetadataPayload> {
+	if (ref.metadataCiphertext === null || ref.vaultId === null || ref.metadataVersion === null) {
+		return null;
 	}
-	return keys.vault?.id === vaultId ? keys.vault : null;
+	const metadata = sealedReader.read(
+		messageMetadataKind,
+		{ recordId: ref.id, ciphertext: ref.metadataCiphertext, payloadVersion: ref.metadataVersion },
+		vaultById(ref.vaultId)
+	);
+	return openedPart(metadata, (value) => withVersion(openedSidecars, value));
+}
+
+/** A reaction's emoji, in the same three states as `openedMessage`. */
+export function openedReaction(reaction: ReactionView): Opened<string> {
+	if (reaction.vaultId === null || reaction.payloadVersion === null) {
+		return null;
+	}
+	const opened = sealedReader.read(
+		messageReactionKind,
+		{
+			recordId: reaction.id,
+			ciphertext: reaction.ciphertext,
+			payloadVersion: reaction.payloadVersion
+		},
+		vaultById(reaction.vaultId)
+	);
+	return openedPart(opened, (value) => value.emoji);
 }
 
 /** A sealed reaction, ready to put. Each write gets a fresh id, which it is sealed to. */
@@ -477,13 +458,6 @@ async function writeMessageMetadataEntry(
 			? existing.map((entry) => (entry.href === href ? embed : entry))
 			: [...existing, embed]
 	};
-
-	// A message still in the original scheme gets its sidecar sealed with its
-	// body when it moves into the vault. Until then the details are shown, and
-	// looked up again on the next load, rather than stored half in each scheme.
-	if (message.vaultId === null) {
-		return metadata;
-	}
 
 	const sealed = await sealRecord(messageMetadataKind, {
 		recordId: message.id,

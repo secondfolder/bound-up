@@ -5,6 +5,16 @@ import { testPartnerView } from '$lib/testing/names';
 import { waSettled } from '$lib/testing/web-awesome';
 import type { PartnerView } from '$lib/types';
 
+// Titles and names are sealed; these open them by record id (sealed-refs.ts).
+vi.mock('$lib/crypto/sealed', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/crypto/sealed')>()),
+	openRecord: (await import('$lib/testing/sealed-refs')).openTestRecord
+}));
+vi.mock('$lib/crypto/vaults.svelte', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/crypto/vaults.svelte')>()),
+	vaultById: (id: string) => ({ id })
+}));
+
 /**
  * `$app/state` is a live store fed by the router, and `resolve()` needs the
  * generated route manifest — neither exists in a bare component render. Both
@@ -25,8 +35,8 @@ vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 const { default: AppNav } = await import('./AppNav.svelte');
 
 const partners: PartnerView[] = [
-	// Plaintext names, as a partnership from before sealing has: the only kind
-	// that shows without an open vault, which a component test has none of.
+	// Sealed names, which the mocks above open by record id: a component test
+	// has no vault of its own.
 	testPartnerView('p-ada', 'Ada'),
 	testPartnerView('p-jun', 'Jun', '/jun.png')
 ];
@@ -38,11 +48,14 @@ function renderNav(routeId: string, params: Record<string, string> = {}) {
 }
 
 describe('AppNav', () => {
-	it('renders one tab per partner, between Home and Settings', () => {
+	it('renders one tab per partner, between Home and Settings', async () => {
 		renderNav('/(auth-required)/(app)/home');
 
-		const labels = screen.getAllByRole('link').map((link) => link.textContent?.trim());
-		expect(labels).toEqual(['Home', 'Ada', 'Jun', 'Settings']);
+		// The names are sealed, so a tab says "…" until they have opened.
+		await vi.waitFor(() => {
+			const labels = screen.getAllByRole('link').map((link) => link.textContent?.trim());
+			expect(labels).toEqual(['Home', 'Ada', 'Jun', 'Settings']);
+		});
 	});
 
 	it('renders no partner tabs when there are none', () => {

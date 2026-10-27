@@ -51,14 +51,12 @@ export type ViewerNames = {
  *
  * The names are end-to-end encrypted (docs/partners.md, "Names are sealed"),
  * so the server hands this over and the browser opens it
- * (`partner-names.svelte.ts`). At most one of the three is set:
+ * (`partner-names.svelte.ts`). At most one of the two is set:
  *
  * - `sealed` — sealed in the partnership's vault: where they live for good.
  * - `invite` — sealed under the invite key, before a member's device has moved
  *   them into the vault. `keyWrap` is the key wrapped to the inviter, and is
  *   only ever handed to the inviter; the invitee keeps the key from the link.
- * - `legacy` — a partnership from before names were sealed, in plaintext until
- *   a member's device seals it.
  */
 export type PartnerNamesSource = {
 	partnershipId: string;
@@ -66,11 +64,10 @@ export type PartnerNamesSource = {
 	role: PartnershipRole;
 	sealed: { vaultId: string; ciphertext: string; payloadVersion: number; revision: number } | null;
 	invite: { ciphertext: string; payloadVersion: number; keyWrap: string | null } | null;
-	legacy: StoredNames | null;
 };
 
 /** The stored columns `viewPartnership` needs. A subset of the Drizzle row. */
-export type PartnershipRecord = StoredNames & {
+export type PartnershipRecord = {
 	id: string;
 	status: PartnershipStatus;
 	inviterId: string;
@@ -202,18 +199,7 @@ export function namesSourceFor(
 					keyWrap: role === 'inviter' ? record.inviteKeyWrap : null
 				}
 			: null;
-	// A row written before names were sealed. Its name columns are empty once
-	// it has a sealed record or an invite, so this is never set beside them.
-	const legacy =
-		sealed === null && invite === null && record.inviterName !== ''
-			? {
-					inviterName: record.inviterName,
-					inviteeName: record.inviteeName,
-					inviterRole: record.inviterRole,
-					inviteeRole: record.inviteeRole
-				}
-			: null;
-	return { partnershipId: record.id, role, sealed, invite, legacy };
+	return { partnershipId: record.id, role, sealed, invite };
 }
 
 /** Turns a row plus a viewer into the shape every partner screen renders from. */

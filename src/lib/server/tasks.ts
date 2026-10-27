@@ -49,11 +49,8 @@ import {
 const selfTaskColumns = {
 	id: selfTasks.id,
 	ownerId: selfTasks.ownerId,
-	title: selfTasks.title,
-	description: selfTasks.description,
 	active: selfTasks.active,
 	creditsAwarded: selfTasks.creditsAwarded,
-	completionMessages: selfTasks.completionMessages,
 	ciphertext: selfTasks.ciphertext,
 	vaultId: selfTasks.vaultId,
 	payloadVersion: selfTasks.payloadVersion,
@@ -73,11 +70,8 @@ const partnershipTaskColumns = {
 	partnershipId: partnershipTasks.partnershipId,
 	createdByUserId: partnershipTasks.createdByUserId,
 	timezoneOwnerUserId: partnershipTasks.timezoneOwnerUserId,
-	title: partnershipTasks.title,
-	description: partnershipTasks.description,
 	active: partnershipTasks.active,
 	creditsAwarded: partnershipTasks.creditsAwarded,
-	completionMessages: partnershipTasks.completionMessages,
 	ciphertext: partnershipTasks.ciphertext,
 	vaultId: partnershipTasks.vaultId,
 	payloadVersion: partnershipTasks.payloadVersion,
@@ -93,10 +87,7 @@ const partnershipTaskColumns = {
 
 const selfTaskCompletionColumns = {
 	id: selfTaskCompletions.id,
-	taskTitle: selfTaskCompletions.taskTitle,
-	taskDescription: selfTaskCompletions.taskDescription,
 	creditsAwarded: selfTaskCompletions.creditsAwarded,
-	completionMessage: selfTaskCompletions.completionMessage,
 	completionMessageIndex: selfTaskCompletions.completionMessageIndex,
 	snapshotCiphertext: selfTaskCompletions.snapshotCiphertext,
 	snapshotVaultId: selfTaskCompletions.snapshotVaultId,
@@ -109,10 +100,7 @@ const partnershipTaskCompletionColumns = {
 	id: partnershipTaskCompletions.id,
 	completedByUserId: partnershipTaskCompletions.completedByUserId,
 	createdByUserId: partnershipTaskCompletions.createdByUserId,
-	taskTitle: partnershipTaskCompletions.taskTitle,
-	taskDescription: partnershipTaskCompletions.taskDescription,
 	creditsAwarded: partnershipTaskCompletions.creditsAwarded,
-	completionMessage: partnershipTaskCompletions.completionMessage,
 	completionMessageIndex: partnershipTaskCompletions.completionMessageIndex,
 	snapshotCiphertext: partnershipTaskCompletions.snapshotCiphertext,
 	snapshotVaultId: partnershipTaskCompletions.snapshotVaultId,
@@ -124,11 +112,8 @@ const partnershipTaskCompletionColumns = {
 type SelfTaskRow = {
 	id: string;
 	ownerId: string;
-	title: string | null;
-	description: string | null;
 	active: boolean;
 	creditsAwarded: number;
-	completionMessages: string[] | null;
 	ciphertext: string | null;
 	vaultId: string | null;
 	payloadVersion: number | null;
@@ -148,11 +133,8 @@ type PartnershipTaskRow = {
 	partnershipId: string;
 	createdByUserId: string;
 	timezoneOwnerUserId: string;
-	title: string | null;
-	description: string | null;
 	active: boolean;
 	creditsAwarded: number;
-	completionMessages: string[] | null;
 	ciphertext: string | null;
 	vaultId: string | null;
 	payloadVersion: number | null;
@@ -168,10 +150,7 @@ type PartnershipTaskRow = {
 
 type SelfTaskCompletionRow = {
 	id: string;
-	taskTitle: string | null;
-	taskDescription: string | null;
 	creditsAwarded: number;
-	completionMessage: string | null;
 	completionMessageIndex: number | null;
 	snapshotCiphertext: string | null;
 	snapshotVaultId: string | null;
@@ -272,11 +251,7 @@ function sealedTaskColumns(content: SealedTaskContent, revision: number) {
 		vaultId: content.vaultId,
 		payloadVersion: content.payloadVersion,
 		completionMessageCount: content.completionMessageCount,
-		revision,
-		// Never both: once the content is sealed, the plaintext goes.
-		title: '',
-		description: null,
-		completionMessages: []
+		revision
 	};
 }
 type CreateTaskResult<TReason extends string> =
@@ -318,10 +293,7 @@ function toTimeZoneNote(
 function toTaskCompletionView(row: SelfTaskCompletionRow): TaskCompletionView {
 	return {
 		id: row.id,
-		taskTitle: row.taskTitle ?? '',
-		taskDescription: row.taskDescription,
 		creditsAwarded: row.creditsAwarded,
-		completionMessage: row.completionMessage,
 		createdAt: row.createdAt,
 		sealed: snapshotRef(row),
 		completionMessageIndex: row.completionMessageIndex
@@ -359,11 +331,8 @@ function toSelfTaskView(
 		(row.schedule.mode === 'one-off' ? null : scheduleReferenceDate(row.schedule, viewerTimezone));
 	return {
 		id: row.id,
-		title: row.title ?? '',
-		description: row.description,
 		active: row.active,
 		creditsAwarded: row.creditsAwarded,
-		completionMessages: row.completionMessages ?? [],
 		sealed: sealedRef(row.id, row),
 		revision: row.revision,
 		schedule: row.schedule,
@@ -396,11 +365,8 @@ function toPartnershipTaskView(
 	const createdByMe = row.createdByUserId === membership.viewerId;
 	return {
 		id: row.id,
-		title: row.title ?? '',
-		description: row.description,
 		active: row.active,
 		creditsAwarded: row.creditsAwarded,
-		completionMessages: row.completionMessages ?? [],
 		sealed: sealedRef(row.id, row),
 		revision: row.revision,
 		schedule: row.schedule,
@@ -620,30 +586,23 @@ function chooseCompletionIndex(count: number): number | null {
 /**
  * What a completion records of the task, as it is now.
  *
- * A sealed task's record is copied as it is — the person completing need not
- * be its author and cannot re-seal it — with which of its messages was picked.
- * A task still in plaintext is snapshotted in plaintext, as before sealing.
+ * The task's sealed record is copied as it is — the person completing need
+ * not be its author and cannot re-seal it — with which of its messages was
+ * picked. Nothing for a task with no sealed content, which nothing writes any
+ * more: the columns are nullable only for history, and the completion then
+ * shows as unreadable rather than failing.
  */
 function completionSnapshot(task: SelfTaskRow | PartnershipTaskRow) {
 	const sealed = sealedRef(task.id, task);
-	if (sealed) {
-		return {
-			snapshotCiphertext: sealed.ciphertext,
-			snapshotVaultId: sealed.vaultId,
-			snapshotVersion: sealed.payloadVersion,
-			snapshotRecordId: sealed.recordId,
-			completionMessageIndex: chooseCompletionIndex(task.completionMessageCount),
-			taskTitle: '',
-			taskDescription: null,
-			completionMessage: null
-		};
+	if (!sealed) {
+		return {};
 	}
-	const messages = task.completionMessages ?? [];
-	const index = chooseCompletionIndex(messages.length);
 	return {
-		taskTitle: task.title ?? '',
-		taskDescription: task.description,
-		completionMessage: index === null ? null : (messages[index] ?? null)
+		snapshotCiphertext: sealed.ciphertext,
+		snapshotVaultId: sealed.vaultId,
+		snapshotVersion: sealed.payloadVersion,
+		snapshotRecordId: sealed.recordId,
+		completionMessageIndex: chooseCompletionIndex(task.completionMessageCount)
 	};
 }
 
@@ -1574,11 +1533,7 @@ export async function listHomePartnerTaskSections(
 				status: partnerships.status,
 				control: partnerships.control,
 				inviterId: partnerships.inviterId,
-				inviteeId: partnerships.inviteeId,
-				inviterName: partnerships.inviterName,
-				inviteeName: partnerships.inviteeName,
-				inviterRole: partnerships.inviterRole,
-				inviteeRole: partnerships.inviteeRole
+				inviteeId: partnerships.inviteeId
 			})
 			.from(partnerships)
 			.where(inArray(partnerships.id, partnershipIds)),
@@ -1681,7 +1636,6 @@ const WIDGET_PREVIEW_LIMIT = 3;
 
 type TaskWidgetRow = {
 	id: string;
-	title: string | null;
 	ciphertext: string | null;
 	vaultId: string | null;
 	payloadVersion: number | null;
@@ -1702,7 +1656,8 @@ function toTasksWidgetView(rows: TaskWidgetRow[], viewerActs: boolean, now: Date
 		ready: viewerActs
 			? ready.slice(0, WIDGET_PREVIEW_LIMIT).map((row) => ({
 					id: row.id,
-					title: row.title ?? '',
+					// Only a guide's title is shown as it is; a task's is sealed.
+					title: '',
 					kind: 'task' as const,
 					sealed: sealedRef(row.id, row),
 					note: row.creditsAwarded > 0 ? `+${row.creditsAwarded}` : null,
@@ -1744,7 +1699,6 @@ export async function getHomeTasksWidget(
 		db
 			.select({
 				id: selfTasks.id,
-				title: selfTasks.title,
 				ciphertext: selfTasks.ciphertext,
 				vaultId: selfTasks.vaultId,
 				payloadVersion: selfTasks.payloadVersion,
@@ -1774,7 +1728,6 @@ export async function getHomeTasksWidget(
 						id: partnershipTasks.id,
 						partnershipId: partnershipTasks.partnershipId,
 						createdByUserId: partnershipTasks.createdByUserId,
-						title: partnershipTasks.title,
 						ciphertext: partnershipTasks.ciphertext,
 						vaultId: partnershipTasks.vaultId,
 						payloadVersion: partnershipTasks.payloadVersion,
@@ -1844,7 +1797,6 @@ export async function getPartnershipTasksWidget(
 			id: partnershipTasks.id,
 			partnershipId: partnershipTasks.partnershipId,
 			createdByUserId: partnershipTasks.createdByUserId,
-			title: partnershipTasks.title,
 			ciphertext: partnershipTasks.ciphertext,
 			vaultId: partnershipTasks.vaultId,
 			payloadVersion: partnershipTasks.payloadVersion,

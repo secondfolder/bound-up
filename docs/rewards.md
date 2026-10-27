@@ -207,9 +207,9 @@ sealed record's envelope and every permission.
 - **Reading** goes through `openedReward` / `openedClaim` in
   `src/lib/sealed-views.svelte.ts`.
 
-Rewards written before sealing keep `title` and `description` in plaintext
-until a device seals them in the background; see
-[docs/temporary-code.md](temporary-code.md#tasks-and-rewards-in-plaintext).
+There is no plaintext content column. The sealed columns are nullable only
+for history, as on the task tables ([tasks.md](tasks.md#data-model)); every
+writer sets them.
 
 ## Data model
 

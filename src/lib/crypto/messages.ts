@@ -1,19 +1,21 @@
 /**
- * Encrypting and decrypting a message.
+ * A message's payload shapes, its attachments' encryption, and age encryption
+ * of a payload to a list of recipients.
  *
  * BROWSER ONLY — see the note at the top of `kdf.ts`.
  *
- * A message body is an age file encrypted to **both** partners, so each of them
- * can open it independently and the server can hold the only copy without being
- * able to read it. That is also what makes the history restorable on a new
- * device: there is no ratchet to have moved on.
+ * A message body is a sealed record in the partnership vault
+ * (`sealed-kinds/messages.ts`); what it opens to is `MessagePayload`. The
+ * plaintext is JSON rather than a bare string, because a message is not only
+ * text — it carries the attachment manifest, and each attachment's own key.
  *
- * The plaintext is JSON rather than a bare string, because a message is not only
- * text — it carries the attachment manifest, and each attachment's own key. See
- * `MessagePayload`.
+ * `encryptPayload` / `decryptPayload` are plain age, to recipients rather than
+ * under a vault. Only what a device keeps for its own account uses them now —
+ * message drafts and the notebook outbox, sealed to the writer's own
+ * recipient.
  */
 
-import { type CachedEmbedDetails, withSafeUrls } from '../embeds';
+import type { CachedEmbedDetails } from '../embeds';
 import { fromBase64, toBase64 } from '../encryption';
 import { MAX_BODY_CHARS } from '../messaging';
 import { loadAge } from './identity';
@@ -99,12 +101,12 @@ export async function encryptPayload(
 }
 
 /**
- * Opens a message body, or returns null when this identity cannot.
+ * Opens a payload, or returns null when this identity cannot.
  *
- * Null rather than a throw for "not for me", because a board can legitimately
- * contain messages from before a key was replaced — the UI renders those as
- * "ask your partner to restore this" rather than as a failure. age throws for
- * that case, so it is caught and converted here, once.
+ * Null rather than a throw for "not for me", because a device can hold a
+ * draft sealed to a key the account has since replaced, and that is "no
+ * draft" rather than a failure. age throws for that case, so it is caught and
+ * converted here, once.
  */
 export async function decryptPayload<T = MessagePayload>(
 	ciphertext: string,
@@ -120,22 +122,6 @@ export async function decryptPayload<T = MessagePayload>(
 	} catch {
 		return null;
 	}
-}
-
-export async function decryptMessageMetadata(
-	ciphertext: string,
-	identity: CryptoKey | string
-): Promise<MessageMetadataPayload | null> {
-	const payload = await decryptPayload<MessageMetadataPayload>(ciphertext, identity);
-	if (!payload) {
-		return null;
-	}
-	// Every reader of a sidecar comes through here, and the sender wrote it, so
-	// this is where its URLs are checked. See `withSafeUrls`.
-	return {
-		...payload,
-		embeds: Array.isArray(payload.embeds) ? payload.embeds.map(withSafeUrls) : []
-	};
 }
 
 /** Trims and bounds what the composer collected, before it is encrypted. */

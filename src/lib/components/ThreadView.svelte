@@ -2,8 +2,8 @@
 	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { invalidate } from '$app/navigation';
-	import type { MessageMetadataPayload, MessagePayload } from '$lib/crypto/messages';
-	import { currentKeyring, unlockedIdentity } from '$lib/crypto/session.svelte';
+	import type { MessageMetadataPayload } from '$lib/crypto/messages';
+	import { unlockedIdentity } from '$lib/crypto/session.svelte';
 	import { writeGrantFor } from '$lib/crypto/trust.svelte';
 	import { partnershipVault } from '$lib/crypto/vaults.svelte';
 	import { timelineMarks } from '$lib/message-timeline';
@@ -12,9 +12,9 @@
 		type ComposedMessage,
 		fillMissingMessageMetadata,
 		type MessageWriteKeys,
-		openMessage,
-		openMessageMetadata,
-		openReaction,
+		openedMessage,
+		openedMessageMetadata,
+		openedReaction,
 		refreshMessageMetadata,
 		sendMessage
 	} from '$lib/messaging/client';
@@ -62,9 +62,7 @@
 		firstUnreadId?: string | null;
 	} = $props();
 
-	const keyring = $derived(currentKeyring());
-	// `undefined` until vaults are worked out; sealed rows wait for it, and the
-	// effect below runs again when it arrives.
+	// `undefined` until vaults are worked out; writes wait for it.
 	const vault = $derived(partnershipVault(partnershipId));
 	// Selection is the live control state; re-deriving it on every thread refresh
 	// would undo a tag click while the assignment request is in flight.
@@ -72,78 +70,45 @@
 	let selectedTagIds = $state(thread.tags?.map((tag) => tag.id) ?? []);
 
 	/**
-	 * Decrypted bodies, by message id.
-	 *
-	 * `undefined` means "still working", `null` means "this identity cannot open
-	 * it" — a real state, not an error, for a message sent to a key the user
-	 * replaced. `MessageBubble` renders the three cases differently.
+	 * Embed details this view has looked up or refreshed itself, by message id.
+	 * They are stored on the message as well, but a reader would otherwise
+	 * show the old sidecar until the next load brought the new one back.
 	 */
-	let bodies: Record<string, MessagePayload | null> = $state({});
-	let metadata: Record<string, MessageMetadataPayload | null> = $state({});
-	let reactions: Record<string, { emoji: string; mine: boolean }[]> = $state({});
+	let metadataUpdates: Record<string, MessageMetadataPayload> = $state({});
 	const attemptedMetadataBackfill = new SvelteSet<string>();
 
 	/**
+	 * Each message's body, sidecar and reactions, opened through
+	 * `sealedReader`. A body is `undefined` while its vault is not open yet,
+	 * null when this device cannot open it — a real state, not an error, for
+	 * a message sealed to a vault the user lost — and `MessageBubble` renders
+	 * the three cases differently. Opened once per page load however often
+	 * `invalidate()` hands the thread over again.
+	 */
+	const opened = $derived(
+		thread.messages.map((message) => ({
+			body: openedMessage(message),
+			metadata: metadataUpdates[message.id] ?? openedMessageMetadata(message),
+			reactions: message.reactions.map((reaction) => ({
+				emoji: openedReaction(reaction),
+				mine: reaction.mine
+			}))
+		}))
+	);
+
+	/**
 	 * Which thread's reactions have all been opened once. Until they have, a
-	 * reaction appearing is one that was already there, decrypting, and does
-	 * not pop; after, it is one that has just been added.
+	 * reaction appearing is one that was already there, opening, and does not
+	 * pop; after, it is one that has just been added.
 	 */
 	let reactionsOpenedFor: string | null = $state(null);
-
+	const reactionsOpened = $derived(
+		opened.every((message) => message.reactions.every((reaction) => reaction.emoji !== undefined))
+	);
 	$effect(() => {
-		const unlocked = keyring.status === 'unlocked' ? keyring.identity : null;
-		if (!unlocked) {
-			return;
+		if (reactionsOpened) {
+			reactionsOpenedFor = threadId;
 		}
-		const keys = { identity: unlocked, vault };
-
-		// Captured so a run superseded by a newer one bails out rather than
-		// writing stale plaintext over fresh — the same guard EdgeTask.svelte uses.
-		const { messages } = thread;
-		const messagesThreadId = thread.id;
-		let cancelled = false;
-
-		void (async () => {
-			for (const message of messages) {
-				if (cancelled) {
-					return;
-				}
-				// `undefined` is a sealed row whose vault is not open yet: left unset,
-				// so it reads as still working, and filled in when this runs again.
-				// `untrack`, because this effect writes these records and must not
-				// also depend on them.
-				if (!untrack(() => message.id in bodies)) {
-					const body = await openMessage(message, keys);
-					if (body !== undefined) {
-						bodies[message.id] = body;
-					}
-				}
-				if (message.metadataCiphertext !== null && !untrack(() => message.id in metadata)) {
-					const opened = await openMessageMetadata(message, keys);
-					if (opened !== undefined) {
-						metadata[message.id] = opened;
-					}
-				}
-				const decoded: { emoji: string; mine: boolean }[] = [];
-				for (const reaction of message.reactions) {
-					const emoji = await openReaction(reaction, keys);
-					if (emoji) {
-						decoded.push({ emoji, mine: reaction.mine });
-					}
-				}
-				if (cancelled) {
-					return;
-				}
-				reactions[message.id] = decoded;
-			}
-			if (!cancelled) {
-				reactionsOpenedFor = messagesThreadId;
-			}
-		})();
-
-		return () => {
-			cancelled = true;
-		};
 	});
 
 	/**
@@ -301,10 +266,15 @@
 			return;
 		}
 		attemptedMetadataBackfill.add(key);
-		const current = metadata[message.id] ?? null;
-		const next = await fillMissingMessageMetadata(partnershipId, message, href, current, keys);
+		const next = await fillMissingMessageMetadata(
+			partnershipId,
+			message,
+			href,
+			currentMetadata(message),
+			keys
+		);
 		if (next) {
-			metadata[message.id] = next;
+			metadataUpdates[message.id] = next;
 		}
 	}
 
@@ -314,15 +284,25 @@
 			reportRequestFailure(null, "Couldn't refresh this preview. Please try again.");
 			return;
 		}
-		const current = metadata[message.id] ?? null;
-		const next = await refreshMessageMetadata(partnershipId, message, href, current, keys);
+		const next = await refreshMessageMetadata(
+			partnershipId,
+			message,
+			href,
+			currentMetadata(message),
+			keys
+		);
 		if (!next) {
 			// Pressed and waited on, unlike the backfill above, which is
 			// opportunistic and simply tries again on the next view.
 			reportRequestFailure(null, "Couldn't refresh this preview. Please try again.");
 			return;
 		}
-		metadata[message.id] = next;
+		metadataUpdates[message.id] = next;
+	}
+
+	/** The sidecar as it stands, or null while it is not open (or there is none). */
+	function currentMetadata(message: MessageView): MessageMetadataPayload | null {
+		return metadataUpdates[message.id] ?? openedMessageMetadata(message) ?? null;
 	}
 </script>
 
@@ -337,13 +317,15 @@
 		{#each thread.messages as message, index (message.id)}
 			<MessageBubble
 				{message}
-				payload={message.id in bodies ? bodies[message.id] : undefined}
-				metadata={message.id in metadata ? metadata[message.id] : undefined}
+				payload={opened[index]?.body}
+				metadata={opened[index]?.metadata}
 				onEmbedActivated={(href) => cacheEmbedDetails(message, href)}
 				onRefreshEmbed={(href) => refreshEmbed(message, href)}
 				{partnershipId}
 				when={formatWhen(message.createdAt)}
-				reactions={reactions[message.id] ?? []}
+				reactions={opened[index]?.reactions.flatMap(({ emoji, mine }) =>
+					emoji ? [{ emoji, mine }] : []
+				) ?? []}
 				onReact={(emoji) => react(message, emoji)}
 				onClearReaction={() => clearReaction(message)}
 				seenBy={message.id === thread.seenMessageId ? partner : null}

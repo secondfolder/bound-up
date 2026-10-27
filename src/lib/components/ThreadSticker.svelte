@@ -1,20 +1,13 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
 	import { resolve } from '$app/paths';
-	import type {
-		MessageAttachmentInfo,
-		MessageMetadataPayload,
-		MessagePayload
-	} from '$lib/crypto/messages';
-	import { currentKeyring } from '$lib/crypto/session.svelte';
-	import { partnershipVault } from '$lib/crypto/vaults.svelte';
+	import type { MessageAttachmentInfo, MessagePayload } from '$lib/crypto/messages';
 	import { canDisplayAvif, canPlayVideo } from '$lib/media/support';
 	import { describeUnseenMedia, formatTimeLeft, neverOpened } from '$lib/messaging';
 	import {
 		fetchAttachment,
 		MediaExpiredError,
-		openMessage,
-		openMessageMetadata
+		openedMessage,
+		openedMessageMetadata
 	} from '$lib/messaging/client';
 	import { documentToPlainText, parseStoredRichText } from '$lib/richtext';
 	import { openedTagName, shownText } from '$lib/sealed-views.svelte';
@@ -93,28 +86,47 @@
 			threadId: thread.id
 		})
 	);
-	const keyring = $derived(currentKeyring());
-	// `undefined` until vaults are worked out; the effects below wait for it.
-	const vault = $derived(partnershipVault(partnershipId));
 	const sealed = $derived(thread.unread && neverOpened(thread));
-	let preview: MessagePayload | null | undefined = $state(undefined);
-	let previewMetadata = $state<MessageMetadataPayload | null | undefined>(undefined);
+	// Opened through `sealedReader`: `undefined` until the vault is open, null
+	// when it will not open here. A sealed tile opens nothing of its message.
+	const preview = $derived(sealed ? undefined : openedMessage(thread.preview));
+	const previewMetadata = $derived(sealed ? undefined : openedMessageMetadata(thread.preview));
 	let mediaPreviews: PreviewMedia[] = $state([]);
 	let mediaLoading = $state(false);
 
 	/**
 	 * The kinds of the viewer's unseen, self-destructing files: undefined while
-	 * the bodies decrypt, null when not all of them could be read (the tile
-	 * then says "media"). Decrypted here, even on a sealed tile, because the
-	 * server does not know whether a file is an image or a video.
+	 * the bodies open, null when not all of them could be read (the tile then
+	 * says "media"). Opened here, even on a sealed tile, because the server
+	 * does not know whether a file is an image or a video.
 	 */
-	let unseenKinds = $state<MessageAttachmentInfo['kind'][] | null | undefined>(undefined);
-	// Primitives for the effects to depend on: `thread` is a fresh object on
-	// every `invalidate()`, and an effect that read `thread.unseenMedia` would
-	// decrypt again on every refresh of the board (AGENTS.md).
-	const unseenKey = $derived(
-		thread.unseenMedia?.messages.map((message) => message.attachmentIds.join(',')).join(';') ?? null
-	);
+	const unseenKinds = $derived.by((): MessageAttachmentInfo['kind'][] | null | undefined => {
+		const unseen = thread.unseenMedia;
+		if (!unseen) {
+			return undefined;
+		}
+		const perMessage = unseen.messages.map((message) => {
+			const payload = openedMessage(message);
+			if (!payload) {
+				// `undefined` while the vault is not open yet; null, unreadable.
+				return payload;
+			}
+			const kinds: MessageAttachmentInfo['kind'][] = [];
+			for (const id of message.attachmentIds) {
+				const kind = payload.attachments.find((info) => info.id === id)?.kind;
+				if (!kind) {
+					return null;
+				}
+				kinds.push(kind);
+			}
+			return kinds;
+		});
+		if (perMessage.some((kinds) => kinds === undefined)) {
+			return undefined;
+		}
+		const known = perMessage.filter((kinds) => Array.isArray(kinds));
+		return known.length === perMessage.length && !unseen.truncated ? known.flat() : null;
+	});
 	const unseenExpiresAt = $derived(thread.unseenMedia?.expiresAt.getTime() ?? null);
 	let now = $state(Date.now());
 
@@ -129,108 +141,11 @@
 		return () => clearInterval(timer);
 	});
 
-	$effect(() => {
-		if (unseenKey === null || keyring.status !== 'unlocked') {
-			unseenKinds = undefined;
-			return;
-		}
-		const unseen = untrack(() => thread.unseenMedia);
-		if (!unseen) {
-			return;
-		}
-		const keys = { identity: keyring.identity, vault };
-		let cancelled = false;
-		void Promise.all(
-			unseen.messages.map(async (message) => {
-				const payload = await openMessage(message, keys);
-				if (payload === undefined) {
-					// Sealed, and the vault is not open yet: this runs again when it is.
-					return;
-				}
-				if (!payload) {
-					return null;
-				}
-				const kinds: MessageAttachmentInfo['kind'][] = [];
-				for (const id of message.attachmentIds) {
-					const kind = payload.attachments.find((info) => info.id === id)?.kind;
-					if (!kind) {
-						return null;
-					}
-					kinds.push(kind);
-				}
-				return kinds;
-			})
-		)
-			.then((perMessage) => {
-				if (cancelled || perMessage.some((kinds) => kinds === undefined)) {
-					return;
-				}
-				const known = perMessage.filter((kinds) => Array.isArray(kinds));
-				unseenKinds = known.length === perMessage.length && !unseen.truncated ? known.flat() : null;
-			})
-			.catch(() => {
-				if (!cancelled) {
-					unseenKinds = null;
-				}
-			});
-		return () => {
-			cancelled = true;
-		};
-	});
-
 	const unseenLine = $derived(
 		unseenKinds === undefined || unseenExpiresAt === null || now >= unseenExpiresAt
 			? null
 			: describeUnseenMedia(unseenKinds, formatTimeLeft(unseenExpiresAt - now))
 	);
-
-	$effect(() => {
-		if (sealed) {
-			return;
-		}
-		if (keyring.status !== 'unlocked') {
-			return;
-		}
-
-		let cancelled = false;
-		preview = undefined;
-		void openMessage(thread.preview, { identity: keyring.identity, vault }).then((payload) => {
-			if (!cancelled) {
-				preview = payload;
-			}
-		});
-
-		return () => {
-			cancelled = true;
-		};
-	});
-
-	$effect(() => {
-		if (sealed) {
-			return;
-		}
-		if (keyring.status !== 'unlocked') {
-			return;
-		}
-		if (thread.preview.metadataCiphertext === null) {
-			previewMetadata = null;
-			return;
-		}
-
-		let cancelled = false;
-		previewMetadata = undefined;
-		void openMessageMetadata(thread.preview, { identity: keyring.identity, vault }).then(
-			(payload) => {
-				if (!cancelled) {
-					previewMetadata = payload;
-				}
-			}
-		);
-
-		return () => {
-			cancelled = true;
-		};
-	});
 
 	$effect(() => {
 		const payload = preview;

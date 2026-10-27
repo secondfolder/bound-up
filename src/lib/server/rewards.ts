@@ -34,8 +34,6 @@ import {
 
 const selfRewardColumns = {
 	id: selfRewards.id,
-	title: selfRewards.title,
-	description: selfRewards.description,
 	ciphertext: selfRewards.ciphertext,
 	vaultId: selfRewards.vaultId,
 	payloadVersion: selfRewards.payloadVersion,
@@ -50,8 +48,6 @@ const partnershipRewardColumns = {
 	id: partnershipRewards.id,
 	partnershipId: partnershipRewards.partnershipId,
 	createdByUserId: partnershipRewards.createdByUserId,
-	title: partnershipRewards.title,
-	description: partnershipRewards.description,
 	ciphertext: partnershipRewards.ciphertext,
 	vaultId: partnershipRewards.vaultId,
 	payloadVersion: partnershipRewards.payloadVersion,
@@ -64,8 +60,6 @@ const partnershipRewardColumns = {
 
 const rewardHistoryColumns = {
 	id: selfRewardClaims.id,
-	rewardTitle: selfRewardClaims.rewardTitle,
-	rewardDescription: selfRewardClaims.rewardDescription,
 	rewardCost: selfRewardClaims.rewardCost,
 	snapshotCiphertext: selfRewardClaims.snapshotCiphertext,
 	snapshotVaultId: selfRewardClaims.snapshotVaultId,
@@ -78,8 +72,6 @@ const partnershipRewardHistoryColumns = {
 	id: partnershipRewardClaims.id,
 	claimedByUserId: partnershipRewardClaims.claimedByUserId,
 	createdByUserId: partnershipRewardClaims.createdByUserId,
-	rewardTitle: partnershipRewardClaims.rewardTitle,
-	rewardDescription: partnershipRewardClaims.rewardDescription,
 	rewardCost: partnershipRewardClaims.rewardCost,
 	snapshotCiphertext: partnershipRewardClaims.snapshotCiphertext,
 	snapshotVaultId: partnershipRewardClaims.snapshotVaultId,
@@ -90,8 +82,6 @@ const partnershipRewardHistoryColumns = {
 
 type SelfRewardRow = {
 	id: string;
-	title: string | null;
-	description: string | null;
 	ciphertext: string | null;
 	vaultId: string | null;
 	payloadVersion: number | null;
@@ -104,8 +94,6 @@ type SelfRewardRow = {
 
 type SelfRewardHistoryRow = {
 	id: string;
-	rewardTitle: string | null;
-	rewardDescription: string | null;
 	rewardCost: number;
 	snapshotCiphertext: string | null;
 	snapshotVaultId: string | null;
@@ -118,8 +106,6 @@ type PartnershipRewardRow = {
 	id: string;
 	partnershipId: string;
 	createdByUserId: string;
-	title: string | null;
-	description: string | null;
 	ciphertext: string | null;
 	vaultId: string | null;
 	payloadVersion: number | null;
@@ -174,36 +160,34 @@ function rewardContentProblem(
 	return content.vaultId === vaultId ? null : 'wrong-vault';
 }
 
-/** The columns a sealed reward write sets. The plaintext goes once the content is sealed. */
+/** The columns a sealed reward write sets. */
 function sealedRewardColumns(content: RewardInput['content'], revision: number) {
 	return {
 		ciphertext: content.ciphertext,
 		vaultId: content.vaultId,
 		payloadVersion: content.payloadVersion,
-		revision,
-		title: '',
-		description: null
+		revision
 	};
 }
 
 /**
  * What a claim records of the reward: its sealed record copied as it is — the
- * claimant need not be its author and cannot re-seal it — or, for a reward
- * still in plaintext, a plaintext snapshot as before sealing.
+ * claimant need not be its author and cannot re-seal it. Nothing for a reward
+ * with no sealed content, which nothing writes any more: the columns are
+ * nullable only for history, and the claim then shows as unreadable rather
+ * than failing.
  */
 function claimSnapshot(reward: SelfRewardRow | PartnershipRewardRow) {
 	const sealed = sealedRef(reward.id, reward);
-	if (sealed) {
-		return {
-			snapshotCiphertext: sealed.ciphertext,
-			snapshotVaultId: sealed.vaultId,
-			snapshotVersion: sealed.payloadVersion,
-			snapshotRecordId: sealed.recordId,
-			rewardTitle: '',
-			rewardDescription: null
-		};
+	if (!sealed) {
+		return {};
 	}
-	return { rewardTitle: reward.title ?? '', rewardDescription: reward.description };
+	return {
+		snapshotCiphertext: sealed.ciphertext,
+		snapshotVaultId: sealed.vaultId,
+		snapshotVersion: sealed.payloadVersion,
+		snapshotRecordId: sealed.recordId
+	};
 }
 type CreateRewardResult<TReason extends string> =
 	| { ok: true; id: string }
@@ -246,8 +230,6 @@ async function readPartnershipCredits(
 function toSelfRewardView(row: SelfRewardRow, credits: number): SelfRewardView {
 	return {
 		id: row.id,
-		title: row.title ?? '',
-		description: row.description,
 		sealed: sealedRef(row.id, row),
 		revision: row.revision,
 		cost: row.cost,
@@ -261,8 +243,6 @@ function toSelfRewardView(row: SelfRewardRow, credits: number): SelfRewardView {
 function toHistoryView(row: SelfRewardHistoryRow): RewardHistoryView {
 	return {
 		id: row.id,
-		rewardTitle: row.rewardTitle ?? '',
-		rewardDescription: row.rewardDescription,
 		rewardCost: row.rewardCost,
 		createdAt: row.createdAt,
 		sealed: snapshotRef(row)
@@ -278,8 +258,6 @@ function toPartnershipRewardView(
 	const createdByMe = row.createdByUserId === viewerId;
 	return {
 		id: row.id,
-		title: row.title ?? '',
-		description: row.description,
 		sealed: sealedRef(row.id, row),
 		revision: row.revision,
 		cost: row.cost,
@@ -868,11 +846,7 @@ export async function listHomePartnerRewardSections(
 				status: partnerships.status,
 				control: partnerships.control,
 				inviterId: partnerships.inviterId,
-				inviteeId: partnerships.inviteeId,
-				inviterName: partnerships.inviterName,
-				inviteeName: partnerships.inviteeName,
-				inviterRole: partnerships.inviterRole,
-				inviteeRole: partnerships.inviteeRole
+				inviteeId: partnerships.inviteeId
 			})
 			.from(partnerships)
 			.where(inArray(partnerships.id, partnershipIds)),
@@ -941,7 +915,6 @@ const WIDGET_PREVIEW_LIMIT = 3;
 
 type RewardWidgetRow = {
 	id: string;
-	title: string | null;
 	ciphertext: string | null;
 	vaultId: string | null;
 	payloadVersion: number | null;
@@ -973,7 +946,8 @@ function toRewardsWidgetView(
 		claimable: viewerActs
 			? claimable.slice(0, WIDGET_PREVIEW_LIMIT).map((row) => ({
 					id: row.id,
-					title: row.title ?? '',
+					// Only a guide's title is shown as it is; a reward's is sealed.
+					title: '',
 					kind: 'reward' as const,
 					sealed: sealedRef(row.id, row),
 					note: `${row.cost}`,
@@ -1017,7 +991,6 @@ export async function getHomeRewardsWidget(
 			db
 				.select({
 					id: selfRewards.id,
-					title: selfRewards.title,
 					ciphertext: selfRewards.ciphertext,
 					vaultId: selfRewards.vaultId,
 					payloadVersion: selfRewards.payloadVersion,
@@ -1059,7 +1032,6 @@ export async function getHomeRewardsWidget(
 							id: partnershipRewards.id,
 							partnershipId: partnershipRewards.partnershipId,
 							createdByUserId: partnershipRewards.createdByUserId,
-							title: partnershipRewards.title,
 							ciphertext: partnershipRewards.ciphertext,
 							vaultId: partnershipRewards.vaultId,
 							payloadVersion: partnershipRewards.payloadVersion,
@@ -1097,7 +1069,6 @@ export async function getHomeRewardsWidget(
 		return [
 			{
 				id: row.id,
-				title: row.title,
 				ciphertext: row.ciphertext,
 				vaultId: row.vaultId,
 				payloadVersion: row.payloadVersion,
@@ -1152,7 +1123,6 @@ export async function getPartnershipRewardsWidget(
 			.select({
 				id: partnershipRewards.id,
 				createdByUserId: partnershipRewards.createdByUserId,
-				title: partnershipRewards.title,
 				ciphertext: partnershipRewards.ciphertext,
 				vaultId: partnershipRewards.vaultId,
 				payloadVersion: partnershipRewards.payloadVersion,

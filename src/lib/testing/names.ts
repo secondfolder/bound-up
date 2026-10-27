@@ -4,26 +4,28 @@ import {
 	storedNamesFrom,
 	type ViewerNames
 } from '../partnership';
+import { testSealedRef } from './sealed-refs';
 
 /**
- * A names source for a partnership from before names were sealed, built from
- * what the viewer sees.
- *
- * The plaintext kind on purpose: it is the only source `partnerName()` shows
- * without an open vault, and component tests have none. A test of the sealed
- * path asserts on the source the server hands over instead.
+ * A names source sealed in the partnership's vault, built from what the
+ * viewer sees. It opens only in a test file that mocks the reader's seams
+ * (`sealed-refs.ts`); a test of what the server hands over asserts on the
+ * source instead.
  */
-export function legacyNamesSource(
+export function testNamesSource(
 	partnershipId: string,
 	names: Partial<ViewerNames> & { partnerName: string },
 	role: PartnershipRole = 'inviter'
 ): PartnerNamesSource {
+	const { vaultId, ciphertext, payloadVersion } = testSealedRef(
+		storedNamesFrom({ yourName: 'You', partnerRole: null, yourRole: null, ...names }, role),
+		partnershipId
+	);
 	return {
 		partnershipId,
 		role,
-		sealed: null,
-		invite: null,
-		legacy: storedNamesFrom({ yourName: 'You', partnerRole: null, yourRole: null, ...names }, role)
+		sealed: { vaultId, ciphertext, payloadVersion, revision: 1 },
+		invite: null
 	};
 }
 
@@ -33,5 +35,5 @@ export function testPartnerView(
 	partnerName: string,
 	image: string | null = null
 ): { id: string; names: PartnerNamesSource; image: string | null } {
-	return { id, names: legacyNamesSource(id, { partnerName }), image };
+	return { id, names: testNamesSource(id, { partnerName }), image };
 }

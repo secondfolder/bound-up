@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { generateAgeIdentity, importIdentityKey } from '$lib/crypto/identity';
-import { emptyRichTextDocument } from '$lib/richtext';
+import { emptyRichTextDocument, plainTextToDocument } from '$lib/richtext';
 import { defined } from '$lib/testing/defined';
 import {
 	type DraftOwner,
@@ -31,8 +31,14 @@ const threadA: DraftScope = { kind: 'thread', threadId: 'thread-a' };
 const threadB: DraftScope = { kind: 'thread', threadId: 'thread-b' };
 const newThread: DraftScope = { kind: 'new-thread', partnershipId: 'partnership-1' };
 
-// Legacy plain text is a valid stored value — `parseStoredRichText` turns it
-// into a one-paragraph document — so tests can write prose directly.
+/**
+ * Prose as the stored document a composer hands over. A bare string is not a
+ * document, so a draft of one would read as empty and never be kept.
+ */
+function doc(text: string): string {
+	return JSON.stringify(plainTextToDocument(text));
+}
+
 const EMPTY_DOCUMENT = JSON.stringify(emptyRichTextDocument());
 
 describe('openDraft', () => {
@@ -42,19 +48,19 @@ describe('openDraft', () => {
 
 		const first = await openDraft(threadA, ada, storage);
 		expect(first.initial).toBeNull();
-		first.save({ text: 'half a thought', tagIds: [] });
+		first.save({ text: doc('half a thought'), tagIds: [] });
 		await first.settled();
 
 		// A reload is a fresh session over the same storage.
 		const second = await openDraft(threadA, ada, storage);
-		expect(second.initial).toEqual({ text: 'half a thought', tagIds: [] });
+		expect(second.initial).toEqual({ text: doc('half a thought'), tagIds: [] });
 	});
 
 	it('stores ciphertext, never the words', async () => {
 		const ada = await owner();
 		const storage = memoryStorage();
 		const session = await openDraft(threadA, ada, storage);
-		session.save({ text: 'meet me in the kitchen', tagIds: ['tag-1'] });
+		session.save({ text: doc('meet me in the kitchen'), tagIds: ['tag-1'] });
 		await session.settled();
 
 		const [stored] = [...storage.entries.values()];
@@ -68,12 +74,12 @@ describe('openDraft', () => {
 		const { recipient, identity } = await generateAgeIdentity();
 		const storage = memoryStorage();
 		const writer = await openDraft(threadA, { recipient, identity }, storage);
-		writer.save({ text: 'from a real device', tagIds: [] });
+		writer.save({ text: doc('from a real device'), tagIds: [] });
 		await writer.settled();
 
 		const key = await importIdentityKey(identity);
 		const reader = await openDraft(threadA, { recipient, identity: key }, storage);
-		expect(reader.initial?.text).toBe('from a real device');
+		expect(reader.initial?.text).toBe(doc('from a real device'));
 	});
 
 	it('keeps each thread, and the new-message dialog, apart', async () => {
@@ -83,20 +89,22 @@ describe('openDraft', () => {
 		const a = await openDraft(threadA, ada, storage);
 		const b = await openDraft(threadB, ada, storage);
 		const fresh = await openDraft(newThread, ada, storage);
-		a.save({ text: 'for thread a', tagIds: [] });
-		b.save({ text: 'for thread b', tagIds: [] });
-		fresh.save({ text: 'a new thread', tagIds: ['tag-1'] });
+		a.save({ text: doc('for thread a'), tagIds: [] });
+		b.save({ text: doc('for thread b'), tagIds: [] });
+		fresh.save({ text: doc('a new thread'), tagIds: ['tag-1'] });
 		await Promise.all([a.settled(), b.settled(), fresh.settled()]);
 
 		// Editing one leaves the others exactly as they were.
-		a.save({ text: 'for thread a, edited', tagIds: [] });
+		a.save({ text: doc('for thread a, edited'), tagIds: [] });
 		await a.settled();
 		b.clear();
 
-		expect((await openDraft(threadA, ada, storage)).initial?.text).toBe('for thread a, edited');
+		expect((await openDraft(threadA, ada, storage)).initial?.text).toBe(
+			doc('for thread a, edited')
+		);
 		expect((await openDraft(threadB, ada, storage)).initial).toBeNull();
 		expect((await openDraft(newThread, ada, storage)).initial).toEqual({
-			text: 'a new thread',
+			text: doc('a new thread'),
 			tagIds: ['tag-1']
 		});
 	});
@@ -108,13 +116,13 @@ describe('openDraft', () => {
 
 		const thread = await openDraft(threadA, ada, storage);
 		const dreamDraft = await openDraft(daydream, ada, storage);
-		thread.save({ text: 'to my partner', tagIds: [] });
-		dreamDraft.save({ text: 'to the character', tagIds: [] });
+		thread.save({ text: doc('to my partner'), tagIds: [] });
+		dreamDraft.save({ text: doc('to the character'), tagIds: [] });
 		await Promise.all([thread.settled(), dreamDraft.settled()]);
 
 		expect(draftStorageKey(ada, daydream)).not.toBe(draftStorageKey(ada, threadA));
-		expect((await openDraft(threadA, ada, storage)).initial?.text).toBe('to my partner');
-		expect((await openDraft(daydream, ada, storage)).initial?.text).toBe('to the character');
+		expect((await openDraft(threadA, ada, storage)).initial?.text).toBe(doc('to my partner'));
+		expect((await openDraft(daydream, ada, storage)).initial?.text).toBe(doc('to the character'));
 	});
 
 	it('keeps two accounts on one browser apart', async () => {
@@ -138,7 +146,7 @@ describe('openDraft', () => {
 		// key replaced on another device leaves behind.
 		const key = draftStorageKey(ada, threadA);
 		const other = await openDraft(threadA, impostor, storage);
-		other.save({ text: 'not for ada', tagIds: [] });
+		other.save({ text: doc('not for ada'), tagIds: [] });
 		await other.settled();
 		storage.setItem(
 			key,
@@ -155,7 +163,7 @@ describe('openDraft', () => {
 		const storage = memoryStorage();
 		const session = await openDraft(newThread, ada, storage);
 
-		session.save({ text: 'with a tag', tagIds: ['tag-1'] });
+		session.save({ text: doc('with a tag'), tagIds: ['tag-1'] });
 		await session.settled();
 		expect(storage.entries.size).toBe(1);
 
@@ -176,7 +184,7 @@ describe('openDraft', () => {
 		const session = await openDraft(threadA, ada, storage);
 
 		// Queued, and still encrypting when the text is removed.
-		session.save({ text: 'typed then deleted', tagIds: [] });
+		session.save({ text: doc('typed then deleted'), tagIds: [] });
 		session.clear();
 		await session.settled();
 
@@ -191,11 +199,11 @@ describe('openDraft', () => {
 		let text = '';
 		for (const letter of 'quickly typed') {
 			text += letter;
-			session.save({ text, tagIds: [] });
+			session.save({ text: doc(text), tagIds: [] });
 		}
 		await session.settled();
 
-		expect((await openDraft(threadA, ada, storage)).initial?.text).toBe('quickly typed');
+		expect((await openDraft(threadA, ada, storage)).initial?.text).toBe(doc('quickly typed'));
 	});
 
 	it('stores while the typing is still going on, not only once it stops', async () => {
@@ -205,9 +213,9 @@ describe('openDraft', () => {
 		const write = vi.spyOn(storage, 'setItem');
 
 		// Each save lands before the next arrives, as with a person typing.
-		session.save({ text: 'one', tagIds: [] });
+		session.save({ text: doc('one'), tagIds: [] });
 		await session.settled();
-		session.save({ text: 'one two', tagIds: [] });
+		session.save({ text: doc('one two'), tagIds: [] });
 		await session.settled();
 
 		expect(write).toHaveBeenCalledTimes(2);
@@ -217,7 +225,7 @@ describe('openDraft', () => {
 		const storage = memoryStorage();
 		const session = await openDraft(threadA, null, storage);
 		expect(session.initial).toBeNull();
-		session.save({ text: 'no key on this account', tagIds: [] });
+		session.save({ text: doc('no key on this account'), tagIds: [] });
 		await session.settled();
 		expect(storage.entries.size).toBe(0);
 	});
@@ -239,9 +247,9 @@ describe('openDraft', () => {
 
 		const session = await openDraft(threadA, ada, refuses);
 		expect(session.initial).toBeNull();
-		session.save({ text: 'still typing', tagIds: [] });
+		session.save({ text: doc('still typing'), tagIds: [] });
 		session.clear();
-		session.save({ text: 'still typing', tagIds: [] });
+		session.save({ text: doc('still typing'), tagIds: [] });
 		await session.settled();
 
 		// Logged, without the words.
@@ -255,6 +263,6 @@ describe('isDraftEmpty', () => {
 	it('uses the same measure as the Send button', () => {
 		expect(isDraftEmpty('')).toBe(true);
 		expect(isDraftEmpty(EMPTY_DOCUMENT)).toBe(true);
-		expect(isDraftEmpty('something')).toBe(false);
+		expect(isDraftEmpty(doc('something'))).toBe(false);
 	});
 });

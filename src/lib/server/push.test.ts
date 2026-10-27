@@ -275,12 +275,10 @@ describe('watchingDevices', () => {
 
 describe('notifyPartner', () => {
 	it('names nobody, and runs in the background', async () => {
-		// Plaintext names on purpose, from before sealing: even when the server
-		// could read them, a notification must not carry them, since it is
-		// shown on a lock screen and passes through the push service.
-		const { id } = await createTestPartnership(db, ada, bo, {
-			legacyNames: { inviterName: 'Ace', inviteeName: 'Bobby' }
-		});
+		// The server cannot read the names, and even if it could, a notification
+		// must not carry them: it is shown on a lock screen and passes through
+		// the push service.
+		const { id } = await createTestPartnership(db, ada, bo);
 		const membership = defined(await requireMembership(db, id, ada.id), 'membership');
 		const { browser } = await subscribe(bo);
 		const service = createTestPushService();

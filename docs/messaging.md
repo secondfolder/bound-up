@@ -56,35 +56,17 @@ what is particular to messages:
   `server/messaging.ts`). A body sealed to any other vault is one neither
   partner could open.
 
-### Moving into the vault
+Every message, sidecar and reaction is sealed in the vault. `vault_id` and
+`payload_version` are nullable only because rows from before vaults had none:
+making them `NOT NULL` would mean rebuilding the table, which on D1
+cascade-deletes everything that references it (the trap in AGENTS.md), so the
+code holds the line instead. Every writer sets them, and a reader treats a row
+without them as one that will not open here.
 
-Messages sent before vaults were age-encrypted to both partners' recipients,
-and some partnerships still hold rows like that: `vault_id` is NULL on them.
-The server cannot re-encrypt anything, so moving them is done by a device:
-
-- Once its vaults are open, the app shell starts `migrateOpenPartnerships`
-  (`messaging/migrate-on-load.ts`), once per partnership per page load, for
-  every partnership this device may write into.
-- That pages through `GET .../sealed-migration` — rows still in the original
-  scheme, messages and reactions on separate cursors — opens each with the
-  user's identity, seals it into the vault, and posts the copies back
-  (`messaging/vault-migration.ts`).
-- **Either partner can move any row**, since every one is encrypted to both. A
-  row this device cannot open — encrypted to a key it no longer has — is
-  skipped and left for the other partner's device.
-- **The server writes each row at most once** (`sealLegacyMessages`): only
-  where `vault_id IS NULL`, only inside this partnership, only into this
-  partnership's vault. Two devices migrating at once cannot overwrite each
-  other, and the endpoint cannot be used to edit a message.
-- **A body written before rich text is converted as it is sealed**, so
-  nothing in a vault is plain text. That replaced the earlier, separate
-  conversion of a sender's own legacy bodies.
-
-Until a row has moved it still reads the original way: every reader picks the
-scheme from the row (`openMessage` in `messaging/client.ts`). A sidecar is only
-ever sealed beside a sealed body; an embed looked up for a row still in the
-original scheme is shown, and stored when the row moves. How to tell when the
-original scheme can be deleted is in [docs/temporary-code.md](temporary-code.md).
+Screens open bodies, sidecars and reactions through `sealedReader`
+(`openedMessage`, `openedMessageMetadata` and `openedReaction` in
+`messaging/client.ts`), so a record shown in two places is opened once per
+page load.
 
 ## Tables
 
@@ -139,12 +121,6 @@ and the server learns only that two names are equal. Sorting by name happens in
 the browser (`TagPicker.svelte`), the only place a name can be read. Renames are
 last-write-wins, unlike task edits: a tag is a label, and the loser can simply
 rename again.
-
-Tags made before sealing keep their name in plaintext until a member's device
-seals them in the background, with the tasks and rewards
-([docs/temporary-code.md](temporary-code.md#tasks-and-rewards-in-plaintext)).
-One whose name is already taken by a sealed tag is left as it is rather than
-failing the rest.
 
 **Reactions are encrypted.** The deliberate contrast with the icon, and what
 makes both calls defensible: a reaction only ever renders inside a thread that
@@ -645,10 +621,7 @@ security-critical part:
    **snapshot** of its recipient.
 2. Each partner is shown the request — on every screen, not only the board —
    and must compare the recovery code **out of band** before confirming.
-3. On confirm, the partner's device first moves any rows still in the original
-   scheme into the vault ([Moving into the vault](#moving-into-the-vault)) —
-   they are encrypted to the requester's lost key, so the vault is the only way
-   they will be read again. Then it wraps the vault key for the snapshotted
+3. On confirm, the partner's device wraps the vault key for the snapshotted
    recipient and posts it (`POST .../restore`, `restoreVaultAccess`). That one
    wrap restores the whole history, closes the request, and approves the
    sign-in if no other partner got there first.
@@ -782,7 +755,6 @@ record can only be made by someone holding the vault key.
 | `.../attachments/[attachmentId]`    | `GET`, streams ciphertext. `410` once the media has self-destructed.        |
 | `.../ack-warning`                   | `POST`, the one-time warning acknowledgement.                               |
 | `.../restore`                       | `POST` the vault wrapped for the requester's new key, `DELETE` to decline.  |
-| `.../sealed-migration`              | `GET` rows still in the original scheme, `POST` them sealed into the vault. |
 | `.../messages/[messageId]/metadata` | `PUT` a sealed sidecar, beside a sealed body only.                          |
 | `api/realtime/events`               | `GET`, the SSE feed, on the partnership's room and the `messages` topic. See [realtime.md](realtime.md). |
 | `api/realtime/presence`             | `POST`, a stream's lease renewal or goodbye. See [realtime.md](realtime.md#a-stream-is-a-lease). |
@@ -953,10 +925,7 @@ A message body is a Lexical `editorState.toJSON()` document, not prose — see
   document cannot be cut at a character offset without corrupting it.
 - **Ciphertext is bigger than it used to be.** `MAX_CIPHERTEXT_BYTES` (64 KB)
   has less headroom than when bodies were plain text.
-- **`messages.body_format` is a second plaintext column**, `'plain' | 'lexical'`,
-  and a closed list for the same reason `icon` is. It exists only so the server
-  can tell a pre-rich-text body from a converted one, which it otherwise cannot
-  do at all. Moving a row into the vault converts its body and sets it to
-  `'lexical'`, so once nothing is left in the original scheme nothing is
-  `'plain'` either. It is temporary — see
-  [docs/temporary-code.md](temporary-code.md).
+- **A body that is not a document reads as empty**, rather than as text.
+  Bodies from before rich text were bare strings; none is left on the server,
+  and one still in an old draft on a device comes back as nothing rather than
+  breaking the composer (`parseStoredRichText`).

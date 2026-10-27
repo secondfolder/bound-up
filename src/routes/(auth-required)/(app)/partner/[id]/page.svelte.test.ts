@@ -1,8 +1,18 @@
 import { render, screen } from '@testing-library/svelte';
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { legacyNamesSource } from '$lib/testing/names';
+import { testNamesSource } from '$lib/testing/names';
 import type { PageData } from './$types';
+
+// Titles and names are sealed; these open them by record id (sealed-refs.ts).
+vi.mock('$lib/crypto/sealed', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/crypto/sealed')>()),
+	openRecord: (await import('$lib/testing/sealed-refs')).openTestRecord
+}));
+vi.mock('$lib/crypto/vaults.svelte', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/crypto/vaults.svelte')>()),
+	vaultById: (id: string) => ({ id })
+}));
 
 const pageState = {
 	data: {
@@ -58,9 +68,9 @@ function data(timezone: string | null): PageData {
 		notebook: [],
 		partner: {
 			id: 'p1',
-			// Plaintext, as a partnership from before sealing: the only names
-			// that show without an open vault.
-			names: legacyNamesSource('p1', {
+			// Sealed, and opened by record id by the mocks above: a component
+			// test has no vault of its own.
+			names: testNamesSource('p1', {
 				partnerName: 'Jun',
 				yourName: 'Ada',
 				partnerRole: 'sub',
@@ -83,9 +93,10 @@ describe('/partner/[id]/+page.svelte', () => {
 		vi.useRealTimers();
 	});
 
-	it("shows the partner role as the current user's name plus role", () => {
+	it("shows the partner role as the current user's name plus role", async () => {
 		render(Page, { data: data('America/New_York') });
-		expect(screen.getByText("Ada's sub")).toBeInTheDocument();
+		// The names are sealed, so they show once they have opened.
+		await vi.waitFor(() => expect(screen.getByText("Ada's sub")).toBeInTheDocument());
 		expect(screen.queryByText(/dom \/ sub|sub \/ dom/)).not.toBeInTheDocument();
 	});
 

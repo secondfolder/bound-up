@@ -131,6 +131,17 @@ export const partnerEditSealedSchema = z.object({
 	invitePayloadVersion: version.optional()
 });
 
+/**
+ * Moving the names out of an accepted invite and into the partnership's
+ * vault, sealed there by a device that opened the invite. JSON, not a form:
+ * it is background work (`invite-names.ts`), not something a person submits.
+ */
+export const partnerNamesMoveSchema = z.object({
+	vaultId: clientId,
+	ciphertext: sealed,
+	payloadVersion: z.number().int().positive()
+});
+
 /** A posted form as a plain object of its string fields, for `safeParse`. */
 export function formFields(formData: FormData): Record<string, string> {
 	const fields: Record<string, string> = {};

@@ -6,17 +6,11 @@
  *
  * Runs on the device of the partner who did **not** lose their key. Everything
  * the two of them share is sealed in the partnership vault, so restoring it is
- * one wrap: the vault key, wrapped for the requester's new key. Two steps:
+ * one wrap: the vault key, wrapped for the requester's new key. Two parts:
  *
- * 1. **Anything still in the original scheme is sealed into the vault first**
- *    (`vault-migration.ts`), the same migration every device runs in the
- *    background. Those rows are encrypted to both partners' old recipients,
- *    and the requester's old key is gone, so the vault is the only way they
- *    will read them again. This device can open them: it is one of the two
- *    recipients on every one.
- * 2. **The vault is wrapped for the requested key** and posted, which closes
+ * 1. **The vault is wrapped for the requested key** and posted, which closes
  *    the request and approves the sign-in.
- * 3. **The requester's own vault**, if they held it in escrow with this
+ * 2. **The requester's own vault**, if they held it in escrow with this
  *    partner, has this partner's half passed on with it: their layer opened,
  *    and the inside — still sealed under the server's share — re-encrypted to
  *    the requested key. The server releases its share to the account only once
@@ -40,19 +34,12 @@ import { unlockedIdentity } from '../crypto/session.svelte';
 import { writeGrantFor } from '../crypto/trust.svelte';
 import { partnershipVault, wrapPartnershipVaultFor } from '../crypto/vaults.svelte';
 import { tryFetch } from '../request-failure.svelte';
-import { migratePartnershipToVault } from './vault-migration';
 
-export type RestoreProgress = {
-	/** Rows moved into the vault on the way. */
-	done: number;
-};
-
-export type RestoreOutcome = ({ ok: true } & RestoreProgress) | { ok: false; message: string };
+export type RestoreOutcome = { ok: true } | { ok: false; message: string };
 
 export async function runHistoryRestore(
 	partnershipId: string,
-	request: { id: string; requestedRecipient: string },
-	onProgress?: (progress: RestoreProgress) => void
+	request: { id: string; requestedRecipient: string }
 ): Promise<RestoreOutcome> {
 	const unlocked = unlockedIdentity();
 	const vault = partnershipVault(partnershipId);
@@ -62,12 +49,6 @@ export async function runHistoryRestore(
 	}
 
 	try {
-		const done = await migratePartnershipToVault(partnershipId, unlocked.identity, {
-			vault,
-			grant
-		});
-		onProgress?.({ done });
-
 		const vaultWrap = await wrapPartnershipVaultFor(partnershipId, request.requestedRecipient);
 		if (!vaultWrap) {
 			return { ok: false, message: 'This device cannot open what you share. Try another device.' };
@@ -81,7 +62,7 @@ export async function runHistoryRestore(
 		if (!response.ok) {
 			throw new Error(`Could not save the restore (${response.status})`);
 		}
-		return { ok: true, done };
+		return { ok: true };
 	} catch (error) {
 		console.error(error);
 		return {

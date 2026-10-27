@@ -7,6 +7,16 @@ import { defined } from '$lib/testing/defined';
 import { testPartnershipTaskView, testSelfTaskView } from '$lib/testing/item-views';
 import { waProp, waSettled } from '$lib/testing/web-awesome';
 
+// Titles and names are sealed; these open them by record id (sealed-refs.ts).
+vi.mock('$lib/crypto/sealed', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/crypto/sealed')>()),
+	openRecord: (await import('$lib/testing/sealed-refs')).openTestRecord
+}));
+vi.mock('$lib/crypto/vaults.svelte', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/crypto/vaults.svelte')>()),
+	vaultById: (id: string) => ({ id })
+}));
+
 vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 
 /**

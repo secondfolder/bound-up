@@ -499,8 +499,7 @@ Four things follow:
   showing.
 - Because the decision is made while authoring, **adding a provider later does
   not retroactively embed old content.** A document without an embed node has
-  no embed, whatever `embedSpecFor` learns afterwards. The one exception is the
-  legacy migration, which embeds every supported URL it finds.
+  no embed, whatever `embedSpecFor` learns afterwards.
 
 `embedSpecFor` still runs at render rather than being stored, so _dropping_ a
 provider degrades an embed to its link instead of leaving a hole.
@@ -645,8 +644,12 @@ their own message, and the reader parses the document where it is drawn.
 **URLs are checked twice**: `isSafeHttpUrl` on the way in, and again at render
 before an `href` reaches the DOM.
 
-## Legacy content
+## Reading what is stored
 
-Everything written before this change is a plain string. That is handled by one
-boundary function, `parseStoredRichText`, and is **temporary** — see
-[docs/temporary-code.md](temporary-code.md) for the removal contract.
+Every reader goes through one boundary function, `parseStoredRichText`. It
+validates the document and moves root-level embeds, the shape every embed was
+once stored in, into the paragraph after them. Anything that is not a document
+reads as an **empty one**, never as text and never as a throw. Bodies and
+descriptions written before rich text were bare strings; none is left on the
+server, and a message draft that old, still on a device, comes back empty
+rather than breaking its composer.

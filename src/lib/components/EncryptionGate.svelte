@@ -4,10 +4,9 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { authClient } from '$lib/auth-client';
-	import { sealOpenScopes } from '$lib/content-sealing';
 	import { currentKeyring, initialiseKeyring, lock, resetKeyring } from '$lib/crypto/session.svelte';
 	import { currentVaults, initialiseVaults } from '$lib/crypto/vaults.svelte';
-	import { migrateOpenPartnerships } from '$lib/messaging/migrate-on-load';
+	import { moveInviteNamesIntoVaults } from '$lib/invite-names';
 	import { rememberSignInEmail } from '$lib/sign-in-again';
 	import StoragePersistenceDialog from './StoragePersistenceDialog.svelte';
 
@@ -70,21 +69,14 @@
 		});
 	});
 
-	// Once vaults are open, any messages a partnership still has in the
-	// original scheme are moved into its vault, and any tasks and rewards still
-	// in plaintext are sealed, in the background. Each runs once per scope per
-	// page load (`migrate-on-load.ts`, `content-sealing.ts`).
+	// Once vaults are open, the names of any partnership still under its
+	// accepted invite's key are moved into its vault, in the background, once
+	// per partnership per page load (`invite-names.ts`).
 	const vaultsReady = $derived(currentVaults().status === 'ready');
 	$effect(() => {
-		if (!vaultsReady) {
-			return;
+		if (vaultsReady) {
+			untrack(moveInviteNamesIntoVaults);
 		}
-		untrack(() => {
-			if (keyring.status === 'unlocked') {
-				migrateOpenPartnerships(keyring.identity);
-				sealOpenScopes();
-			}
-		});
 	});
 
 	$effect(() => {

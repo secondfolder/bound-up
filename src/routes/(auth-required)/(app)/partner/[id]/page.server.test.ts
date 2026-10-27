@@ -9,6 +9,7 @@ import {
 	createTestPartnershipTask,
 	createTestThread,
 	createTestUser,
+	FAKE_INVITE_KEY_WRAP,
 	setTestPartnershipRewardCredits,
 	type TestUser
 } from '$lib/testing/fixtures';
@@ -33,20 +34,16 @@ afterEach(() => harness.close());
 const at = (id: string, user: TestUser | null) => fakeEvent({ db, user, params: { id } });
 
 test('shows each side their own view of the same link', async () => {
-	const { id } = await createTestPartnership(db, ada, jun, {
-		legacyNames: {
-			inviterName: 'Ada',
-			inviteeName: 'Jun',
-			inviterRole: 'dom',
-			inviteeRole: 'sub'
-		},
-		control: 'me'
-	});
-	const legacy = { inviterName: 'Ada', inviteeName: 'Jun', inviterRole: 'dom', inviteeRole: 'sub' };
+	const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
 
 	expect((await runLoad(load(at(id, ada)))).partner).toEqual({
 		id,
-		names: { partnershipId: id, role: 'inviter', sealed: null, invite: null, legacy },
+		names: {
+			partnershipId: id,
+			role: 'inviter',
+			sealed: null,
+			invite: expect.objectContaining({ keyWrap: FAKE_INVITE_KEY_WRAP })
+		},
 		image: null,
 		timezone: 'America/New_York',
 		canEdit: true
@@ -54,7 +51,12 @@ test('shows each side their own view of the same link', async () => {
 
 	expect((await runLoad(load(at(id, jun)))).partner).toEqual({
 		id,
-		names: { partnershipId: id, role: 'invitee', sealed: null, invite: null, legacy },
+		names: {
+			partnershipId: id,
+			role: 'invitee',
+			sealed: null,
+			invite: expect.objectContaining({ keyWrap: null })
+		},
 		image: '/ada.png',
 		timezone: 'Europe/London',
 		canEdit: false
@@ -65,7 +67,6 @@ test('hands over sealed names without a key wrap to the invitee', async () => {
 	const { id } = await createTestPartnership(db, ada, jun);
 	const { partner } = await runLoad(load(at(id, jun)));
 	expect(partner.names.invite?.keyWrap).toBeNull();
-	expect(partner.names.legacy).toBeNull();
 });
 
 /**

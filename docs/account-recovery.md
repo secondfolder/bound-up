@@ -47,8 +47,7 @@ into their account has no way to message you about it. It links to the
 messages board, where `RestoreRequests.svelte` shows the same code, computed
 from the public key snapshotted on the request. If it matches, the partner
 confirms, and their device wraps their partnership's vault for the new key
-(docs/messaging.md) — moving any messages still in the original scheme into
-the vault first. **Storing that wrap approves the sign-in**. The partner's device also remembers the new key as
+(docs/messaging.md). **Storing that wrap approves the sign-in**. The partner's device also remembers the new key as
 vouched for — comparing the code is the same assurance as comparing a safety
 number — so when the server starts serving it, it is accepted as verified with
 no "key changed" warning. Only on that device: another of the partner's devices

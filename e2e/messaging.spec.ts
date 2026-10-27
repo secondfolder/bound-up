@@ -1294,7 +1294,6 @@ test.describe('thread tags', () => {
 				[ada.who.email.toLowerCase()]
 			);
 			expect(rows).toHaveLength(1);
-			expect(rows[0]).toMatchObject({ name: '' });
 			expect(String(rows[0]?.ciphertext)).toMatch(/^sb1\./);
 			expect(String(rows[0]?.name_index)).toMatch(/^[A-Za-z0-9_-]{43}$/);
 			expect(JSON.stringify(rows)).not.toContain('planning');

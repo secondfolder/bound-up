@@ -1,11 +1,5 @@
 import { z } from 'zod';
-import {
-	MAX_CIPHERTEXT_BYTES,
-	MAX_REACTION_CIPHERTEXT_BYTES,
-	MAX_REACTIONS_PER_MESSAGE,
-	RESTORE_PAGE_SIZE,
-	THREAD_ICONS
-} from '$lib/messaging';
+import { MAX_CIPHERTEXT_BYTES, MAX_REACTION_CIPHERTEXT_BYTES, THREAD_ICONS } from '$lib/messaging';
 import { SEALED_PATTERN } from '$lib/sealed';
 import { isClientId, MAX_VAULT_WRAP_LENGTH, VAULT_WRAP_PATTERN } from '$lib/vault';
 
@@ -81,36 +75,6 @@ export const messageMetadataSchema = z.object({
 });
 
 /**
- * One batch of messages moved from the original scheme into the partnership
- * vault. Bounded by `RESTORE_PAGE_SIZE`, the size of the page the server hands
- * out, so a client cannot send back more than it could have been given. Ids
- * are the rows' existing ids, which the re-sealed bodies are bound to.
- */
-export const sealedMigrationSchema = z.object({
-	vaultId: clientIdSchema,
-	messages: z
-		.array(
-			z.object({
-				id: clientIdSchema,
-				ciphertext: bodySchema,
-				payloadVersion: versionSchema,
-				metadataCiphertext: bodySchema.nullable(),
-				metadataVersion: versionSchema.nullable()
-			})
-		)
-		.max(RESTORE_PAGE_SIZE, 'Too many messages at once'),
-	reactions: z
-		.array(
-			z.object({
-				id: clientIdSchema,
-				ciphertext: reactionBodySchema,
-				payloadVersion: versionSchema
-			})
-		)
-		.max(RESTORE_PAGE_SIZE * MAX_REACTIONS_PER_MESSAGE, 'Too many reactions at once')
-});
-
-/**
  * Approving a partner-assisted restore: the partnership vault, wrapped for the
  * key the requester is about to have. See `restoreVaultAccess`.
  */
@@ -131,5 +95,4 @@ export const restoreDeclineSchema = z.object({
 
 export type NewThreadInput = z.output<typeof newThreadSchema>;
 export type ReplyInput = z.output<typeof replySchema>;
-export type SealedMigrationInput = z.output<typeof sealedMigrationSchema>;
 export type RestoreApplyInput = z.output<typeof restoreApplySchema>;

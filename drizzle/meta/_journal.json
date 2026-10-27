@@ -330,6 +330,13 @@
       "when": 1792934756467,
       "tag": "0046_add_scene_help_consents",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "6",
+      "when": 1793089162282,
+      "tag": "0047_drop_legacy_migrations",
+      "breakpoints": true
     }
   ]
 }

@@ -12,7 +12,6 @@ import {
 	MEDIA_TTL_MIN_MS,
 	MEDIA_TTL_NEVER,
 	type MediaTtl,
-	RESTORE_PAGE_SIZE,
 	seenMessageId,
 	type ThreadIcon,
 	UNSEEN_MEDIA_MESSAGE_LIMIT
@@ -1004,7 +1003,6 @@ const TAG_COLORS = ['#d95f59', '#d98c3f', '#c5a33d', '#55a36b', '#3f9caa', '#5d7
 /** What a tag view is read from, wherever tags are listed. */
 const TAG_COLUMNS = {
 	id: messageTags.id,
-	name: messageTags.name,
 	color: messageTags.color,
 	ciphertext: messageTags.ciphertext,
 	vaultId: messageTags.vaultId,
@@ -1013,13 +1011,12 @@ const TAG_COLUMNS = {
 
 function toTagView(row: {
 	id: string;
-	name: string;
 	color: string;
 	ciphertext: string | null;
 	vaultId: string | null;
 	payloadVersion: number | null;
 }): TagView {
-	return { id: row.id, name: row.name, color: row.color, sealed: sealedRef(row.id, row) };
+	return { id: row.id, color: row.color, sealed: sealedRef(row.id, row) };
 }
 
 function validTagColor(color: string): boolean {
@@ -1143,7 +1140,6 @@ export async function createTag(
 		.values({
 			id: input.id,
 			partnershipId,
-			name: '',
 			color,
 			ciphertext,
 			vaultId,
@@ -1164,7 +1160,6 @@ export async function createTag(
 		ok: true,
 		tag: {
 			id: input.id,
-			name: '',
 			color,
 			sealed: { recordId: input.id, vaultId, ciphertext, payloadVersion }
 		}
@@ -1217,7 +1212,6 @@ export async function updateTag(
 	}
 	const sealed = name
 		? {
-				name: '',
 				ciphertext: name.ciphertext,
 				vaultId: name.vaultId,
 				payloadVersion: name.payloadVersion,
@@ -1295,9 +1289,9 @@ export async function setMessageMetadataCiphertext(
 		return 'bad-body';
 	}
 
-	// Only beside a sealed body. A message still in the original scheme gets
-	// its sidecar when it is migrated, sealed with the body; writing a sealed
-	// sidecar next to an age body would leave the row half in each scheme.
+	// Only beside a sealed body: the sidecar is sealed in the body's vault and
+	// bound to the same record. `vault_id` is nullable only for history, so a
+	// row without one is refused rather than given half a sealed record.
 	const updated = await db
 		.update(messages)
 		.set({ metadataCiphertext: input.metadataCiphertext, metadataVersion: input.metadataVersion })
@@ -1368,8 +1362,6 @@ export async function startThread(
 			threadId,
 			senderId: input.senderId,
 			ciphertext: input.ciphertext,
-			// LEGACY-RICHTEXT: everything sent from now on is a rich-text document.
-			bodyFormat: 'lexical',
 			vaultId: input.vaultId,
 			payloadVersion: input.payloadVersion,
 			metadataCiphertext: input.metadataCiphertext ?? null,
@@ -1433,7 +1425,6 @@ export async function sendMessage(
 			threadId: input.threadId,
 			senderId: input.senderId,
 			ciphertext: input.ciphertext,
-			bodyFormat: 'lexical',
 			vaultId: input.vaultId,
 			payloadVersion: input.payloadVersion,
 			metadataCiphertext: input.metadataCiphertext ?? null,
@@ -1718,216 +1709,6 @@ export async function listHelpRequests(
 	return rows.map((row) => row.partnershipId);
 }
 
-// ── moving messages into the partnership vault ──────────────────────────────
-
-/** One page of rows still in the original scheme, for a device to seal into the vault. */
-export type LegacyMessagePage = {
-	messages: { id: string; ciphertext: string; metadataCiphertext: string | null }[];
-	/** Reactions still in the original scheme, whether or not their message has moved. */
-	reactions: { id: string; ciphertext: string }[];
-	/** Pass back for the next page; null when this was the last. */
-	next: { messagesAfter: string | null; reactionsAfter: string | null } | null;
-};
-
-const inPartnership = (db: Db, partnershipId: string) =>
-	db
-		.select({ id: messageThreads.id })
-		.from(messageThreads)
-		.where(eq(messageThreads.partnershipId, partnershipId));
-
-/**
- * Messages and reactions in a partnership that are still age-encrypted to both
- * partners rather than sealed in its vault. See docs/messaging.md, "Moving
- * into the vault".
- *
- * Either member may read these: every one is encrypted to both of them, so
- * this hands over nothing they could not already open. Paged by id on two
- * independent cursors, because a row a device cannot open (encrypted to a key
- * it no longer has) stays behind, and the next page has to move past it.
- */
-export async function listLegacyMessages(
-	db: Db,
-	input: {
-		partnershipId: string;
-		actorId: string;
-		messagesAfter?: string | null;
-		reactionsAfter?: string | null;
-	}
-): Promise<LegacyMessagePage | null> {
-	const membership = await requireMembership(db, input.partnershipId, input.actorId);
-	if (!membership) {
-		return null;
-	}
-	const threads = inPartnership(db, input.partnershipId);
-
-	const [messageRows, reactionRows] = await Promise.all([
-		db
-			.select({
-				id: messages.id,
-				ciphertext: messages.ciphertext,
-				metadataCiphertext: messages.metadataCiphertext
-			})
-			.from(messages)
-			.where(
-				and(
-					inArray(messages.threadId, threads),
-					sql`${messages.vaultId} is null`,
-					input.messagesAfter ? gt(messages.id, input.messagesAfter) : undefined
-				)
-			)
-			.orderBy(asc(messages.id))
-			.limit(RESTORE_PAGE_SIZE),
-		db
-			.select({ id: messageReactions.id, ciphertext: messageReactions.ciphertext })
-			.from(messageReactions)
-			.where(
-				and(
-					inArray(
-						messageReactions.messageId,
-						db.select({ id: messages.id }).from(messages).where(inArray(messages.threadId, threads))
-					),
-					sql`${messageReactions.vaultId} is null`,
-					input.reactionsAfter ? gt(messageReactions.id, input.reactionsAfter) : undefined
-				)
-			)
-			.orderBy(asc(messageReactions.id))
-			.limit(RESTORE_PAGE_SIZE)
-	]);
-
-	const moreMessages = messageRows.length === RESTORE_PAGE_SIZE;
-	const moreReactions = reactionRows.length === RESTORE_PAGE_SIZE;
-	return {
-		messages: messageRows.map((row) => ({
-			...row,
-			metadataCiphertext: row.metadataCiphertext ?? null
-		})),
-		reactions: reactionRows,
-		// A short page is the last page of its kind. A full one might be exactly
-		// the end, which costs one empty read, versus a count on every page.
-		next:
-			moreMessages || moreReactions
-				? {
-						messagesAfter: moreMessages ? (messageRows.at(-1)?.id ?? null) : null,
-						reactionsAfter: moreReactions ? (reactionRows.at(-1)?.id ?? null) : null
-					}
-				: null
-	};
-}
-
-/**
- * Replaces rows still in the original scheme with copies sealed in the
- * partnership vault.
- *
- * Either member may do it, for any row in the partnership: both can read
- * every one, and the copy says what the original said — or the server cannot
- * tell either way, which is no new trust boundary, since a partner could
- * always write whatever they liked into the conversation. What the `where`
- * enforces is the shape of the change:
- *
- * - `vault_id IS NULL` — strictly one way, once. A row already sealed cannot
- *   be touched, so two devices migrating at once write each row at most once
- *   and neither can overwrite the other, and this can never become an "edit a
- *   sent message" endpoint.
- * - the row is in this partnership — the confused-deputy guard.
- * - the vault is this partnership's own.
- */
-export async function sealLegacyMessages(
-	db: Db,
-	input: {
-		partnershipId: string;
-		actorId: string;
-		vaultId: string;
-		messages: {
-			id: string;
-			ciphertext: string;
-			payloadVersion: number;
-			metadataCiphertext: string | null;
-			metadataVersion: number | null;
-		}[];
-		reactions: { id: string; ciphertext: string; payloadVersion: number }[];
-	}
-): Promise<{ ok: true; sealed: number } | { ok: false; reason: 'not-a-member' | 'invalid' }> {
-	const membership = await requireMembership(db, input.partnershipId, input.actorId);
-	if (!membership) {
-		return { ok: false, reason: 'not-a-member' };
-	}
-	if ((await partnershipVaultIdFor(db, input.partnershipId)) !== input.vaultId) {
-		return { ok: false, reason: 'invalid' };
-	}
-	const acceptable =
-		input.messages.every(
-			(message) =>
-				sealedIsAcceptable(messageBodyKind, message.ciphertext, message.payloadVersion) &&
-				(message.metadataCiphertext === null ||
-					(message.metadataVersion !== null &&
-						sealedIsAcceptable(
-							messageMetadataKind,
-							message.metadataCiphertext,
-							message.metadataVersion
-						)))
-		) &&
-		input.reactions.every((reaction) =>
-			sealedIsAcceptable(messageReactionKind, reaction.ciphertext, reaction.payloadVersion)
-		);
-	if (!acceptable) {
-		return { ok: false, reason: 'invalid' };
-	}
-
-	const threads = inPartnership(db, input.partnershipId);
-	const updates = [
-		...input.messages.map((message) =>
-			db
-				.update(messages)
-				.set({
-					ciphertext: message.ciphertext,
-					// The migration converts a pre-rich-text body as it seals it, so
-					// every sealed body is a document. LEGACY-RICHTEXT.
-					bodyFormat: 'lexical',
-					vaultId: input.vaultId,
-					payloadVersion: message.payloadVersion,
-					metadataCiphertext: message.metadataCiphertext,
-					metadataVersion: message.metadataCiphertext === null ? null : message.metadataVersion
-				})
-				.where(
-					and(
-						eq(messages.id, message.id),
-						sql`${messages.vaultId} is null`,
-						inArray(messages.threadId, threads)
-					)
-				)
-				.returning({ id: messages.id })
-		),
-		...input.reactions.map((reaction) =>
-			db
-				.update(messageReactions)
-				.set({
-					ciphertext: reaction.ciphertext,
-					vaultId: input.vaultId,
-					payloadVersion: reaction.payloadVersion
-				})
-				.where(
-					and(
-						eq(messageReactions.id, reaction.id),
-						sql`${messageReactions.vaultId} is null`,
-						inArray(
-							messageReactions.messageId,
-							db
-								.select({ id: messages.id })
-								.from(messages)
-								.where(inArray(messages.threadId, threads))
-						)
-					)
-				)
-				.returning({ id: messageReactions.id })
-		)
-	];
-	if (updates.length === 0) {
-		return { ok: true, sealed: 0 };
-	}
-	const results = await db.batch(updates as [(typeof updates)[number], ...typeof updates]);
-	return { ok: true, sealed: results.reduce((sum, rows) => sum + rows.length, 0) };
-}
-
 /**
  * The pending request, if `actorId` is the member who can actually act on it.
  *
@@ -2003,10 +1784,9 @@ export async function escrowForRestore(
  * vault, wrapped for the key their partner-assisted sign-in will give them.
  *
  * One wrap restores the whole history, because everything in the partnership
- * is sealed under the vault — the helping device seals any rows still in the
- * original scheme first (`sealLegacyMessages`), then calls this. Attachments
- * in the object store are never touched either way: each is encrypted under
- * its own key, carried inside its message body.
+ * is sealed under the vault. Attachments in the object store are never
+ * touched: each is encrypted under its own key, carried inside its message
+ * body.
  *
  * The wrap is stored *beside* the requester's existing one, for the recipient
  * on the request rather than the one they have now. Their current wrap must

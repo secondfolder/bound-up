@@ -102,6 +102,34 @@ const props = {
 	onClearReaction: vi.fn()
 };
 
+/** A stored body of one plain paragraph. */
+function prose(text: string): string {
+	return JSON.stringify({
+		root: {
+			type: 'root',
+			children: [{ type: 'paragraph', children: [{ type: 'text', text, format: 0 }] }]
+		}
+	});
+}
+
+/** A stored body that is one link, with the embed its sender put on it. */
+function linkWithEmbed(url: string): string {
+	return JSON.stringify({
+		root: {
+			type: 'root',
+			children: [
+				{
+					type: 'paragraph',
+					children: [
+						{ type: 'embed', url },
+						{ type: 'autolink', url, children: [{ type: 'text', text: url, format: 0 }] }
+					]
+				}
+			]
+		}
+	});
+}
+
 describe('MessageBubble', () => {
 	/**
 	 * THE assertion for this component. Rendering the ciphertext — even for a
@@ -147,7 +175,7 @@ describe('MessageBubble', () => {
 			props: {
 				...props,
 				message: message(),
-				payload: { version: 1, text: 'meet me later', attachments: [] },
+				payload: { version: 1, text: prose('meet me later'), attachments: [] },
 				metadata: undefined
 			}
 		});
@@ -183,7 +211,7 @@ describe('MessageBubble', () => {
 			props: {
 				...props,
 				message: message(),
-				payload: { version: 1, text: 'https://vimeo.com/2', attachments: [] },
+				payload: { version: 1, text: linkWithEmbed('https://vimeo.com/2'), attachments: [] },
 				metadata
 			}
 		});
@@ -221,7 +249,7 @@ describe('MessageBubble', () => {
 			props: {
 				...props,
 				message: message(),
-				payload: { version: 1, text: 'https://vimeo.com/2', attachments: [] },
+				payload: { version: 1, text: linkWithEmbed('https://vimeo.com/2'), attachments: [] },
 				metadata
 			}
 		});
@@ -319,7 +347,7 @@ describe('MessageBubble', () => {
 			props: {
 				...props,
 				message: message({ metadataCiphertext: 'encrypted-metadata' }),
-				payload: { version: 1, text: 'https://vimeo.com/2', attachments: [] },
+				payload: { version: 1, text: linkWithEmbed('https://vimeo.com/2'), attachments: [] },
 				metadata: undefined
 			}
 		});

@@ -161,12 +161,12 @@ describe('actions', () => {
 		});
 
 		await actions.default?.(at(task.id, ada, post));
-		await expect(readSelfTaskRow(db, task.id)).resolves.toMatchObject({
-			title: '',
-			description: null,
-			completionMessages: [],
+		const row = await readSelfTaskRow(db, task.id);
+		expect(row).toMatchObject({
 			ciphertext: post.ciphertext
 		});
+		// Only the sealed record is kept: there is nowhere for the text to go.
+		expect(JSON.stringify(row)).not.toContain('Nap');
 	});
 
 	it("404s for another user's task", async () => {

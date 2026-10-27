@@ -1,11 +1,22 @@
 import { render, screen } from '@testing-library/svelte';
 import '@testing-library/jest-dom/vitest';
-import { describe, expect, it } from 'vitest';
-import { legacyNamesSource } from '$lib/testing/names';
+import { describe, expect, it, vi } from 'vitest';
+import { testNamesSource } from '$lib/testing/names';
+import { testSealedRef } from '$lib/testing/sealed-refs';
 import { waProp } from '$lib/testing/web-awesome';
 import type { RewardsWidgetView, TasksWidgetView } from '$lib/types';
 import RewardsWidget from './RewardsWidget.svelte';
 import TasksWidget from './TasksWidget.svelte';
+
+// Titles and names are sealed; these open them by record id (sealed-refs.ts).
+vi.mock('$lib/crypto/sealed', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/crypto/sealed')>()),
+	openRecord: (await import('$lib/testing/sealed-refs')).openTestRecord
+}));
+vi.mock('$lib/crypto/vaults.svelte', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/crypto/vaults.svelte')>()),
+	vaultById: (id: string) => ({ id })
+}));
 
 function tasks(overrides: Partial<TasksWidgetView> = {}): TasksWidgetView {
 	return {
@@ -30,16 +41,16 @@ function rewards(overrides: Partial<RewardsWidgetView> = {}): RewardsWidgetView 
 }
 
 describe('TasksWidget', () => {
-	it('lists what is ready and counts what is hidden behind it', () => {
+	it('lists what is ready and counts what is hidden behind it', async () => {
 		render(TasksWidget, {
 			href: '/home/tasks',
 			tasks: tasks({
 				ready: [
 					{
 						id: 't1',
-						title: 'Morning stretches',
+						title: '',
 						kind: 'task',
-						sealed: null,
+						sealed: testSealedRef({ title: 'Morning stretches' }),
 						note: '+2',
 						context: null
 					}
@@ -49,23 +60,25 @@ describe('TasksWidget', () => {
 			})
 		});
 
-		expect(screen.getByText('Morning stretches')).toBeInTheDocument();
+		expect(await screen.findByText('Morning stretches')).toBeInTheDocument();
 		expect(screen.getByText('+2')).toBeInTheDocument();
 		expect(screen.getByText('and 3 more ready')).toBeInTheDocument();
 	});
 
-	it('keeps whose a row is beside a title too long to fit, rather than inside its ellipsis', () => {
+	it('keeps whose a row is beside a title too long to fit, rather than inside its ellipsis', async () => {
 		const { container } = render(TasksWidget, {
 			href: '/home/tasks',
 			tasks: tasks({
 				ready: [
 					{
 						id: 't1',
-						title: 'Write me a letter with a deliberately long title to see wrapping',
+						title: '',
 						kind: 'task',
-						sealed: null,
+						sealed: testSealedRef({
+							title: 'Write me a letter with a deliberately long title to see wrapping'
+						}),
 						note: '+2',
-						context: legacyNamesSource('p1', { partnerName: 'Morgan' })
+						context: testNamesSource('p1', { partnerName: 'Morgan' })
 					}
 				],
 				readyCount: 1,
@@ -74,7 +87,7 @@ describe('TasksWidget', () => {
 		});
 
 		const context = container.querySelector('.context');
-		expect(context).toHaveTextContent('Morgan');
+		await vi.waitFor(() => expect(context).toHaveTextContent('Morgan'));
 		expect(context?.parentElement?.tagName).toBe('LI');
 		expect(container.querySelector('.title .context')).toBeNull();
 		// The note is credits, and says so.
@@ -144,13 +157,20 @@ describe('TasksWidget', () => {
 });
 
 describe('RewardsWidget', () => {
-	it('leads with the balance the costs beside it are read against', () => {
+	it('leads with the balance the costs beside it are read against', async () => {
 		render(RewardsWidget, {
 			href: '/home/rewards',
 			rewards: rewards({
 				balances: [{ id: 'self', label: null, credits: 12 }],
 				claimable: [
-					{ id: 'r1', title: 'Long bath', kind: 'reward', sealed: null, note: '5', context: null }
+					{
+						id: 'r1',
+						title: '',
+						kind: 'reward',
+						sealed: testSealedRef({ title: 'Long bath' }),
+						note: '5',
+						context: null
+					}
 				],
 				claimableCount: 3,
 				activeCount: 5
@@ -159,7 +179,7 @@ describe('RewardsWidget', () => {
 
 		expect(screen.getByText('12')).toBeInTheDocument();
 		expect(screen.getByText('12').parentElement).toHaveTextContent('12 credits');
-		expect(screen.getByText('Long bath')).toBeInTheDocument();
+		expect(await screen.findByText('Long bath')).toBeInTheDocument();
 		// Counts only the ones it did not have room for, never the ones the
 		// balance does not cover.
 		expect(screen.getByText('and 2 more you can claim')).toBeInTheDocument();

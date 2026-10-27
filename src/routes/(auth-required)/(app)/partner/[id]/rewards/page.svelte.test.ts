@@ -3,9 +3,19 @@ import '@testing-library/jest-dom/vitest';
 import { render } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
 import { testPartnershipRewardView } from '$lib/testing/item-views';
-import { legacyNamesSource, testPartnerView } from '$lib/testing/names';
+import { testNamesSource, testPartnerView } from '$lib/testing/names';
 import { waByProp, waSettled } from '$lib/testing/web-awesome';
 import type { LayoutData as PageData } from './$types';
+
+// Titles and names are sealed; these open them by record id (sealed-refs.ts).
+vi.mock('$lib/crypto/sealed', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/crypto/sealed')>()),
+	openRecord: (await import('$lib/testing/sealed-refs')).openTestRecord
+}));
+vi.mock('$lib/crypto/vaults.svelte', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/crypto/vaults.svelte')>()),
+	vaultById: (id: string) => ({ id })
+}));
 
 vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 /** The list is the route's layout, which reads an action's answer from `page`. */
@@ -48,7 +58,7 @@ function data({
 		debug: false,
 		partner: {
 			id: 'p1',
-			names: legacyNamesSource('p1', { partnerName: 'Jun' }),
+			names: testNamesSource('p1', { partnerName: 'Jun' }),
 			canManageRewards,
 			canClaimRewards
 		},

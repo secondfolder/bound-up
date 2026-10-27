@@ -22,7 +22,6 @@ relationship, so storing them twice would let the two halves disagree.
 | `status`                             | `'pending'` or `'accepted'`. There is no declined or ended state — see below.    |
 | `names_*`                            | The names and roles, sealed in the partnership's vault. See below.               |
 | `invite_*`                           | Before the names reach the vault: sealed under the invite key. See below.        |
-| `inviter_name` … `invitee_role`      | Plaintext names and roles, only on a link from before sealing; empty otherwise.  |
 | `control`                            | `'inviter'`, `'invitee'` or `'both'`. Who may change the names and roles.        |
 | `invite_token` / `invite_expires_at` | The secret in the URL and its deadline. Both cleared on acceptance.              |
 | `accepted_at`                        | When the link was made.                                                          |
@@ -58,16 +57,20 @@ them back, and can read none of them. They live under two keys in turn:
    identity can make (docs/encryption.md, "The self vault's wrap"), so the
    server cannot hand the inviter a key of its own to build the link from.
 2. **The partnership vault.** Once the invite is accepted and the device of a
-   member who holds `control` has the vault open, that device seals the names
-   into it (kind `partnership-names`, columns `names_*`) and the invite and its
-   key wrap are cleared, in one write (`content-sealing.ts` and
-   `/api/sealing/[scope]`, alongside tasks and rewards). Only a member who
-   holds `control`, because sealing them is writing them: the server cannot
-   compare the sealed copy with the invite, so a read-only member allowed to
-   seal could rewrite the names. Their device is not handed them, and the
-   names stay under the invite key until the controller's device runs. Edits
-   after that are sealed into the vault, compare-and-swap on
-   `names_revision`.
+   member who holds `control` has the vault open, that device opens the names
+   from the invite, seals them into the vault (kind `partnership-names`,
+   columns `names_*`), and the invite and its key wrap are cleared, in one
+   write: `invite-names.ts`, started by `EncryptionGate` once per partnership
+   per page load, through `GET` / `PUT /api/partnerships/[id]/names`
+   (`inviteNamesToMove` and `moveInviteNamesIntoVault` in
+   `server/partnerships.ts`). The write matches only a row whose names are not
+   in the vault yet, so two devices moving them at once write them once, and
+   it can never stand in for an edit. Only a member who holds `control`,
+   because moving them is writing them: the server cannot compare the sealed
+   copy with the invite, so a read-only member allowed to move them could
+   rewrite the names. Their device is not handed them, and the names stay
+   under the invite key until the controller's device runs. Edits after that
+   are sealed into the vault, compare-and-swap on `names_revision`.
 
 **Accepting needs no keys.** `/invite/[token]` is public and has no keyring,
 so an accepter who may edit (see control, below) seals their changes back under
@@ -76,7 +79,7 @@ names move into the vault. The invitee's device keeps the key from the link
 (local storage, `rememberInviteKey`) because the fragment does not survive the
 trip through signing up — the email confirmation link opens a new tab — and
 forgets it once a page load serves the names from the vault (`openedNames`).
-Not as soon as its own sealing pass has moved them: a page whose load read the
+Not as soon as it has moved them itself: a page whose load read the
 invite a moment before still needs the key to open it. On another device, the
 invitee sees "…" for the names until a device of the member who holds control
 has moved them.
@@ -89,8 +92,8 @@ a mismatch blocks accepting, and a match is pinned on the invitee's device as
 closes trust-on-first-use in that direction ([docs/encryption.md](encryption.md)).
 
 **What the server can no longer check** is what the names say. It still decides
-who may write them — `acceptInvite`, `updatePartnership` and the sealing pass
-(`sealUnsealedContent`) re-read `control` from the stored row (invariant 14)
+who may write them — `acceptInvite`, `updatePartnership` and
+`moveInviteNamesIntoVault` re-read `control` from the stored row (invariant 14)
 — but a read-only accepter whose device posted re-sealed names anyway would be
 ignored only because the server drops them, not because it compared them.
 Partners are trusted to that extent.
@@ -104,11 +107,9 @@ Partners are trusted to that extent.
 - Everything server-rendered — nav tabs, page titles, widget lines — shows "…"
   until hydration opens the names.
 
-A partnership from before names were sealed keeps them in the plaintext columns
-until a member's device seals them ([docs/temporary-code.md](temporary-code.md#tasks-and-rewards-in-plaintext)).
-A **pending** invite from before then has no invite key, so no link to it can
-work: the invite page treats it as dead, and the inviter's settings page offers
-a new link, which seals it under a fresh key.
+There are no plaintext name columns. The sealed ones are nullable, as on the
+task tables, and a row with neither a sealed record nor an invite shows its
+names as "can't be shown".
 
 ### Never map the names yourself
 
@@ -118,8 +119,8 @@ is the easiest bug in this feature, so exactly one function does the mapping:
 (and its inverse, `storedNamesFrom`, for writes).
 
 The server never sees names at all, so `viewPartnership` returns a
-`PartnerNamesSource` — the sealed record, the invite, or the legacy plaintext,
-plus the viewer's `role` — and the browser opens it with
+`PartnerNamesSource` — the sealed record or the invite, plus the viewer's
+`role` — and the browser opens it with
 [`src/lib/partner-names.svelte.ts`](../src/lib/partner-names.svelte.ts):
 
 ```ts
@@ -263,6 +264,7 @@ token (`not-found`), an expired one (`expired`), the inviter's own link
 | `/partner/[id]/rewards/[rewardId]` | `(auth-required)` | The edit screen for one reward on that link, using the same form layout as add.                           |
 | `/partner/[id]/rewards/history`    | `(auth-required)` | Reward claim history for that link.                                                                       |
 | `/playroom/kink-list/partner/[id]` | `(auth-required)` | Your kink list for that partner, linked from the partner page. See [kink-list.md](kink-list.md#partners). |
+| `/api/partnerships/[id]/names`     | own `locals.user` check | `GET` where to read names still under the invite, `PUT` them sealed into the vault. See above.         |
 
 ## Partnership rewards
 
@@ -321,7 +323,7 @@ states:
 
 | State              | When                               | What the page shows                                                                                                                                                                              |
 | ------------------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `invalid`          | Unknown, consumed or expired token, or an invite from before sealing | "This link doesn't work". Nothing else — see below.                                                                                                                                              |
+| `invalid`          | Unknown, consumed or expired token | "This link doesn't work". Nothing else — see below.                                                                                                                                              |
 | `sign-in-required` | Valid token, nobody signed in      | The inviter's chosen name, opened from the invite, plus login/signup buttons carrying `redirectTo`. "Create an account" is primary: someone opening an invite while signed out most likely does not have an account yet. |
 | `self`             | The inviter opened their own link  | "That's your own link"                                                                                                                                                                           |
 | `already-linked`   | The two are already connected      | "You're already linked"                                                                                                                                                                          |

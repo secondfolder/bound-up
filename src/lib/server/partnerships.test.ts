@@ -21,8 +21,10 @@ import {
 	findPendingInviteByToken,
 	generateInviteToken,
 	getPartnershipForUser,
+	inviteNamesToMove,
 	listPartnersForNav,
 	listPartnershipsForUser,
+	moveInviteNamesIntoVault,
 	partnershipExistsBetween,
 	rotateInviteToken,
 	updatePartnership
@@ -89,10 +91,6 @@ describe('createInvite', () => {
 		expect(row.inviteCiphertext).toBe(invite.inviteCiphertext);
 		expect(row.invitePayloadVersion).toBe(1);
 		expect(row.inviteKeyWrap).toBe(FAKE_INVITE_KEY_WRAP);
-		expect(row.inviterName).toBe('');
-		expect(row.inviteeName).toBe('');
-		expect(row.inviterRole).toBeNull();
-		expect(row.inviteeRole).toBeNull();
 		expect(row.namesCiphertext).toBeNull();
 	});
 
@@ -244,20 +242,6 @@ describe('acceptInvite', () => {
 		});
 	});
 
-	it('refuses an invite from before names were sealed, which has no invite key', async () => {
-		const invite = await createTestInvite(db, ada, {
-			legacyNames: { inviterName: 'Ada', inviteeName: 'Jun' }
-		});
-
-		expect(await acceptInvite(db, { token: invite.inviteToken, inviteeId: jun.id })).toEqual({
-			ok: false,
-			reason: 'expired'
-		});
-		const row = await readPartnershipRow(db, invite.id);
-		expect(row.status).toBe('pending');
-		expect(row.inviteeId).toBeNull();
-	});
-
 	it('keeps the sealed invite on the row, since there is no vault to move it to yet', async () => {
 		const invite = await createTestInvite(db, ada);
 		await acceptInvite(db, { token: invite.inviteToken, inviteeId: jun.id });
@@ -355,33 +339,6 @@ describe('rotateInviteToken', () => {
 		expect(row.inviteKeyWrap).toBe('bmV3LWtleS13cmFw');
 	});
 
-	it('gives an invite from before sealing a key, clearing its plaintext names', async () => {
-		const invite = await createTestInvite(db, ada, {
-			legacyNames: {
-				inviterName: 'Ada',
-				inviteeName: 'Jun',
-				inviterRole: 'dom',
-				inviteeRole: 'sub'
-			}
-		});
-		const next = sealedInvite();
-		const rotated = await rotateInviteToken(db, invite.id, ada.id, next);
-
-		const row = await readPartnershipRow(db, invite.id);
-		expect(row.inviteCiphertext).toBe(next.ciphertext);
-		expect(row.inviterName).toBe('');
-		expect(row.inviteeName).toBe('');
-		expect(row.inviterRole).toBeNull();
-		expect(row.inviteeRole).toBeNull();
-		// ...and the new link can be accepted, where the legacy one could not.
-		expect(
-			await acceptInvite(db, {
-				token: defined(rotated, 'the rotated invite').inviteToken,
-				inviteeId: jun.id
-			})
-		).toEqual({ ok: true, id: invite.id });
-	});
-
 	it('refuses a malformed re-seal, leaving the old link working', async () => {
 		const invite = await createTestInvite(db, ada);
 		expect(
@@ -437,15 +394,6 @@ describe('listPartnersForNav', () => {
 		expect(adaTab.names.invite?.keyWrap).toBe(FAKE_INVITE_KEY_WRAP);
 	});
 
-	it('a partnership from before sealing still carries its plaintext names', async () => {
-		await createTestPartnership(db, ada, jun, {
-			legacyNames: { inviterName: 'Ada', inviteeName: 'Jun' }
-		});
-		const [tab] = await listPartnersForNav(db, jun.id);
-		expect(tab.names.legacy).toMatchObject({ inviterName: 'Ada', inviteeName: 'Jun' });
-		expect(tab.names.role).toBe('invitee');
-	});
-
 	it('leaves pending invites out of the nav', async () => {
 		await createTestInvite(db, ada);
 		expect(await listPartnersForNav(db, ada.id)).toEqual([]);
@@ -497,13 +445,11 @@ describe('listPartnershipsForUser', () => {
 	});
 
 	it('shows the invitee their side of the row', async () => {
-		await createTestPartnership(db, ada, jun, {
-			legacyNames: { inviterName: 'Ada', inviteeName: 'Jun' }
-		});
+		await createTestPartnership(db, ada, jun);
 		const [view] = await listPartnershipsForUser(db, jun.id);
 		expect(view.role).toBe('invitee');
 		expect(view.names.role).toBe('invitee');
-		expect(view.names.legacy).toMatchObject({ inviterName: 'Ada', inviteeName: 'Jun' });
+		expect(view.names.invite?.keyWrap).toBeNull();
 	});
 });
 
@@ -556,16 +502,11 @@ describe('updatePartnership', () => {
 		expect(row.control).toBe('both');
 	});
 
-	it('moves the names into the vault, clearing the invite and any plaintext', async () => {
-		const { id } = await createTestPartnership(db, ada, jun, {
-			legacyNames: { inviterName: 'Ada', inviteeName: 'Jun', inviterRole: 'dom' }
-		});
+	it('moves the names into the vault, clearing the invite', async () => {
+		const { id } = await createTestPartnership(db, ada, jun);
 		await updatePartnership(db, id, ada.id, { control: 'both', names: await sealedNames(id) });
 
 		const row = await readPartnershipRow(db, id);
-		expect(row.inviterName).toBe('');
-		expect(row.inviteeName).toBe('');
-		expect(row.inviterRole).toBeNull();
 		expect(row.inviteCiphertext).toBeNull();
 		expect(row.inviteKeyWrap).toBeNull();
 	});
@@ -740,6 +681,118 @@ describe('updatePartnership', () => {
 				invite: { ciphertext: fakeSealed('x'), payloadVersion: 1 }
 			});
 			expect(result).toEqual({ ok: false, reason: 'forbidden' });
+		});
+	});
+});
+
+describe('moving the names out of an accepted invite', () => {
+	/** The names sealed in `id`'s vault, as the moving device posts them. */
+	async function vaultNames(id: string, label = 'names') {
+		return {
+			vaultId: await ensureTestPartnershipVault(db, id),
+			ciphertext: fakeSealed(label),
+			payloadVersion: 1
+		};
+	}
+
+	it('hands a member who holds control the invite, its wrap to the inviter only', async () => {
+		const { id } = await createTestPartnership(db, ada, jun, { control: 'mix' });
+		const forAda = defined(await inviteNamesToMove(db, id, ada.id), 'ada');
+		expect(forAda.names?.invite?.keyWrap).toBe(FAKE_INVITE_KEY_WRAP);
+		const forJun = defined(await inviteNamesToMove(db, id, jun.id), 'jun');
+		expect(forJun.names?.invite).toMatchObject({ payloadVersion: 1, keyWrap: null });
+		expect(forJun.names?.role).toBe('invitee');
+	});
+
+	it('hands a member without control nothing, since moving them is writing them', async () => {
+		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
+		expect(await inviteNamesToMove(db, id, jun.id)).toEqual({ names: null });
+		expect((await inviteNamesToMove(db, id, ada.id))?.names).not.toBeNull();
+	});
+
+	it('hands over nothing for a pending invite, or once the names are in the vault', async () => {
+		const pending = await createTestInvite(db, ada);
+		expect(await inviteNamesToMove(db, pending.id, ada.id)).toEqual({ names: null });
+
+		const { id } = await createTestPartnership(db, ada, jun);
+		await moveInviteNamesIntoVault(db, id, ada.id, await vaultNames(id));
+		expect(await inviteNamesToMove(db, id, ada.id)).toEqual({ names: null });
+	});
+
+	it('answers null for someone outside the partnership', async () => {
+		const { id } = await createTestPartnership(db, ada, jun);
+		expect(await inviteNamesToMove(db, id, stranger.id)).toBeNull();
+	});
+
+	it('stores the names in the vault and clears the invite, in one write', async () => {
+		const { id } = await createTestPartnership(db, ada, jun);
+		const names = await vaultNames(id);
+		expect(await moveInviteNamesIntoVault(db, id, jun.id, names)).toEqual({
+			ok: true,
+			moved: true
+		});
+		expect(await readPartnershipRow(db, id)).toMatchObject({
+			namesCiphertext: names.ciphertext,
+			namesVaultId: names.vaultId,
+			namesPayloadVersion: 1,
+			namesRevision: 1,
+			inviteCiphertext: null,
+			invitePayloadVersion: null,
+			inviteKeyWrap: null
+		});
+	});
+
+	it('moves them once: a second device cannot overwrite names already in the vault', async () => {
+		const { id } = await createTestPartnership(db, ada, jun);
+		const first = await vaultNames(id, 'first');
+		await moveInviteNamesIntoVault(db, id, ada.id, first);
+
+		expect(await moveInviteNamesIntoVault(db, id, jun.id, await vaultNames(id, 'second'))).toEqual({
+			ok: true,
+			moved: false
+		});
+		expect(await readPartnershipRow(db, id)).toMatchObject({
+			namesCiphertext: first.ciphertext,
+			namesRevision: 1
+		});
+	});
+
+	it('refuses a member without control, and a stranger', async () => {
+		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
+		const names = await vaultNames(id);
+		expect(await moveInviteNamesIntoVault(db, id, jun.id, names)).toEqual({
+			ok: false,
+			reason: 'forbidden'
+		});
+		expect(await moveInviteNamesIntoVault(db, id, stranger.id, names)).toEqual({
+			ok: false,
+			reason: 'forbidden'
+		});
+		expect((await readPartnershipRow(db, id)).namesCiphertext).toBeNull();
+	});
+
+	it("refuses names sealed anywhere but the partnership's vault, or malformed", async () => {
+		const { id } = await createTestPartnership(db, ada, jun);
+		const names = await vaultNames(id);
+		for (const bad of [
+			{ ...names, vaultId: crypto.randomUUID() },
+			{ ...names, ciphertext: 'Ada and Jun' },
+			{ ...names, payloadVersion: 99 }
+		]) {
+			expect(await moveInviteNamesIntoVault(db, id, ada.id, bad)).toEqual({
+				ok: false,
+				reason: 'bad-names'
+			});
+		}
+		expect((await readPartnershipRow(db, id)).inviteCiphertext).not.toBeNull();
+	});
+
+	it('refuses a pending invite, which has no vault to move them into', async () => {
+		const invite = await createTestInvite(db, ada);
+		const names = await vaultNames(invite.id);
+		expect(await moveInviteNamesIntoVault(db, invite.id, ada.id, names)).toEqual({
+			ok: false,
+			reason: 'bad-names'
 		});
 	});
 });

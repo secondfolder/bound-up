@@ -181,12 +181,12 @@ describe('actions', () => {
 		});
 
 		await actions.default?.(at(id, task.id, ada, post));
-		await expect(readPartnershipTaskRow(db, task.id)).resolves.toMatchObject({
-			title: '',
-			description: null,
-			completionMessages: [],
+		const row = await readPartnershipTaskRow(db, task.id);
+		expect(row).toMatchObject({
 			ciphertext: post.ciphertext
 		});
+		// Only the sealed record is kept: there is nowhere for the text to go.
+		expect(JSON.stringify(row)).not.toContain('Tea time');
 	});
 
 	it('403s when the other partner posts an edit under shared control', async () => {

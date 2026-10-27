@@ -9,7 +9,7 @@ const PARTNERSHIP_ID = '00000000-0000-4000-8000-000000000003';
 const KEY = new Uint8Array(32).fill(7);
 
 function source(where: Pick<PartnerNamesSource, 'sealed' | 'invite'>): PartnerNamesSource {
-	return { partnershipId: PARTNERSHIP_ID, role: 'invitee', legacy: null, ...where };
+	return { partnershipId: PARTNERSHIP_ID, role: 'invitee', ...where };
 }
 
 afterEach(() => {
@@ -18,7 +18,7 @@ afterEach(() => {
 
 /**
  * When the invitee's device lets go of the key from the link. It once did as
- * soon as its sealing pass had moved the names into the vault, which left a
+ * soon as it had moved the names into the vault, which left a
  * page whose load read the invite a moment earlier unable to open it: the
  * names showed as unreadable until the next load.
  */

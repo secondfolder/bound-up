@@ -11,11 +11,8 @@ const threeAWeek: TaskSchedule = {
 function task(overrides: Partial<TaskView> = {}): TaskView {
 	return {
 		id: 'task',
-		title: 'Stretch',
-		description: null,
 		active: true,
 		creditsAwarded: 2,
-		completionMessages: [],
 		sealed: null,
 		revision: 0,
 		schedule: { mode: 'one-off' },

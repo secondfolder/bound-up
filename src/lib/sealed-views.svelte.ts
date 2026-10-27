@@ -7,9 +7,9 @@
  *
  * Each opener answers in the three states `sealed-cache.svelte.ts` describes:
  * `undefined` while working (a placeholder), `null` when the record will not
- * open here ("cannot show"), and the content otherwise. A row written before
- * sealing has no `sealed` yet and answers with its plaintext straight away;
- * the background sealing (`content-sealing.ts`) moves it over.
+ * open here ("cannot show"), and the content otherwise. A view with no
+ * `sealed` at all has nothing to open, so it answers `null` too: every writer
+ * seals, and the columns are nullable only for history.
  *
  * Which vault to open with is the one the record names. A page does not get
  * to choose, so a partnership task shown on /home opens exactly as it does on
@@ -45,24 +45,12 @@ import type {
 
 export type Opened<T> = T | null | undefined;
 
-function open<T>(kind: SealedKind<T>, ref: SealedRefView): Opened<T> {
-	return sealedReader.read(kind, ref, vaultById(ref.vaultId));
+function open<T>(kind: SealedKind<T>, ref: SealedRefView | null): Opened<T> {
+	return ref ? sealedReader.read(kind, ref, vaultById(ref.vaultId)) : null;
 }
 
 /** A task's content: title, description, completion messages. */
-export function openedTask(task: {
-	title: string;
-	description: string | null;
-	completionMessages: string[];
-	sealed: SealedRefView | null;
-}): Opened<TaskContent> {
-	if (!task.sealed) {
-		return {
-			title: task.title,
-			description: task.description,
-			completionMessages: task.completionMessages
-		};
-	}
+export function openedTask(task: { sealed: SealedRefView | null }): Opened<TaskContent> {
 	return open(taskKind, task.sealed);
 }
 
@@ -78,13 +66,6 @@ export type OpenedCompletion = {
  * task's messages without being able to read them; this is where it is read.
  */
 export function openedCompletion(completion: TaskCompletionView): Opened<OpenedCompletion> {
-	if (!completion.sealed) {
-		return {
-			taskTitle: completion.taskTitle,
-			taskDescription: completion.taskDescription,
-			completionMessage: completion.completionMessage
-		};
-	}
 	const task = open(taskKind, completion.sealed);
 	if (!task) {
 		return task;
@@ -98,31 +79,21 @@ export function openedCompletion(completion: TaskCompletionView): Opened<OpenedC
 }
 
 /** A reward's content: title and description. */
-export function openedReward(reward: {
-	title: string;
-	description: string | null;
-	sealed: SealedRefView | null;
-}): Opened<RewardContent> {
-	if (!reward.sealed) {
-		return { title: reward.title, description: reward.description };
-	}
+export function openedReward(reward: { sealed: SealedRefView | null }): Opened<RewardContent> {
 	return open(rewardKind, reward.sealed);
 }
 
 /** A claim as history shows it: the reward as it was when claimed. */
 export function openedClaim(claim: RewardHistoryView): Opened<RewardContent> {
-	if (!claim.sealed) {
-		return { title: claim.rewardTitle, description: claim.rewardDescription };
-	}
 	return open(rewardKind, claim.sealed);
 }
 
 /** A widget row's title, from whichever kind the row is. */
 export function openedWidgetTitle(item: WidgetItemView): Opened<string> {
-	if (!item.sealed) {
-		return item.title;
-	}
 	switch (item.kind) {
+		case 'guide':
+			// Guides are the app's, not a user's, so their titles are never sealed.
+			return item.title;
 		case 'task':
 			return openedPart(open(taskKind, item.sealed), (value) => value.title);
 		case 'daydream':
@@ -161,9 +132,6 @@ export function openedDaydreamIdea(ref: SealedRefView): Opened<DaydreamIdeaConte
 
 /** A message tag's name. */
 export function openedTagName(tag: TagView): Opened<string> {
-	if (!tag.sealed) {
-		return tag.name;
-	}
 	return openedPart(open(tagKind, tag.sealed), (value) => value.name);
 }
 

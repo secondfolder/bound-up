@@ -1,9 +1,10 @@
-import { and, desc, eq, or } from 'drizzle-orm';
+import { and, desc, eq, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import {
 	canEditPartnership,
 	INVITE_TTL_MS,
 	isInviteUsable,
+	type PartnerNamesSource,
 	type PartnershipControl,
 	type PartnershipRecord,
 	type PartnershipView,
@@ -39,10 +40,6 @@ const partnershipColumns = {
 	status: partnerships.status,
 	inviterId: partnerships.inviterId,
 	inviteeId: partnerships.inviteeId,
-	inviterName: partnerships.inviterName,
-	inviteeName: partnerships.inviteeName,
-	inviterRole: partnerships.inviterRole,
-	inviteeRole: partnerships.inviteeRole,
 	control: partnerships.control,
 	namesCiphertext: partnerships.namesCiphertext,
 	namesVaultId: partnerships.namesVaultId,
@@ -210,10 +207,7 @@ export type CreateInviteInput = {
 	invite: SealedInvite;
 };
 
-/**
- * Creates the pending row and returns it with its fresh token. The names are
- * in `invite`, sealed; the name columns are left empty.
- */
+/** Creates the pending row and returns it with its fresh token. The names are in `invite`, sealed. */
 export async function createInvite(
 	db: Db,
 	input: CreateInviteInput,
@@ -233,8 +227,6 @@ export async function createInvite(
 			id: input.id,
 			inviterId: input.inviterId,
 			status: 'pending',
-			inviterName: '',
-			inviteeName: '',
 			control: input.control,
 			inviteToken,
 			inviteExpiresAt,
@@ -257,8 +249,7 @@ export async function createInvite(
  * Offered rather than done automatically on every re-copy: rotating silently
  * would break a link the inviter had already sent. The invite is sealed again
  * under a new invite key at the same time, so the old link fails on both
- * halves — and an invite from before names were sealed, which has no key at
- * all, gets one, its plaintext names cleared.
+ * halves.
  */
 export async function rotateInviteToken(
 	db: Db,
@@ -279,11 +270,7 @@ export async function rotateInviteToken(
 			inviteExpiresAt,
 			inviteCiphertext: invite.ciphertext,
 			invitePayloadVersion: invite.payloadVersion,
-			inviteKeyWrap: invite.keyWrap,
-			inviterName: '',
-			inviteeName: '',
-			inviterRole: null,
-			inviteeRole: null
+			inviteKeyWrap: invite.keyWrap
 		})
 		.where(
 			and(
@@ -321,9 +308,9 @@ export type AcceptInviteResult =
  * first clears `invite_token` and the second matches no rows.
  *
  * The sealed invite stays on the row: there is no partnership vault yet, and
- * the accepter's browser may not even have its keys open on this page. A
- * member's device moves the names into the vault once it has one
- * (`content-sealing.ts`), and clears the invite then.
+ * the accepter's browser may not even have its keys open on this page. The
+ * device of a member who holds control moves the names into the vault once it
+ * has one (`moveInviteNamesIntoVault`), and clears the invite then.
  */
 export async function acceptInvite(
 	db: Db,
@@ -334,8 +321,7 @@ export async function acceptInvite(
 	if (!existing) {
 		return { ok: false, reason: 'not-found' };
 	}
-	// An invite from before names were sealed has no invite key, so no link to
-	// it can carry one: it is offered again as a new link instead.
+	// An invite with no sealed names has nothing a link could open.
 	if (!isInviteUsable(existing, now) || existing.inviteCiphertext === null) {
 		return { ok: false, reason: existing.status === 'accepted' ? 'not-found' : 'expired' };
 	}
@@ -478,11 +464,8 @@ export async function updatePartnership(
 			namesVaultId: names.vaultId,
 			namesPayloadVersion: names.payloadVersion,
 			namesRevision: names.expectedRevision + 1,
-			// Whatever the names were held in before, they are in the vault now.
-			inviterName: '',
-			inviteeName: '',
-			inviterRole: null,
-			inviteeRole: null,
+			// If the names were still under the invite's key, they are in the
+			// vault now, and the invite has nothing left to open.
 			inviteCiphertext: null,
 			invitePayloadVersion: null,
 			inviteKeyWrap: null
@@ -490,6 +473,88 @@ export async function updatePartnership(
 		.where(and(eq(partnerships.id, id), eq(partnerships.namesRevision, names.expectedRevision)))
 		.returning({ id: partnerships.id });
 	return rows.length > 0 ? { ok: true } : { ok: false, reason: 'conflict' };
+}
+
+/**
+ * Where a member who holds control can read a partnership's names from while
+ * they are still under the accepted invite's key, for their device to move
+ * them into the vault (`invite-names.ts`). `{ names: null }` when there is
+ * nothing to move — they are in the vault already, the link is still pending,
+ * or the viewer may not write them. Null when the viewer is not a member.
+ *
+ * Only for a member who holds control, because moving the names is writing
+ * them: the server cannot compare the sealed copy with the invite, so a
+ * read-only member allowed to move them could rewrite them (invariant 14).
+ */
+export async function inviteNamesToMove(
+	db: Db,
+	id: string,
+	userId: string
+): Promise<{ names: PartnerNamesSource | null } | null> {
+	const current = await getPartnershipForUser(db, id, userId);
+	if (!current) {
+		return null;
+	}
+	const movable =
+		current.canEdit &&
+		current.status === 'accepted' &&
+		current.names.sealed === null &&
+		current.names.invite !== null;
+	return { names: movable ? current.names : null };
+}
+
+export type MoveInviteNamesResult =
+	| { ok: true; moved: boolean }
+	| { ok: false; reason: 'forbidden' | 'bad-names' };
+
+/**
+ * Stores a partnership's names, sealed in its vault by a device that opened
+ * them from the accepted invite, and clears the invite in the same write.
+ *
+ * Once only: the update matches a row whose names are not in the vault yet,
+ * so two devices moving them at once write them at most once between them,
+ * and this can never stand in for an edit, which is compare-and-swap on the
+ * revision (`updatePartnership`). `moved` is false when the other got there
+ * first. `control` is re-read from the stored row, as for any write of the
+ * names.
+ */
+export async function moveInviteNamesIntoVault(
+	db: Db,
+	id: string,
+	userId: string,
+	names: { vaultId: string; ciphertext: string; payloadVersion: number }
+): Promise<MoveInviteNamesResult> {
+	const current = await getPartnershipForUser(db, id, userId);
+	if (!current?.canEdit) {
+		return { ok: false, reason: 'forbidden' };
+	}
+	if (
+		current.status !== 'accepted' ||
+		names.vaultId !== (await partnershipVaultIdFor(db, id)) ||
+		!sealedIsAcceptable(partnershipNamesKind, names.ciphertext, names.payloadVersion)
+	) {
+		return { ok: false, reason: 'bad-names' };
+	}
+	const rows = await db
+		.update(partnerships)
+		.set({
+			namesCiphertext: names.ciphertext,
+			namesVaultId: names.vaultId,
+			namesPayloadVersion: names.payloadVersion,
+			namesRevision: sql`${partnerships.namesRevision} + 1`,
+			inviteCiphertext: null,
+			invitePayloadVersion: null,
+			inviteKeyWrap: null
+		})
+		.where(
+			and(
+				eq(partnerships.id, id),
+				eq(partnerships.status, 'accepted'),
+				isNull(partnerships.namesCiphertext)
+			)
+		)
+		.returning({ id: partnerships.id });
+	return { ok: true, moved: rows.length > 0 };
 }
 
 /**

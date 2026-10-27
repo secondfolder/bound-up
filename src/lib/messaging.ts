@@ -79,36 +79,6 @@ export const THREAD_ICON_LABELS: Record<ThreadIcon, string> = {
 /** The icon a thread gets when the sender does not pick one. */
 export const DEFAULT_THREAD_ICON: ThreadIcon = 'envelope';
 
-/**
- * LEGACY-RICHTEXT — how a message body is serialised.
- *
- * Plaintext, and a closed list of exactly two values, for the same reason the
- * thread icon is (AGENTS.md invariant 14): the server cannot read a body, so
- * without this it cannot tell a pre-rich-text message from a converted one.
- * Two fixed values reveal nothing about content, where a free-text column
- * would be a covert channel. Re-validated in `server/messaging.ts` as well as
- * in the endpoint's Zod schema.
- *
- * It earns its place three times over:
- *
- * 1. The migration endpoint accepts a rewrite only for a row still at
- *    `'plain'`, so it cannot become a general "edit any message I sent"
- *    backdoor — messages are otherwise immutable by design.
- * 2. `select count(*) from messages where body_format = 'plain'` is the
- *    removal trigger for all the legacy code, rather than a guess.
- * 3. The client knows which messages are worth converting without decrypting
- *    every one first.
- *
- * Deleted with the rest of the legacy handling; see docs/temporary-code.md.
- */
-export const MESSAGE_BODY_FORMATS = ['plain', 'lexical'] as const;
-
-export type MessageBodyFormat = (typeof MESSAGE_BODY_FORMATS)[number];
-
-export function isMessageBodyFormat(value: unknown): value is MessageBodyFormat {
-	return typeof value === 'string' && (MESSAGE_BODY_FORMATS as readonly string[]).includes(value);
-}
-
 export function isThreadIcon(value: unknown): value is ThreadIcon {
 	return typeof value === 'string' && (THREAD_ICONS as readonly string[]).includes(value);
 }
@@ -284,27 +254,6 @@ export const MAX_BODY_CHARS = 4000;
 
 /** Threads per board before paging would be needed. */
 export const BOARD_LIMIT = 200;
-
-/**
- * Reactions one message can carry.
- *
- * Two, and this is a fact about the domain rather than a policy: a reaction is
- * unique per `(message, user)` and a partnership has exactly two members. Used
- * to bound the restore payload.
- */
-export const MAX_REACTIONS_PER_MESSAGE = 2;
-
-/**
- * Messages per page of a partner-assisted history restore.
- *
- * Lives here, in the pure module, rather than beside the query that uses it,
- * because the endpoint's Zod schema needs it too — a client must not be able
- * to post back more rows than a page could have contained. Bounded because the
- * whole page is decrypted and re-encrypted in the browser, and because D1
- * bills on bytes read: 100 bodies at the 64 KB cap is a 6 MB worst case, which
- * is a lot but not a hang. In practice a sext is a few hundred bytes.
- */
-export const RESTORE_PAGE_SIZE = 100;
 
 // ── unread ───────────────────────────────────────────────────────────────────
 

@@ -33,21 +33,19 @@ test('gives the bottom nav one tab per linked partner, its names sealed', async 
 		{ id, names: expect.objectContaining({ partnershipId: id, role: 'inviter' }), image: null }
 	]);
 	// The server hands over only ciphertext: it has no name to give.
-	expect(partners[0]?.names.legacy).toBeNull();
 	expect(partners[0]?.names.invite?.ciphertext).toMatch(/^sb1\./);
 });
 
 test('uses the names source and picture from the viewer’s own end', async () => {
-	await createTestPartnership(db, ada, jun, {
-		legacyNames: { inviterName: 'Ada', inviteeName: 'Jun' }
-	});
+	await createTestPartnership(db, ada, jun);
 	const { partners } = await runLoad(load(fakeEvent({ db, user: jun, cookies: {} })));
 	expect(partners).toEqual([
 		{
 			id: expect.any(String),
 			names: expect.objectContaining({
 				role: 'invitee',
-				legacy: expect.objectContaining({ inviterName: 'Ada', inviteeName: 'Jun' })
+				// The invitee is never handed the inviter's wrap of the invite key.
+				invite: expect.objectContaining({ keyWrap: null })
 			}),
 			image: '/ada.png'
 		}

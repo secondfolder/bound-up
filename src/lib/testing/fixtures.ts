@@ -126,9 +126,7 @@ export async function createTestUser(db: Db, overrides: Partial<TestUser> = {}):
 
 /**
  * A pending invite, as `/settings/partners/new` would create it: sealed under
- * an invite key the server never sees, so a stand-in ciphertext does. A test
- * that wants a partnership from before names were sealed, with plaintext
- * names, asks for `legacyNames`.
+ * an invite key the server never sees, so a stand-in ciphertext does.
  */
 export async function createTestInvite(
 	db: Db,
@@ -139,13 +137,6 @@ export async function createTestInvite(
 		now?: Date;
 		/** The stand-in for the sealed invite. */
 		inviteCiphertext?: string;
-		/** Store these in the clear instead, as a row from before sealing would. */
-		legacyNames?: {
-			inviterName: string;
-			inviteeName: string;
-			inviterRole?: string | null;
-			inviteeRole?: string | null;
-		};
 	} = {}
 ): Promise<{ id: string; inviteToken: string; inviteExpiresAt: Date; inviteCiphertext: string }> {
 	const inviteCiphertext = options.inviteCiphertext ?? fakeSealed('invite');
@@ -161,21 +152,6 @@ export async function createTestInvite(
 	);
 	if (!result.ok) {
 		throw new Error(`fixture could not create invite: ${result.reason}`);
-	}
-	if (options.legacyNames) {
-		const { legacyNames } = options;
-		await db
-			.update(partnerships)
-			.set({
-				inviterName: legacyNames.inviterName,
-				inviteeName: legacyNames.inviteeName,
-				inviterRole: legacyNames.inviterRole ?? null,
-				inviteeRole: legacyNames.inviteeRole ?? null,
-				inviteCiphertext: null,
-				invitePayloadVersion: null,
-				inviteKeyWrap: null
-			})
-			.where(eq(partnerships.id, result.id));
 	}
 	return {
 		id: result.id,
@@ -195,27 +171,10 @@ export async function createTestPartnership(
 	invitee: TestUser,
 	options: Parameters<typeof createTestInvite>[2] = {}
 ): Promise<{ id: string }> {
-	// Accepted as a sealed invite, since only those can be; a legacy one gets
-	// its plaintext names afterwards, as a row accepted before sealing has.
-	const { legacyNames, ...rest } = options;
-	const invite = await createTestInvite(db, inviter, rest);
+	const invite = await createTestInvite(db, inviter, options);
 	const result = await acceptInvite(db, { token: invite.inviteToken, inviteeId: invitee.id });
 	if (!result.ok) {
 		throw new Error(`fixture could not accept invite: ${result.reason}`);
-	}
-	if (legacyNames) {
-		await db
-			.update(partnerships)
-			.set({
-				inviterName: legacyNames.inviterName,
-				inviteeName: legacyNames.inviteeName,
-				inviterRole: legacyNames.inviterRole ?? null,
-				inviteeRole: legacyNames.inviteeRole ?? null,
-				inviteCiphertext: null,
-				invitePayloadVersion: null,
-				inviteKeyWrap: null
-			})
-			.where(eq(partnerships.id, result.id));
 	}
 	return { id: result.id };
 }
@@ -721,29 +680,6 @@ export async function readMessageRows(db: Db, threadId: string) {
 		.from(messages)
 		.where(eq(messages.threadId, threadId))
 		.orderBy(messages.createdAt, messages.id);
-}
-
-/**
- * Turns a message back into a row in the original scheme: an age ciphertext
- * to both partners, no vault. Nothing sends those any more, so a test of the
- * migration into the vault has to make them.
- */
-export async function makeMessageLegacy(
-	db: Db,
-	messageId: string,
-	options: { ciphertext?: string; metadataCiphertext?: string | null; plain?: boolean } = {}
-): Promise<void> {
-	await db
-		.update(messages)
-		.set({
-			ciphertext: options.ciphertext ?? 'YWdlIGJvZHk=',
-			metadataCiphertext: options.metadataCiphertext ?? null,
-			vaultId: null,
-			payloadVersion: null,
-			metadataVersion: null,
-			bodyFormat: options.plain ? 'plain' : 'lexical'
-		})
-		.where(eq(messages.id, messageId));
 }
 
 // ── daydreams ────────────────────────────────────────────────────────────────

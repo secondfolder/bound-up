@@ -174,10 +174,9 @@ Task and reward titles are sealed ([tasks.md](tasks.md#what-the-server-can-see))
 so the server cannot put them in a row. Each `WidgetItemView` carries the
 record's sealed reference instead (`sealed`, and `kind` to say which kind it
 opens as), and `WidgetItems` opens it with `openedWidgetTitle` from
-`sealed-views.svelte.ts`: "…" until the vault is open, the title after. A row
-written before sealing still has a plaintext `title`, shown straight away.
-Guides are the app's own content, never sealed, and their rows have
-`kind: 'guide'` and no `sealed`.
+`sealed-views.svelte.ts`: "…" until the vault is open, the title after; its
+`title` is empty. Guides are the app's own content, never sealed: their rows
+have `kind: 'guide'`, no `sealed`, and the title itself.
 
 `viewerActs` is always true on `/home`, where there is only one side.
 

@@ -238,9 +238,12 @@ Important fields on the live task rows:
 - `last_completed_at`
 - `completed_count`
 - `next_eligible_at`
-- `title`, `description`, `completion_messages` — plaintext, filled only on
-  rows written before sealing and emptied when a device seals them (see
-  [docs/temporary-code.md](temporary-code.md#tasks-and-rewards-in-plaintext))
+
+There is no plaintext content column. `ciphertext` and `vault_id` are
+nullable only because rows from before sealing had none: making them `NOT
+NULL` would mean rebuilding the table, which on D1 cascade-deletes everything
+that references it (the trap in AGENTS.md). Every writer sets them, and a row
+without them reads as one that cannot be shown.
 
 The task views add one thing worked out at load: `windowCompletions`, how many
 completions of a rolling-window task with a limit still count against it right

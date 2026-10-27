@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { CachedEmbedDetails } from '../embeds';
 import { MAX_BODY_CHARS } from '../messaging';
 import { generateAgeIdentity, importIdentityKey } from './identity';
 import {
 	decryptAttachment,
-	decryptMessageMetadata,
 	decryptPayload,
 	encryptAttachment,
 	encryptPayload,
@@ -35,7 +33,6 @@ async function collect(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> 
 }
 
 describe('encryptPayload / decryptPayload', () => {
-	/** The shape every message in the feature has. */
 	it('lets both partners open one ciphertext, and nobody else', async () => {
 		const ada = await generateAgeIdentity();
 		const jun = await generateAgeIdentity();
@@ -51,8 +48,8 @@ describe('encryptPayload / decryptPayload', () => {
 				payload('meet me in the kitchen')
 			);
 		}
-		// Null, not a throw: a board can hold messages from before a key change,
-		// and the UI renders those as "ask your partner to restore this".
+		// Null, not a throw: a device can hold a draft sealed to a key the
+		// account has since replaced, and that is "no draft", not a failure.
 		await expect(decryptPayload(ciphertext, stranger.identity)).resolves.toBeNull();
 	});
 
@@ -129,66 +126,6 @@ describe('encryptPayload / decryptPayload', () => {
 		const text = 'naïve 🔐 — “curly” … 日本語';
 		const ciphertext = await encryptPayload(payload(text), [ada.recipient]);
 		await expect(decryptPayload(ciphertext, ada.identity)).resolves.toEqual(payload(text));
-	});
-});
-
-describe('decryptMessageMetadata', () => {
-	const embed = (overrides: Partial<CachedEmbedDetails>): CachedEmbedDetails => ({
-		href: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-		fetchedAt: 0,
-		kind: 'iframe',
-		providerName: 'YouTube',
-		title: 'A video',
-		description: null,
-		thumbnailUrl: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg',
-		canonicalUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-		imageUrl: null,
-		iframeSrc: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
-		iframeHeight: null,
-		faviconUrl: 'https://www.youtube.com/favicon.ico',
-		themeColor: null,
-		...overrides
-	});
-
-	it('passes http(s) URLs from the sender through untouched', async () => {
-		const ada = await generateAgeIdentity();
-		const details = embed({});
-		const ciphertext = await encryptPayload({ version: 1, embeds: [details] }, [ada.recipient]);
-		await expect(decryptMessageMetadata(ciphertext, ada.identity)).resolves.toEqual({
-			version: 1,
-			embeds: [details]
-		});
-	});
-
-	// The sender's client writes the sidecar, so nothing on the server checked
-	// it; a `javascript:` iframe src would run on this origin.
-	it('drops every URL field that is not http(s)', async () => {
-		const ada = await generateAgeIdentity();
-		const ciphertext = await encryptPayload(
-			{
-				version: 1,
-				embeds: [
-					embed({
-						iframeSrc: 'javascript:alert(1)',
-						canonicalUrl: 'javascript:alert(2)',
-						thumbnailUrl: 'data:text/html,<script>',
-						imageUrl: '//evil.example/x.png',
-						faviconUrl: 'vbscript:x'
-					})
-				]
-			},
-			[ada.recipient]
-		);
-		const opened = await decryptMessageMetadata(ciphertext, ada.identity);
-		expect(opened?.embeds).toEqual([
-			embed({
-				iframeSrc: null,
-				canonicalUrl: null,
-				thumbnailUrl: null,
-				imageUrl: null,
-				faviconUrl: null
-			})
-		]);
 	});
 });
 

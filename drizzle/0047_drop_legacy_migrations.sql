@@ -1,0 +1,26 @@
+ALTER TABLE `message_tags` DROP COLUMN `name`;--> statement-breakpoint
+ALTER TABLE `messages` DROP COLUMN `body_format`;--> statement-breakpoint
+ALTER TABLE `partnership_reward_claims` DROP COLUMN `reward_title`;--> statement-breakpoint
+ALTER TABLE `partnership_reward_claims` DROP COLUMN `reward_description`;--> statement-breakpoint
+ALTER TABLE `partnership_rewards` DROP COLUMN `title`;--> statement-breakpoint
+ALTER TABLE `partnership_rewards` DROP COLUMN `description`;--> statement-breakpoint
+ALTER TABLE `partnership_task_completions` DROP COLUMN `task_title`;--> statement-breakpoint
+ALTER TABLE `partnership_task_completions` DROP COLUMN `task_description`;--> statement-breakpoint
+ALTER TABLE `partnership_task_completions` DROP COLUMN `completion_message`;--> statement-breakpoint
+ALTER TABLE `partnership_tasks` DROP COLUMN `title`;--> statement-breakpoint
+ALTER TABLE `partnership_tasks` DROP COLUMN `description`;--> statement-breakpoint
+ALTER TABLE `partnership_tasks` DROP COLUMN `completion_messages`;--> statement-breakpoint
+ALTER TABLE `partnerships` DROP COLUMN `inviter_name`;--> statement-breakpoint
+ALTER TABLE `partnerships` DROP COLUMN `invitee_name`;--> statement-breakpoint
+ALTER TABLE `partnerships` DROP COLUMN `inviter_role`;--> statement-breakpoint
+ALTER TABLE `partnerships` DROP COLUMN `invitee_role`;--> statement-breakpoint
+ALTER TABLE `self_reward_claims` DROP COLUMN `reward_title`;--> statement-breakpoint
+ALTER TABLE `self_reward_claims` DROP COLUMN `reward_description`;--> statement-breakpoint
+ALTER TABLE `self_rewards` DROP COLUMN `title`;--> statement-breakpoint
+ALTER TABLE `self_rewards` DROP COLUMN `description`;--> statement-breakpoint
+ALTER TABLE `self_task_completions` DROP COLUMN `task_title`;--> statement-breakpoint
+ALTER TABLE `self_task_completions` DROP COLUMN `task_description`;--> statement-breakpoint
+ALTER TABLE `self_task_completions` DROP COLUMN `completion_message`;--> statement-breakpoint
+ALTER TABLE `self_tasks` DROP COLUMN `title`;--> statement-breakpoint
+ALTER TABLE `self_tasks` DROP COLUMN `description`;--> statement-breakpoint
+ALTER TABLE `self_tasks` DROP COLUMN `completion_messages`;

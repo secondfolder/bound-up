@@ -42,7 +42,6 @@ test.describe('sealed partnership names', () => {
 
 			const adaId = await userId(ada.who.email);
 			const pending = await sql('SELECT * FROM partnerships WHERE inviter_id = ?', [adaId]);
-			expect(pending.rows[0]).toMatchObject({ inviter_name: '', invitee_name: '' });
 			expect(String(pending.rows[0]?.invite_ciphertext)).toMatch(/^sb1\./);
 			expect(JSON.stringify(pending.rows)).not.toMatch(/Pup|Handler|pet/);
 

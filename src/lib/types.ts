@@ -81,8 +81,9 @@ export type TaskTimeZoneNoteView = {
 /**
  * A sealed record a device can open: which record it is sealed as, under
  * which vault, and at what payload version. See docs/encryption.md, "Sealed
- * records". Null on a view means the row is still plaintext, written before
- * sealing, until a device seals it.
+ * records". Null on a view means the row has nothing to open, which a device
+ * shows as "cannot show": every writer seals, and the columns are nullable
+ * only because rows from before sealing had none.
  */
 export type SealedRefView = {
 	recordId: string;
@@ -95,17 +96,12 @@ export type SealedRefView = {
  * A completed task, as history.
  *
  * `sealed` is the task as it was, copied when it was completed, and
- * `completionMessageIndex` which of its messages was picked. Null `sealed` is
- * a completion recorded before sealing, whose `taskTitle`, `taskDescription`
- * and `completionMessage` are still plaintext; for a sealed one they are empty
- * until a device opens it (`openedCompletion` in `sealed-views.svelte.ts`).
+ * `completionMessageIndex` which of its messages was picked, opened by a
+ * device (`openedCompletion` in `sealed-views.svelte.ts`).
  */
 export type TaskCompletionView = {
 	id: string;
-	taskTitle: string;
-	taskDescription: string | null;
 	creditsAwarded: number;
-	completionMessage: string | null;
 	createdAt: Date;
 	sealed: SealedRefView | null;
 	completionMessageIndex: number | null;
@@ -117,18 +113,14 @@ export type PartnershipTaskCompletionView = TaskCompletionView & {
 };
 
 /**
- * `title`, `description` and `completionMessages` are plaintext only on a task
- * written before sealing; on a sealed one (`sealed`) they are empty until a
- * device opens it (`openedTask` in `sealed-views.svelte.ts`). `revision` is
- * what an edit is compare-and-swap against.
+ * The title, description and completion messages are in `sealed`, opened by a
+ * device (`openedTask` in `sealed-views.svelte.ts`). `revision` is what an
+ * edit is compare-and-swap against.
  */
 export type SelfTaskView = {
 	id: string;
-	title: string;
-	description: string | null;
 	active: boolean;
 	creditsAwarded: number;
-	completionMessages: string[];
 	sealed: SealedRefView | null;
 	revision: number;
 	schedule: TaskSchedule;
@@ -150,11 +142,8 @@ export type SelfTaskView = {
 /** As `SelfTaskView`, sealed in the partnership's vault. */
 export type PartnershipTaskView = {
 	id: string;
-	title: string;
-	description: string | null;
 	active: boolean;
 	creditsAwarded: number;
-	completionMessages: string[];
 	sealed: SealedRefView | null;
 	revision: number;
 	schedule: TaskSchedule;
@@ -300,11 +289,11 @@ export type VaultListingView = {
 };
 
 /**
- * Where one message body lives: enough to open it under either scheme.
+ * Where one message body lives: enough to open it.
  *
- * A row with a `vaultId` is sealed under that partnership vault (and its
- * sidecar too, when it has one); a row without is still in the original
- * scheme, age-encrypted to both partners, until a device migrates it. See
+ * Sealed under the partnership vault `vaultId` names, and its sidecar too
+ * when it has one. `vaultId` and the versions are nullable only because rows
+ * from before vaults had none; a row without them opens as unreadable. See
  * docs/messaging.md.
  */
 export type MessageBodyRef = {
@@ -312,7 +301,7 @@ export type MessageBodyRef = {
 	/** Never rendered as text, even briefly. */
 	ciphertext: string;
 	vaultId: string | null;
-	/** The sealed body's payload version. Null exactly when `vaultId` is. */
+	/** The sealed body's payload version. Nullable for the reason `vaultId` is. */
 	payloadVersion: number | null;
 	/** Cached derived metadata for the body, encrypted like the body. */
 	metadataCiphertext: string | null;
@@ -365,13 +354,11 @@ export type UnseenMediaView = {
 };
 
 /**
- * A message tag. `name` is plaintext only on a tag made before sealing; a
- * sealed one has it in `sealed`, opened in the browser (`openedTagName` in
- * `sealed-views.svelte.ts`), and `name` is empty.
+ * A message tag. Its name is in `sealed`, opened in the browser
+ * (`openedTagName` in `sealed-views.svelte.ts`).
  */
 export type TagView = {
 	id: string;
-	name: string;
 	color: string;
 	sealed: SealedRefView | null;
 };
@@ -433,18 +420,14 @@ export type UnreadPartnerView = {
 /** A claimed reward, as history. `sealed` as on `TaskCompletionView`. */
 export type RewardHistoryView = {
 	id: string;
-	rewardTitle: string;
-	rewardDescription: string | null;
 	rewardCost: number;
 	createdAt: Date;
 	sealed: SealedRefView | null;
 };
 
-/** `title` and `description` as on `SelfTaskView`. */
+/** The title and description are in `sealed`, as on `SelfTaskView`. */
 export type SelfRewardView = {
 	id: string;
-	title: string;
-	description: string | null;
 	sealed: SealedRefView | null;
 	revision: number;
 	cost: number;
@@ -456,8 +439,6 @@ export type SelfRewardView = {
 
 export type PartnershipRewardView = {
 	id: string;
-	title: string;
-	description: string | null;
 	sealed: SealedRefView | null;
 	revision: number;
 	cost: number;
@@ -532,8 +513,8 @@ export type HelpRequestView = {
 export type WidgetItemView = {
 	id: string;
 	/**
-	 * Plaintext only for an item written before sealing; for a sealed one it is
-	 * empty until a device opens `sealed` (`openedWidgetItem`).
+	 * A guide's title, which is the app's and never sealed. Empty for every
+	 * other kind, whose title is in `sealed` (`openedWidgetTitle`).
 	 */
 	title: string;
 	/** Which kind `sealed` opens as. A guide is never sealed: guides are the app's, not a user's. */

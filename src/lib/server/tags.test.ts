@@ -7,11 +7,9 @@ import {
 	createTestThread,
 	createTestUser,
 	ensureTestPartnershipVault,
-	ensureTestSelfVault,
 	fakeSealed,
 	type TestUser
 } from '../testing/fixtures';
-import { listUnsealedContent, sealUnsealedContent } from './content-sealing';
 import { messageTags } from './db/schema';
 import { createTag, listTags, type SealedTagName, setThreadTags, updateTag } from './messaging';
 
@@ -65,7 +63,6 @@ describe('createTag', () => {
 			ok: true,
 			tag: {
 				id,
-				name: '',
 				color: '#55a36b',
 				sealed: {
 					recordId: id,
@@ -77,7 +74,6 @@ describe('createTag', () => {
 		});
 		const [row] = await harness.db.select().from(messageTags).where(eq(messageTags.id, id));
 		expect(row).toMatchObject({
-			name: '',
 			ciphertext: name.ciphertext,
 			vaultId,
 			nameIndex: name.nameIndex
@@ -175,105 +171,9 @@ describe('listing', () => {
 		expect(tags).toEqual([
 			{
 				id,
-				name: '',
 				color: expect.any(String),
 				sealed: { recordId: id, vaultId, ciphertext: name.ciphertext, payloadVersion: 1 }
 			}
 		]);
-	});
-});
-
-describe('sealing tags made before sealing', () => {
-	async function legacyTag(name: string): Promise<string> {
-		const id = crypto.randomUUID();
-		await harness.db.insert(messageTags).values({ id, partnershipId, name, color: '#5d7fc2' });
-		return id;
-	}
-
-	it('hands a member the plaintext tags, and seals them with their index', async () => {
-		const id = await legacyTag('planning');
-		const page = defined(
-			await listUnsealedContent(harness.db, jun.id, { kind: 'partnership', partnershipId }),
-			'the page'
-		);
-		expect(page.tags).toEqual([{ id, name: 'planning' }]);
-
-		const ciphertext = fakeSealed('tag');
-		await expect(
-			sealUnsealedContent(
-				harness.db,
-				jun.id,
-				{ kind: 'partnership', partnershipId },
-				{
-					vaultId,
-					tasks: [],
-					completions: [],
-					rewards: [],
-					claims: [],
-					tags: [{ id, ciphertext, payloadVersion: 1, nameIndex: nameIndex('planning') }]
-				}
-			)
-		).resolves.toEqual({ ok: true, sealed: 1 });
-		const [row] = await harness.db.select().from(messageTags).where(eq(messageTags.id, id));
-		expect(row).toMatchObject({ name: '', ciphertext, vaultId, nameIndex: nameIndex('planning') });
-	});
-
-	it('leaves a tag in plaintext when its name is already taken, rather than failing', async () => {
-		await createTag(harness.db, partnershipId, ada.id, {
-			id: crypto.randomUUID(),
-			name: sealedName('planning')
-		});
-		const clash = await legacyTag('planning');
-		const fine = await legacyTag('errands');
-		await expect(
-			sealUnsealedContent(
-				harness.db,
-				ada.id,
-				{ kind: 'partnership', partnershipId },
-				{
-					vaultId,
-					tasks: [],
-					completions: [],
-					rewards: [],
-					claims: [],
-					tags: [
-						{
-							id: clash,
-							ciphertext: fakeSealed('a'),
-							payloadVersion: 1,
-							nameIndex: nameIndex('planning')
-						},
-						{
-							id: fine,
-							ciphertext: fakeSealed('b'),
-							payloadVersion: 1,
-							nameIndex: nameIndex('errands')
-						}
-					]
-				}
-			)
-		).resolves.toEqual({ ok: true, sealed: 1 });
-		const [row] = await harness.db.select().from(messageTags).where(eq(messageTags.id, clash));
-		expect(row).toMatchObject({ name: 'planning', ciphertext: null });
-	});
-
-	it('refuses tags in the self scope, which has none', async () => {
-		const selfVault = await ensureTestSelfVault(harness.db, ada.id);
-		const id = await legacyTag('planning');
-		await expect(
-			sealUnsealedContent(
-				harness.db,
-				ada.id,
-				{ kind: 'self' },
-				{
-					vaultId: selfVault,
-					tasks: [],
-					completions: [],
-					rewards: [],
-					claims: [],
-					tags: [{ id, ciphertext: fakeSealed('t'), payloadVersion: 1, nameIndex: nameIndex('p') }]
-				}
-			)
-		).resolves.toEqual({ ok: false, reason: 'invalid' });
 	});
 });

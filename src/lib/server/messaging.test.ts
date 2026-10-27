@@ -9,7 +9,6 @@ import {
 	MEDIA_TTL_MIN_MS,
 	MEDIA_TTL_NEVER,
 	type MediaTtl,
-	RESTORE_PAGE_SIZE,
 	UNSEEN_MEDIA_MESSAGE_LIMIT
 } from '../messaging';
 import { createTestDb, type TestDb } from '../testing/db';
@@ -23,7 +22,6 @@ import {
 	createTestUser,
 	ensureTestPartnershipVault,
 	fakeSealed,
-	makeMessageLegacy,
 	readAttachmentRows,
 	readMessageRows,
 	readThreadReadRows,
@@ -31,14 +29,8 @@ import {
 	type TestUser
 } from '../testing/fixtures';
 import { createTestMediaStore, outgoingAttachment, type TestMediaStore } from '../testing/media';
-import { legacyNamesSource } from '../testing/names';
-import {
-	accountRecoveryRequests,
-	messageAttachments,
-	messageReactions,
-	messages,
-	vaultWraps
-} from './db/schema';
+import { testNamesSource } from '../testing/names';
+import { accountRecoveryRequests, messageAttachments, vaultWraps } from './db/schema';
 import { grantFeature } from './features';
 import { attachmentKey, partnershipMediaPrefix } from './media';
 import {
@@ -48,10 +40,8 @@ import {
 	getPartnerMessagesWidget,
 	getThread,
 	isThreadUnread,
-	type LegacyMessagePage,
 	listBoard,
 	listHelpRequests,
-	listLegacyMessages,
 	listRestoreRequests,
 	listUnreadCounts,
 	markThreadOpened,
@@ -60,9 +50,7 @@ import {
 	requireMessageMembership,
 	requireThreadMembership,
 	restoreVaultAccess,
-	sealLegacyMessages,
 	sendMessage,
-	setMessageMetadataCiphertext,
 	setReaction,
 	startThread
 } from './messaging';
@@ -105,7 +93,7 @@ const reaction = (label: string) => ({
 const at = (ms: number) => new Date(ms);
 const partnerView = (id: string) => ({
 	id,
-	names: legacyNamesSource(id, { partnerName: 'Jun' }),
+	names: testNamesSource(id, { partnerName: 'Jun' }),
 	image: null
 });
 
@@ -1562,198 +1550,6 @@ async function readRecovery(id: string) {
 	return row;
 }
 
-describe('moving messages into the vault', () => {
-	/** A thread with one message in the original scheme, and a reaction on a reply. */
-	async function legacyThread() {
-		const { threadId, messageId } = await createTestThread(harness.db, partnershipId, jun);
-		await makeMessageLegacy(harness.db, messageId, { metadataCiphertext: 'bWV0YQ==' });
-		const reply = await createTestMessage(harness.db, partnershipId, threadId, ada);
-		await harness.db.insert(messageReactions).values({
-			messageId: reply.messageId,
-			userId: jun.id,
-			ciphertext: 'YWdlIHJlYWN0aW9u'
-		});
-		return { threadId, messageId };
-	}
-
-	it('hands either member the rows still in the original scheme, and nothing else', async () => {
-		const { messageId } = await legacyThread();
-		for (const member of [ada, jun]) {
-			const page = defined(
-				await listLegacyMessages(harness.db, { partnershipId, actorId: member.id }),
-				'page'
-			);
-			expect(page.messages).toEqual([
-				{ id: messageId, ciphertext: 'YWdlIGJvZHk=', metadataCiphertext: 'bWV0YQ==' }
-			]);
-			expect(page.reactions).toEqual([{ id: expect.any(String), ciphertext: 'YWdlIHJlYWN0aW9u' }]);
-			expect(page.next).toBeNull();
-		}
-	});
-
-	it('refuses a non-member', async () => {
-		const stranger = await createTestUser(harness.db);
-		await expect(
-			listLegacyMessages(harness.db, { partnershipId, actorId: stranger.id })
-		).resolves.toBeNull();
-	});
-
-	it('never leaks another partnership’s rows', async () => {
-		const cas = await createTestUser(harness.db, { name: 'Cas' });
-		const other = await createTestPartnership(harness.db, ada, cas);
-		const elsewhere = await createTestThread(harness.db, other.id, cas);
-		await makeMessageLegacy(harness.db, elsewhere.messageId);
-		const page = await listLegacyMessages(harness.db, { partnershipId, actorId: ada.id });
-		expect(page?.messages).toEqual([]);
-	});
-
-	it('pages through everything without skipping or repeating a row', async () => {
-		const { threadId } = await createTestThread(harness.db, partnershipId, jun);
-		const ids: string[] = [];
-		for (let i = 0; i < RESTORE_PAGE_SIZE + 5; i += 1) {
-			const { messageId } = await createTestMessage(harness.db, partnershipId, threadId, jun);
-			await makeMessageLegacy(harness.db, messageId);
-			ids.push(messageId);
-		}
-		const seen: string[] = [];
-		let after: string | null = null;
-		for (;;) {
-			const page: LegacyMessagePage = defined(
-				await listLegacyMessages(harness.db, {
-					partnershipId,
-					actorId: ada.id,
-					messagesAfter: after
-				}),
-				'page'
-			);
-			seen.push(...page.messages.map((message) => message.id));
-			if (!page.next?.messagesAfter) {
-				break;
-			}
-			after = page.next.messagesAfter;
-		}
-		const byId = (a: string, b: string) => a.localeCompare(b);
-		expect(seen.sort(byId)).toEqual(ids.sort(byId));
-	});
-
-	it('seals rows into the vault once, from either member, and marks them rich text', async () => {
-		const { messageId, threadId } = await legacyThread();
-		await makeMessageLegacy(harness.db, messageId, { plain: true });
-		const [legacyReaction] = await harness.db.select().from(messageReactions);
-
-		const sealing = {
-			partnershipId,
-			actorId: ada.id,
-			vaultId,
-			messages: [
-				{
-					id: messageId,
-					ciphertext: 'sb1.c2VhbGVk',
-					payloadVersion: 1,
-					metadataCiphertext: 'sb1.bWV0YQ',
-					metadataVersion: 1
-				}
-			],
-			reactions: [
-				{ id: defined(legacyReaction, 'reaction').id, ciphertext: 'sb1.cmVhY3Q', payloadVersion: 1 }
-			]
-		};
-		await expect(sealLegacyMessages(harness.db, sealing)).resolves.toEqual({ ok: true, sealed: 2 });
-
-		const [row] = await readMessageRows(harness.db, threadId);
-		expect(row).toMatchObject({
-			ciphertext: 'sb1.c2VhbGVk',
-			vaultId,
-			payloadVersion: 1,
-			metadataCiphertext: 'sb1.bWV0YQ',
-			metadataVersion: 1,
-			bodyFormat: 'lexical'
-		});
-
-		// Strictly once: Jun's device, migrating the same row a moment later,
-		// changes nothing — and nor could anyone using this to edit a message.
-		await expect(
-			sealLegacyMessages(harness.db, {
-				...sealing,
-				actorId: jun.id,
-				messages: [{ ...sealing.messages[0], ciphertext: 'sb1.b3ZlcndyaXR0ZW4' }]
-			})
-		).resolves.toEqual({ ok: true, sealed: 0 });
-		const [after] = await readMessageRows(harness.db, threadId);
-		expect(after?.ciphertext).toBe('sb1.c2VhbGVk');
-	});
-
-	it('refuses another vault, and anything not sealed', async () => {
-		const { messageId } = await legacyThread();
-		const row = {
-			id: messageId,
-			ciphertext: 'sb1.c2VhbGVk',
-			payloadVersion: 1,
-			metadataCiphertext: null,
-			metadataVersion: null
-		};
-		await expect(
-			sealLegacyMessages(harness.db, {
-				partnershipId,
-				actorId: ada.id,
-				vaultId: crypto.randomUUID(),
-				messages: [row],
-				reactions: []
-			})
-		).resolves.toEqual({ ok: false, reason: 'invalid' });
-		await expect(
-			sealLegacyMessages(harness.db, {
-				partnershipId,
-				actorId: ada.id,
-				vaultId,
-				messages: [{ ...row, ciphertext: 'YWdlIGFnYWlu' }],
-				reactions: []
-			})
-		).resolves.toEqual({ ok: false, reason: 'invalid' });
-	});
-
-	it('cannot touch another partnership’s rows', async () => {
-		const cas = await createTestUser(harness.db, { name: 'Cas' });
-		const other = await createTestPartnership(harness.db, ada, cas);
-		const elsewhere = await createTestThread(harness.db, other.id, cas);
-		await makeMessageLegacy(harness.db, elsewhere.messageId, { ciphertext: 'c2FmZQ==' });
-		await sealLegacyMessages(harness.db, {
-			partnershipId,
-			actorId: ada.id,
-			vaultId,
-			messages: [
-				{
-					id: elsewhere.messageId,
-					ciphertext: 'sb1.dGFtcGVyZWQ',
-					payloadVersion: 1,
-					metadataCiphertext: null,
-					metadataVersion: null
-				}
-			],
-			reactions: []
-		});
-		const [row] = await harness.db
-			.select({ ciphertext: messages.ciphertext })
-			.from(messages)
-			.where(eq(messages.id, elsewhere.messageId));
-		expect(row?.ciphertext).toBe('c2FmZQ==');
-	});
-
-	/** A sidecar sealed next to an age body would leave the row half in each scheme. */
-	it('writes a sealed sidecar only beside a sealed body', async () => {
-		const { messageId } = await legacyThread();
-		await expect(
-			setMessageMetadataCiphertext(harness.db, {
-				partnershipId,
-				messageId,
-				viewerId: ada.id,
-				metadataCiphertext: 'sb1.bWV0YQ',
-				metadataVersion: 1
-			})
-		).resolves.toBe('not-sealed');
-	});
-});
-
 describe('getPartnerMessagesWidget', () => {
 	it('agrees with listUnreadCounts about what unread means', async () => {
 		await createTestThread(harness.db, partnershipId, ada);
@@ -1768,7 +1564,7 @@ describe('getPartnerMessagesWidget', () => {
 		const [fromHome] = await listUnreadCounts(harness.db, jun.id, [
 			{
 				id: partnershipId,
-				names: legacyNamesSource(partnershipId, { partnerName: 'Ada' }),
+				names: testNamesSource(partnershipId, { partnerName: 'Ada' }),
 				image: null
 			}
 		]);

@@ -128,16 +128,14 @@ describe('self tasks', () => {
 		);
 	});
 
-	it('keeps no plaintext on a sealed row, and hands back none', async () => {
-		const { id } = await createTestSelfTask(harness.db, ada);
+	it('hands back the sealed record, and nothing in its place', async () => {
+		const { id, ciphertext } = await createTestSelfTask(harness.db, ada);
 
-		await expect(readSelfTaskRow(harness.db, id)).resolves.toMatchObject({
-			title: '',
-			description: null,
-			completionMessages: []
-		});
 		const task = defined(await getSelfTaskForUser(harness.db, ada.id, ada.timezone, id), 'task');
-		expect(task).toMatchObject({ title: '', description: null, completionMessages: [] });
+		expect(task.sealed).toMatchObject({ recordId: id, ciphertext });
+		for (const plaintext of ['title', 'description', 'completionMessages']) {
+			expect(task).not.toHaveProperty(plaintext);
+		}
 	});
 
 	it('completes a one-off self task, awards credits, and deactivates it', async () => {
@@ -187,10 +185,7 @@ describe('self tasks', () => {
 			snapshotCiphertext: ciphertext,
 			snapshotVaultId: vaultId,
 			snapshotVersion: 1,
-			snapshotRecordId: id,
-			taskTitle: '',
-			taskDescription: null,
-			completionMessage: null
+			snapshotRecordId: id
 		});
 		const index = defined(completion.completionMessageIndex, 'completion message index');
 		expect(index).toBeGreaterThanOrEqual(0);
@@ -200,9 +195,7 @@ describe('self tasks', () => {
 		expect(section.completions).toEqual([
 			expect.objectContaining({
 				sealed: { recordId: id, vaultId, ciphertext, payloadVersion: 1 },
-				completionMessageIndex: index,
-				taskTitle: '',
-				completionMessage: null
+				completionMessageIndex: index
 			})
 		]);
 	});
@@ -376,10 +369,7 @@ describe('partnership tasks', () => {
 		await expect(readPartnershipTaskRow(harness.db, id)).resolves.toMatchObject({
 			ciphertext,
 			vaultId,
-			revision: 0,
-			title: '',
-			description: null,
-			completionMessages: []
+			revision: 0
 		});
 
 		const stranger = await createTestUser(harness.db, { name: 'Stranger' });
@@ -617,10 +607,7 @@ describe('partnership tasks', () => {
 			snapshotCiphertext: ciphertext,
 			snapshotVaultId: vaultId,
 			snapshotVersion: 1,
-			snapshotRecordId: id,
-			taskTitle: '',
-			taskDescription: null,
-			completionMessage: null
+			snapshotRecordId: id
 		});
 		const index = defined(completion.completionMessageIndex, 'completion message index');
 		expect(index).toBeGreaterThanOrEqual(0);

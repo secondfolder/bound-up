@@ -35,7 +35,6 @@ describe('load', () => {
 		// The claim keeps a copy of the reward's sealed record, bound to the reward.
 		expect(data.selfRewards.claims).toContainEqual(
 			expect.objectContaining({
-				rewardTitle: '',
 				rewardCost: 2,
 				sealed: expect.objectContaining({ recordId: reward.id, ciphertext: reward.ciphertext })
 			})

@@ -29,11 +29,6 @@ function record(overrides: Partial<PartnershipRecord> = {}): PartnershipRecord {
 		status: 'accepted',
 		inviterId: INVITER,
 		inviteeId: INVITEE,
-		// Named so a swapped assertion is obvious rather than a coin flip.
-		inviterName: 'Name-For-Inviter',
-		inviteeName: 'Name-For-Invitee',
-		inviterRole: null,
-		inviteeRole: null,
 		control: 'both',
 		namesCiphertext: null,
 		namesVaultId: null,
@@ -48,8 +43,6 @@ function record(overrides: Partial<PartnershipRecord> = {}): PartnershipRecord {
 
 /** The sealed columns of a row whose names are in the partnership's vault. */
 const SEALED_NAMES = {
-	inviterName: '',
-	inviteeName: '',
 	namesCiphertext: 'sb1.names',
 	namesVaultId: 'vault-1',
 	namesPayloadVersion: 1,
@@ -58,8 +51,6 @@ const SEALED_NAMES = {
 
 /** The columns of a row whose names are still sealed under the invite key. */
 const INVITE_NAMES = {
-	inviterName: '',
-	inviteeName: '',
 	inviteCiphertext: 'sb1.invite',
 	invitePayloadVersion: 1,
 	inviteKeyWrap: 'd3JhcA=='
@@ -217,30 +208,13 @@ describe('namesForViewer / storedNamesFrom', () => {
 });
 
 describe('namesSourceFor', () => {
-	it('a row from before sealing is a legacy source, in plaintext', () => {
-		const source = namesSourceFor(record({ inviterRole: 'R' }), 'invitee');
-		expect(source).toEqual({
-			partnershipId: 'p1',
-			role: 'invitee',
-			sealed: null,
-			invite: null,
-			legacy: {
-				inviterName: 'Name-For-Inviter',
-				inviteeName: 'Name-For-Invitee',
-				inviterRole: 'R',
-				inviteeRole: null
-			}
-		});
-	});
-
 	it('an invite hands its key wrap to the inviter only', () => {
 		const r = record({ status: 'pending', inviteeId: null, ...INVITE_NAMES });
 		expect(namesSourceFor(r, 'inviter')).toEqual({
 			partnershipId: 'p1',
 			role: 'inviter',
 			sealed: null,
-			invite: { ciphertext: 'sb1.invite', payloadVersion: 1, keyWrap: 'd3JhcA==' },
-			legacy: null
+			invite: { ciphertext: 'sb1.invite', payloadVersion: 1, keyWrap: 'd3JhcA==' }
 		});
 		// The invitee keeps the key from the link; a wrap to the inviter is not theirs.
 		expect(namesSourceFor(r, 'invitee').invite).toEqual({
@@ -255,8 +229,7 @@ describe('namesSourceFor', () => {
 			partnershipId: 'p1',
 			role: 'invitee',
 			sealed: { vaultId: 'vault-1', ciphertext: 'sb1.names', payloadVersion: 1, revision: 3 },
-			invite: null,
-			legacy: null
+			invite: null
 		});
 	});
 
@@ -264,12 +237,12 @@ describe('namesSourceFor', () => {
 		const source = namesSourceFor(record({ ...INVITE_NAMES, ...SEALED_NAMES }), 'inviter');
 		expect(source.sealed).not.toBeNull();
 		expect(source.invite).toBeNull();
-		expect(source.legacy).toBeNull();
 	});
 
-	it('an invite is never mistaken for legacy names', () => {
-		const source = namesSourceFor(record(INVITE_NAMES), 'inviter');
-		expect(source.legacy).toBeNull();
+	it('a row with neither is a source with nothing to open', () => {
+		const source = namesSourceFor(record(), 'inviter');
+		expect(source.sealed).toBeNull();
+		expect(source.invite).toBeNull();
 	});
 
 	it('a half-written sealed record is not a sealed source', () => {

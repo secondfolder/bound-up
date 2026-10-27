@@ -7,9 +7,8 @@
  *
  * The server hands each screen a `PartnerNamesSource` rather than a name
  * (docs/partners.md, "Names are sealed"), and this opens it — from the
- * partnership's vault, from the invite before the names have moved there, or
- * straight from plaintext for a partnership older than sealing — and then
- * maps "theirs" and "yours" with `namesForViewer`, the one place that mapping
+ * partnership's vault, or from the invite before the names have moved there —
+ * and then maps "theirs" and "yours" with `namesForViewer`, the one place that mapping
  * lives (AGENTS.md invariant 12).
  */
 
@@ -87,8 +86,8 @@ const forgotten = new Set<string>();
 
 /**
  * Forgets the invitee's key from the link, now that a load has served the
- * names from the vault and so cleared the invite it opened. Not when the
- * sealing pass moves them: a page whose load had read the invite a moment
+ * names from the vault and so cleared the invite it opened. Not when this
+ * device moves them there (`invite-names.ts`): a page whose load had read the invite a moment
  * before still needs the key, and without it showed the names as unreadable
  * until the next load. Once per partnership, as this runs on every render.
  */
@@ -101,9 +100,6 @@ function forgetInviteKeyOnce(partnershipId: string) {
 
 /** The four stored names and roles, in the three states every sealed read has. */
 export function openedNames(source: PartnerNamesSource): Opened<StoredNames> {
-	if (source.legacy) {
-		return source.legacy;
-	}
 	const { sealed, invite, partnershipId } = source;
 	if (sealed) {
 		forgetInviteKeyOnce(partnershipId);

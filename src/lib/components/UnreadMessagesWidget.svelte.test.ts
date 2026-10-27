@@ -1,7 +1,17 @@
 import { render, screen } from '@testing-library/svelte';
 import '@testing-library/jest-dom/vitest';
 import { describe, expect, it, vi } from 'vitest';
-import { legacyNamesSource } from '$lib/testing/names';
+import { testNamesSource } from '$lib/testing/names';
+
+// Titles and names are sealed; these open them by record id (sealed-refs.ts).
+vi.mock('$lib/crypto/sealed', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/crypto/sealed')>()),
+	openRecord: (await import('$lib/testing/sealed-refs')).openTestRecord
+}));
+vi.mock('$lib/crypto/vaults.svelte', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/crypto/vaults.svelte')>()),
+	vaultById: (id: string) => ({ id })
+}));
 
 vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 
@@ -9,7 +19,7 @@ const { default: UnreadMessagesWidget } = await import('./UnreadMessagesWidget.s
 
 const jun = {
 	partnershipId: 'p1',
-	names: legacyNamesSource('p1', { partnerName: 'Jun' }),
+	names: testNamesSource('p1', { partnerName: 'Jun' }),
 	image: null,
 	unreadThreads: 2,
 	newestAt: new Date('2026-09-13T12:00:00Z')

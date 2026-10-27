@@ -44,9 +44,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	const invite = await findPendingInviteByToken(locals.db, params.token);
 
 	// A missing token and an expired one are reported the same way. There is no
-	// value in telling an anonymous visitor which of the two they found. An
-	// invite from before names were sealed has no key any link could carry, so
-	// it is offered again as a new link, the same way.
+	// value in telling an anonymous visitor which of the two they found. The
+	// sealed invite's columns are nullable, so one without them is the same.
 	if (
 		!(
 			invite &&

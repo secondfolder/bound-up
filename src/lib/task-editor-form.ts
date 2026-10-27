@@ -92,12 +92,11 @@ export function taskEditorFormValuesForCreate(timezoneOwnerUserId: string): Task
 }
 
 export function taskEditorFormValuesFromTask(task: TaskEditableView): TaskEditorFormValues {
+	// The title, description and completion messages stay empty here: they are
+	// sealed, and the browser fills them in once it has opened the task.
 	const values = defaultValues(task.timezoneOwnerUserId);
-	values.title = task.title;
-	values.description = task.description ?? '';
 	values.creditsAwarded = String(task.creditsAwarded);
 	values.active = task.active;
-	values.completionMessagesText = task.completionMessages.join('\n');
 	values.scheduleMode = task.schedule.mode;
 
 	switch (task.schedule.mode) {

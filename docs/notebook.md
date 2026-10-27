@@ -31,8 +31,8 @@ needs the trust check's grant (`writeGrantFor`), as every write does.
 | `localStorage` on the device | Edits not yet confirmed by the server | age-encrypted to the user's own key |
 
 None of the kinds is compressed (`sz1.`): that is allowed only for content the
-server has already seen. There is no plaintext column for content and no
-"plaintext until sealed" path: an entry is sealed from its first byte.
+server has already seen. There is no plaintext column for content: an entry
+is sealed from its first byte.
 
 **What the server still knows**, all of it metadata it needs to route,
 authorise and order: an entry's id and scope; whether it is a journal entry or

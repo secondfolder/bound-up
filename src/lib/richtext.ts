@@ -1,6 +1,4 @@
 import { z } from 'zod';
-// LEGACY-RICHTEXT — the one import of the legacy reader; see docs/temporary-code.md
-import { legacyTextToDocument } from '$lib/richtext-legacy';
 import {
 	MAX_EXTRA_LABEL,
 	MAX_MENU_SUBTITLE,
@@ -370,14 +368,13 @@ export function parseRichTextDocument(stored: string): RichTextDocument | null {
  * The read boundary: turn whatever is stored into a document.
  *
  * Every reader goes through this and nothing else, so no component ever has to
- * know that two formats exist. Once the legacy migration is finished this
- * collapses to `parseRichTextDocument(stored) ?? emptyRichTextDocument()`.
+ * know about the older embed shape `hoistBlockEmbeds` rewrites. Anything that
+ * is not a document reads as an empty one rather than throwing: bodies from
+ * before rich text were bare strings, and nothing reads those as text any
+ * more, but an old draft left on a device must still not break its composer.
  */
 export function parseStoredRichText(stored: string): RichTextDocument {
-	const parsed = parseRichTextDocument(stored);
-	// LEGACY-RICHTEXT — delete the second branch with the rest, but keep the
-	// hoist; see docs/temporary-code.md
-	return hoistBlockEmbeds(parsed ?? legacyTextToDocument(stored));
+	return hoistBlockEmbeds(parseRichTextDocument(stored) ?? emptyRichTextDocument());
 }
 
 /**
@@ -488,10 +485,8 @@ export function emptyRichTextDocument(): RichTextDocument {
  * paragraphs, single newlines as line breaks.
  *
  * For text that was never rich — a suggested response a person wants to edit
- * before sending, say — and so not the legacy conversion in
- * `richtext-legacy.ts`, which also turns URLs into embeds to match how old
- * messages looked. Nothing here is linked or embedded; the editor links URLs
- * itself as the person edits.
+ * before sending, say. Nothing here is linked or embedded; the editor links
+ * URLs itself as the person edits.
  */
 export function plainTextToDocument(text: string): RichTextDocument {
 	const children: RichTextBlockNode[] = [];

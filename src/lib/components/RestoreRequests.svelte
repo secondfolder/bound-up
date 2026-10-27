@@ -2,11 +2,7 @@
 	import { invalidate, invalidateAll } from '$app/navigation';
 	import { recoveryCode } from '$lib/crypto/fingerprint';
 	import { trustRecoveredKey } from '$lib/crypto/trust.svelte';
-	import {
-		declineHistoryRestore,
-		type RestoreProgress,
-		runHistoryRestore
-	} from '$lib/messaging/restore';
+	import { declineHistoryRestore, runHistoryRestore } from '$lib/messaging/restore';
 	import type { RestoreRequestView } from '$lib/types';
 	import SafetyNumber from './SafetyNumber.svelte';
 
@@ -68,33 +64,23 @@
 		return entries;
 	});
 
-	type Busy = { id: string; progress: RestoreProgress | null };
-	let busy: Busy | null = $state(null);
+	/** The request being restored or declined, while it is. */
+	let busy: { id: string } | null = $state(null);
 
-	/** The confirm button's text: its own progress, or the question it asks. */
+	/** The confirm button's text: working, or the question it asks. */
 	function restoreLabel(requestId: string): string {
-		if (busy?.id !== requestId) {
-			return 'The code matches — help them';
-		}
-		return busy.progress ? `Working… ${busy.progress.done} done` : 'Working…';
+		return busy?.id === requestId ? 'Working…' : 'The code matches — help them';
 	}
 	let failure: string | null = $state(null);
 
 	async function restore(request: RestoreRequestView) {
 		failure = null;
-		busy = { id: request.id, progress: null };
+		busy = { id: request.id };
 		try {
-			const outcome = await runHistoryRestore(
-				partnershipId,
-				{ id: request.id, requestedRecipient: request.requestedRecipient },
-				(progress) => {
-					// Rebuilt rather than mutated: `busy` is the $state reference and
-					// reassigning the object is what makes the label update.
-					if (busy) {
-						busy = { id: request.id, progress };
-					}
-				}
-			);
+			const outcome = await runHistoryRestore(partnershipId, {
+				id: request.id,
+				requestedRecipient: request.requestedRecipient
+			});
 			if (outcome.ok) {
 				// They just compared the code, which vouches for the new key as much
 				// as comparing a safety number would.
@@ -112,7 +98,7 @@
 
 	async function decline(request: RestoreRequestView) {
 		failure = null;
-		busy = { id: request.id, progress: null };
+		busy = { id: request.id };
 		try {
 			if (!(await declineHistoryRestore(partnershipId, request.id))) {
 				failure = 'That request could not be declined — reload and try again.';

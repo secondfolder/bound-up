@@ -95,10 +95,7 @@ describe('the create action', () => {
 		expect(row.inviteCiphertext).toBe(post.inviteCiphertext);
 		expect(row.invitePayloadVersion).toBe(1);
 		expect(row.inviteKeyWrap).toBe(FAKE_INVITE_KEY_WRAP);
-		expect(row.inviterName).toBe('');
-		expect(row.inviteeName).toBe('');
-		expect(row.inviterRole).toBeNull();
-		expect(row.inviteeRole).toBeNull();
+		expect(row.namesCiphertext).toBeNull();
 	});
 
 	it('the link in the message actually resolves to the stored token', async () => {

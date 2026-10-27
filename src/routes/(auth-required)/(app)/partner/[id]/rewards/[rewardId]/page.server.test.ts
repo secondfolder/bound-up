@@ -162,11 +162,12 @@ describe('actions', () => {
 		const post = await sealedPost(id, reward.id, { title: 'Tea time', description: 'Fresh pot' });
 		await runAndCatch(() => actions.default?.(at(id, reward.id, ada, post)));
 
-		await expect(readPartnershipRewardRow(db, reward.id)).resolves.toMatchObject({
-			title: '',
-			description: null,
+		const row = await readPartnershipRewardRow(db, reward.id);
+		expect(row).toMatchObject({
 			ciphertext: post.ciphertext
 		});
+		// Only the sealed record is kept: there is nowhere for the text to go.
+		expect(JSON.stringify(row)).not.toContain('Tea time');
 	});
 
 	it('refuses the non-controlling side', async () => {

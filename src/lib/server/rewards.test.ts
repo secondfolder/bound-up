@@ -118,15 +118,14 @@ describe('self rewards', () => {
 		);
 	});
 
-	it('keeps no plaintext on a sealed row, and hands back none', async () => {
-		const { id } = await createTestSelfReward(harness.db, ada);
+	it('hands back the sealed record, and nothing in its place', async () => {
+		const { id, ciphertext } = await createTestSelfReward(harness.db, ada);
 
-		await expect(readSelfRewardRow(harness.db, id)).resolves.toMatchObject({
-			title: '',
-			description: null
-		});
 		const reward = defined(await getSelfRewardForUser(harness.db, ada.id, id), 'reward');
-		expect(reward).toMatchObject({ title: '', description: null });
+		expect(reward.sealed).toMatchObject({ recordId: id, ciphertext });
+		for (const plaintext of ['title', 'description']) {
+			expect(reward).not.toHaveProperty(plaintext);
+		}
 	});
 
 	it('snapshots the sealed reward at claim time, not as later edited', async () => {
@@ -145,14 +144,11 @@ describe('self rewards', () => {
 			snapshotCiphertext: ciphertext,
 			snapshotVaultId: vaultId,
 			snapshotVersion: 1,
-			snapshotRecordId: id,
-			rewardTitle: '',
-			rewardDescription: null
+			snapshotRecordId: id
 		});
 		const section = await getSelfRewardsSection(harness.db, ada.id);
 		expect(section.claims).toEqual([
 			expect.objectContaining({
-				rewardTitle: '',
 				sealed: { recordId: id, vaultId, ciphertext, payloadVersion: 1 }
 			})
 		]);
@@ -287,9 +283,7 @@ describe('partnership rewards', () => {
 		await expect(readPartnershipRewardRow(harness.db, id)).resolves.toMatchObject({
 			ciphertext,
 			vaultId,
-			revision: 0,
-			title: '',
-			description: null
+			revision: 0
 		});
 
 		await expect(
@@ -351,9 +345,7 @@ describe('partnership rewards', () => {
 			snapshotCiphertext: ciphertext,
 			snapshotVaultId: vaultId,
 			snapshotVersion: 1,
-			snapshotRecordId: id,
-			rewardTitle: '',
-			rewardDescription: null
+			snapshotRecordId: id
 		});
 		const page = defined(await getPartnershipRewardsPage(harness.db, claimantView, ada.id), 'page');
 		expect(page.claims).toEqual([

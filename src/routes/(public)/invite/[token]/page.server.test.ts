@@ -79,16 +79,6 @@ describe('load', () => {
 		expect(data.invite).toBeNull();
 	});
 
-	it('reports an invite from before names were sealed as invalid', async () => {
-		// It has no key a link could carry, so it is offered again as a new link.
-		const invite = await createTestInvite(db, ada, {
-			legacyNames: { inviterName: 'Ada', inviteeName: 'Jun' }
-		});
-		const data = await runLoad(load(at(invite.inviteToken, jun)));
-		expect(data.state).toBe('invalid');
-		expect(JSON.stringify(data)).not.toContain('Ada');
-	});
-
 	it('reports a consumed token as invalid', async () => {
 		const invite = await createTestInvite(db, ada);
 		await runAndCatch(() => accept(at(invite.inviteToken, jun, {})));
@@ -255,19 +245,6 @@ describe('the accept action', () => {
 			status: 400,
 			data: { error: expect.stringMatching(/expired/i) }
 		});
-	});
-
-	it('refuses an invite from before names were sealed as expired', async () => {
-		const invite = await createTestInvite(db, ada, {
-			legacyNames: { inviterName: 'Ada', inviteeName: 'Jun' }
-		});
-
-		const result = await accept(at(invite.inviteToken, jun, {}));
-		expect(result).toMatchObject({
-			status: 400,
-			data: { error: expect.stringMatching(/expired/i) }
-		});
-		expect((await readPartnershipRow(db, invite.id)).status).toBe('pending');
 	});
 
 	it('reports an unknown token as a 404', async () => {

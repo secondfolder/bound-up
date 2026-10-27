@@ -14,13 +14,15 @@ vi.mock('$lib/crypto/session.svelte', () => ({
 	currentKeyring: () => ({ status: 'unlocked', identity: 'secret' })
 }));
 
-const openMessage =
-	vi.fn<(ciphertext: string, identity: CryptoKey | string) => Promise<MessagePayload | null>>();
+/**
+ * What each body opens to. The real opening goes through `sealedReader`,
+ * covered by `sealed-cache.svelte.test.ts`; here a body says what the test
+ * says, at once, as an opened record does once it has landed.
+ */
+const openedMessage = vi.fn<(ref: MessageBodyRef) => MessagePayload | null | undefined>();
 
-const openMessageMetadata =
-	vi.fn<
-		(ciphertext: string, identity: CryptoKey | string) => Promise<MessageMetadataPayload | null>
-	>();
+const openedMessageMetadata =
+	vi.fn<(ref: MessageBodyRef) => MessageMetadataPayload | null | undefined>();
 
 const fetchAttachment =
 	vi.fn<
@@ -35,22 +37,32 @@ const fetchAttachment =
 // component imported.
 vi.mock('$lib/messaging/client', async (importOriginal) => {
 	const { MediaExpiredError } = await importOriginal<typeof import('$lib/messaging/client')>();
-	return { openMessage, openMessageMetadata, fetchAttachment, MediaExpiredError };
+	return { openedMessage, openedMessageMetadata, fetchAttachment, MediaExpiredError };
 });
 
 const { default: ThreadSticker } = await import('./ThreadSticker.svelte');
 const { MediaExpiredError } = await import('$lib/messaging/client');
 
-/** A body in the original scheme: the mocked `openMessage` is what decides what it says. */
+/** A sealed body: the mocked `openedMessage` is what decides what it says. */
 function bodyRef(ciphertext: string): MessageBodyRef {
 	return {
 		id: `m-${ciphertext}`,
 		ciphertext,
-		vaultId: null,
-		payloadVersion: null,
+		vaultId: 'v1',
+		payloadVersion: 1,
 		metadataCiphertext: null,
 		metadataVersion: null
 	};
+}
+
+/** A stored body of one plain paragraph. */
+function prose(text: string): string {
+	return JSON.stringify({
+		root: {
+			type: 'root',
+			children: [{ type: 'paragraph', children: [{ type: 'text', text, format: 0 }] }]
+		}
+	});
 }
 
 function thread(overrides: Partial<ThreadStickerView> = {}): ThreadStickerView {
@@ -72,8 +84,8 @@ const realDateTimeFormat = Intl.DateTimeFormat;
 beforeEach(() => {
 	vi.useFakeTimers();
 	vi.setSystemTime(new Date('2026-09-13T15:00:00Z'));
-	openMessage.mockReset();
-	openMessageMetadata.mockReset();
+	openedMessage.mockReset();
+	openedMessageMetadata.mockReset();
 	fetchAttachment.mockReset();
 	Intl.DateTimeFormat = class {
 		readonly #options: Intl.DateTimeFormatOptions | undefined;
@@ -96,7 +108,7 @@ afterEach(() => {
 
 describe('ThreadSticker', () => {
 	it('shows a sealed envelope only for a never-opened unread thread', () => {
-		openMessage.mockResolvedValue({ version: 1, text: 'secret', attachments: [] });
+		openedMessage.mockReturnValue({ version: 1, text: prose('secret'), attachments: [] });
 		const { container, queryByText } = render(ThreadSticker, {
 			props: {
 				thread: thread({ unread: true, lastFullyReadAt: null }),
@@ -108,11 +120,11 @@ describe('ThreadSticker', () => {
 
 		expect(waProp(container.querySelector('wa-icon'), 'name')).toBe('envelope');
 		expect(queryByText('secret')).toBeNull();
-		expect(openMessage).not.toHaveBeenCalled();
+		expect(openedMessage).not.toHaveBeenCalled();
 	});
 
 	it('shows a decrypted preview for a reopened unread thread instead of the envelope', async () => {
-		openMessage.mockResolvedValue({ version: 1, text: 'first whisper', attachments: [] });
+		openedMessage.mockReturnValue({ version: 1, text: prose('first whisper'), attachments: [] });
 		const { container, findByText } = render(ThreadSticker, {
 			props: {
 				thread: thread({ unread: true, lastFullyReadAt: new Date('2026-09-12T18:00:00Z') }),
@@ -127,7 +139,7 @@ describe('ThreadSticker', () => {
 	});
 
 	it('shows a single text bubble full-size when the first message has only text', async () => {
-		openMessage.mockResolvedValue({ version: 1, text: 'soft words', attachments: [] });
+		openedMessage.mockReturnValue({ version: 1, text: prose('soft words'), attachments: [] });
 
 		const { container, findByText } = render(ThreadSticker, {
 			props: {
@@ -145,8 +157,12 @@ describe('ThreadSticker', () => {
 	});
 
 	it('prefers cached embed metadata for the board preview when present', async () => {
-		openMessage.mockResolvedValue({ version: 1, text: 'https://example.com', attachments: [] });
-		openMessageMetadata.mockResolvedValue({
+		openedMessage.mockReturnValue({
+			version: 1,
+			text: prose('https://example.com'),
+			attachments: []
+		});
+		openedMessageMetadata.mockReturnValue({
 			version: 1,
 			embeds: [
 				{
@@ -185,7 +201,7 @@ describe('ThreadSticker', () => {
 	});
 
 	it('shows a send time for today and an opened date when the latest message was read later', async () => {
-		openMessage.mockResolvedValue({ version: 1, text: 'meet me later', attachments: [] });
+		openedMessage.mockReturnValue({ version: 1, text: prose('meet me later'), attachments: [] });
 		const { container, findByText } = render(ThreadSticker, {
 			props: {
 				thread: thread(),
@@ -201,7 +217,7 @@ describe('ThreadSticker', () => {
 	});
 
 	it('shows a thumbnail when the first message is attachment-only', async () => {
-		openMessage.mockResolvedValue({
+		openedMessage.mockReturnValue({
 			version: 1,
 			text: '',
 			attachments: [
@@ -235,9 +251,9 @@ describe('ThreadSticker', () => {
 	});
 
 	it('fans multiple image thumbnails out with the text in its own bubble', async () => {
-		openMessage.mockResolvedValue({
+		openedMessage.mockReturnValue({
 			version: 1,
-			text: 'soft words',
+			text: prose('soft words'),
 			attachments: [
 				{
 					id: 'a1',
@@ -277,7 +293,7 @@ describe('ThreadSticker', () => {
 	});
 
 	it('shows a self-destructed attachment as the bomb, beside a sibling that still renders', async () => {
-		openMessage.mockResolvedValue({
+		openedMessage.mockReturnValue({
 			version: 1,
 			text: '',
 			attachments: [
@@ -345,7 +361,7 @@ describe('ThreadSticker', () => {
 			});
 
 		it('names the kind and the soonest expiry, even on a sealed tile', async () => {
-			openMessage.mockResolvedValue(payloadWith(['image'], ['a1']));
+			openedMessage.mockReturnValue(payloadWith(['image'], ['a1']));
 			const { container } = renderTile({
 				expiresAt: new Date(Date.now() + 3 * 24 * Hour),
 				messages: [{ ...bodyRef('c1'), attachmentIds: ['a1'] }],
@@ -357,10 +373,7 @@ describe('ThreadSticker', () => {
 					'Image self-destructs in 3 days'
 				)
 			);
-			expect(openMessage).toHaveBeenCalledWith(
-				expect.objectContaining({ ciphertext: 'c1' }),
-				expect.objectContaining({ identity: 'secret' })
-			);
+			expect(openedMessage).toHaveBeenCalledWith(expect.objectContaining({ ciphertext: 'c1' }));
 			// The link's label is what a screen reader hears; the line itself is hidden.
 			expect(container.querySelector('a')?.getAttribute('aria-label')).toContain(
 				'image self-destructs in 3 days'
@@ -370,9 +383,11 @@ describe('ThreadSticker', () => {
 		});
 
 		it('counts only the unseen files it was told about, across messages', async () => {
-			openMessage
-				.mockResolvedValueOnce(payloadWith(['video', 'image'], ['v1', 'seen']))
-				.mockResolvedValueOnce(payloadWith(['video'], ['v2']));
+			openedMessage.mockImplementation((ref) =>
+				ref.ciphertext === 'c1'
+					? payloadWith(['video', 'image'], ['v1', 'seen'])
+					: payloadWith(['video'], ['v2'])
+			);
 			const { container } = renderTile({
 				expiresAt: new Date(Date.now() + 2 * Hour),
 				messages: [
@@ -390,7 +405,7 @@ describe('ThreadSticker', () => {
 		});
 
 		it('says media when the list was cut short or a body will not open', async () => {
-			openMessage.mockResolvedValue(payloadWith(['image'], ['a1']));
+			openedMessage.mockReturnValue(payloadWith(['image'], ['a1']));
 			const truncated = renderTile({
 				expiresAt: new Date(Date.now() + Hour),
 				messages: [{ ...bodyRef('c1'), attachmentIds: ['a1'] }],
@@ -403,7 +418,7 @@ describe('ThreadSticker', () => {
 			);
 			truncated.unmount();
 
-			openMessage.mockResolvedValue(null);
+			openedMessage.mockReturnValue(null);
 			const unreadable = renderTile({
 				expiresAt: new Date(Date.now() + Hour),
 				messages: [{ ...bodyRef('c1'), attachmentIds: ['a1'] }],
@@ -421,7 +436,7 @@ describe('ThreadSticker', () => {
 			expect(none.container.querySelector('.self-destructs')).toBeNull();
 			none.unmount();
 
-			openMessage.mockResolvedValue(payloadWith(['image'], ['a1']));
+			openedMessage.mockReturnValue(payloadWith(['image'], ['a1']));
 			const { container } = renderTile({
 				expiresAt: new Date(Date.now() + 90 * 1000),
 				messages: [{ ...bodyRef('c1'), attachmentIds: ['a1'] }],
@@ -440,7 +455,7 @@ describe('ThreadSticker', () => {
 		// timers the file's fake ones would freeze.
 		beforeEach(() => {
 			vi.useRealTimers();
-			openMessage.mockResolvedValue({ version: 1, text: 'hello', attachments: [] });
+			openedMessage.mockReturnValue({ version: 1, text: prose('hello'), attachments: [] });
 		});
 		afterEach(() => {
 			vi.restoreAllMocks();

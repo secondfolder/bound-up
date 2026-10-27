@@ -12,9 +12,8 @@ import type { RequestHandler } from './$types';
  * `server/messaging.ts`.
  *
  * Restoring is one wrap: the partnership vault, for the key the requester's
- * sign-in will give them (`restoreVaultAccess`). The helping device first
- * seals anything still in the original scheme into the vault, through
- * `../sealed-migration`, so that one wrap covers the whole history.
+ * sign-in will give them (`restoreVaultAccess`). Everything in the partnership
+ * is sealed in that vault, so one wrap covers the whole history.
  */
 
 /**

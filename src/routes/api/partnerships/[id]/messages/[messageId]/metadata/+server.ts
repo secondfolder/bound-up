@@ -29,10 +29,10 @@ export const PUT: RequestHandler = async ({ locals, params, request }) => {
 	if (outcome === 'bad-body') {
 		error(400, 'Malformed metadata');
 	}
-	// A message still in the original scheme gets its sidecar when it is
-	// migrated, with its body. Not an error worth showing anyone.
+	// A row with no vault, which nothing writes any more. Not an error worth
+	// showing anyone: the details are looked up again on the next view.
 	if (outcome === 'not-sealed') {
-		error(409, 'This message has not moved into the vault yet');
+		error(409, 'This message is not sealed in a vault');
 	}
 	return json({ ok: true });
 };
