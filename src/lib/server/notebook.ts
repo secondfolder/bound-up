@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, lt, lte, max, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, lt, lte, max, or, sql } from 'drizzle-orm';
 import {
 	canSetAccess,
 	compactionBound,
@@ -26,7 +26,7 @@ import {
 	sealedRef,
 	selfVaultIdFor
 } from './sealed-content';
-import { isSpaceMember, partnershipControl, soloSpaceIdOf } from './spaces';
+import { isSpaceMember, partnershipControl, soloSpaceFor, soloSpaceIdOf } from './spaces';
 
 /**
  * Every database access for the notebook. See docs/notebook.md.
@@ -41,9 +41,18 @@ import { isSpaceMember, partnershipControl, soloSpaceIdOf } from './spaces';
 /** Whose notebook: one account's own, or a partnership's shared one. */
 export type NotebookScope = { kind: 'self' } | { kind: 'partnership'; partnershipId: string };
 
+/** The notebook scope a space is: your own solo space, or a partnership's. */
+export function scopeForSpace(space: { spaceId: string; kind: 'solo' | 'shared' }): NotebookScope {
+	return space.kind === 'solo'
+		? { kind: 'self' }
+		: { kind: 'partnership', partnershipId: space.spaceId };
+}
+
 /** What a viewer may do in a scope, once it is known they are in it. */
-type ResolvedScope = {
+export type ResolvedScope = {
 	scope: NotebookScope;
+	/** The scope's space: the viewer's solo space, or the partnership's (the same id). */
+	spaceId: string;
 	/** The vault every record in this scope must be sealed under, or null while there is none yet. */
 	vaultId: string | null;
 	partnership: PartnershipForAccess | null;
@@ -84,9 +93,17 @@ export async function resolveScope(
 	userId: string
 ): Promise<ResolvedScope | null> {
 	if (scope.kind === 'self') {
+		const [spaceId, vaultId] = await Promise.all([
+			soloSpaceFor(db, userId),
+			selfVaultIdFor(db, userId)
+		]);
+		if (!spaceId) {
+			return null;
+		}
 		return {
 			scope,
-			vaultId: await selfVaultIdFor(db, userId),
+			spaceId,
+			vaultId,
 			partnership: null,
 			room: userRoom(userId)
 		};
@@ -97,6 +114,7 @@ export async function resolveScope(
 	}
 	return {
 		scope,
+		spaceId: scope.partnershipId,
 		vaultId: await partnershipVaultIdFor(db, scope.partnershipId),
 		partnership,
 		room: partnershipRoom(scope.partnershipId)
@@ -107,6 +125,7 @@ const entryColumns = {
 	id: notebookEntries.id,
 	ownerId: notebookEntries.ownerId,
 	partnershipId: notebookEntries.partnershipId,
+	spaceId: notebookEntries.spaceId,
 	kind: notebookEntries.kind,
 	entryDate: notebookEntries.entryDate,
 	createdByUserId: notebookEntries.createdByUserId,
@@ -125,6 +144,7 @@ type EntryRow = {
 	id: string;
 	ownerId: string | null;
 	partnershipId: string | null;
+	spaceId: string | null;
 	kind: NotebookKind;
 	entryDate: string | null;
 	createdByUserId: string | null;
@@ -222,8 +242,17 @@ export async function getEntryContext(
 	};
 }
 
+/**
+ * The space an entry is in. Every row has `space_id` since the spaces
+ * backfill; a shared entry's is its partnership's id in any case.
+ */
+export function entrySpaceId(row: Pick<EntryRow, 'spaceId' | 'partnershipId'>): string {
+	return row.spaceId ?? row.partnershipId ?? '';
+}
+
 function toListEntry(row: EntryRow, access: EntryAccess, visible: boolean): NotebookEntryView {
 	return {
+		spaceId: entrySpaceId(row),
 		id: row.id,
 		kind: row.kind,
 		entryDate: row.entryDate,
@@ -237,9 +266,11 @@ function toListEntry(row: EntryRow, access: EntryAccess, visible: boolean): Note
 }
 
 /**
- * Every entry of one kind in a scope that `userId` may see, in the order its
- * list shows them: a journal by date, newest first; notes by when they were
- * last edited.
+ * Every entry of one kind in the given scopes that `userId` may see, in the
+ * order its list shows them: a journal by date, newest first; notes by when
+ * they were last edited. Several scopes are the Everyone list: one query over
+ * every space in it (`space_id IN (…)`), each row's access then worked out
+ * against its own scope, exactly as a list of that scope alone would.
  *
  * An entry hidden from the viewer is left out, except where the viewer may
  * now lift that restriction (control has moved to them since it was set): it
@@ -248,17 +279,19 @@ function toListEntry(row: EntryRow, access: EntryAccess, visible: boolean): Note
  */
 export async function listEntries(
 	db: Db,
-	resolved: ResolvedScope,
+	scopes: ResolvedScope | readonly ResolvedScope[],
 	userId: string,
 	kind: NotebookKind
 ): Promise<NotebookEntryView[]> {
-	const where =
-		resolved.scope.kind === 'self'
-			? and(eq(notebookEntries.ownerId, userId), eq(notebookEntries.kind, kind))
-			: and(
-					eq(notebookEntries.partnershipId, resolved.scope.partnershipId),
-					eq(notebookEntries.kind, kind)
-				);
+	const list: readonly ResolvedScope[] = 'scope' in scopes ? [scopes] : scopes;
+	const bySpace = new Map(list.map((resolved) => [resolved.spaceId, resolved]));
+	if (bySpace.size === 0) {
+		return [];
+	}
+	const where = and(
+		inArray(notebookEntries.spaceId, [...bySpace.keys()]),
+		eq(notebookEntries.kind, kind)
+	);
 	const order =
 		kind === 'journal'
 			? [desc(notebookEntries.entryDate), desc(notebookEntries.createdAt), notebookEntries.id]
@@ -269,6 +302,10 @@ export async function listEntries(
 		.where(where)
 		.orderBy(...order);
 	return rows.flatMap((row) => {
+		const resolved = bySpace.get(entrySpaceId(row));
+		if (!resolved) {
+			return [];
+		}
 		const access = entryAccessFor(forAccess(row), userId, resolved.partnership ?? undefined);
 		if (access !== 'none') {
 			return [toListEntry(row, access, true)];

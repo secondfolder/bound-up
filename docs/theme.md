@@ -346,6 +346,22 @@ at the end of the page, because inside the app shell the window does not
 scroll and `fixed` would not stay put. An item's detail is a `ResponsiveDialog`
 ([docs/dialogs.md](dialogs.md)).
 
+## Space colours
+
+Who a thing belongs to is a colour wherever spaces meet: the context switcher
+and the chip on each row of an Everyone list ([contexts.md](contexts.md)).
+
+- `--space-colour-me` is your own space, always the accent amber.
+- `--space-colour-teal`, `-violet`, `-blue`, `-pink`, `-green` and `-lime` are
+  the partner colours each viewer chooses from (`SPACE_COLOURS` in
+  `space-colours.ts`). They are light and saturated enough to stand apart from
+  the amber and from each other on the dark surfaces, at lightnesses that keep
+  the same dark ink legible on every one.
+- `--space-colour-ink` (the brand's on-loud rust) is what is drawn on them:
+  initials, the person glyph.
+- `--space-colour-gap` (the lowered surface) parts the slices of the
+  Everyone avatar, so two neighbouring colours do not blur into one.
+
 ## Adding to it
 
 A new component reaches for the semantic tokens, never a hex value. A new

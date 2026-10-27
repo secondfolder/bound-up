@@ -57,6 +57,16 @@ Messages are per-partner: there is no single `/messages` page behind the word,
 so its title is plain text and each row carries its own link to that partner's
 board. Every other card links.
 
+The Notebook card links to `/notebook`, which shows the current context
+([contexts.md](contexts.md)) rather than one space, so following it switches
+the context to the card's own space first — your own on `/home`, the
+partnership's on `/partner/[id]` — through `SectionWidget`'s `onfollow`. A
+link opened in a new tab skips that and shows the context as it is. Such a
+link is not preloaded on hover (`data-sveltekit-preload-data="off"`): the
+preload would fetch the list in the old context, and the navigation then used
+it. It navigates with `invalidate: ['app:context']`, so the app layout's
+context, which a navigation does not otherwise re-run, follows too.
+
 That card goes away **entirely** when nothing is unread — the whole card, not
 just its body, which is what every other card drops. A "Messages" header on its
 own would still be chrome on a screen read at a glance, and unlike the others it

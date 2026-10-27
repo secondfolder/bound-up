@@ -56,6 +56,8 @@ function data({
 		isAdmin: false,
 		pushAvailable: false,
 		debug: false,
+		contextSpaces: [],
+		context: { kind: 'all' },
 		partner: {
 			id: 'p1',
 			names: testNamesSource('p1', { partnerName: 'Jun' }),

@@ -41,9 +41,9 @@ async function setUp() {
 	});
 	const { container } = render(MenuLinkPopover, {
 		editor,
-		menuHref: (menuId: string) => `/home/notebook/scene/menus/${menuId}`
+		menuHref: (menuId: string) => `/notebook/scene/menus/${menuId}`
 	});
-	const link = `${location.origin}/home/notebook/scene/menus/${menu.dataset.menuId}`;
+	const link = `${location.origin}/notebook/scene/menus/${menu.dataset.menuId}`;
 	return { container, ask: () => button.click(), link, menu };
 }
 

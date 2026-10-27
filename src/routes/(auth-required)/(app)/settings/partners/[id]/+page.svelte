@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
+	import SpaceColourForm from '$lib/components/context/SpaceColourForm.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import SealedPartnerEditForm from '$lib/components/SealedPartnerEditForm.svelte';
 	import { inviteFragment } from '$lib/crypto/invite';
@@ -215,6 +216,11 @@
 				</dl>
 				<p class="hint">They're in control of this link, so only they can change these.</p>
 			{/if}
+		{/if}
+
+		{#if data.colourForm}
+			<h2>Colour</h2>
+			<SpaceColourForm form={data.colourForm} partnerName={shownName} />
 		{/if}
 
 		<!-- Set apart from the settings above, with what it does said before

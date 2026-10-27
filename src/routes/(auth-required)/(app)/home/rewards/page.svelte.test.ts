@@ -44,6 +44,8 @@ function data(
 		isAdmin: false,
 		pushAvailable: false,
 		debug: false,
+		contextSpaces: [],
+		context: { kind: 'all' },
 		selfRewards: { credits: 10, rewards: own, claims: [] },
 		partnerRewards:
 			theirs === null

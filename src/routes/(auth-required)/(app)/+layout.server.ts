@@ -1,14 +1,20 @@
+import { ALL_CONTEXT, type AppContext, CONTEXT_DEPENDENCY } from '$lib/context';
 import { DEBUG_COOKIE, debugModeOn } from '$lib/debug';
 import type { FeatureKey } from '$lib/features';
 import { isAdmin } from '$lib/server/admin';
+import { contextSpaceViews } from '$lib/server/context';
 import { listUserFeatures } from '$lib/server/features';
 import { listHelpRequests } from '$lib/server/messaging';
 import { listPartnersForNav } from '$lib/server/partnerships';
 import { readVapidConfig } from '$lib/server/push';
-import type { HelpRequestView } from '$lib/types';
+import type { ContextSpaceView, HelpRequestView } from '$lib/types';
 import type { LayoutServerLoad } from './$types';
 
-export const load: LayoutServerLoad = async ({ locals, cookies }) => {
+export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
+	// The switcher's current context comes from here, so switching re-runs this
+	// along with the page's own loads. See docs/contexts.md.
+	depends(CONTEXT_DEPENDENCY);
+
 	// Loaded in the layout rather than per page because the bottom nav renders
 	// one tab per partner on every screen in this group. The group's own guard
 	// has already run by the time a layout load does, so `locals.user` is set —
@@ -21,11 +27,13 @@ export const load: LayoutServerLoad = async ({ locals, cookies }) => {
 			features: [] as FeatureKey[],
 			isAdmin: false,
 			pushAvailable: false,
-			debug: false
+			debug: false,
+			contextSpaces: [] as ContextSpaceView[],
+			context: ALL_CONTEXT as AppContext
 		};
 	}
 
-	const [partners, helpFrom, features] = await Promise.all([
+	const [partners, helpFrom, features, spaces, context] = await Promise.all([
 		listPartnersForNav(locals.db, locals.user.id),
 		// On every screen, because a partner who cannot sign in cannot message
 		// you to say so. The query this replaced — "has this user any message
@@ -35,7 +43,12 @@ export const load: LayoutServerLoad = async ({ locals, cookies }) => {
 		// parallel, so a page cannot rely on this having run first, and a form
 		// action runs before any load at all — every page and action that serves
 		// a feature checks with `requireFeature` itself.
-		listUserFeatures(locals.db, locals.user.id)
+		listUserFeatures(locals.db, locals.user.id),
+		// The spaces the context switcher offers, and the one the cookie names.
+		// Display only, like `features`: no action reads either to decide where
+		// a write goes (docs/contexts.md, "Writes name their space").
+		locals.contextSpaces(),
+		locals.context()
 	]);
 
 	// Names from the nav's own list rather than a second query, so the two can
@@ -56,6 +69,8 @@ export const load: LayoutServerLoad = async ({ locals, cookies }) => {
 		pushAvailable: readVapidConfig(locals.settings) !== null,
 		// This device's debug switch, honoured only while the account holds
 		// the feature. Display only, like `features`. See docs/debug-mode.md.
-		debug: debugModeOn(features, cookies.get(DEBUG_COOKIE))
+		debug: debugModeOn(features, cookies.get(DEBUG_COOKIE)),
+		contextSpaces: contextSpaceViews(spaces, partners),
+		context
 	};
 };

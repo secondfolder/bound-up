@@ -37,7 +37,10 @@
 		{/if}
 		<TasksWidget tasks={data.tasks} href={resolve('/(auth-required)/(app)/home/tasks')} />
 		<RewardsWidget rewards={data.rewards} href={resolve('/(auth-required)/(app)/home/rewards')} />
-		<NotebookWidget items={data.notebook} href={resolve('/(auth-required)/(app)/home/notebook')} />
+		<NotebookWidget
+			items={data.notebook}
+			spaceId={data.contextSpaces.find((space) => space.kind === 'solo')?.id ?? null}
+		/>
 		<PlayroomWidget latestIq={data.latestIq} href={resolve('/(auth-required)/(app)/playroom')} />
 	</div>
 </div>

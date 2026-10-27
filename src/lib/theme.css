@@ -201,6 +201,22 @@
 		/* What sits on a filled dot: the check mark. */
 		--kink-level-ink: oklch(18% 0.03 40);
 
+		/* How a space looks to the viewer (docs/contexts.md): your own is the
+		   accent, and each partnership one of the rest, chosen per viewer from
+		   this closed list (`space-colours.ts`). Light and saturated enough to
+		   stand apart from the amber and from each other on the dark surfaces,
+		   with the same dark ink legible on every one. The gap is what parts
+		   two slices of the Everyone avatar. */
+		--space-colour-me: var(--accent-color);
+		--space-colour-teal: oklch(80% 0.11 180);
+		--space-colour-violet: oklch(77% 0.14 300);
+		--space-colour-blue: oklch(76% 0.12 255);
+		--space-colour-pink: oklch(76% 0.14 10);
+		--space-colour-green: oklch(84% 0.13 140);
+		--space-colour-lime: oklch(89% 0.15 115);
+		--space-colour-ink: var(--wa-color-brand-on-loud);
+		--space-colour-gap: var(--wa-color-surface-lowered);
+
 		/* A daydream passage's speech (docs/daydreams.md, "Reading a
 		   passage"). Dialogue is a warmer, brighter cream than narration's
 		   text colour, enough to find the next line by eye without shouting.

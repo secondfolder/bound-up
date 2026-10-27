@@ -49,6 +49,8 @@ function data(
 		isAdmin: false,
 		pushAvailable: false,
 		debug: false,
+		contextSpaces: [],
+		context: { kind: 'all' },
 		selfTasks: { tasks: selfTasks, completions: [], credits: 12 },
 		partnerTasks
 	} as PageData;

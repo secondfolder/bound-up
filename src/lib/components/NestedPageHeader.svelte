@@ -7,7 +7,8 @@
 		backText,
 		title = null,
 		description = null,
-		actions
+		actions,
+		corner
 	}: {
 		backHref: string;
 		backLabel: string;
@@ -19,6 +20,11 @@
 		 * history, say.
 		 */
 		actions?: Snippet;
+		/**
+		 * At the end of the back link's line: the context switcher, on a page
+		 * whose list follows the context (docs/contexts.md).
+		 */
+		corner?: Snippet;
 	} = $props();
 </script>
 
@@ -37,6 +43,7 @@
 			<wa-icon name="chevron-left" variant="solid"></wa-icon>
 			<span>{backText}</span>
 		</a>
+		{#if corner}<div class="corner">{@render corner()}</div>{/if}
 	</div>
 
 	{#if title || description || actions}
@@ -70,6 +77,11 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
+	}
+
+	.corner {
+		display: flex;
+		margin-inline-start: auto;
 	}
 
 	a {

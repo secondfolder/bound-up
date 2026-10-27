@@ -159,6 +159,8 @@ export function createSharedSpace(
 					spaceId: partnerships.id,
 					userId: partnerships.inviterId,
 					canManage: sql<boolean>`${inviter?.canManage ? 1 : 0}`.as('can_manage'),
+					// Every column, in order, is what an insert from a select takes.
+					colour: sql<null>`null`.as('colour'),
 					createdAt: sql<Date>`${Date.now()}`.as('created_at'),
 					updatedAt: sql<Date>`${Date.now()}`.as('updated_at')
 				})
@@ -201,6 +203,7 @@ export function syncSharedSpaceMembers(db: Db, partnershipId: string): Batch {
 						spaceId: partnerships.id,
 						userId: sql<string>`${partnerships.inviteeId}`.as('user_id'),
 						canManage: sql<boolean>`0`.as('can_manage'),
+						colour: sql<null>`null`.as('colour'),
 						createdAt: sql<Date>`${now}`.as('created_at'),
 						updatedAt: sql<Date>`${now}`.as('updated_at')
 					})

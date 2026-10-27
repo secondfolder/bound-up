@@ -4,6 +4,7 @@ import type { ThreadIcon } from './messaging';
 import type { EntryAccess, NotebookKind, PartnerAccess } from './notebook';
 import type { PartnerNamesSource } from './partnership';
 import type { Intensity, Role, Vibe } from './playroom/iq-test/settings';
+import type { SpaceColour } from './space-colours';
 import type { VaultKind } from './vault';
 
 /**
@@ -182,6 +183,22 @@ export type HomePartnerTasksSectionView = {
 export type GuideView = {
 	id: string;
 	title: string;
+};
+
+/**
+ * A space the viewer can switch to, as the context switcher and the space
+ * chips show it. See docs/contexts.md.
+ */
+export type ContextSpaceView = {
+	id: string;
+	kind: 'solo' | 'shared';
+	/**
+	 * How it looks to the viewer: `me` for their own space, which is always
+	 * the accent, otherwise their choice for it or the default by order.
+	 */
+	colour: SpaceColour | 'me';
+	/** A shared space's names (`partner-names.svelte.ts`); null for your own. */
+	names: PartnerNamesSource | null;
 };
 
 /**
@@ -742,6 +759,8 @@ export type NotebookEntryView = {
 	access: EntryAccess;
 	partnerAccess: PartnerAccess;
 	header: SealedRefView | null;
+	/** The space it is in, for the chip an Everyone list puts on each row. */
+	spaceId: string;
 };
 
 /** One automatic version of a notebook entry, as its history lists it. */

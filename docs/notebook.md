@@ -3,8 +3,10 @@
 Somewhere to write things down. A notebook holds **journal entries** (dated),
 **notes** (free pages) and **scenes** (plans for play, with ideas and prompts
 beside them: [scenes.md](scenes.md)), each a rich-text document with a title. Everyone
-has their own notebook at `/home/notebook`, and every partnership has a shared
-one at `/partner/[id]/notebook`. An entry is edited live by everyone who has it
+has their own notebook, and every partnership has a shared one; all of them are
+at `/notebook`, which shows whichever the current context is — your own, one
+partnership's, or every one at once ([contexts.md](contexts.md)). An entry is
+edited live by everyone who has it
 open, the way a shared online document is: each writer's edits merge into the
 others' as they type, each sees where the others' carets are, and a history of
 versions is kept automatically.
@@ -233,13 +235,45 @@ media (`purgePartnershipMedia`), and under `permanent/users/<userId>/notebook/`
 for a solo one. The app has no account deletion; if it gains one, that prefix
 has to go with it.
 
+## The list in every context
+
+`/notebook` follows the context ([contexts.md](contexts.md)), with the
+switcher at the top right:
+
+- **One space** (Me, or a partnership) lists that space's entries, live on its
+  room (`user:<id>` for your own, `partnership:<id>` for a shared one), as each
+  notebook always has.
+- **Everyone** lists every space you are in **in one query**
+  (`space_id IN (…)`, by `notebook_entries_space_id_idx`), and works each row's
+  access out against its own space exactly as that space's list would
+  (`entryAccessFor`, and the hidden-but-liftable rows). Each row carries a chip
+  saying whose it is. With only your own space, Everyone is just Me: no chips,
+  no question.
+- **Everyone is not live.** One stream per partnership would cost one each
+  ([realtime.md](realtime.md)), so the list refreshes when the page is looked
+  at again (`visibilitychange` and `focus`) instead. Fanning list events out to
+  every member's own room, so one stream covers Everyone, is a later step.
+- **Starting an entry names its space.** In one space it is that space; in
+  Everyone a **"For whom?"** choice (Me, or each partner) must be made first,
+  and the last one used is remembered on the device (`localStorage`). Either
+  way the form posts `spaceId`, and `createEntryAction` checks membership of
+  it: it never reads the context, which another tab can change under this one.
+- **An entry is its own space's.** `/notebook/[entryId]` takes its space from
+  the entry, so one opened while the context says someone else shows as
+  whoever's it is (a chip at the top right), with the actions its partnership
+  allows. Its links go back to `/notebook`, in whatever the context is.
+
+The /home and /partner cards link to `/notebook` and switch the context to
+their own space on the way (`NotebookWidget`), so following one shows what it
+previewed.
+
 ## Screens and endpoints
 
 | Route | |
 | --- | --- |
-| `/home/notebook`, `/partner/[id]/notebook` | Journal, Notes and Scenes tabs; a new entry; `?/create`, and `?/show` for a hidden entry the viewer may show again. |
-| `.../notebook/[entryId]` | The entry: title (its save status, Settings, History and Delete at the end of its row, or on a row above it where they do not fit), editor, presence, history; `?/setAccess` (who else can see it, in the Settings popover, for whoever has the say over that) and `?/delete`. |
-| `.../notebook/[entryId]/menus/[menuId]` | A scene's menu on a page of its own, read only until Edit, its to-dos tickable by a writer ([scenes.md](scenes.md#a-menus-own-page)). |
+| `/notebook` | Journal, Notes and Scenes tabs in the current context; a new entry; `?/create` (naming its `spaceId`), and `?/show` for a hidden entry the viewer may show again (naming the entry's space). |
+| `/notebook/[entryId]` | The entry, in its own space: title (its save status, Settings, History and Delete at the end of its row, or on a row above it where they do not fit), editor, presence, history; `?/setAccess` (who else can see it, in the Settings popover, for whoever has the say over that) and `?/delete`. |
+| `/notebook/[entryId]/menus/[menuId]` | A scene's menu on a page of its own, read only until Edit, its to-dos tickable by a writer ([scenes.md](scenes.md#a-menus-own-page)). |
 | `api/notebook/entries/[entryId]/updates` | `GET` edits after a seq (with the latest version on open); `POST` a batch and/or a caret. |
 | `.../header` | `POST` the sealed header, compare-and-swap. |
 | `.../versions` | `GET` the history; `POST` a version. |
@@ -249,8 +283,10 @@ The live stream is the shared `api/realtime/events`, on the entry's topic. The
 /home and /partner cards show the three most recently edited entries
 (`NotebookWidget`), leaving out anything hidden from the viewer.
 
-The loads and actions for both scopes are in `server/notebook-pages.ts`, and
-everything that touches the database in `server/notebook.ts`.
+The loads and actions are in `server/notebook-pages.ts`, and everything that
+touches the database in `server/notebook.ts`. The old addresses,
+`/home/notebook/**` and `/partner/[id]/notebook/**`, are gone, with no
+redirects.
 
 ## Not built yet
 

@@ -426,6 +426,17 @@ export async function linkAccounts(
 	await invitee.page.waitForURL(/\/partner\//);
 }
 
+/**
+ * Switches a side's context, as the switcher does: one cookie per browser
+ * context, so it changes what every list in that side's tabs shows, and
+ * nothing in the other side's. `all`, or a space id (a partnership's is its
+ * own id). See docs/contexts.md.
+ */
+export async function showContext(page: Page, context: string): Promise<void> {
+	const response = await page.request.post('/api/context', { data: { context } });
+	expect(response.status()).toBe(204);
+}
+
 /** Opens a partner's messages board, and waits until it can be written on. */
 export async function openBoard(page: Page, partnerName: string): Promise<void> {
 	// Scoped to the nav and matched loosely on purpose: the tab's accessible

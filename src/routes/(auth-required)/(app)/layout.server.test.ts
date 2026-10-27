@@ -100,3 +100,28 @@ test('turns debug mode on only for an account holding it, on a device that switc
 test('has debug mode off without a session', async () => {
 	expect((await runLoad(load(fakeEvent({ db, user: null, cookies: {} })))).debug).toBe(false);
 });
+
+test('offers the switcher the viewer’s own space and each linked partnership, with the context', async () => {
+	const { id } = await createTestPartnership(db, ada, jun);
+	await createTestInvite(db, ada);
+	const data = await runLoad(load(fakeEvent({ db, user: ada, cookies: {}, contextCookie: id })));
+	expect(data.contextSpaces).toEqual([
+		{ id: expect.any(String), kind: 'solo', colour: 'me', names: null },
+		{
+			id,
+			kind: 'shared',
+			colour: 'teal',
+			names: expect.objectContaining({ partnershipId: id })
+		}
+	]);
+	expect(data.context).toEqual({ kind: 'space', spaceId: id });
+});
+
+test('says Everyone for a context the viewer cannot use', async () => {
+	const { id } = await createTestPartnership(db, ada, jun);
+	const stranger = await createTestUser(db, { name: 'Cy' });
+	const data = await runLoad(
+		load(fakeEvent({ db, user: stranger, cookies: {}, contextCookie: id }))
+	);
+	expect(data.context).toEqual({ kind: 'all' });
+});

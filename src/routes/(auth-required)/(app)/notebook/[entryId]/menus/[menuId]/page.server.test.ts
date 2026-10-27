@@ -10,7 +10,7 @@ import {
 import { load } from './+page.server';
 
 /**
- * A shared scene's menu on its own page: the scene's own access, and only a
+ * A scene's menu on its own page: the scene's own access, and only a
  * scene. Whether the menu is in it is the browser's to say. See
  * docs/scenes.md, "A menu's own page".
  */
@@ -33,8 +33,8 @@ function at(user: TestUser, entryId: string) {
 	return fakeEvent({
 		db: harness.db,
 		user,
-		params: { id: partnershipId, entryId, menuId: 'a-menu' },
-		path: `/partner/${partnershipId}/notebook/${entryId}/menus/a-menu`
+		params: { entryId, menuId: 'a-menu' },
+		path: `/notebook/${entryId}/menus/a-menu`
 	});
 }
 
@@ -47,7 +47,11 @@ describe('load', () => {
 		});
 		const asAda = await runLoad(load(at(ada, scene.id)));
 		const asBo = await runLoad(load(at(bo, scene.id)));
-		expect(asAda).toMatchObject({ menuId: 'a-menu', entry: { id: scene.id, canWrite: true } });
+		expect(asAda).toMatchObject({
+			menuId: 'a-menu',
+			entry: { id: scene.id, canWrite: true },
+			space: { id: partnershipId, kind: 'shared', partnershipId }
+		});
 		expect(asBo.entry).toMatchObject({ canWrite: false });
 		// Nothing the scene's prompt column needs.
 		expect(asAda).not.toHaveProperty('scene');

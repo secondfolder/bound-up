@@ -932,8 +932,9 @@
 				{
 					"id": "partner-colours",
 					"title": "Partner colours",
-					"summary": "Give each partner a colour of their own.",
-					"status": "planned",
+					"summary": "Give each partner a colour of their own, seen only by you.",
+					"status": "shipped",
+					"shippedOn": "2026-10-27",
 					"icon": "droplet"
 				},
 				{

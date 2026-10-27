@@ -16,6 +16,7 @@ import type { NotebookKind, PartnerAccess } from '../../../notebook';
 import type { PartnershipControl, PartnershipStatus } from '../../../partnership';
 import type { Intensity, Role, Vibe } from '../../../playroom/iq-test/settings';
 import type { ServerSettingKey, ServerSettingSource } from '../../../server-settings';
+import type { SpaceColour } from '../../../space-colours';
 import type { SpaceKind } from '../../../spaces';
 import type { EdgeTaskInstructions, TaskSchedule } from '../../../types';
 import type { VaultKind } from '../../../vault';
@@ -276,6 +277,14 @@ export const spaceMembers = sqliteTable(
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
 		canManage: integer('can_manage', { mode: 'boolean' }).notNull(),
+		/**
+		 * How this member sees the space: their own choice of colour for it, from
+		 * the closed list in `space-colours.ts`, or null for the one assigned by
+		 * order. Per member, never shown to the others, and a closed list rather
+		 * than free text so a plaintext column cannot carry anything else. See
+		 * docs/contexts.md.
+		 */
+		colour: text('colour').$type<SpaceColour>(),
 		...timestamps
 	},
 	(table) => [

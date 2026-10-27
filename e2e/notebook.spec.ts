@@ -9,6 +9,7 @@ import {
 	newAccounts,
 	newSide,
 	type Side,
+	showContext,
 	typeRichText,
 	waitForHydration
 } from './helpers';
@@ -47,15 +48,22 @@ async function setTitle(page: Page, title: string) {
 async function sharedNotebook(
 	browser: Browser,
 	control: 'me' | 'them' | 'mix' = 'mix'
-): Promise<{ ada: Side; bo: Side; notebookUrl: string }> {
+): Promise<{ ada: Side; bo: Side; notebookUrl: string; partnershipId: string }> {
 	const ada = await newSide(browser, 'Ada');
 	const bo = await newSide(browser, 'Bo');
 	await newAccounts(ada, bo);
 	await linkAccounts(ada, bo, control);
-	// The invitee lands on the partner page; its notebook is one link away.
+	// The invitee lands on the partner page; its notebook card switches to
+	// the partnership's context on the way to /notebook. Ada's device has a
+	// context of its own, switched to the same partnership.
+	const partnershipId = bo.page.url().split('/').at(-1) ?? '';
+	// After hydration: before it the card is a plain link, which goes to
+	// /notebook without switching, in whatever context the device had.
+	await waitForHydration(bo.page);
 	await bo.page.getByRole('link', { name: 'Notebook' }).click();
-	await bo.page.waitForURL(/\/partner\/[0-9a-f-]{36}\/notebook$/);
-	return { ada, bo, notebookUrl: bo.page.url() };
+	await bo.page.waitForURL(/\/notebook$/);
+	await showContext(ada.page, partnershipId);
+	return { ada, bo, notebookUrl: '/notebook', partnershipId };
 }
 
 test.describe('the solo journal', () => {
@@ -63,7 +71,7 @@ test.describe('the solo journal', () => {
 		const side = await newSide(browser, 'Ada');
 		try {
 			await newAccount(side.page, side.who);
-			await side.page.goto('/home/notebook');
+			await side.page.goto('/notebook');
 			const url = await startEntry(side.page, 'journal');
 
 			await setTitle(side.page, 'A good week');
@@ -90,7 +98,7 @@ test.describe('the solo journal', () => {
 			expect(stored).not.toContain('A good week');
 
 			// The list shows it by its (opened) title.
-			await side.page.goto('/home/notebook');
+			await side.page.goto('/notebook');
 			await expect(side.page.getByRole('link', { name: /A good week/ })).toBeVisible({
 				timeout: 15_000
 			});
@@ -106,7 +114,7 @@ test.describe('the writing surface', () => {
 		const side = await newSide(browser, 'Ada');
 		try {
 			await newAccount(side.page, side.who);
-			await side.page.goto('/home/notebook');
+			await side.page.goto('/notebook');
 			await startEntry(side.page, 'note');
 			await typeRichText(side.page, 'One line.');
 
@@ -225,6 +233,155 @@ test.describe('a shared note', () => {
 	});
 });
 
+/**
+ * One list for every context (docs/contexts.md): the switcher re-filters it
+ * in place, Everyone shows every space with each row's owner, a new entry in
+ * Everyone asks whose it is, and nothing the context says ever moves a write.
+ */
+test.describe('contexts', () => {
+	const control = (page: Page) => page.getByRole('button', { name: /^Showing / });
+
+	/** Opens the fan and picks one, then waits for the list to have followed. */
+	async function pick(page: Page, name: string) {
+		await control(page).click();
+		await page.getByRole('button', { name: `Show ${name}` }).click();
+		await expect(control(page)).toHaveAccessibleName(new RegExp(`^Showing ${name}`));
+		await expect(control(page)).toHaveAttribute('aria-expanded', 'false');
+	}
+
+	async function titled(page: Page, kind: 'note', title: string): Promise<string> {
+		const url = await startEntry(page, kind);
+		await setTitle(page, title);
+		await expect(page.getByText('Saved')).toBeVisible();
+		return url;
+	}
+
+	test('switching keeps the page and re-filters it; Everyone shows both, each saying whose', async ({
+		browser
+	}) => {
+		const { ada, bo } = await sharedNotebook(browser);
+		try {
+			const tag = crypto.randomUUID().slice(0, 6);
+			// Bo is in the partnership's context, from its card.
+			await expect(control(bo.page)).toHaveAccessibleName(/^Showing Ada/);
+			const ours = await titled(bo.page, 'note', `Ours ${tag}`);
+
+			await bo.page.goto('/notebook');
+			await waitForHydration(bo.page);
+			await pick(bo.page, 'Me');
+			await expect(bo.page).toHaveURL(/\/notebook$/);
+			await bo.page.getByRole('tab', { name: 'Notes' }).click();
+			await expect(bo.page.getByRole('link', { name: new RegExp(`Ours ${tag}`) })).toHaveCount(0);
+			await titled(bo.page, 'note', `Mine ${tag}`);
+
+			await bo.page.goto('/notebook');
+			await waitForHydration(bo.page);
+			await pick(bo.page, 'Everyone');
+			await bo.page.getByRole('tab', { name: 'Notes' }).click();
+			await expect(bo.page.getByRole('link', { name: new RegExp(`Ours ${tag}`) })).toContainText(
+				'Ada'
+			);
+			await expect(bo.page.getByRole('link', { name: new RegExp(`Mine ${tag}`) })).toContainText(
+				'Me'
+			);
+
+			// A partnership's entry opened in Me is still the partnership's.
+			await pick(bo.page, 'Me');
+			await bo.page.goto(ours);
+			await expect(bo.page.locator('header .corner')).toContainText('Ada');
+			await expect(surface(bo.page)).toBeVisible();
+			// Control is shared and Bo started it, so its settings are his.
+			await expect(bo.page.locator('wa-button', { hasText: 'Settings' })).toBeVisible();
+		} finally {
+			await ada.close();
+			await bo.close();
+		}
+	});
+
+	test('a new entry in Everyone asks whose it is first', async ({ browser }) => {
+		const { ada, bo } = await sharedNotebook(browser);
+		try {
+			await showContext(ada.page, 'all');
+			await ada.page.goto('/notebook');
+			await waitForHydration(ada.page);
+			await expect(control(ada.page)).toHaveAccessibleName(/^Showing Everyone/);
+			await ada.page.getByRole('tab', { name: 'Notes' }).click();
+
+			await clickWaButton(ada.page, 'New note');
+			await expect(ada.page.getByText('Choose who it’s for')).toBeVisible();
+			await expect(ada.page).toHaveURL(/\/notebook$/);
+
+			await ada.page.locator('wa-select[name="spaceId"]').click();
+			await ada.page.getByRole('option', { name: 'Bo' }).click();
+			await clickWaButton(ada.page, 'New note');
+			await ada.page.waitForURL(/\/notebook\/[0-9a-f-]{36}$/);
+			await expect(ada.page.locator('header .corner')).toContainText('Bo');
+			const id = ada.page.url().split('/').at(-1) ?? '';
+			const { rows } = await sql('SELECT partnership_id FROM notebook_entries WHERE id = ?', [id]);
+			expect(rows[0]?.partnership_id).toBeTruthy();
+
+			// Remembered on this device as the next one's default.
+			await ada.page.goto('/notebook');
+			await expect(ada.page.locator('wa-select[name="spaceId"]')).toHaveJSProperty(
+				'value',
+				String(rows[0]?.partnership_id)
+			);
+		} finally {
+			await ada.close();
+			await bo.close();
+		}
+	});
+
+	test('another tab switching does not move where this one creates; coming back refreshes it', async ({
+		browser
+	}) => {
+		const { ada, bo, partnershipId } = await sharedNotebook(browser);
+		const second = await bo.page.context().newPage();
+		try {
+			await bo.page.goto('/notebook');
+			await waitForHydration(bo.page);
+			await pick(bo.page, 'Me');
+			await bo.page.getByRole('tab', { name: 'Notes' }).click();
+
+			// The same device, another tab: the cookie is the device's.
+			await showContext(second, 'all');
+
+			// This tab still shows Me, so what it starts is Bo's own.
+			await expect(control(bo.page)).toHaveAccessibleName(/^Showing Me/);
+			const url = await startEntry(bo.page, 'note');
+			const id = url.split('/').at(-1) ?? '';
+			const { rows } = await sql(
+				'SELECT partnership_id, owner_id FROM notebook_entries WHERE id = ?',
+				[id]
+			);
+			expect(rows[0]?.partnership_id).toBeNull();
+			expect(rows[0]?.owner_id).toBeTruthy();
+
+			// Back on the list, the tab coming to the front again sees the cookie
+			// changed under it and follows.
+			await bo.page.goto('/notebook');
+			await expect(control(bo.page)).toHaveAccessibleName(/^Showing Everyone/);
+			await showContext(second, partnershipId);
+			await bo.page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+			await expect(control(bo.page)).toHaveAccessibleName(/^Showing Ada/);
+		} finally {
+			await second.close();
+			await ada.close();
+			await bo.close();
+		}
+	});
+
+	test('the old notebook addresses are gone', async ({ browser }) => {
+		const side = await newSide(browser, 'Ada');
+		try {
+			await newAccount(side.page, side.who);
+			expect((await side.page.goto('/home/notebook'))?.status()).toBe(404);
+		} finally {
+			await side.close();
+		}
+	});
+});
+
 test.describe('version history', () => {
 	test('keeps versions automatically, and restores one', async ({ browser }) => {
 		const side = await newSide(browser, 'Ada');
@@ -237,7 +394,7 @@ test.describe('version history', () => {
 				);
 			});
 			await newAccount(side.page, side.who);
-			await side.page.goto('/home/notebook');
+			await side.page.goto('/notebook');
 			await startEntry(side.page, 'note');
 
 			await typeRichText(side.page, 'First draft.');
@@ -274,7 +431,7 @@ test.describe('offline', () => {
 		const side = await newSide(browser, 'Ada');
 		try {
 			await newAccount(side.page, side.who);
-			await side.page.goto('/home/notebook');
+			await side.page.goto('/notebook');
 			const url = await startEntry(side.page, 'note');
 
 			let refused = 0;

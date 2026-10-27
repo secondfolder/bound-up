@@ -20,7 +20,7 @@ Every feature still reads its rows by its own columns (`owner_id`,
 | Table           | What                                                                                       |
 | --------------- | ------------------------------------------------------------------------------------------ |
 | `spaces`        | `id`, `kind` (`solo` or `shared`), timestamps. Nothing about a space is content.            |
-| `space_members` | `space_id`, `user_id`, `can_manage`. Unique on the pair, indexed on `user_id`.              |
+| `space_members` | `space_id`, `user_id`, `can_manage`, `colour`. Unique on the pair, indexed on `user_id`.    |
 
 These carry a nullable `space_id`:
 
@@ -92,6 +92,11 @@ A **pending invite** has one member, so what it offers the invitee can only be
 read from the row: `partnershipControl()` returns the column itself until the
 partnership is accepted. That is invite detail, and invites are pair-shaped
 (below).
+
+A member's **`colour`** is how that space looks to *them* in the context
+switcher and on an Everyone list: their own choice from a closed list, or null
+for one assigned by order. It is never shown to the other members. See
+[contexts.md](contexts.md#colours).
 
 Membership checks delegate to the space: "is this user in the partnership"
 is `isSpaceMember(partnerships.id, userId)` everywhere it is asked
@@ -194,5 +199,6 @@ so they need no change when screens start speaking in spaces.
 | `src/lib/server/spaces.ts`             | Membership, the solo space, `partnershipControl`, the sync, and deleting      |
 | `drizzle/0048_add_spaces.sql`          | The tables and the `space_id` columns, all `CREATE` and `ADD COLUMN`           |
 | `drizzle/0049_backfill_spaces.sql`     | The trigger, and spaces and members for what already existed                   |
+| `drizzle/0050_add_space_member_colour.sql` | Each member's colour for the space ([contexts.md](contexts.md#colours))    |
 | `src/lib/server/spaces.test.ts`        | Membership, the sync, the id clash, and the no-orphans tests                   |
 | `src/lib/server/db/migrations.test.ts` | The backfill, against rows written before it                                   |

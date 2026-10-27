@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import type { Attachment } from 'svelte/attachments';
 
 	/**
 	 * The card shell every /home and /partner/[id] section is built from.
@@ -13,7 +14,8 @@
 		title,
 		href,
 		icon,
-		body
+		body,
+		onfollow
 	}: {
 		title: string;
 		/**
@@ -37,7 +39,27 @@
 		 * than no body.
 		 */
 		body?: Snippet;
+		/**
+		 * Runs when the title's link is followed, before the browser goes:
+		 * the notebook card's, to show the list in the card's own context.
+		 */
+		onfollow?: (event: MouseEvent) => void;
 	} = $props();
+
+	/**
+	 * `onfollow` as a listener on the link itself, not an `onclick=`: Svelte
+	 * delegates that to the root, where SvelteKit's router also listens for
+	 * link clicks, so which ran first was down to registration order. On the
+	 * link, it runs before anything at the root and can stop the router.
+	 */
+	const following: Attachment<HTMLAnchorElement> = (link) => {
+		const follow = onfollow;
+		if (!follow) {
+			return;
+		}
+		link.addEventListener('click', follow);
+		return () => link.removeEventListener('click', follow);
+	};
 </script>
 
 <!--
@@ -53,7 +75,10 @@
 				`href` arrives already resolved — every caller builds it with
 				`resolve()`, because only the page knows which route params to pass.
 			-->
-			<a {href}>
+			<!-- Not preloaded when it switches the context first: a preload
+			     fetches the page's data in the context as it was, and the
+			     navigation would then use that. -->
+			<a {href} {@attach following} data-sveltekit-preload-data={onfollow ? 'off' : undefined}>
 				{#if icon}
 					<wa-icon name={icon} variant="solid"></wa-icon>
 				{/if}

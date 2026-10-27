@@ -349,3 +349,39 @@ describe('the disconnect action', () => {
 		expect(result).toMatchObject({ type: 'error', status: 401 });
 	});
 });
+
+/** How a partnership looks to each of its members: per viewer, from a closed list. */
+describe('colour', () => {
+	it('starts on the colour the switcher shows, and offers none for a pending invite', async () => {
+		const { id } = await createTestPartnership(db, ada, jun);
+		expect((await runLoad(load(at(id, ada)))).colourForm?.data.colour).toBe('teal');
+		const invite = await createTestInvite(db, ada);
+		expect((await runLoad(load(at(invite.id, ada)))).colourForm).toBeNull();
+	});
+
+	it('saves the viewer’s choice, and only theirs', async () => {
+		const { id } = await createTestPartnership(db, ada, jun);
+		await run('colour', at(id, ada, { colour: 'pink' }) as never);
+		expect((await runLoad(load(at(id, ada)))).colourForm?.data.colour).toBe('pink');
+		expect((await runLoad(load(at(id, jun)))).colourForm?.data.colour).toBe('teal');
+	});
+
+	it('refuses a colour that is not on the list', async () => {
+		const { id } = await createTestPartnership(db, ada, jun);
+		const result = await run('colour', at(id, ada, { colour: '#ff0000' }) as never);
+		expect(result).toMatchObject({ status: 400 });
+	});
+
+	it('404s someone outside the partnership, and a pending invite', async () => {
+		const { id } = await createTestPartnership(db, ada, jun);
+		const invite = await createTestInvite(db, ada);
+		const outsider = await runAndCatch(() =>
+			run('colour', at(id, stranger, { colour: 'pink' }) as never)
+		);
+		const pending = await runAndCatch(() =>
+			run('colour', at(invite.id, ada, { colour: 'pink' }) as never)
+		);
+		expect(outsider).toMatchObject({ type: 'error', status: 404 });
+		expect(pending).toMatchObject({ type: 'error', status: 404 });
+	});
+});

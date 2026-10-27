@@ -1,9 +1,8 @@
-import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { entryTopic } from '$lib/notebook';
-import { partnerships } from '$lib/server/db/schema';
 import { createNotifier } from '$lib/server/realtime/backend';
 import { partnershipRoom } from '$lib/server/realtime/index';
+import { soloSpaceFor } from '$lib/server/spaces';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { defined } from '$lib/testing/defined';
 import { fakeEvent, runAction, runAndCatch, runLoad } from '$lib/testing/events';
@@ -12,6 +11,7 @@ import {
 	createTestPartnership,
 	createTestUser,
 	readNotebookEntryRow,
+	setTestPartnershipControl,
 	type TestUser
 } from '$lib/testing/fixtures';
 import { createTestMediaStore, type TestMediaStore } from '$lib/testing/media';
@@ -22,7 +22,10 @@ vi.mock('$lib/server/media/backend', () => ({
 	createMediaStore: () => Promise.resolve(media.store)
 }));
 
-/** One shared entry: who may open it, restrict it and delete it. */
+/**
+ * One entry: who may open it, restrict it and delete it. It is in its own
+ * space whatever the context, so nothing here depends on the cookie.
+ */
 
 let harness: TestDb;
 let ada: TestUser;
@@ -36,20 +39,18 @@ beforeEach(async () => {
 	bo = await createTestUser(harness.db, { name: 'Bo' });
 	partnershipId = (await createTestPartnership(harness.db, ada, bo)).id;
 	// Ada, the inviter, holds control.
-	await harness.db
-		.update(partnerships)
-		.set({ control: 'inviter' })
-		.where(eq(partnerships.id, partnershipId));
+	await setTestPartnershipControl(harness.db, partnershipId, 'inviter');
 });
 
 afterEach(() => harness.close());
 
-function at(user: TestUser, entryId: string, formData?: Record<string, string>) {
+function at(user: TestUser, entryId: string, formData?: Record<string, string>, context?: string) {
 	return fakeEvent({
 		db: harness.db,
 		user,
-		params: { id: partnershipId, entryId },
-		path: `/partner/${partnershipId}/notebook/${entryId}`,
+		params: { entryId },
+		path: `/notebook/${entryId}`,
+		...(context === undefined ? {} : { contextCookie: context }),
 		...(formData ? { formData } : {})
 	});
 }
@@ -114,10 +115,7 @@ describe('setAccess', () => {
 
 	/** With control shared, the say over an entry is its creator's alone. */
 	it('is refused under shared control to the member who did not create the entry', async () => {
-		await harness.db
-			.update(partnerships)
-			.set({ control: 'both' })
-			.where(eq(partnerships.id, partnershipId));
+		await setTestPartnershipControl(harness.db, partnershipId, 'both');
 		const entry = await createTestNotebookEntry(harness.db, ada, { partnershipId });
 
 		expect((await runLoad(load(at(bo, entry.id)))).entry.canSetAccess).toBe(false);
@@ -141,10 +139,7 @@ describe('delete', () => {
 	it('deletes for someone who may edit, and returns to the list', async () => {
 		const entry = await createTestNotebookEntry(harness.db, ada, { partnershipId });
 		const result = await runAndCatch(() => runAction(actions, 'delete', at(bo, entry.id)));
-		expect(result).toMatchObject({
-			type: 'redirect',
-			location: `/partner/${partnershipId}/notebook`
-		});
+		expect(result).toMatchObject({ type: 'redirect', location: '/notebook' });
 		expect(await readNotebookEntryRow(harness.db, entry.id)).toBeUndefined();
 	});
 
@@ -185,5 +180,39 @@ describe('a scene', () => {
 	it('has no scene extras for a note', async () => {
 		const note = await createTestNotebookEntry(harness.db, ada, { partnershipId });
 		expect((await runLoad(load(at(ada, note.id)))).scene).toBeNull();
+	});
+});
+
+/** An entry is shown as its own space's, whatever the switcher says (docs/contexts.md). */
+describe('the entry’s own space', () => {
+	it('opens a partnership’s entry as theirs while the context is the viewer’s own', async () => {
+		const adaSolo = defined(await soloSpaceFor(harness.db, ada.id), 'Ada’s own space');
+		const entry = await createTestNotebookEntry(harness.db, bo, { partnershipId });
+
+		const data = await runLoad(load(at(ada, entry.id, undefined, adaSolo)));
+
+		expect(data.space).toEqual({ id: partnershipId, kind: 'shared', partnershipId });
+		expect(data.room).toBe(`partnership:${partnershipId}`);
+		// The partnership's own actions follow the partnership: Ada holds its
+		// control, so she may restrict the entry, from her own context too.
+		expect(data.entry.canSetAccess).toBe(true);
+		const boSolo = defined(await soloSpaceFor(harness.db, bo.id), 'Bo’s own space');
+		expect((await runLoad(load(at(bo, entry.id, undefined, boSolo)))).entry.canSetAccess).toBe(
+			false
+		);
+	});
+
+	it('opens the viewer’s own entry as theirs while the context is a partnership', async () => {
+		const adaSolo = defined(await soloSpaceFor(harness.db, ada.id), 'Ada’s own space');
+		const entry = await createTestNotebookEntry(harness.db, ada);
+		const data = await runLoad(load(at(ada, entry.id, undefined, partnershipId)));
+		expect(data.space).toEqual({ id: adaSolo, kind: 'solo', partnershipId: null });
+		expect(data.entry.canSetAccess).toBe(false);
+	});
+
+	it('looks like nothing to anyone else, whatever their context', async () => {
+		const entry = await createTestNotebookEntry(harness.db, ada);
+		const result = await runAndCatch(() => runLoad(load(at(bo, entry.id, undefined, 'all'))));
+		expect(result).toMatchObject({ type: 'error', status: 404 });
 	});
 });

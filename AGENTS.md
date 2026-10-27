@@ -35,6 +35,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/lib/types.ts`            | Types both server and components need. Alias-free so the schema can import it                |
 | `src/lib/components/`         | Presentational Svelte components                                                             |
 | `src/lib/partnership.ts`      | The partners domain rules. Alias-free. See [docs/partners.md](docs/partners.md)              |
+| `src/lib/context.ts`, `src/lib/space-colours.ts`, `src/lib/components/context/` | The current context (whose things a list shows) and each space's colour: the pure halves (alias-free), the switcher. See [docs/contexts.md](docs/contexts.md) |
 | `src/lib/spaces.ts`, `src/lib/server/spaces.ts` | Spaces: a solo one per account, a shared one per partnership (same id), members and `can_manage`, deleting a space with everything in it. `spaces.ts` is pure and alias-free. See [docs/spaces.md](docs/spaces.md) |
 | `src/lib/features.ts`         | Feature registry. Alias-free. See [docs/features-and-admin.md](docs/features-and-admin.md)   |
 | `src/lib/vault.ts`, `src/lib/sealed.ts` | Vaults and sealed records, the pure halves: formats, the per-kind payload versions. Alias-free. See [docs/encryption.md](docs/encryption.md#vaults) |
@@ -425,6 +426,14 @@ to *show* and nothing else: loads run in parallel and actions run before any
 load, so a check that only lives in a layout gates nothing. Admin pages call
 `requireAdmin` in every load and action for the same reason. See
 [docs/features-and-admin.md](docs/features-and-admin.md).
+
+**The context is a view filter; every write names its space.** Lists that
+follow the switcher (`/notebook` so far) read `locals.context()` and depend on
+`app:context`. No action may read the context to decide where a write goes —
+it is one cookie per device, so another tab can change it at any moment — so a
+create or change posts its `spaceId` (or takes it from the item it changes)
+and the server checks membership of that space. An item page takes its space
+from the item, never the context. See [docs/contexts.md](docs/contexts.md).
 
 **Troubleshooting UI goes behind debug mode, not a feature of its own.** Read
 `page.data.debug` (or `readDebugMode` outside the app shell); it is display
@@ -1107,6 +1116,7 @@ Four places, split on scope:
 | [docs/realtime.md](docs/realtime.md)                                                     | The shared realtime room: scopes, topics, eviction, leases, cost, the DO export |
 | [docs/dialogs.md](docs/dialogs.md)                                                       | `ResponsiveDialog`: a sheet on a phone, a dialog wider, placed in the visual viewport |
 | [docs/scenes.md](docs/scenes.md)                                                         | Planning a scene: the prompt column, blocks, menus and their designs, surprises, model help |
+| [docs/contexts.md](docs/contexts.md)                                                     | The current context: the cookie, `locals.context()`, the switcher, writes naming their space, colours |
 
 **Keeping these current is part of the change, not a follow-up to it.**
 

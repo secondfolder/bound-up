@@ -305,8 +305,8 @@ makes, so `scene-blocks.css` and `menu-designs.css` style both.
 ### A menu's own page
 
 A menu can be shown on a page of its own, filling it:
-`/home/notebook/[entryId]/menus/[menuId]` for a solo scene and
-`/partner/[id]/notebook/[entryId]/menus/[menuId]` for a shared one.
+`/notebook/[entryId]/menus/[menuId]`, for a solo scene and a shared one alike,
+since the page takes its space from the scene ([notebook.md](notebook.md#the-list-in-every-context)).
 
 - **A menu's id.** Lexical's node keys are made afresh on every load, so a
   link needs a handle kept with the menu: `MenuNode.__menuId`, stored as

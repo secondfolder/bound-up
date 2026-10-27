@@ -1,6 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
+import { type AppContext, CONTEXT_DEPENDENCY, spacesInContext } from '../context';
 import { entryTopic, isEntryDate, type PartnerAccess } from '../notebook';
 import { notebookCreateSchema, partnerAccessSchema } from '../schemas/notebook';
 import { calendarDayKey } from '../timezone';
@@ -18,24 +19,34 @@ import { createMediaStore } from './media/backend';
 import {
 	createEntry,
 	deleteEntry,
+	type EntryContext,
+	entrySpaceId,
 	getEntryContext,
 	liftHiddenEntry,
 	listEntries,
 	type NotebookScope,
+	type ResolvedScope,
 	resolveScope,
+	scopeForSpace,
 	setPartnerAccess
 } from './notebook';
 import { publishEntryFrame, publishListChange } from './notebook-live';
 import { createNotifier } from './realtime/backend';
-import type { RoomKey } from './realtime/index';
+import { partnershipRoom, type RoomKey } from './realtime/index';
 import { getScenePreferences, type ScenePreferencesView } from './scene-preferences';
 import { hasAcceptedSceneHelp } from './scenes/help';
 import { sealedRef } from './sealed-content';
+import { requireSpaceMember } from './spaces';
 
 /**
- * The loads and actions behind the notebook's pages, shared by the solo
- * notebook (`/home/notebook`) and each partnership's (`/partner/[id]/notebook`),
- * which differ only in their scope. See docs/notebook.md.
+ * The loads and actions behind the notebook's pages: `/notebook`, an entry,
+ * and a scene's menu. See docs/notebook.md.
+ *
+ * The list follows the current context (docs/contexts.md): one space, or
+ * every space the viewer is in. Nothing else does. An entry takes its space
+ * from the entry, and every action names the space it writes to in its form
+ * and checks membership of that space — never the context, which another
+ * tab can change at any moment.
  *
  * Every one of them resolves the scope and the entry from the database for
  * itself: an action runs before any load, so a check that lived in a layout
@@ -64,16 +75,39 @@ export function notebookDependency(scope: NotebookScope): `notebook:${string}` {
 	return scope.kind === 'self' ? 'notebook:self' : `notebook:${scope.partnershipId}`;
 }
 
-/** Where a scope's notebook lives. */
-export function notebookPath(scope: NotebookScope): string {
-	return scope.kind === 'self' ? '/home/notebook' : `/partner/${scope.partnershipId}/notebook`;
+/** What an Everyone list depends on, beside each of its spaces' own keys. */
+export const NOTEBOOK_ALL_DEPENDENCY = 'notebook:all';
+
+/** The notebook's list. One route for every context: the context decides what it shows. */
+export const NOTEBOOK_PATH = '/notebook';
+
+/** Where an entry lives. Its space is the entry's own, so it needs none in the path. */
+export function entryPath(entryId: string): string {
+	return `${NOTEBOOK_PATH}/${entryId}`;
 }
 
 export type NotebookListData = {
 	journal: NotebookEntryView[];
 	notes: NotebookEntryView[];
 	scenes: NotebookEntryView[];
-	room: RoomKey;
+	/**
+	 * The room a list of one space watches, so it updates live; null for an
+	 * Everyone list of several, which refreshes when the page is looked at
+	 * again instead of holding a stream per partnership (docs/notebook.md,
+	 * "The list in every context").
+	 */
+	room: RoomKey | null;
+	/** The spaces the list shows, in the switcher's order: one, unless the context is Everyone. */
+	spaceIds: string[];
+	/** The key to invalidate when the list changes elsewhere. */
+	dependency: string;
+	/**
+	 * The context this list was read in. Returned by the page as well as the
+	 * app layout, and the page's wins: a client-side navigation re-runs the
+	 * page's load but not the layout's, whose context could then be one the
+	 * cookie no longer names, and the switcher must say what the list shows.
+	 */
+	context: AppContext;
 	viewerId: string;
 	/** Today in the viewer's timezone, for a new journal entry's date. */
 	today: string;
@@ -90,36 +124,73 @@ function otherMember(
 	return partnership.inviterId === userId ? partnership.inviteeId : partnership.inviterId;
 }
 
+/**
+ * The list, in the current context. The context only filters: it is checked
+ * against the viewer's spaces when it is read (`locals.context()`), and each
+ * space it names is resolved here as its own list would resolve it.
+ */
 export async function loadNotebookList(
-	event: Pick<Event, 'locals' | 'depends'>,
-	scope: NotebookScope
+	event: Pick<Event, 'locals' | 'depends'>
 ): Promise<NotebookListData> {
 	const user = requireUser(event.locals);
-	const resolved = await resolveScope(event.locals.db, scope, user.id);
-	if (!resolved) {
-		error(404, 'Partner not found');
+	event.depends(CONTEXT_DEPENDENCY);
+	const { db } = event.locals;
+	const [context, spaces] = await Promise.all([
+		event.locals.context(),
+		event.locals.contextSpaces()
+	]);
+	const shown = spacesInContext(
+		context,
+		spaces.map((space) => ({ ...space, id: space.spaceId }))
+	);
+	const resolved = (
+		await Promise.all(shown.map((space) => resolveScope(db, scopeForSpace(space), user.id)))
+	).filter((scope): scope is ResolvedScope => scope !== null);
+	for (const scope of resolved) {
+		event.depends(notebookDependency(scope.scope));
 	}
-	event.depends(notebookDependency(scope));
+	const [single] = resolved;
+	const dependency =
+		resolved.length === 1 && single ? notebookDependency(single.scope) : NOTEBOOK_ALL_DEPENDENCY;
+	event.depends(dependency);
 	const [journal, notes, scenes] = await Promise.all([
-		listEntries(event.locals.db, resolved, user.id, 'journal'),
-		listEntries(event.locals.db, resolved, user.id, 'note'),
-		listEntries(event.locals.db, resolved, user.id, 'scene')
+		listEntries(db, resolved, user.id, 'journal'),
+		listEntries(db, resolved, user.id, 'note'),
+		listEntries(db, resolved, user.id, 'scene')
 	]);
 	return {
 		journal,
 		notes,
 		scenes,
-		room: resolved.room,
+		room: resolved.length === 1 && single ? single.room : null,
+		spaceIds: resolved.map((scope) => scope.spaceId),
+		dependency,
+		context,
 		viewerId: user.id,
 		today: calendarDayKey(user.timezone, new Date())
 	};
 }
 
 /**
- * Creates an entry from the sealed header and first edit the page posted in
- * place of anything typed (`NewEntryForm`), then opens it.
+ * The scope of the space a form names, if the viewer is in it. A write names
+ * its space rather than reading the context (docs/contexts.md), and this is
+ * the membership check behind that.
  */
-export async function createEntryAction(event: ActionEvent, scope: NotebookScope) {
+async function namedScope(
+	locals: App.Locals,
+	userId: string,
+	spaceId: string
+): Promise<ResolvedScope | null> {
+	const membership = await requireSpaceMember(locals.db, spaceId, userId);
+	return membership ? await resolveScope(locals.db, scopeForSpace(membership), userId) : null;
+}
+
+/**
+ * Creates an entry from the sealed header and first edit the page posted in
+ * place of anything typed (`NewEntryForm`), in the space the form names, then
+ * opens it.
+ */
+export async function createEntryAction(event: ActionEvent) {
 	const user = requireUser(event.locals);
 	const form = await event.request.formData();
 	let body: unknown;
@@ -136,9 +207,9 @@ export async function createEntryAction(event: ActionEvent, scope: NotebookScope
 	if (kind === 'journal' && !isEntryDate(entryDate)) {
 		return fail(400, { error: 'Please choose a date for this journal entry.' });
 	}
-	const resolved = await resolveScope(event.locals.db, scope, user.id);
+	const resolved = await namedScope(event.locals, user.id, String(form.get('spaceId') ?? ''));
 	if (!resolved) {
-		error(404, 'Partner not found');
+		error(404, 'Not found');
 	}
 	const result = await createEntry(event.locals.db, resolved, user.id, {
 		...input,
@@ -154,31 +225,47 @@ export async function createEntryAction(event: ActionEvent, scope: NotebookScope
 		});
 	}
 	await publishListChange(await createNotifier(event), resolved.room);
-	redirect(303, `${notebookPath(scope)}/${input.id}`);
+	redirect(303, entryPath(input.id));
 }
 
 /**
  * Shows an entry hidden from the viewer again, once control has moved to
- * them from whoever hid it. See `canSetAccess`.
+ * them from whoever hid it. See `canSetAccess`. The form names the entry's
+ * space; `liftHiddenEntry` checks the entry is in it and the viewer is too.
  */
-export async function showHiddenEntryAction(event: ActionEvent, scope: NotebookScope) {
+export async function showHiddenEntryAction(event: ActionEvent) {
 	const user = requireUser(event.locals);
-	if (scope.kind !== 'partnership') {
-		error(404, 'Not found');
-	}
 	const form = await event.request.formData();
 	const entryId = String(form.get('entryId') ?? '');
-	const result = await liftHiddenEntry(event.locals.db, entryId, user.id, scope.partnershipId);
+	const spaceId = String(form.get('spaceId') ?? '');
+	const result = await liftHiddenEntry(event.locals.db, entryId, user.id, spaceId);
 	if (!result.ok) {
 		error(404, 'Not found');
 	}
 	const notifier = await createNotifier(event);
-	const resolved = await resolveScope(event.locals.db, scope, user.id);
-	if (resolved) {
-		await publishListChange(notifier, resolved.room);
-		await publishEntryFrame(notifier, resolved.room, entryId, { type: 'access' });
-	}
+	// Only a shared entry can be hidden, and a shared space's id is its
+	// partnership's, so its room is that partnership's.
+	const room = partnershipRoom(spaceId);
+	await publishListChange(notifier, room);
+	await publishEntryFrame(notifier, room, entryId, { type: 'access' });
 	return { shown: true };
+}
+
+/** The space an entry is in, as its page needs to show whose it is and seal into it. */
+export type EntrySpaceView = {
+	id: string;
+	kind: 'solo' | 'shared';
+	/** The partnership a shared entry is in, whose vault seals it; null for your own. */
+	partnershipId: string | null;
+};
+
+function entrySpace(context: EntryContext): EntrySpaceView {
+	const { partnershipId } = context.entry;
+	return {
+		id: entrySpaceId(context.entry),
+		kind: partnershipId ? 'shared' : 'solo',
+		partnershipId
+	};
 }
 
 export type NotebookEntryData = {
@@ -196,6 +283,8 @@ export type NotebookEntryData = {
 		/** Whether the restriction, if any, is one the viewer set. */
 		restrictedByViewer: boolean;
 	};
+	/** The entry's own space, whatever the current context is. */
+	space: EntrySpaceView;
 	room: RoomKey;
 	viewerId: string;
 	/** A scene's extras; null for a journal entry or a note. */
@@ -254,19 +343,23 @@ async function sceneExtras(
 	};
 }
 
+/**
+ * One entry, in its own space: opened while the context is something else,
+ * it shows as the entry it is, and the context is left alone.
+ */
 export async function loadNotebookEntry(
-	event: Pick<Event, 'locals' | 'params' | 'depends'>,
-	scope: NotebookScope
+	event: Pick<Event, 'locals' | 'params' | 'depends'>
 ): Promise<NotebookEntryData> {
 	const user = requireUser(event.locals);
 	const { entryId } = event.params;
 	event.depends(`notebook:entry:${entryId}`);
-	const context = await getEntryContext(event.locals.db, entryId, user.id, scope);
+	const context = await getEntryContext(event.locals.db, entryId, user.id);
 	if (!context) {
 		error(404, 'Not found');
 	}
 	return {
 		entry: entryView(context, user.id),
+		space: entrySpace(context),
 		room: context.room,
 		viewerId: user.id,
 		scene: context.entry.kind === 'scene' ? await sceneExtras(event, user.id, context) : null
@@ -300,18 +393,18 @@ function entryView(
  * cannot read the scene.
  */
 export async function loadSceneMenu(
-	event: Pick<Event, 'locals' | 'params' | 'depends'>,
-	scope: NotebookScope
+	event: Pick<Event, 'locals' | 'params' | 'depends'>
 ): Promise<Omit<NotebookEntryData, 'scene'> & { menuId: string; partnerId: string | null }> {
 	const user = requireUser(event.locals);
 	const { entryId, menuId } = event.params;
 	event.depends(`notebook:entry:${entryId}`);
-	const context = await getEntryContext(event.locals.db, entryId, user.id, scope);
+	const context = await getEntryContext(event.locals.db, entryId, user.id);
 	if (!(context && context.entry.kind === 'scene' && menuId)) {
 		error(404, 'Not found');
 	}
 	return {
 		entry: entryView(context, user.id),
+		space: entrySpace(context),
 		room: context.room,
 		viewerId: user.id,
 		menuId,
@@ -326,13 +419,13 @@ export async function loadSceneMenu(
  * who may no longer read it is dropped from the entry's stream, and every
  * open copy is told to reload what it may do.
  */
-export async function setAccessAction(event: ActionEvent, scope: NotebookScope) {
+export async function setAccessAction(event: ActionEvent) {
 	const user = requireUser(event.locals);
 	const form = await superValidate(event.request, zod4(partnerAccessSchema));
 	if (!form.valid) {
 		return fail(400, { form });
 	}
-	const context = await getEntryContext(event.locals.db, event.params.entryId, user.id, scope);
+	const context = await getEntryContext(event.locals.db, event.params.entryId, user.id);
 	if (!context?.partnership) {
 		error(404, 'Not found');
 	}
@@ -356,9 +449,9 @@ export async function setAccessAction(event: ActionEvent, scope: NotebookScope) 
 	return { form };
 }
 
-export async function deleteEntryAction(event: ActionEvent, scope: NotebookScope) {
+export async function deleteEntryAction(event: ActionEvent) {
 	const user = requireUser(event.locals);
-	const context = await getEntryContext(event.locals.db, event.params.entryId, user.id, scope);
+	const context = await getEntryContext(event.locals.db, event.params.entryId, user.id);
 	if (!context) {
 		error(404, 'Not found');
 	}
@@ -377,5 +470,5 @@ export async function deleteEntryAction(event: ActionEvent, scope: NotebookScope
 	const notifier = await createNotifier(event);
 	await publishEntryFrame(notifier, context.room, context.entry.id, { type: 'deleted' });
 	await publishListChange(notifier, context.room);
-	redirect(303, notebookPath(scope));
+	redirect(303, NOTEBOOK_PATH);
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `space_members` ADD `colour` text;

@@ -2,7 +2,9 @@
 // for information about these interfaces
 
 import type { AnyD1Database } from 'drizzle-orm/d1';
+import type { AppContext } from '$lib/context';
 import type { Auth, Session, User } from '$lib/server/auth';
+import type { ContextSpace } from '$lib/server/context';
 import type { Db } from '$lib/server/db';
 import type { Mailer } from '$lib/server/mail';
 import type { MediaBucket } from '$lib/server/media';
@@ -83,6 +85,16 @@ declare global {
 			 * `$lib/server/settings` and docs/server-settings.md.
 			 */
 			settings: ServerSettings;
+			/**
+			 * The current context — Everyone, or one space — from the `context`
+			 * cookie, checked against the viewer's spaces: one they are not in
+			 * is Everyone. Lazy and memoised per request. Display only: no
+			 * action may read it to decide where a write goes, since another
+			 * tab can change it at any moment. See docs/contexts.md.
+			 */
+			context: () => Promise<AppContext>;
+			/** The spaces the viewer can switch between, solo first. Lazy and memoised, like `context`. */
+			contextSpaces: () => Promise<ContextSpace[]>;
 		}
 		// interface PageData {}
 		// interface PageState {}

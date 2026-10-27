@@ -1,6 +1,7 @@
 <script lang="ts">
+	import SpaceChip from '$lib/components/context/SpaceChip.svelte';
 	import { openedNotebookHeader } from '$lib/sealed-views.svelte';
-	import type { NotebookEntryView } from '$lib/types';
+	import type { ContextSpaceView, NotebookEntryView } from '$lib/types';
 
 	/**
 	 * One entry in a notebook list: its title and excerpt, opened on this
@@ -13,7 +14,8 @@
 		dayLabel,
 		edited,
 		note,
-		showHiddenAction
+		showHiddenAction,
+		chip
 	}: {
 		entry: NotebookEntryView;
 		href: string;
@@ -21,6 +23,8 @@
 		edited: string;
 		note: string | null;
 		showHiddenAction: string | null;
+		/** Whose space it is in, on a list of several; absent on a list of one. */
+		chip?: ContextSpaceView | undefined;
 	} = $props();
 
 	const opened = $derived(openedNotebookHeader(entry.header));
@@ -30,10 +34,12 @@
 	{#if entry.header === null}
 		<!-- Hidden from the viewer, who may now show it again: control moved to them. -->
 		<div class="hidden-entry">
-			<span>An entry hidden from you</span>
+			<span>An entry hidden from you {#if chip}<SpaceChip space={chip} />{/if}</span>
 			{#if showHiddenAction}
 				<form method="POST" action={showHiddenAction}>
 					<input type="hidden" name="entryId" value={entry.id} />
+					<!-- The write names its space; it is never read from the context. -->
+					<input type="hidden" name="spaceId" value={entry.spaceId} />
 					<wa-button type="submit" size="s" appearance="outlined">Show it again</wa-button>
 				</form>
 			{/if}
@@ -53,6 +59,7 @@
 			</span>
 			{#if opened?.excerpt}<span class="excerpt">{opened.excerpt}</span>{/if}
 			<span class="meta">
+				{#if chip}<SpaceChip space={chip} />{/if}
 				{#if entry.kind === 'journal'}<span>{dayLabel}</span>{/if}
 				<span>{edited}</span>
 				{#if note}<wa-badge appearance="outlined" variant="neutral">{note}</wa-badge>{/if}

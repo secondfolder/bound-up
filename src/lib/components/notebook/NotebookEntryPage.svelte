@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { LexicalEditor } from 'lexical';
+	import type { Snippet } from 'svelte';
 	import { invalidate } from '$app/navigation';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import SidePanelLayout from '$lib/components/SidePanelLayout.svelte';
@@ -47,7 +48,8 @@
 		cursorLabel,
 		partnerLabel = null,
 		menuHref = null,
-		onGone
+		onGone,
+		whose
 	}: {
 		entry: EntryData;
 		/** A scene's extras, for its prompt column; null for a journal entry or a note. */
@@ -78,6 +80,11 @@
 		menuHref?: ((menuId: string) => string) | null;
 		/** The entry is gone or no longer readable: leave for the list. */
 		onGone: () => void;
+		/**
+		 * Whose space the entry is in, at the end of the back link's line: an
+		 * entry shows as its own space's whatever the context is.
+		 */
+		whose?: Snippet;
 	} = $props();
 
 	const opened = entrySession(() => ({
@@ -234,7 +241,12 @@
 {/snippet}
 
 <section class="page" class:wide={entry.kind === 'scene'}>
-	<NestedPageHeader backHref={back.href} backLabel={back.label} backText={back.text} />
+	<NestedPageHeader
+		backHref={back.href}
+		backLabel={back.label}
+		backText={back.text}
+		corner={whose}
+	/>
 
 	<div class="content">
 		{#if !session || session.phase === 'loading'}

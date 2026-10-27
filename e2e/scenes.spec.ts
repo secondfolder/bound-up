@@ -46,8 +46,13 @@ async function sharedNotebook(browser: Browser): Promise<{ ada: Side; bo: Side; 
 	const bo = await newSide(browser, 'Bo');
 	await newAccounts(ada, bo);
 	await linkAccounts(ada, bo, 'mix');
+	// The partner page's notebook card switches to the partnership's context
+	// on the way to /notebook (docs/contexts.md).
+	// After hydration: before it the card is a plain link, which goes to
+	// /notebook without switching, in whatever context the device had.
+	await waitForHydration(bo.page);
 	await bo.page.getByRole('link', { name: 'Notebook' }).click();
-	await bo.page.waitForURL(/\/partner\/[0-9a-f-]{36}\/notebook$/);
+	await bo.page.waitForURL(/\/notebook$/);
 	return { ada, bo, url: bo.page.url() };
 }
 
@@ -58,7 +63,7 @@ test.describe('a solo scene', () => {
 		const side = await newSide(browser, 'Ada');
 		try {
 			await newAccount(side.page, side.who);
-			await side.page.goto('/home/notebook');
+			await side.page.goto('/notebook');
 			const url = await startScene(side.page);
 
 			// The essentials are there from the start; one about speaking waits
@@ -100,7 +105,7 @@ test.describe('a solo scene', () => {
 		const side = await newSide(browser, 'Ada');
 		try {
 			await newAccount(side.page, side.who);
-			await side.page.goto('/home/notebook');
+			await side.page.goto('/notebook');
 			const url = await startScene(side.page);
 
 			await expect(prompt(side.page, 'next-day')).toHaveCount(0);
@@ -141,7 +146,7 @@ test.describe('below a menu', () => {
 		const side = await newSide(browser, 'Ada');
 		try {
 			await newAccount(side.page, side.who);
-			await side.page.goto('/home/notebook');
+			await side.page.goto('/notebook');
 			await startScene(side.page);
 			await column(side.page).getByRole('button', { name: 'Menu', exact: true }).click();
 			const menu = side.page.locator('.scene-menu').first();
@@ -171,7 +176,7 @@ test.describe('the column on a phone', () => {
 		try {
 			await side.page.setViewportSize({ width: 390, height: 800 });
 			await newAccount(side.page, side.who);
-			await side.page.goto('/home/notebook');
+			await side.page.goto('/notebook');
 			await startScene(side.page);
 
 			// Away to start with, so the page has the whole width.
@@ -198,7 +203,7 @@ test.describe('story ideas and what you’re into', () => {
 		const side = await newSide(browser, 'Ada');
 		try {
 			await newAccount(side.page, side.who);
-			await side.page.goto('/home/notebook');
+			await side.page.goto('/notebook');
 			await startScene(side.page);
 
 			// No kink list yet: the column says how to get chips, not nothing.
@@ -227,7 +232,7 @@ test.describe('help from the model', () => {
 		const side = await newSide(browser, 'Ada');
 		try {
 			await newAccount(side.page, side.who);
-			await side.page.goto('/home/notebook');
+			await side.page.goto('/notebook');
 			const url = await startScene(side.page);
 
 			await column(side.page).getByRole('button', { name: 'What might we have missed?' }).click();
@@ -501,7 +506,7 @@ test.describe('blocks', () => {
 		const side = await newSide(browser, 'Ada');
 		try {
 			await newAccount(side.page, side.who);
-			await side.page.goto('/home/notebook');
+			await side.page.goto('/notebook');
 			await startScene(side.page);
 			await typeRichText(side.page, 'Mains');
 			await side.page.keyboard.press('Enter');
@@ -535,7 +540,7 @@ test.describe('blocks', () => {
 		const side = await newSide(browser, 'Ada');
 		try {
 			await newAccount(side.page, side.who);
-			await side.page.goto('/home/notebook');
+			await side.page.goto('/notebook');
 			await startScene(side.page);
 			await typeRichText(side.page, 'Massage');
 			await side.page.keyboard.press('Enter');
@@ -625,7 +630,7 @@ test.describe('a menu’s own page', () => {
 		const side = await newSide(browser, 'Ada');
 		try {
 			await newAccount(side.page, side.who);
-			await side.page.goto('/home/notebook');
+			await side.page.goto('/notebook');
 			const sceneUrl = await startScene(side.page);
 			const menu = await menuWithToDo(side.page);
 
@@ -764,7 +769,7 @@ test.describe('a menu’s own page', () => {
 		const side = await newSide(browser, 'Ada');
 		try {
 			await newAccount(side.page, side.who);
-			await side.page.goto('/home/notebook');
+			await side.page.goto('/notebook');
 			const sceneUrl = await startScene(side.page);
 			await typeRichText(side.page, 'No menus here');
 			await expect(side.page.getByText('Saved')).toBeVisible();

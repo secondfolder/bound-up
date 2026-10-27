@@ -4,6 +4,7 @@ import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { building, dev } from '$app/environment';
 import { env as privateEnv } from '$env/dynamic/private';
 import { createAuth } from '$lib/server/auth';
+import { contextResolver } from '$lib/server/context';
 import type { Db } from '$lib/server/db';
 import { createDb, getLocalDb } from '$lib/server/db/backend';
 import { createMailer, type Mailer, resendBaseUrl, sendInBackground } from '$lib/server/mail';
@@ -128,6 +129,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 			event.locals.user = result.user;
 		}
 	}
+
+	// Resolved only when a load asks, so a request that shows no list pays
+	// nothing for it. See docs/contexts.md.
+	const resolver = contextResolver(db, event.locals.user?.id ?? null, event.cookies);
+	event.locals.context = resolver.context;
+	event.locals.contextSpaces = resolver.contextSpaces;
 
 	// The `/api/auth` counterparts of the rate-limited form actions, counted in
 	// the same buckets. Better Auth's own limiter is off (see auth.ts).

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, type Snippet } from 'svelte';
+	import { invalidate } from '$app/navigation';
 	import { page } from '$app/state';
 	import AppNav from '$lib/components/AppNav.svelte';
 	import EncryptionGate from '$lib/components/EncryptionGate.svelte';
@@ -7,6 +8,14 @@
 	import HomeScreenHint from '$lib/components/HomeScreenHint.svelte';
 	import NotificationsHint from '$lib/components/NotificationsHint.svelte';
 	import TimezoneWarning from '$lib/components/TimezoneWarning.svelte';
+	import {
+		type AppContext,
+		CONTEXT_COOKIE,
+		CONTEXT_DEPENDENCY,
+		parseContext,
+		readCookie,
+		serialiseContext
+	} from '$lib/context';
 	import { currentVaults } from '$lib/crypto/vaults.svelte';
 	import { hasFeature } from '$lib/features';
 	import { DEVICE_LIST_KEY } from '$lib/kink-list/device-key';
@@ -47,6 +56,35 @@
 				// Background work nobody is waiting on: the next full load asks again.
 			});
 		}
+	});
+
+	/**
+	 * Every tab on a device shares the context, since it is one cookie
+	 * (docs/contexts.md). A tab coming back to the front whose page was
+	 * rendered for another context than the cookie now names — switched in
+	 * another tab — refreshes what depends on it, so the switcher never
+	 * claims one context over a list of another. Compared as a primitive, so
+	 * a refresh does not re-add the listener.
+	 */
+	// `page.data`, not this layout's own `data`: a page that follows the
+	// context returns the one it was read in, which a client-side navigation
+	// can leave newer than the layout's.
+	const renderedContext = $derived(
+		serialiseContext((page.data.context as AppContext | undefined) ?? data.context)
+	);
+	$effect(() => {
+		const rendered = renderedContext;
+		const check = () => {
+			if (document.visibilityState !== 'visible') {
+				return;
+			}
+			const stored = parseContext(readCookie(document.cookie, CONTEXT_COOKIE));
+			if (serialiseContext(stored) !== rendered) {
+				void invalidate(CONTEXT_DEPENDENCY);
+			}
+		};
+		document.addEventListener('visibilitychange', check);
+		return () => document.removeEventListener('visibilitychange', check);
 	});
 
 	/**
@@ -92,7 +130,9 @@
 </style>
 </svelte:head>
 
-<div class="shell" {@attach fitVisualViewport}>
+<!-- `data-app-shell` is what the context switcher measures its fan against:
+     the screen's top-right corner, as this shell is fitted to it. -->
+<div class="shell" data-app-shell {@attach fitVisualViewport}>
 	<main>
 		{#if showTimezoneWarning}
 			<TimezoneWarning user={data.user} />

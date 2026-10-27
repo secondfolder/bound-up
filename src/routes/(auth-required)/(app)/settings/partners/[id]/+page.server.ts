@@ -9,6 +9,8 @@ import {
 	partnerEditSealedSchema,
 	partnerRotateSealedSchema
 } from '$lib/schemas/partnerForm';
+import { spaceColourFormSchema } from '$lib/schemas/spaceColourForm';
+import { contextSpaceViews, setSpaceColour } from '$lib/server/context';
 import { createMediaStore } from '$lib/server/media/backend';
 import { purgePartnershipMedia } from '$lib/server/messaging';
 import {
@@ -32,6 +34,17 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	}
 
 	const usable = isInviteUsable(partnership, new Date());
+
+	// The colour as the switcher shows it now: the viewer's own choice, or
+	// the default by order, so the picker starts on what they see. Only for a
+	// linked partnership, which is the only kind the switcher shows.
+	const spaceView =
+		partnership.status === 'accepted'
+			? contextSpaceViews(await locals.contextSpaces(), [partnership]).find(
+					(space) => space.id === partnership.id
+				)
+			: undefined;
+	const colour = spaceView && spaceView.colour !== 'me' ? spaceView.colour : null;
 
 	return {
 		partnership: {
@@ -65,7 +78,10 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			},
 			zod4(partnerEditFormSchema),
 			{ errors: false }
-		)
+		),
+		colourForm: colour
+			? await superValidate({ colour }, zod4(spaceColourFormSchema), { errors: false })
+			: null
 	};
 };
 
@@ -121,6 +137,30 @@ export const actions: Actions = {
 		}
 
 		redirect(303, '/settings/partners');
+	},
+
+	/**
+	 * How this partnership looks to the viewer. Their own membership row
+	 * only: the colour is per viewer, never the partnership's. Re-checks that
+	 * they are in a linked partnership rather than trusting the form having
+	 * been shown (invariant 14).
+	 */
+	colour: async ({ locals, params, request }) => {
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
+		const colourForm = await superValidate(request, zod4(spaceColourFormSchema));
+		if (!colourForm.valid) {
+			return kitFail(400, { colourForm });
+		}
+		const partnership = await getPartnershipForUser(locals.db, params.id, locals.user.id);
+		if (partnership?.status !== 'accepted') {
+			error(404, 'Partner not found');
+		}
+		if (!(await setSpaceColour(locals.db, params.id, locals.user.id, colourForm.data.colour))) {
+			error(404, 'Partner not found');
+		}
+		return { colourForm };
 	},
 
 	/**

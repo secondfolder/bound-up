@@ -64,7 +64,7 @@
 
 		<NotebookWidget
 			items={data.notebook}
-			href={resolve('/(auth-required)/(app)/partner/[id]/notebook', { id: partner.id })}
+			spaceId={partner.id}
 		/>
 
 		<!-- A card with no body rather than a plain link under the others: the

@@ -1,3 +1,10 @@
+<script lang="ts" module>
+	import type { SealScope } from '$lib/sealed-forms';
+
+	/** The space a new entry goes to, named in the form, and the vault it is sealed into. */
+	export type NewEntryTarget = { spaceId: string; sealScope: SealScope };
+</script>
+
 <script lang="ts">
 	import { defaults } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
@@ -7,12 +14,17 @@
 	import { toBase64 } from '$lib/encryption';
 	import { ENTRY_DATE_PATTERN, type NotebookKind } from '$lib/notebook';
 	import { loadCollab } from '$lib/notebook/load';
-	import { type SealScope, writableVault } from '$lib/sealed-forms';
+	import { writableVault } from '$lib/sealed-forms';
 	import { notebookEntryKind, notebookUpdateKind } from '$lib/sealed-kinds/notebook';
 	import { superForm } from '$lib/superform';
 
 	/**
 	 * Starts a journal entry or a note, and opens it.
+	 *
+	 * It names the space it goes to in a `spaceId` field, which the server
+	 * checks membership of: never the current context, which another tab can
+	 * change while this one is open (docs/contexts.md). `target` says which,
+	 * or null when the viewer has still to choose.
 	 *
 	 * Nothing typed is posted, because nothing is typed here beyond a journal
 	 * entry's date: the form seals an empty title and the entry's first edit
@@ -23,9 +35,14 @@
 	let {
 		kind,
 		today,
-		sealScope,
+		target,
 		action = '?/create'
-	}: { kind: NotebookKind; today: string; sealScope: SealScope; action?: string } = $props();
+	}: {
+		kind: NotebookKind;
+		today: string;
+		target: () => Promise<NewEntryTarget | null>;
+		action?: string;
+	} = $props();
 
 	const schema = z.object({
 		entryDate: z.string().regex(ENTRY_DATE_PATTERN, 'Please choose a date')
@@ -55,7 +72,13 @@
 					cancel();
 					return;
 				}
-				const writable = await writableVault(sealScope);
+				const chosen = await target();
+				if (!chosen) {
+					// The choice says what is missing, under itself.
+					cancel();
+					return;
+				}
+				const writable = await writableVault(chosen.sealScope);
 				if (typeof writable === 'string') {
 					problem = writable;
 					cancel();
@@ -80,6 +103,7 @@
 				]);
 				const vaultId = writable.vault.id;
 				formData.delete('entryDate');
+				formData.set('spaceId', chosen.spaceId);
 				formData.set(
 					'entry',
 					JSON.stringify({

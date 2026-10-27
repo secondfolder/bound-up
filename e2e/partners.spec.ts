@@ -120,7 +120,8 @@ test.describe('linking two accounts', () => {
 			// And the settings screen offers no edit form either.
 			await jun.page.getByRole('link', { name: 'Connection settings' }).click();
 			await expect(jun.page.getByText("They're in control of this link")).toBeVisible();
-			await expect(jun.page.getByRole('button', { name: 'Save' })).toHaveCount(0);
+			// Exact: the page also has the colour's "Save colour", which is Jun's own.
+			await expect(jun.page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
 			// ...but leaving is always available.
 			await expect(jun.page.getByRole('button', { name: 'Disconnect' })).toBeVisible();
 		} finally {
@@ -286,7 +287,8 @@ test.describe('managing a link', () => {
 			// Before filling, not just before saving: hydration overwrites the field.
 			await waitForHydration(ada.page);
 			await ada.page.locator('wa-input[name="partnerName"] input').fill('Junie');
-			await clickWaButton(ada.page, 'Save');
+			// Not "Save colour", the other save on the page.
+			await clickWaButton(ada.page, /^Save$/);
 
 			await expect(async () => {
 				expect(await navTabs(ada.page)).toEqual(['Home', 'Junie', 'Settings']);

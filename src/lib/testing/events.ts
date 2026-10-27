@@ -1,3 +1,5 @@
+import { CONTEXT_COOKIE } from '../context';
+import { contextResolver } from '../server/context';
 import type { Db } from '../server/db';
 import type { Mailer } from '../server/mail';
 import {
@@ -116,6 +118,14 @@ export type FakeEventOptions = {
 	 * `testSettings({ … })` for the settings a test is about.
 	 */
 	settings?: ServerSettings;
+	/**
+	 * The `context` cookie's value, for `locals.context()`: `all`, a space id,
+	 * or absent for a device that has never switched. `locals.context()` and
+	 * `locals.contextSpaces()` are the real resolver over `db`, so a test sees
+	 * the fallback for a space the viewer is not in. Put in `cookies` too
+	 * when that is given, so a test can read back what a route set.
+	 */
+	contextCookie?: string;
 	/** `event.fetch`, for a route that calls out through it. Absent otherwise. */
 	fetch?: typeof fetch;
 	/**
@@ -179,6 +189,24 @@ export function fakeEvent<Event = never>(options: FakeEventOptions): Event {
 				throw new Error('fakeEvent was given no db — pass `db` for a route that queries');
 			}
 		});
+	}
+
+	if (options.db) {
+		const jar: Record<string, string> = options.cookies ?? {};
+		if (options.contextCookie !== undefined) {
+			jar[CONTEXT_COOKIE] = options.contextCookie;
+		}
+		const resolver = contextResolver(options.db, options.user?.id ?? null, {
+			get: (name) => jar[name],
+			set: (name, value) => {
+				jar[name] = value;
+			},
+			delete: (name) => {
+				delete jar[name];
+			}
+		});
+		locals.context = resolver.context;
+		locals.contextSpaces = resolver.contextSpaces;
 	}
 
 	if (options.mailer) {

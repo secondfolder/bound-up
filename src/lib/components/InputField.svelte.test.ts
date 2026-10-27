@@ -11,7 +11,7 @@ import InputField from './InputField.svelte';
  * are exercised through the forms that hold them (`PartnerAcceptForm`).
  */
 
-const LINK = 'https://example.com/home/notebook/entry/menus/menu';
+const LINK = 'https://example.com/notebook/entry/menus/menu';
 
 async function linkField(selectOnFocus: boolean) {
 	const { container } = render(InputField, {
