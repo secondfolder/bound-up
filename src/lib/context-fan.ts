@@ -62,8 +62,10 @@ export const LABEL_TARGET = 80;
 /**
  * Short of the target, a size of avatar that still allows names this wide
  * is kept rather than shrunk further: "Everyone" and "Add partner" fit.
+ * With room to spare: "Add partner" is about 61px on macOS and wider on
+ * Linux, whose Chromium rounds glyph advances, so 64 cut it short there.
  */
-export const LABEL_GOOD = 64;
+export const LABEL_GOOD = 72;
 /** The widest a name is ever drawn, however much room there is; longer ones end in "…". */
 export const LABEL_MAX = 120;
 /** Narrower than this a name is not worth drawing at all. */

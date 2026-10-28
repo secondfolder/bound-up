@@ -276,8 +276,11 @@ The geometry is a pure module, `src/lib/context-fan.ts`, unit-tested in
   name). `layoutFan` tries avatars from 56px down to 36px and, for each, rings
   from 140px out; it takes the largest avatars whose smallest ring gives every
   name 80px without any name touching another name or another avatar
-  (`labelBudget`), else the largest that give names 64px, else whatever gives
-  them most. A fan one ring cannot give 64px — nine options (six partners) on
+  (`labelBudget`), else the largest that give names 72px, else whatever gives
+  them most. 72px is "Add partner" with room to spare: it measures about 61px
+  on macOS and more on Linux, whose Chromium rounds each glyph's advance, so
+  at 64px it was whole on one and cut short on the other. A fan one ring
+  cannot give 72px — nine options (six partners) on
   a phone's quarter circle — **staggers**: every other option a row further
   in, at the same even angles, so each name has two steps of room. A crowded
   fan's names are a size smaller.
