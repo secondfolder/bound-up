@@ -333,21 +333,17 @@ shows them, built from two generic components:
 Around them: `CreditBalances`, the balances a page's items pay into, as a row
 of `CreditPill`s labelled by a coins icon at its start, a partner's marked with
 their picture and any the viewer may set editable in place; `ItemsTabs`, the
-Tasks | Rewards pair of links at the top of both pages, drawn as the same pill
-as a segmented control but plain links with `aria-current`, since each is a
-page with its own URL and sheets; and `WhoseTime`, "Jun's time" with a tooltip
-giving the zone and both people's time, for any time that belongs to someone
-else's clock. Times a list shows are informal — "9am", "Tomorrow 6:30pm" —
+Tasks | Rewards pair of links at the top of both pages, a segmented control of
+links with `aria-current`, since each is a page with its own URL and sheets;
+and `WhoseTime`, "Jun's time" with a tooltip giving the zone and both
+people's time, for any time that belongs to someone else's clock. Times a list shows are informal — "9am", "Tomorrow 6:30pm" —
 through `src/lib/informal-time.ts`. Adding to a list is a dashed row at its
 top (`QuickAddLink`, "Add a task").
 
-`SegmentedTabs`, a pill-shaped segmented control with a count on each tab, for
-a page split two or three ways that should read as one thing from different
-sides (native buttons with the ARIA tab pattern, since `wa-button` forwards no
-`aria-selected`), has no user since the partner tasks and rewards pages'
-"For you" / "For them" tabs gave way to the To do and Set for others lists. It
-is kept, with its test, on purpose: there are plans for it, so do not delete
-it as dead code.
+Tabs, and any choice of a few drawn as buttons, are the segmented pill
+(`TabGroup`, `RadioButtonGroup`): the options in one pill on
+`--wa-color-surface-lowered`, the chosen one under a raised fill that slides
+and resizes onto it. See [docs/segmented-controls.md](segmented-controls.md).
 
 An item's detail is a `ResponsiveDialog`
 ([docs/dialogs.md](dialogs.md)).

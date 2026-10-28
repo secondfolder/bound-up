@@ -45,6 +45,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/lib/kink-list/`          | The kink list: the catalogue and its loader, answers and their rules (pure, alias-free), and the stores (browser). See [docs/kink-list.md](docs/kink-list.md) |
 | `src/lib/scenes/`, `src/lib/components/scenes/`, `src/lib/lexical/nodes/scene/` | Scenes: the prompt catalogue, story ideas, menu designs and help prompts (pure, alias-free), the column, and the scene blocks' nodes and plugin (`lexical/plugins/scene-blocks.ts`). See [docs/scenes.md](docs/scenes.md) |
 | `src/lib/playroom/`           | The Playroom's tool registry and the IQ test's engine: questions, rigging, copy. See [docs/playroom.md](docs/playroom.md) |
+| `src/lib/components/segmented/`, `src/lib/components/tabs/` | The segmented pill with its sliding fill (`RadioButtonGroup`), and the tabs drawn with it (`TabGroup`). See [docs/segmented-controls.md](docs/segmented-controls.md) |
 | `src/lib/lexical/`            | Editor-only Lexical pieces, one per file. See [docs/rich-text.md](docs/rich-text.md)         |
 | `src/lib/vfx/`                | The Svelte layer over VFX-JS. See [docs/page-effects.md](docs/page-effects.md)               |
 | `src/lib/effects/`            | Our VFX-JS effects and `mix()`; library ones come from `@vfx-js/effects`                     |
@@ -690,6 +691,14 @@ its notches, and can be left unset; a feature's own slider wraps it. Biome's
 plugins cannot match markup, so this one is on review. See
 [docs/sliders.md](docs/sliders.md).
 
+**Tabs are `TabGroup`, never `wa-tab-group`; a choice of a few drawn as
+buttons is `RadioButtonGroup`, never `wa-radio appearance="button"`.** Both
+draw the same pill with a fill that slides onto the chosen option, and
+`RadioButtonGroup`'s `kind` renders native radios, ARIA tabs or links,
+whichever the options are. Web Awesome's own cannot be tabs or links:
+`wa-radio` forces `role="radio"` on itself. On review, like the slider rule.
+See [docs/segmented-controls.md](docs/segmented-controls.md).
+
 **A detail that opens over a list is `ResponsiveDialog`**: a sheet from the
 bottom on a phone, a dialog in the middle wider, one `wa-dialog` restyled by
 CSS. Do not restyle a bare `wa-dialog` into a sheet by hand again
@@ -1132,6 +1141,7 @@ Four places, split on scope:
 | [docs/debug-mode.md](docs/debug-mode.md)                                                 | Per-device troubleshooting UI behind a feature: the toggle, panel, raw logs  |
 | [docs/kink-list.md](docs/kink-list.md)                                                   | The kink list: the catalogue, answers and inheritance, privacy, saving       |
 | [docs/sliders.md](docs/sliders.md)                                                       | The base slider every slider is built on: notches, springing, unset          |
+| [docs/segmented-controls.md](docs/segmented-controls.md)                                 | The segmented pill and tabs: radios, tabs or links, the sliding fill, continuity |
 | [docs/server-settings.md](docs/server-settings.md)                                       | Secrets, email and model providers in the database: generating, the admin page, presets |
 | [docs/prompt-review.md](docs/prompt-review.md)                                           | Every daydream prompt: axes, the committed snapshot, lint, the debug page, Claude review |
 | [docs/notebook.md](docs/notebook.md)                                                     | Journal and notes: live co-editing, encryption at rest, versions, the outbox, access |

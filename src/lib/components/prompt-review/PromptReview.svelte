@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import RadioButton from '$lib/components/segmented/RadioButton.svelte';
+	import RadioButtonGroup from '$lib/components/segmented/RadioButtonGroup.svelte';
 	import {
 		AXIS_PARAM,
 		type Catalogue,
@@ -208,19 +210,11 @@
 {/snippet}
 
 <div class="bar">
-	<wa-radio-group
-		label="View"
-		orientation="horizontal"
-		size="s"
-		value={view}
-		{@attach onChoose((value) => {
-			view = value as View;
-		})}
-	>
+	<RadioButtonGroup label="View" size="s" bind:value={view}>
 		{#each VIEWS as option (option.id)}
-			<wa-radio appearance="button" value={option.id}>{option.label}</wa-radio>
+			<RadioButton value={option.id}>{option.label}</RadioButton>
 		{/each}
-	</wa-radio-group>
+	</RadioButtonGroup>
 	<wa-select label="Words" size="s" value={source} {@attach onChoose((value) => {
 			source = value;
 		})}>

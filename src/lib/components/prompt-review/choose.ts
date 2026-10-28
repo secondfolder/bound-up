@@ -1,7 +1,7 @@
 import type { Attachment } from 'svelte/attachments';
 
 /**
- * Calls `set` with a `wa-select`'s or `wa-radio-group`'s value when it changes.
+ * Calls `set` with a `wa-select`'s value when it changes.
  * Listened for by hand: the change comes from a custom element whose controls
  * live in shadow roots, and Svelte's delegated `onchange` does not reliably
  * cross that boundary (AGENTS.md).

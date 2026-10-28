@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { onMount, type Snippet } from 'svelte';
 	import { defaults } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import { z } from 'zod';
@@ -7,6 +7,9 @@
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import SelectField from '$lib/components/SelectField.svelte';
+	import Tab from '$lib/components/tabs/Tab.svelte';
+	import TabGroup from '$lib/components/tabs/TabGroup.svelte';
+	import TabPanel from '$lib/components/tabs/TabPanel.svelte';
 	import { SOLO_NAME, shownSpace } from '$lib/context-client.svelte';
 	import { invalidate } from '$lib/navigation';
 	import { groupByMonth, NOTEBOOK_LIST_TOPIC, type NotebookKind } from '$lib/notebook';
@@ -64,29 +67,28 @@
 
 	const tabStorageKey = 'bound-up:notebook-tab';
 
-	function initialTab(): NotebookKind {
+	// Every visit starts on the journal and moves to the remembered tab once
+	// mounted, rather than reading storage while the state initialises: the
+	// tabs render on the server, which has no storage, so a different first
+	// tab in the browser would hydrate the wrong one as selected.
+	let tab = $state<NotebookKind>('journal');
+
+	onMount(() => {
 		try {
 			const saved = globalThis.localStorage?.getItem(tabStorageKey);
 			if (saved === 'note' || saved === 'scene') {
-				return saved;
+				tab = saved;
 			}
-			return 'journal';
 		} catch {
-			return 'journal';
+			// A remembered tab is a convenience; without storage it starts on the journal.
 		}
-	}
+	});
 
-	let tab = $state<NotebookKind>(initialTab());
-
-	function rememberTab(event: Event) {
-		const name = (event as CustomEvent<{ name?: string }>).detail?.name;
-		if (name === 'journal' || name === 'note' || name === 'scene') {
-			tab = name;
-			try {
-				globalThis.localStorage?.setItem(tabStorageKey, name);
-			} catch {
-				// A remembered tab is a convenience; without storage it starts on the journal.
-			}
+	function rememberTab(name: NotebookKind) {
+		try {
+			globalThis.localStorage?.setItem(tabStorageKey, name);
+		} catch {
+			// As above.
 		}
 	}
 
@@ -306,12 +308,14 @@
 				/>
 			</div>
 		{/if}
-		<wa-tab-group active={tab} onwa-tab-show={rememberTab}>
-			<wa-tab slot="nav" panel="journal">Journal</wa-tab>
-			<wa-tab slot="nav" panel="note">Notes</wa-tab>
-			<wa-tab slot="nav" panel="scene">Scenes</wa-tab>
+		<TabGroup label="Notebook" bind:active={tab} ontabshow={rememberTab}>
+			{#snippet nav()}
+				<Tab panel="journal">Journal</Tab>
+				<Tab panel="note">Notes</Tab>
+				<Tab panel="scene">Scenes</Tab>
+			{/snippet}
 
-			<wa-tab-panel name="journal">
+			<TabPanel name="journal">
 				<div class="panel">
 					<NewEntryForm kind="journal" {today} {target} />
 					{#if journal.length === 0}
@@ -325,9 +329,9 @@
 						{/each}
 					{/if}
 				</div>
-			</wa-tab-panel>
+			</TabPanel>
 
-			<wa-tab-panel name="note">
+			<TabPanel name="note">
 				<div class="panel">
 					<NewEntryForm kind="note" {today} {target} />
 					{#if notes.length === 0}
@@ -338,9 +342,9 @@
 						{@render rows(notes)}
 					{/if}
 				</div>
-			</wa-tab-panel>
+			</TabPanel>
 
-			<wa-tab-panel name="scene">
+			<TabPanel name="scene">
 				<div class="panel">
 					<NewEntryForm kind="scene" {today} {target} />
 					{#if scenes.length === 0}
@@ -351,8 +355,8 @@
 						{@render rows(scenes)}
 					{/if}
 				</div>
-			</wa-tab-panel>
-		</wa-tab-group>
+			</TabPanel>
+		</TabGroup>
 	</div>
 </section>
 
@@ -377,7 +381,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--wa-space-m);
-		padding-block-start: var(--wa-space-m);
 	}
 
 	h2 {

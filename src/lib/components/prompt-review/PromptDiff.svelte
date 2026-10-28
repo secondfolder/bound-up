@@ -1,6 +1,7 @@
 <script lang="ts">
+	import RadioButton from '$lib/components/segmented/RadioButton.svelte';
+	import RadioButtonGroup from '$lib/components/segmented/RadioButtonGroup.svelte';
 	import { type DiffLine, diffTexts, sideBySide } from '$lib/prompt-review';
-	import { onChoose } from './choose';
 
 	/**
 	 * Two prompts compared (docs/prompt-review.md, "The debug page"): line by
@@ -59,18 +60,10 @@
 		<span class="after">+ {afterLabel}</span>
 		<span class="count">{diff.removed} lines out, {diff.added} in</span>
 	</p>
-	<wa-radio-group
-		label="Layout"
-		orientation="horizontal"
-		size="s"
-		value={layout}
-		{@attach onChoose((value) => {
-			layout = value === 'split' ? 'split' : 'unified';
-		})}
-	>
-		<wa-radio appearance="button" value="unified">One column</wa-radio>
-		<wa-radio appearance="button" value="split">Side by side</wa-radio>
-	</wa-radio-group>
+	<RadioButtonGroup label="Layout" size="s" bind:value={layout}>
+		<RadioButton value="unified">One column</RadioButton>
+		<RadioButton value="split">Side by side</RadioButton>
+	</RadioButtonGroup>
 	<wa-switch size="s" {@attach listenForWhitespace}>Ignore spaces at line ends</wa-switch>
 </div>
 
