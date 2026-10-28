@@ -272,6 +272,11 @@ test.describe('contexts', () => {
 		try {
 			const tag = crypto.randomUUID().slice(0, 6);
 			await showContext(bo.page, 'all');
+			// Off the page sharedNotebook left Bo on first. It returns once the
+			// URL is /notebook, before that page has hydrated and opened its
+			// own stream on the partnership's space, which it would otherwise
+			// do while the goto below is under way and be counted here.
+			await bo.page.goto('about:blank');
 			const streams: string[] = [];
 			bo.page.on('request', (request) => {
 				if (request.url().includes('/api/realtime/events')) {
@@ -292,8 +297,7 @@ test.describe('contexts', () => {
 				{ timeout: 15_000 }
 			);
 			// One stream, on Bo's own room, however many spaces the list shows.
-			expect(new Set(streams).size).toBe(1);
-			expect(streams[0]).toMatch(/^user:/);
+			expect([...new Set(streams)]).toEqual([expect.stringMatching(/^user:/)]);
 			expect(streams[0]).not.toContain(partnershipId);
 		} finally {
 			await ada.close();
