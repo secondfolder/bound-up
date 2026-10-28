@@ -1039,10 +1039,11 @@
 			line-clamp: 3;
 		}
 
-		/* Over a lit name: what picking it does, in the help's own size and
-		   colour, so the name stays what is read. */
+		/* Over a lit name: what picking it does, in the help's quiet colour
+		   and a size up from it, so it reads easily while the name stays what
+		   is read. */
 		.lead {
-			font-size: var(--wa-font-size-2xs);
+			font-size: var(--wa-font-size-s);
 			line-height: 1.4;
 			font-weight: normal;
 			color: var(--wa-color-text-quiet);
