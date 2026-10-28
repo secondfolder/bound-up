@@ -6,6 +6,7 @@
 	import { type ContextShown, shownContexts, switchContext } from '$lib/context-client.svelte';
 	import {
 		type Box,
+		CLOSE_MS,
 		diskScale,
 		FAN_CSS_EASING,
 		fanCentre,
@@ -22,6 +23,7 @@
 		optionAt,
 		optionTiming,
 		type Point,
+		pillDuration,
 		wedgeShading
 	} from '$lib/context-fan';
 	import type { ContextSpaceView } from '$lib/types';
@@ -601,6 +603,12 @@
 		if (reducedMotion()) {
 			return { duration: 0 };
 		}
+		if (isCurrent && !opening) {
+			// Its name goes as the pill leaves, in the first half of the fan's
+			// closing time: it stays where it is rather than falling into the
+			// centre, and left for the whole time it lingered on its own.
+			return { duration: CLOSE_MS / 2, css: (t: number) => `opacity: ${t.toFixed(3)}` };
+		}
 		if (isCurrent) {
 			// Its name fades in as the pill arrives. The wait is inside the
 			// transition, not its `delay`, which Svelte spends showing the
@@ -614,7 +622,7 @@
 		}
 		return {
 			delay,
-			duration: OPTION_MS,
+			duration: optionTiming(0, opening).duration,
 			easing: fanEase(opening),
 			// Out along its ray by the eased share `t`, and grown by the same
 			// share, so the disk (`unfold`, scaled by `t` on the clock of the
@@ -709,7 +717,7 @@
 				aria-haspopup="true"
 				aria-label="Showing {current.name}. Choose whose to show"
 				style:--flight-ease={open ? FAN_CSS_EASING.opening : FAN_CSS_EASING.home}
-				style:--flight-ms="{OPTION_MS}ms"
+				style:--flight-ms="{pillDuration(open)}ms"
 				style:transform={flight
 					? `translate(${flight.x.toFixed(1)}px, ${flight.y.toFixed(1)}px) scale(${flight.scale.toFixed(3)})`
 					: undefined}
@@ -933,7 +941,7 @@
 		-webkit-tap-highlight-color: transparent;
 		transform-origin: 20px 20px;
 		transition:
-			/* The options' curve and time (`FAN_CSS_EASING`, `OPTION_MS`), so the
+			/* The options' curve and time (`FAN_CSS_EASING`, `pillDuration`), so the
 			   pill lands on the ring with the same bounce as they do. */
 			transform var(--flight-ms) var(--flight-ease),
 			gap 340ms ease,

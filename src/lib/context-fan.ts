@@ -640,8 +640,17 @@ export function optionAt(
 	return index >= 0 && index < count ? index : null;
 }
 
-/** How long an option takes to spring out of the disk's centre, or back into it. */
+/** How long an option takes to spring out of the disk's centre. */
 export const OPTION_MS = 440;
+/**
+ * How long the fan takes to close: the options falling back into the
+ * centre, the disk shrinking with them, and the pill flying home, all
+ * together. Brisker than opening: closing at the opening's 440ms, on an
+ * ease-in, the options and the disk barely moved for the first half while
+ * the pill (on an ease-out) was already home, so the fan seemed to linger
+ * behind it.
+ */
+export const CLOSE_MS = 260;
 /** Opening, each option starts this long after the one before it. */
 export const OPTION_STAGGER_MS = 35;
 
@@ -685,7 +694,14 @@ export const FAN_CSS_EASING = {
  * outside it.
  */
 export function optionTiming(index: number, opening: boolean): Timing {
-	return { delay: opening ? index * OPTION_STAGGER_MS : 0, duration: OPTION_MS };
+	return opening
+		? { delay: index * OPTION_STAGGER_MS, duration: OPTION_MS }
+		: { delay: 0, duration: CLOSE_MS };
+}
+
+/** How long the pill takes to fly to its place on the ring, or home: the options' time each way. */
+export function pillDuration(opening: boolean): number {
+	return opening ? OPTION_MS : CLOSE_MS;
 }
 
 /** How long the whole fan takes to open or close: until its last option lands. */

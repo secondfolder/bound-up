@@ -4,6 +4,7 @@ import {
 	AVATAR_SIZES,
 	type Box,
 	boxesOverlap,
+	CLOSE_MS,
 	cssEasing,
 	DEAD_ZONE,
 	diskScale,
@@ -31,6 +32,7 @@ import {
 	optionBoxes,
 	optionShare,
 	optionTiming,
+	pillDuration,
 	pointAt,
 	rightCut,
 	spreadEvenly,
@@ -520,17 +522,34 @@ describe('the disk and the options, opening and closing', () => {
 
 	it('closes exactly with the options: same start, same length, same curve', () => {
 		for (let index = 0; index < 9; index += 1) {
-			expect(optionTiming(index, false)).toEqual({ delay: 0, duration: OPTION_MS });
+			expect(optionTiming(index, false)).toEqual({ delay: 0, duration: CLOSE_MS });
 		}
-		expect(fanDuration(9, false)).toBe(OPTION_MS);
-		for (let elapsed = 0; elapsed <= OPTION_MS; elapsed += 10) {
+		expect(fanDuration(9, false)).toBe(CLOSE_MS);
+		for (let elapsed = 0; elapsed <= CLOSE_MS; elapsed += 10) {
 			const disk = diskScale(elapsed, 9, false);
 			for (let index = 0; index < 9; index += 1) {
 				expect(optionShare(index, elapsed, false)).toBeCloseTo(disk, 9);
 			}
 		}
 		expect(diskScale(0, 9, false)).toBeCloseTo(1, 6);
-		expect(diskScale(OPTION_MS, 9, false)).toBeCloseTo(0, 6);
+		expect(diskScale(CLOSE_MS, 9, false)).toBeCloseTo(0, 6);
+	});
+
+	it('closes the disk, every option and the pill in one brisk time', () => {
+		for (const count of [4, 9]) {
+			const closing = [
+				fanDuration(count, false),
+				...Array.from({ length: count }, (_, index) => {
+					const { delay, duration } = optionTiming(index, false);
+					return delay + duration;
+				}),
+				pillDuration(false)
+			];
+			expect(Math.max(...closing) - Math.min(...closing)).toBeLessThanOrEqual(5);
+		}
+		expect(CLOSE_MS).toBeLessThan(OPTION_MS);
+		// Opening, the pill takes an option's time.
+		expect(pillDuration(true)).toBe(optionTiming(0, true).duration);
 	});
 	it('bounces opening, disk and options alike, and closes without any bounce', () => {
 		const samples = (opening: boolean, share: (elapsed: number) => number) =>

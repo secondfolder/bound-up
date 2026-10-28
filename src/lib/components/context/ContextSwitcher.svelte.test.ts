@@ -24,6 +24,7 @@ vi.mock('$lib/navigation', () => ({ invalidate, invalidateAll: vi.fn() }));
 
 const { default: ContextSwitcher } = await import('./ContextSwitcher.svelte');
 const { HELD_ATTRIBUTE, holdWhileSwitching } = await import('$lib/context-client.svelte');
+const { CLOSE_MS, OPTION_MS } = await import('$lib/context-fan');
 
 const SOLO = '11111111-1111-4111-8111-111111111111';
 const JUN = '22222222-2222-4222-8222-222222222222';
@@ -425,6 +426,15 @@ describe('the fan', () => {
 		expect(shadows(getComputedStyle(avatar).boxShadow)).toBeLessThanOrEqual(1);
 	});
 
+	it('flies the pill home in the fan’s closing time, the options’ and the disk’s', async () => {
+		renderSwitcher();
+		await userEvent.click(trigger());
+		expect(trigger().style.getPropertyValue('--flight-ms')).toBe(`${OPTION_MS}ms`);
+		await fanSettled();
+		await userEvent.keyboard('{Escape}');
+		expect(trigger().style.getPropertyValue('--flight-ms')).toBe(`${CLOSE_MS}ms`);
+	});
+
 	it('lights the option keyboard focus is on', async () => {
 		const { container } = renderSwitcher({ kind: 'all' });
 		trigger().focus();
@@ -511,13 +521,20 @@ describe('the fan', () => {
 		expect(Number(getComputedStyle(hint).opacity)).toBe(1);
 
 		await userEvent.keyboard('{Escape}');
-		await new Promise((done) => setTimeout(done, 115));
-		// Faded out, though it stays in the page until the options are back.
-		expect(Number(getComputedStyle(hint).opacity)).toBeLessThan(0.05);
-		// Me's option, still on its way back to the centre: the hint went first.
-		expect(
-			Number(getComputedStyle(screen.getByRole('button', { name: 'Show Me' })).opacity)
-		).toBeGreaterThan(0.2);
+		// Frame by frame until the hint has faded out (it stays in the page
+		// until the options are back), then Me's option must still be on its
+		// way: the hint went first. Measured against each other rather than
+		// the clock, so a slow machine cannot fail it.
+		let hintOpacity = 1;
+		let meOpacity = 0;
+		while (hintOpacity >= 0.05 && container.querySelector('.hint')) {
+			await new Promise((done) => requestAnimationFrame(done));
+			hintOpacity = Number(getComputedStyle(hint).opacity);
+			const me = screen.queryByRole('button', { name: 'Show Me' });
+			meOpacity = me ? Number(getComputedStyle(me).opacity) : 0;
+		}
+		expect(hintOpacity).toBeLessThan(0.05);
+		expect(meOpacity).toBeGreaterThan(0.2);
 	});
 
 	it('tells assistive tech what letting go will do while sliding, politely', async () => {

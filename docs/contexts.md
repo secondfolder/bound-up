@@ -165,13 +165,16 @@ before; the current one's name fades in under it as the pill arrives. Under
   out of the option furthest out, so it is the first option's curve, bounce
   and all, and no option is ever outside it. The pill flies by a CSS
   transition on the same curve, sampled into `linear()` (a `cubic-bezier`
-  fit of back-out was off by nearly 5%), over the same 440ms.
-- **Closing does not bounce**: every option falls back together, unstaggered,
-  on a clean cubic ease-in, and the disk shrinks on exactly that curve, so it
-  neither hangs out round them nor leaves them outside. Back-out run
-  backwards had them swell first and shoot through the centre, and with the
-  stagger kept on closing the disk either waited for the last option or left
-  the rest outside it. The pill goes home on a plain ease-out.
+  fit of back-out was off by nearly 5%), over the same 440ms (`OPTION_MS`).
+- **Closing does not bounce, and is brisk**: every option falls back
+  together, unstaggered, on a clean cubic ease-in, the disk shrinks on
+  exactly that curve, and the pill flies home on an ease-out, all in
+  `CLOSE_MS` (260ms; `pillDuration` gives the pill the same time each way as
+  the options). Back-out run backwards had them swell first and shoot
+  through the centre; with the stagger kept on closing the disk either
+  waited for the last option or left the rest outside it; and at the
+  opening's 440ms the ease-in left the options and the disk barely moving
+  while the pill was already home.
 - **The hint** fades in last, once the options have mostly landed, and out
   first on closing.
 
