@@ -33,8 +33,9 @@ test.describe('linking two accounts', () => {
 			await newAccount(ada.page, ada.who);
 			await ada.page.waitForURL('**/today');
 
-			// A brand new account has the five places, and no context switcher:
-			// with nobody to switch to, Everyone would just be Me.
+			// A brand new account has the five places, and a switcher offering
+			// only Me (and "Add partner", a link): with nobody else, Everyone
+			// would just be Me.
 			expect(await navTabs(ada.page)).toEqual([
 				'Today',
 				'Tasks',
@@ -42,7 +43,7 @@ test.describe('linking two accounts', () => {
 				'Messages',
 				'Settings'
 			]);
-			expect(await contextNames(ada.page)).toEqual([]);
+			expect(await contextNames(ada.page)).toEqual(['Me']);
 
 			const link = await createInvite(ada.page, {
 				partnerName: 'Jun',
@@ -57,7 +58,7 @@ test.describe('linking two accounts', () => {
 			await ada.page.goto('/settings/partners');
 			await expect(ada.page.getByText('Waiting for them to accept')).toBeVisible();
 			await ada.page.goto('/today');
-			expect(await contextNames(ada.page)).toEqual([]);
+			expect(await contextNames(ada.page)).toEqual(['Me']);
 
 			// Jun opens the link cold, with no account at all.
 			await jun.page.goto(link);
@@ -213,13 +214,14 @@ test.describe('managing a link', () => {
 
 			await expect(jun.page.getByText('You have no partners yet.')).toBeVisible();
 			// Jun's device was left in that partnership's context, which no
-			// longer exists: an ambient context falls back to Everyone, never a 404.
+			// longer exists: an ambient context falls back to Everyone, never a 404,
+			// which with no partner left is shown as Me.
 			await jun.page.goto('/today');
-			expect(await contextNames(jun.page)).toEqual([]);
+			expect(await contextNames(jun.page)).toEqual(['Me']);
 			await expect(jun.page.getByRole('heading', { level: 1, name: 'Today' })).toBeVisible();
 
 			await ada.page.goto('/today');
-			expect(await contextNames(ada.page)).toEqual([]);
+			expect(await contextNames(ada.page)).toEqual(['Me']);
 		} finally {
 			await ada.close();
 			await jun.close();

@@ -13,9 +13,9 @@ import {
  * The context switcher's fan, measured in a real browser (docs/contexts.md,
  * "The fan"): for a phone, a tablet, a laptop and a wide desktop, with one to
  * six partners and each kind of context showing, every option is the same
- * angle from its neighbours, no name runs into another name or another
- * avatar, nothing is off the screen or under the nav, and the one showing now
- * has its name too. The layout maths has unit tests of its own
+ * angle from its neighbours, no avatar runs into another, nothing is off
+ * the screen or under the nav, and no option carries a name of its own: the
+ * lit one's is shown where the hint is. The layout maths has unit tests of its own
  * (`src/lib/context-fan.test.ts`); this is the check that the page draws what
  * they promise, at the sizes the page really has.
  *
@@ -35,9 +35,9 @@ const VIEWPORTS = [
 ];
 
 const JUN = 'Jun';
-/** A long name, to be cut short with "…". */
+/** A long name, for the hint to wrap. */
 const LONG_NAME = 'Bartholomew Fitzgerald-Hughes';
-/** Long names among them, to be cut short. */
+/** Long names among them. */
 const PARTNER_NAMES = [JUN, LONG_NAME, 'Mo', 'Seraphina Montgomery-Clarke', 'Kit', 'Alexandria'];
 
 type Rect = { left: number; top: number; right: number; bottom: number };
@@ -45,10 +45,9 @@ type Option = {
 	name: string;
 	current: boolean;
 	avatar: Rect;
-	label: Rect;
-	labelText: string;
-	labelOpacity: number;
-	truncated: boolean;
+	/** Whatever text the option draws: none. */
+	text: string;
+	opacity: number;
 };
 type Fan = {
 	options: Option[];
@@ -139,15 +138,18 @@ function readFan(page: Page): Promise<Fan> {
 				: { left: 0, top: 0, right: 0, bottom: 0 };
 		};
 		const options = [...document.querySelectorAll('[data-fan-option]')].map((option) => {
-			const label = option.querySelector<HTMLElement>('[data-fan-label]');
+			const avatar = option.querySelector('[data-fan-avatar]');
 			return {
-				name: option.getAttribute('aria-label') ?? option.textContent?.trim() ?? '',
+				name: option.getAttribute('aria-label') ?? '',
 				current: option.getAttribute('aria-current') === 'true',
-				avatar: rect(option.querySelector('[data-fan-avatar]')),
-				label: rect(label),
-				labelText: label?.textContent?.trim() ?? '',
-				labelOpacity: Number(getComputedStyle(option).opacity),
-				truncated: label ? label.scrollWidth > label.clientWidth : false
+				avatar: rect(avatar),
+				// Text outside the avatar (whose initials are its own).
+				text: [...option.childNodes]
+					.filter((node) => node !== avatar)
+					.map((node) => node.textContent ?? '')
+					.join('')
+					.trim(),
+				opacity: Number(getComputedStyle(option).opacity)
 			};
 		});
 		const disk = rect(document.querySelector('[data-fan-disk]'));
@@ -176,26 +178,28 @@ const overlap = (a: Rect, b: Rect) =>
 
 /** Everything the fan promises, for one layout. `where` names it in a failure. */
 function expectGoodFan(fan: Fan, count: number, current: string, where: string) {
-	expect(fan.options, where).toHaveLength(count + 3);
+	// Everyone, Me, each partner and "Add partner"; with no partner, no Everyone.
+	expect(fan.options, where).toHaveLength(count === 0 ? 2 : count + 3);
 	for (const [i, a] of fan.options.entries()) {
 		for (const [j, b] of fan.options.entries()) {
 			if (i === j) {
 				continue;
 			}
-			expect(overlap(a.label, b.label), `${where}: ${a.name} and ${b.name}’s names`).toBe(false);
-			expect(overlap(a.label, b.avatar), `${where}: ${a.name}’s name on ${b.name}`).toBe(false);
+			expect(overlap(a.avatar, b.avatar), `${where}: ${a.name} on ${b.name}`).toBe(false);
 		}
-		for (const box of [a.avatar, a.label]) {
-			const inside =
-				box.left >= 0 &&
-				box.top >= 0 &&
-				box.right <= fan.viewport.width &&
-				box.bottom <= fan.navTop;
-			expect(inside, `${where}: ${a.name} is off the screen or under the nav`).toBe(true);
-		}
-		expect(a.labelText, `${where}: ${a.name} has a name`).not.toBe('');
-		expect(a.labelOpacity, `${where}: ${a.name} has faded in`).toBeGreaterThan(0.99);
+		const box = a.avatar;
+		const inside =
+			box.left >= 0 && box.top >= 0 && box.right <= fan.viewport.width && box.bottom <= fan.navTop;
+		expect(inside, `${where}: ${a.name} is off the screen or under the nav`).toBe(true);
+		expect(a.name, `${where}: every option is named for assistive tech`).not.toBe('');
+		expect(a.text, `${where}: ${a.name} draws no name of its own`).toBe('');
 	}
+	// Every option but the current one, whose place the pill stands on.
+	const faint = fan.options.filter((option) => !option.current && option.opacity <= 0.99);
+	expect(
+		faint.map((option) => option.name),
+		`${where}: options not yet faded in`
+	).toEqual([]);
 
 	// Evenly spread: the same angle between every pair of neighbours.
 	const angles = fan.options.map((option) =>
@@ -214,10 +218,9 @@ function expectGoodFan(fan: Fan, count: number, current: string, where: string) 
 		`${where}: the gaps between options are ${gaps.map((gap) => gap.toFixed(2))}`
 	).toBeLessThan(0.5);
 
-	// The one showing now has its name under it, and the pill on its place.
+	// The pill on the place of the one showing now.
 	const shown = fan.options.find((option) => option.current);
 	expect(shown?.name, where).toBe(`Show ${current}`);
-	expect(shown?.labelText, where).not.toBe('');
 	const pillCentre = {
 		x: (fan.pill.left + fan.pill.right) / 2,
 		y: (fan.pill.top + fan.pill.bottom) / 2
@@ -228,9 +231,6 @@ function expectGoodFan(fan: Fan, count: number, current: string, where: string) 
 	};
 	expect(Math.hypot(pillCentre.x - slotCentre.x, pillCentre.y - slotCentre.y), where).toBeLessThan(
 		2
-	);
-	expect(shown && overlap(fan.pill, shown.label), `${where}: the pill covers its own name`).toBe(
-		false
 	);
 
 	// The hint: at the top of the page, inside it, over nothing. Against the
@@ -249,24 +249,33 @@ function expectGoodFan(fan: Fan, count: number, current: string, where: string) 
 		`${where}: the hint is on the page`
 	).toBe(true);
 	const covered = fan.options
-		.filter((option) => overlap(box, option.avatar) || overlap(box, option.label))
+		.filter((option) => overlap(box, option.avatar))
 		.map((option) => option.name);
 	expect(covered, `${where}: what the hint covers`).toEqual([]);
 	expect(overlap(box, fan.pill), `${where}: the hint covers the pill`).toBe(false);
-	// Right: 12px in from the edge. Centred: over the disk's centre.
+	// Right: 12px in from the edge. Centred: over the disk's centre. Moved
+	// aside only when an option is in that place, and by half its width at
+	// most (HINT_SLIDE): with no partner, a phone's Me sits where it would go.
 	const misplaced =
 		fan.hint.side === 'right'
 			? fan.viewport.width - box.right - 12
 			: (box.left + box.right) / 2 - (fan.disk.left + fan.disk.right) / 2;
-	expect(Math.abs(misplaced), `${where}: the hint is off its place by`).toBeLessThan(1);
-
-	// Only a partner's name is ever cut short, and it is still whole in the
-	// option's accessible name.
-	const cutShort = fan.options
-		.filter((option) => option.truncated)
-		.filter((option) => !PARTNER_NAMES.some((name) => option.name === `Show ${name}`))
-		.map((option) => option.name);
-	expect(cutShort, `${where}: names cut short`).toEqual([]);
+	const shift = fan.hint.side === 'right' ? misplaced : -misplaced;
+	// Grown by a lit avatar's growth and the clear space kept round it.
+	const place = {
+		left: box.left + shift - 8,
+		top: box.top - 8,
+		right: box.right + shift + 8,
+		bottom: box.bottom + 8
+	};
+	const blocked = fan.options.some((option) => overlap(place, option.avatar));
+	expect(
+		Math.abs(misplaced) < 1 || blocked,
+		`${where}: the hint is ${misplaced.toFixed(1)}px off its place, with nothing there`
+	).toBe(true);
+	expect(Math.abs(misplaced), `${where}: the hint is off its place by`).toBeLessThanOrEqual(
+		(box.right - box.left) / 2 + 1
+	);
 }
 
 async function shot(page: Page, name: string) {
@@ -275,7 +284,7 @@ async function shot(page: Page, name: string) {
 	}
 }
 
-for (const count of [1, 2, 4, 6]) {
+for (const count of [0, 1, 2, 4, 6]) {
 	test(`the fan with ${count} partner${count === 1 ? '' : 's'} is even and legible at every size`, async ({
 		browser
 	}) => {
@@ -286,7 +295,9 @@ for (const count of [1, 2, 4, 6]) {
 		try {
 			// A long name when there is one, to be cut short.
 			const partner = count > 1 ? LONG_NAME : JUN;
-			for (const current of ['Everyone', 'Me', partner]) {
+			// With no partner there is only Me to show.
+			const currents = count === 0 ? ['Me'] : ['Everyone', 'Me', partner];
+			for (const current of currents) {
 				await page.setViewportSize(PHONE);
 				await switchTo(page, current);
 				for (const viewport of VIEWPORTS) {
@@ -296,8 +307,7 @@ for (const count of [1, 2, 4, 6]) {
 					const kind = current === partner ? 'partner' : current.toLowerCase();
 					await shot(page, `${viewport.width}x${viewport.height}-${count}p-${kind}`);
 					const fan = await readFan(page);
-					// Everyone, Me, each partner and "Add partner".
-					expect(fan.options, where).toHaveLength(count + 3);
+					expect(fan.wedge, `${where}: something is selected`).not.toBeNull();
 					expectGoodFan(fan, count, current, where);
 					await closeFan(page);
 				}
@@ -385,13 +395,12 @@ test('the fan stays open through a resize, laid out again, and closes on a click
 		await expect(page.getByRole('button', { name: 'Show Jun', exact: true })).toHaveClass(
 			/hovered/
 		);
-		await expect(page.locator('[data-fan-hint]')).toContainText('Click to show Jun');
-		// Lit, Jun's avatar grows and its name moves down out of its way:
-		// nothing overlaps, its own avatar included.
+		// Named where the hint is, in its place.
+		await expect(page.locator('[data-fan-hint] .hint-centred')).toHaveText('Jun');
+		await expect(page.locator('[data-fan-hint]')).not.toContainText('Tap one');
+		// Lit, Jun's avatar grows into the room left for it: nothing overlaps.
 		await settled(page);
 		const lit = await readFan(page);
-		const jun = lit.options.find((option) => option.name === 'Show Jun');
-		expect(jun && overlap(jun.label, jun.avatar), 'Jun’s name under its grown avatar').toBe(false);
 		expectGoodFan(lit, 2, 'Everyone', 'Jun lit');
 		expect(
 			await page.locator('.backdrop').evaluate((element) => getComputedStyle(element).cursor)
@@ -533,9 +542,12 @@ test('the pointer shows wherever a click picks, even over the hint, and the hint
 				throw new Error('The hint has no box to drag across');
 			}
 			const before = await control(page).getAttribute('aria-label');
-			await page.mouse.move(box.x + 2, box.y + box.height / 2);
+			// From the start of its first line to past its end: a lit option's
+			// name may be one line at the top of a box tall enough for two, so
+			// a drag along the middle could pass under it and select nothing.
+			await page.mouse.move(box.x + 2, box.y + 6);
 			await page.mouse.down();
-			await page.mouse.move(box.x + box.width - 2, box.y + box.height / 2, { steps: 8 });
+			await page.mouse.move(box.x + box.width - 2, box.y + box.height - 2, { steps: 8 });
 			await page.mouse.up();
 			expect(await page.evaluate(() => document.getSelection()?.toString() ?? '')).not.toBe('');
 			await expect(control(page)).toHaveAttribute('aria-expanded', 'true');

@@ -380,9 +380,9 @@ export async function navTabs(page: Page): Promise<string[]> {
 
 /**
  * The contexts the switcher on the current page offers, in its order
- * (Everyone, Me, then each partner), or none when it is not shown at all —
- * which is what an account with no linked partner gets. Opens the fan to
- * read them and closes it again. The page must be one with a switcher.
+ * (Everyone, Me, then each partner; just Me with no linked partner), or none
+ * when it is not shown at all. Opens the fan to read them and closes it
+ * again. The page must be one with a switcher.
  */
 export async function contextNames(page: Page): Promise<string[]> {
 	await waitForHydration(page);

@@ -53,6 +53,7 @@ export function shownSpace(space: ContextSpaceView): {
 /**
  * Every context the switcher offers, in its order: Everyone, Me, then each
  * partner. `you` is the viewer's own name, for their slice of Everyone.
+ * With no partner there is no Everyone: it would just be Me again.
  */
 export function shownContexts(spaces: readonly ContextSpaceView[], you: string): ContextShown[] {
 	const each = spaces.map((space): ContextShown => {
@@ -80,7 +81,7 @@ export function shownContexts(spaces: readonly ContextSpaceView[], you: string):
 		// You first, then each partner: the solo space comes first already.
 		people: each.map((shown) => shown.people[0] ?? { colour: shown.colour, initials: '' })
 	};
-	return [everyone, ...each];
+	return spaces.some((space) => space.kind === 'shared') ? [everyone, ...each] : each;
 }
 
 /**

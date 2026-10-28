@@ -6,7 +6,6 @@
 	import { type ContextShown, shownContexts, switchContext } from '$lib/context-client.svelte';
 	import {
 		type Box,
-		CLOSE_MS,
 		diskScale,
 		FAN_CSS_EASING,
 		fanCentre,
@@ -14,9 +13,6 @@
 		fanEase,
 		HOVER_SCALE,
 		hintPlacement,
-		LABEL_GAP,
-		LABEL_GOOD,
-		LABEL_HEIGHT,
 		layoutFan,
 		OPTION_MS,
 		OPTION_STAGGER_MS,
@@ -69,22 +65,31 @@
 	/** How long a press is held before it opens the fan to slide in. */
 	const HOLD_MS = 280;
 
-	/** The hint's box: at most three lines, wrapping within this width. */
-	const HINT = { width: 150, height: 46 };
+	/**
+	 * The hint's box: at most three lines of help, or two of a lit option's
+	 * name at its much larger size, wrapping within this width.
+	 */
+	const HINT = { width: 150, height: 60 };
 
 	const contexts = $derived(shownContexts(spaces, you));
 	/**
-	 * With no partner, Everyone is just you: offering both would be noise, so
-	 * there is nothing to switch and no control.
+	 * With no partner the switcher offers Me and "Add partner" alone: there is
+	 * no Everyone (`shownContexts`), which would just be Me again. Shown even
+	 * then, so adding a partner is a tap away. Only with no space at all is
+	 * there nothing to draw.
 	 */
-	const visible = $derived(spaces.some((space) => space.kind === 'shared'));
+	const visible = $derived(contexts.length > 0);
 
 	/** A context picked here before the page's data has caught up with it. */
 	let pending = $state<string | null>(null);
-	const currentKey = $derived(pending ?? serialiseContext(context));
+	const storedKey = $derived(pending ?? serialiseContext(context));
+	// With no partner, a stored Everyone is shown as Me, the same things:
+	// Everyone is not on offer then, so it is Me that is current, sits under
+	// the pill and is not switched to when picked.
 	const current = $derived(
-		contexts.find((shown) => shown.key === currentKey) ?? (contexts[0] as ContextShown)
+		contexts.find((shown) => shown.key === storedKey) ?? (contexts[0] as ContextShown)
 	);
+	const currentKey = $derived(current.key);
 
 	/** Every option on the ring, in order: the contexts, then "Add partner". */
 	const slotKeys = $derived([...contexts.map((shown) => shown.key), 'add']);
@@ -243,33 +248,38 @@
 		};
 	});
 
-	const hint = $derived.by(() => {
-		// Sliding, letting go picks; opened by a tap, a mouse over an option
-		// (or the keyboard's focus on one) says a click will.
-		const verb = sliding ? 'Let go' : 'Click';
+	/**
+	 * The lit option's name: the options carry no names of their own, so the
+	 * one under the finger, the mouse or the keyboard's focus is named where
+	 * the hint is, in its place. Null while nothing is lit.
+	 */
+	const litName = $derived(
+		hover === 'add' ? 'Add partner' : (contexts.find((shown) => shown.key === hover)?.name ?? null)
+	);
+
+	/** What to do, while nothing is lit. */
+	const help = $derived(
+		sliding ? 'Slide onto one, then let go' : 'Tap one, or next time hold the button and slide'
+	);
+
+	/** What letting go will do, said to assistive tech while sliding. */
+	const announcement = $derived.by(() => {
 		if (hover === 'add') {
-			return `${verb} to add a partner`;
+			return 'Let go to add a partner';
 		}
-		const over = contexts.find((shown) => shown.key === hover);
-		if (over && (sliding || over.key !== currentKey)) {
-			return `${verb} to show ${over.name}`;
-		}
-		return sliding
-			? 'Slide onto one, then let go'
-			: 'Tap one, or next time hold the button and slide';
+		return litName === null ? help : `Let go to show ${litName}`;
 	});
 
-	/** Where an option's button goes: its avatar centred on its point, its name under it. */
+	/** Where an option's button goes: its avatar centred on its point. */
 	function placeOf(index: number) {
 		const at = layout?.points[index] ?? { x: 0, y: 0 };
 		const avatar = layout?.avatar ?? 56;
-		const width = Math.max(avatar, layout?.label ?? 0);
 		const centre = measured?.centre ?? at;
 		return {
-			left: at.x - width / 2,
+			left: at.x - avatar / 2,
 			top: at.y - avatar / 2,
-			width,
-			height: avatar + LABEL_GAP + LABEL_HEIGHT,
+			width: avatar,
+			height: avatar,
 			// From the option back to the disk's centre, for its way in and out.
 			dx: centre.x - at.x,
 			dy: centre.y - at.y
@@ -565,8 +575,19 @@
 		if (!open) {
 			return;
 		}
+		// A press that began on the hint is selecting its words. The hint
+		// shows the lit option's name, so lighting another as the drag
+		// crosses sectors would swap the text under the selection and lose
+		// it: what is lit holds still until the press ends.
+		let selecting = false;
+		const down = (event: PointerEvent) => {
+			selecting = event.target instanceof Node && (hintElement?.contains(event.target) ?? false);
+		};
+		const up = () => {
+			selecting = false;
+		};
 		const follow = (event: PointerEvent) => {
-			if (sliding || press || event.pointerType === 'touch') {
+			if (sliding || press || selecting || event.pointerType === 'touch') {
 				return;
 			}
 			hover = slotAt(event.clientX, event.clientY);
@@ -578,8 +599,14 @@
 			backdrop?.classList.toggle('pointing', hover !== null);
 			hintElement?.classList.toggle('pointing', hover !== null);
 		};
+		document.addEventListener('pointerdown', down, true);
+		document.addEventListener('pointerup', up, true);
 		document.addEventListener('pointermove', follow);
-		return () => document.removeEventListener('pointermove', follow);
+		return () => {
+			document.removeEventListener('pointerdown', down, true);
+			document.removeEventListener('pointerup', up, true);
+			document.removeEventListener('pointermove', follow);
+		};
 	});
 
 	/** Keyboard focus on an option lights it the same way. */
@@ -628,7 +655,7 @@
 	/**
 	 * An option springing out of the disk's centre to its place, and back in
 	 * on closing. The one showing now is the pill itself, flown to its place,
-	 * so only its name comes in, once the pill is nearly there.
+	 * so its own option, unseen under it, just comes and goes.
 	 *
 	 * `|global` where used: the options are in an `{#each}` inside the
 	 * `{#if open}`, and a local transition plays only when its own block
@@ -648,22 +675,11 @@
 		if (reducedMotion()) {
 			return { duration: 0 };
 		}
-		if (isCurrent && !opening) {
-			// Its name goes as the pill leaves, in the first half of the fan's
-			// closing time: it stays where it is rather than falling into the
-			// centre, and left for the whole time it lingered on its own.
-			return { duration: CLOSE_MS / 2, css: (t: number) => `opacity: ${t.toFixed(3)}` };
-		}
 		if (isCurrent) {
-			// Its name fades in as the pill arrives. The wait is inside the
-			// transition, not its `delay`, which Svelte spends showing the
-			// element fully opaque.
-			const wait = 160;
-			const total = wait + 200;
-			return {
-				duration: total,
-				css: (t: number) => `opacity: ${cubicOut(Math.max(0, (t * total - wait) / 200)).toFixed(3)}`
-			};
+			// Nothing of it shows: its avatar stands hidden under the pill. It
+			// used to fade its name in and out under the pill; the options
+			// have no names now (the lit one's is in the hint).
+			return { duration: 0 };
 		}
 		return {
 			delay,
@@ -744,7 +760,7 @@
 		     and only when it changes (the option under the finger, not every
 		     move). Always rendered, since a live region added with its text
 		     is not announced. -->
-		<span class="wa-visually-hidden" aria-live="polite">{open && sliding ? hint : ''}</span>
+		<span class="wa-visually-hidden" aria-live="polite">{open && sliding ? announcement : ''}</span>
 		<span
 			class="anchor"
 			bind:this={anchor}
@@ -828,8 +844,10 @@
 				</div>
 			</div>
 			{#if hintAt}
-				<!-- Shown, not read: the live region by the pill says what matters.
-				     At the top of the page: right-aligned against its right edge
+				<!-- Shown, not read: the live region by the pill says what matters,
+				     and each option is named by its own label. The lit option's
+				     name while one is lit, what to do otherwise. At the top of the
+				     page: right-aligned against its right edge
 				     when the disk is mostly cut off there, centred over the disk
 				     otherwise (`hintPlacement`). Moved by a transform, so it glides
 				     between the two, and the text is drawn twice, once each way,
@@ -837,6 +855,7 @@
 				<p
 					class="hint"
 					class:right={hintAt.side === 'right'}
+					class:naming={litName !== null}
 					bind:this={hintElement}
 					aria-hidden="true"
 					data-fan-hint={hintAt.side}
@@ -846,21 +865,16 @@
 					style:width="{HINT.width}px"
 					style:height="{HINT.height}px"
 				>
-					<span class="hint-centred">{hint}</span>
-					<span class="hint-right">{hint}</span>
+					<span class="hint-centred">{litName ?? help}</span>
+					<span class="hint-right">{litName ?? help}</span>
 				</p>
 			{/if}
 			<fieldset
 				class="slots"
 				{onfocusin}
 				aria-label="Whose to show"
-				class:crowded={layout.label < LABEL_GOOD}
 				bind:this={group}
-				style:--avatar="{layout.avatar}px"
 				style:--lit-scale={HOVER_SCALE}
-				style:--label="{layout.label}px"
-				style:--label-gap="{LABEL_GAP}px"
-				style:--label-height="{LABEL_HEIGHT}px"
 			>
 				{#each contexts as shown, index (shown.key)}
 					{const place = $derived(placeOf(index))}
@@ -883,11 +897,10 @@
 						onclick={() => pick(shown.key)}
 					>
 						<!-- The one showing now is the pill itself, flown here, so its
-						     own avatar stays out of sight underneath; its name shows. -->
+						     own avatar stays out of sight underneath. -->
 						<span class="slot-avatar" class:standing-in={isCurrent} data-fan-avatar>
 							<ContextAvatar kind={shown.kind} size={layout.avatar} people={shown.people} />
 						</span>
-						<span class="slot-name" data-fan-label>{shown.name}</span>
 					</button>
 				{/each}
 				<a
@@ -895,6 +908,7 @@
 					class:hovered={hover === 'add'}
 					class:selected={wedge?.selected === 'add'}
 					data-fan-option
+					aria-label="Add partner"
 					href={resolve('/(auth-required)/(app)/settings/partners/new')}
 					bind:this={slotButtons[addIndex]}
 					style:left="{addPlace.left}px"
@@ -907,7 +921,6 @@
 					<span class="slot-avatar" data-fan-avatar>
 						<ContextAvatar kind="add" size={layout.avatar} />
 					</span>
-					<span class="slot-name" data-fan-label>Add partner</span>
 				</a>
 			</fieldset>
 		{/if}
@@ -1110,6 +1123,21 @@
 			text-align: center;
 		}
 
+		/* A lit option's name: the options carry none of their own, so this
+		   is where it is read. Much larger and heavier than the help, in the
+		   text's own colour, two lines at most, which `HINT`'s height holds. */
+		&.naming {
+			font-size: var(--wa-font-size-l);
+			line-height: 1.2;
+			font-weight: 800;
+			color: var(--wa-color-text-normal);
+
+			span {
+				-webkit-line-clamp: 2;
+				line-clamp: 2;
+			}
+		}
+
 		/* The copy not showing can be neither pointed at nor selected, so a
 		   selection starts in the one that shows and copies its words once. */
 		.hint-right {
@@ -1146,35 +1174,18 @@
 		}
 	}
 
-	/* One line, as wide as the layout allows; a longer name ends in "…"
-	   and is still whole in the option's accessible name. */
-	.slot-name {
-		box-sizing: border-box;
-		max-inline-size: var(--label);
-		block-size: var(--label-height);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		font-size: var(--wa-font-size-2xs);
-		line-height: var(--label-height);
-		font-weight: var(--wa-font-weight-semibold);
-		transition: transform 120ms ease-out;
-	}
-
-	/* Sized and placed by the layout. Every property Web Awesome's native
-	   <button> styles set that matters is set here: its height and
-	   `justify-content: center` used to centre an avatar-and-name taller
-	   than the button on the button, which moved every avatar up 18px from
-	   where the pill flew to, and the pill covered its own name. */
+	/* Sized and placed by the layout: exactly its avatar, which has no name
+	   under it (the lit option's name is in the hint). Every property Web
+	   Awesome's native <button> styles set that matters is set here: its
+	   height and `justify-content: center` once moved every avatar off the
+	   point the pill flew to. */
 	.slot {
 		position: fixed;
 		z-index: 22;
 		box-sizing: border-box;
 		display: flex;
-		flex-direction: column;
 		align-items: center;
-		justify-content: flex-start;
-		gap: var(--label-gap);
+		justify-content: center;
 		min-inline-size: 0;
 		margin: 0;
 		padding: 0;
@@ -1186,12 +1197,11 @@
 		text-decoration: none;
 		cursor: pointer;
 		/* Grown and shrunk about its avatar's centre, on the way in and out. */
-		transform-origin: 50% calc(var(--avatar) / 2);
+		transform-origin: 50% 50%;
 		-webkit-tap-highlight-color: transparent;
 	}
 
-	/* Keyboard focus only: a thin cream outline round the avatar, not the
-	   whole button and its label. Not the theme's amber focus ring, which
+	/* Keyboard focus only: a thin cream outline round the avatar. Not the theme's amber focus ring, which
 	   would look like the ring that used to mark the lit option. */
 	.slot:focus-visible {
 		outline: none;
@@ -1202,26 +1212,10 @@
 		}
 	}
 
-	/* A crowded fan (many partners on a phone) has narrow names: a size
-	   smaller keeps "Everyone" and "Add partner" whole in them. */
-	.crowded .slot-name {
-		font-size: calc(var(--wa-font-size-2xs) - 1px);
-	}
-
-	/* Lit: the avatar grows (`HOVER_SCALE`) and its name moves down by the
-	   growth, on the same transition, so the two never meet. The layout
-	   leaves room for both. No ring: the wedge is the marker. The name
-	   keeps its colour (the slot's cream) in every state; only its weight
-	   changes. */
-	.slot.hovered {
-		.slot-avatar {
-			transform: scale(var(--lit-scale));
-		}
-
-		.slot-name {
-			transform: translateY(calc(var(--avatar) * (var(--lit-scale) - 1)));
-			font-weight: 800;
-		}
+	/* Lit: the avatar grows (`HOVER_SCALE`), into the room the layout leaves
+	   round every option. No ring: the wedge is the marker. */
+	.slot.hovered .slot-avatar {
+		transform: scale(var(--lit-scale));
 	}
 
 	/* "Add partner" is not a context like the others, so lit it has no
@@ -1253,23 +1247,12 @@
 		}
 	}
 
-	/* The selected option sits on the wedge, solid in its own colour, which
-	   the light space colours would take the name's contrast from. So its
-	   name sits on a chip of the disk's own surface: as legible as the
-	   others, whatever the colour under it. */
-	/* The keyline that keeps an avatar from vanishing into its own colour. */
-	.slot.selected .slot-avatar {
+	/* The selected option sits on the wedge, solid in its own colour: a
+	   keyline keeps its avatar from vanishing into it. Not "Add partner",
+	   which has no wedge: a solid ring outside its dashed edge changed its
+	   shape, where lit it should only brighten. */
+	.slot.selected:not(.add) .slot-avatar {
 		box-shadow: 0 0 0 2px var(--wa-color-surface-default);
-	}
-
-	.slot.selected .slot-name {
-		padding-inline: 4px;
-		border-radius: var(--wa-border-radius-s);
-		background: var(--wa-color-surface-default);
-	}
-
-	.slot[aria-current='true'] .slot-name {
-		font-weight: 800;
 	}
 
 	@media (prefers-reduced-motion: reduce) {

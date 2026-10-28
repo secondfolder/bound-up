@@ -95,9 +95,21 @@ async function fanSettled() {
 }
 
 describe('the control', () => {
-	it('is not there for someone with no partner: Everyone would just be them', () => {
+	it('offers someone with no partner just Me and Add partner: Everyone would just be them', async () => {
 		const { container } = renderSwitcher({ kind: 'all' }, [solo]);
-		expect(container.querySelector('button')).toBeNull();
+		// A stored Everyone shows as Me, the same things.
+		expect(trigger()).toHaveAccessibleName(/^Showing Me/);
+		await userEvent.click(trigger());
+		await fanSettled();
+		const options = [...container.querySelectorAll('[data-fan-option]')].map((option) =>
+			option.getAttribute('aria-label')
+		);
+		expect(options).toEqual(['Show Me', 'Add partner']);
+		expect(screen.queryByRole('button', { name: 'Show Everyone' })).toBeNull();
+		// Me is what is showing, so picking it changes nothing.
+		screen.getByRole('button', { name: 'Show Me' }).click();
+		await vi.waitFor(() => expect(trigger()).toHaveAttribute('aria-expanded', 'false'));
+		expect(fetchMock).not.toHaveBeenCalledWith('/api/context', expect.anything());
 	});
 
 	it('shows Everyone as a pie, a slice per person with their initials, you first', async () => {
@@ -250,14 +262,27 @@ describe('the fan', () => {
 		expect(screen.getByRole('button', { name: 'Show Jun' })).toBeInTheDocument();
 	});
 
-	it('shows the name of the one showing now under its place on the ring', async () => {
-		renderSwitcher({ kind: 'space', spaceId: JUN });
+	it('draws its options as avatars alone, named where the hint is only when one is lit', async () => {
+		const { container } = renderSwitcher({ kind: 'space', spaceId: JUN });
 		await userEvent.click(trigger());
-		const current = await vi.waitFor(() => screen.getByRole('button', { name: 'Show Jun' }));
-		await vi.waitFor(() =>
-			expect(current.querySelector('.slot-name')?.textContent?.trim()).toBe('Jun')
-		);
-		await vi.waitFor(() => expect(getComputedStyle(current).opacity).toBe('1'));
+		await fanSettled();
+		const options = [...container.querySelectorAll<HTMLElement>('[data-fan-option]')];
+		expect(options.length).toBeGreaterThan(0);
+		// Nothing but the avatar: no name under any of them, and the option
+		// exactly its avatar's size.
+		for (const option of options) {
+			expect([...option.children].map((child) => child.className)).toEqual([
+				expect.stringContaining('slot-avatar')
+			]);
+			const avatar = defined(option.querySelector('.slot-avatar'), 'an avatar');
+			expect(option.getBoundingClientRect().height).toBe(avatar.getBoundingClientRect().height);
+		}
+		// Each is still named for assistive tech.
+		expect(screen.getByRole('button', { name: 'Show Jun' })).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Add partner' })).toBeInTheDocument();
+		// Nothing lit: the hint says what to do.
+		expect(container.querySelector('.hint-centred')?.textContent).toContain('Tap one');
+		expect(container.querySelector('.hint')).not.toHaveClass('naming');
 	});
 
 	it('picks a context: tells the server, then refreshes what depends on it', async () => {
@@ -421,27 +446,25 @@ describe('the fan', () => {
 		move(inWedge);
 		await vi.waitFor(() => expect(junOption).toHaveClass('hovered'));
 		expect(wedge()).toBe(JUN);
-		expect(hint()).toBe('Click to show Jun');
+		// Its name, in the hint's place, and the help gone.
+		expect(hint()).toBe('Jun');
+		const hintElement = defined(container.querySelector<HTMLElement>('.hint'), 'the hint');
+		expect(hintElement).toHaveClass('naming');
+		// Much bigger and bolder than the help it stands in for.
+		expect(Number.parseFloat(getComputedStyle(hintElement).fontSize)).toBeGreaterThanOrEqual(
+			1.2 * Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
+		);
+		expect(Number(getComputedStyle(hintElement).fontWeight)).toBeGreaterThanOrEqual(700);
 		const backdrop = defined(container.querySelector<HTMLElement>('.backdrop'), 'the backdrop');
 		// The pointer anywhere in the sector, since a click there picks.
 		expect(getComputedStyle(backdrop).cursor).toBe('pointer');
-		// Lit: grown, with no ring round it, and its name moved down clear of it.
+		// Lit: grown, with no ring round it.
 		await fanSettled();
 		const litAvatar = defined(junOption.querySelector<HTMLElement>('.slot-avatar'), 'Jun’s avatar');
 		// One keyline at most (it keeps the avatar off its own colour on the
 		// wedge), never the two-part amber ring there used to be.
 		expect(shadows(getComputedStyle(litAvatar).boxShadow)).toBeLessThanOrEqual(1);
-		const nameElement = defined(junOption.querySelector('.slot-name'), 'Jun’s name');
-		expect(nameElement.getBoundingClientRect().top).toBeGreaterThanOrEqual(
-			litAvatar.getBoundingClientRect().bottom
-		);
-		// Bold, but the same colour as a name not lit.
-		const meName = defined(
-			screen.getByRole('button', { name: 'Show Me' }).querySelector('.slot-name'),
-			'Me’s name'
-		);
-		expect(getComputedStyle(nameElement).fontWeight).toBe('800');
-		expect(getComputedStyle(nameElement).color).toBe(getComputedStyle(meName).color);
+		expect(litAvatar.getBoundingClientRect().width).toBeGreaterThan(avatar.width);
 
 		// Off the disk: back to the one showing.
 		move({ clientX: disk.right + 200, clientY: disk.bottom + 200 });
@@ -520,7 +543,7 @@ describe('the fan', () => {
 		const outline = getComputedStyle(defined(me.querySelector('.slot-avatar'), 'Me’s avatar'));
 		expect(outline.outlineStyle).toBe('solid');
 		expect(outline.outlineWidth).toBe('2px');
-		expect(container.querySelector('.hint-centred')?.textContent?.trim()).toBe('Click to show Me');
+		expect(container.querySelector('.hint-centred')?.textContent?.trim()).toBe('Me');
 	});
 
 	it('highlights Add partner while sliding over it, and opens it on letting go', async () => {
@@ -547,13 +570,16 @@ describe('the fan', () => {
 		pointer('pointermove', over);
 		await vi.waitFor(() => expect(add).toHaveClass('hovered'));
 		// It glows rather than taking the wedge, which fades out under it, and
-		// the hint says what letting go does.
+		// the hint names it; the live region says what letting go does.
 		const wedge = defined(container.querySelector<HTMLElement>('.wedge'), 'the wedge');
 		expect(wedge).toHaveAttribute('data-fan-wedge', 'add');
 		expect(wedge).toHaveClass('hidden');
 		const glow = defined(add.querySelector('.slot-avatar'), 'Add partner’s avatar');
 		await vi.waitFor(() => expect(getComputedStyle(glow, '::before').opacity).toBe('1'));
-		expect(container.querySelector('.hint-centred')?.textContent?.trim()).toBe(
+		// Only brighter: no keyline round its dashed edge, as the others get.
+		expect(getComputedStyle(glow).boxShadow).toBe('none');
+		expect(container.querySelector('.hint-centred')?.textContent?.trim()).toBe('Add partner');
+		expect(container.querySelector('[aria-live="polite"]')?.textContent).toBe(
 			'Let go to add a partner'
 		);
 		pointer('pointerup', over);
@@ -568,8 +594,11 @@ describe('the fan', () => {
 		control.dispatchEvent(
 			new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerId: 3, ...start })
 		);
-		// Moving opens it at once, without waiting for the hold.
-		const away = { clientX: start.clientX + 30, clientY: start.clientY + 30 };
+		// Moving opens it at once, without waiting for the hold. Far enough to
+		// start a slide (10px) but still within a fingertip of where the press
+		// began (`PRESS_QUIET`, 24px), so over nothing: 30px each way was past
+		// it and landed in whichever sector lay there, which letting go picked.
+		const away = { clientX: start.clientX + 12, clientY: start.clientY + 12 };
 		control.dispatchEvent(
 			new PointerEvent('pointermove', { bubbles: true, pointerId: 3, ...away })
 		);

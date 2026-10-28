@@ -126,7 +126,9 @@ one-tap switch, and never switches by itself. Messages in Me is the first:
 **A page opts in** by rendering it, in `NestedPageHeader`'s `corner` snippet,
 with `data.contextSpaces`, `data.context` and the viewer's name, and by its
 load depending on `app:context`. Settings never shows it. **With no linked
-partner it is not rendered at all**: Everyone would just be Me.
+partner it offers just Me and "Add partner"**: there is no Everyone
+(`shownContexts`), which would just be Me again, and a stored Everyone shows
+as Me. It is still drawn, so adding a partner is a tap away.
 
 **The control** is a pill whose left end is the context's avatar at the
 control's full height (40px), then the name and a caret.
@@ -154,7 +156,8 @@ avatar on the ring: it is pinned by its avatar's left edge (its anchor holds
 the measured closed width), so as the label folds into the avatar the avatar
 never jumps, and it flies straight to its place, scaled to the others' size.
 Every other option springs out of the disk's centre, each 35ms after the one
-before; the current one's name fades in under it as the pill arrives. Under
+before. An option is its avatar alone, with no name under it: the lit
+option's name is shown where the hint is (see "The hint" below). Under
 `prefers-reduced-motion` all of it simply appears and goes.
 
 **One clock and one curve** (`context-fan.ts`: `OPTION_MS`, `optionTiming`,
@@ -187,17 +190,17 @@ gradient's hard stops, since Chrome anti-aliases a clip path's edges but not
 a conic gradient's stops, which drew every side not quite vertical or
 horizontal as a staircase. Inwards, once past the avatars, it fades to
 nothing well before the centre (`wedgeShading`, a radial mask). The selected
-option's name sits on a chip of the disk's surface, since the light space
-colours under it would take its contrast, and its avatar has a 2px keyline
-of the disk's colour, without which it vanished into a wedge of its own
-colour. There is no amber ring round the current or the lit avatar any
+option's avatar has a 2px keyline of the disk's colour, without which it
+vanished into a wedge of its own colour. There is no amber ring round the current or the lit avatar any
 more: the wedge is the marker. The wedge turns about the disk's centre to
 follow what is selected. Only the drawing is softened: the sector
 `optionAt` hit-tests is the whole slice.
 
 **"Add partner" glows instead.** It is not a context like the others, so lit
 it takes no wedge (the wedge fades out under it): a soft cream glow behind its
-"+" and a brighter dashed edge. Its hit area is still its sector.
+"+" and a brighter dashed edge, and no keyline: a solid ring outside the
+dashed edge changed its shape, where lit it should only brighten. Its hit
+area is still its sector.
 
 **Everyone's wedge is a pale spectrum** (`wedgeGradient`): the same shape as
 a partner's, filled with every member's colour in the pie's order, you
@@ -214,12 +217,10 @@ over the part of the wedge that can be seen (`wedgeSpan`): Everyone is
 always at an end of the arc, where half its sector is past the screen's
 edge, and spread over all of it half the colours were off the screen. It
 is built from the members' colours as they are, so a change of palette
-needs nothing here. Its name sits on the same surface chip as any selected
-name.
+needs nothing here.
 
-**Lit**, an avatar grows 14% (`HOVER_SCALE`) and its name moves down by the
-growth on the same transition, so the two never meet; the layout leaves room
-for any one option to be lit (`labelBudget`, `visibleArc`). Keyboard focus is
+**Lit**, an avatar grows 14% (`HOVER_SCALE`); the layout leaves room for any
+one option to be lit (`roomBetween`, `visibleArc`). Keyboard focus is
 shown, on `:focus-visible` only, by a thin cream outline round the avatar,
 not the theme's amber focus ring, which would look like the old marker. Over
 the disk the pointer is the hand anywhere in an option's sector, where a
@@ -228,20 +229,31 @@ click picks it, and the arrow elsewhere.
 **What is selected**: the current context, until something else is pointed
 at. Sliding, it is the option under the finger. Opened by a tap, a mouse
 over the fan lights the option whose sector it is in, the same way, and the
-hint says what a click will do ("Click to show Jun", "Click to add a
-partner"); a click anywhere in that sector picks it. Off the disk, the
+hint shows its name; a click anywhere in that sector picks it. Off the disk, the
 current one is lit again. Keyboard focus on an option lights it too. Touch
 has no hover, so a tap-opened fan on touch shows the current context until a
 tap picks one.
 
-**The hint** (`hintPlacement`) sits at the top of the page, 12px down. When
+**The hint** (`hintPlacement`) is what to do ("Tap one, or next time hold
+the button and slide"; "Slide onto one, then let go") while nothing is lit,
+and the lit option's name ("Jun", "Add partner") in its place while one is:
+the options carry no names of their own, so this is where a name is read.
+The name is much larger and heavier than the help (Web Awesome's `l`, weight
+800, in the text's own colour) and wraps to two lines at most. The hint sits
+at the top of the page, 12px down. When
 more than a third of the disk is cut off by the page's right edge
 (`HINT_RIGHT_CUT`: the disk's rightmost point, centre plus radius, lies more
 than a third of the radius beyond the shell's right edge), it sits against
 that edge, 12px in, right-aligned; a phone's disk, centred on the corner,
 always is. Otherwise it is centred over the disk's centre, centred. It is at
-most 150px wide, wraps to three lines, stays inside the shell, and where it
-would cover an option it moves down until clear rather than over it. A
+most 150px wide and 60px tall (three lines of help, two of a name), stays
+inside the shell, and where it would cover an option it first moves aside,
+nearest first, by up to half its width (`HINT_SLIDE`), and only failing that
+moves down until clear rather than over it. Moving down first dropped it
+below the whole fan and back as a resize slid "Add partner" past its corner.
+While a press that began on it is selecting its words, what is lit holds
+still, since lighting another option would swap the text under the
+selection. A
 resize across the threshold glides it there (a transform transition), and
 the text is drawn once each way, cross-fading, so its alignment never jumps.
 It is part of the fan, above the dim: its words can be selected and copied,
@@ -264,26 +276,24 @@ The geometry is a pure module, `src/lib/context-fan.ts`, unit-tested in
   on a wide screen, where the page column has a maximum width, it is beside
   the pill, well in from the corner.
 - **What the options use**: the longest unbroken run of the ring that can be
-  seen (`visibleArc`): the angles at which an option, avatar and name, is
+  seen (`visibleArc`): the angles at which an option's avatar, lit, is
   wholly inside the shell above its bottom nav, 8px in. A quarter of the ring
   round a corner, a half round the middle of the top edge. The options are
   spread evenly along all of it, first at one end and "Add partner" at the
   other, so every pair of neighbours is the same angle apart. The disk is a
   circle round the centre, clipped to the same area, and the wedge is as wide
   as that angle.
-- **Sizes**: names are one line, centred under their avatar, cut short with
-  "…" at a computed width (the whole name stays in the option's accessible
-  name). `layoutFan` tries avatars from 56px down to 36px and, for each, rings
-  from 140px out; it takes the largest avatars whose smallest ring gives every
-  name 80px without any name touching another name or another avatar
-  (`labelBudget`), else the largest that give names 72px, else whatever gives
-  them most. 72px is "Add partner" with room to spare: it measures about 61px
-  on macOS and more on Linux, whose Chromium rounds each glyph's advance, so
-  at 64px it was whole on one and cut short on the other. A fan one ring
-  cannot give 72px — nine options (six partners) on
-  a phone's quarter circle — **staggers**: every other option a row further
-  in, at the same even angles, so each name has two steps of room. A crowded
-  fan's names are a size smaller.
+- **Sizes**: an option is only its avatar. `layoutFan` tries avatars from
+  56px down to 36px and, for each, rings from 140px out; it takes the largest
+  avatars whose smallest ring leaves 24px clear between the nearest two, one
+  of them lit (`ROOM_TARGET`, `roomBetween`), else the largest that leave
+  12px (`ROOM_GOOD`), else whatever leaves most; never under 4px
+  (`OPTION_GAP`). 24px is about the spacing the names under the avatars used
+  to force, when there were names, so dropping them did not crowd the fan. A
+  fan one ring cannot give 12px with avatars of 48px or more — eight or nine
+  options on a phone's quarter circle — **staggers**: every other option a
+  row further in (an avatar, grown, and 4px), at the same even angles, so
+  each has two steps of room.
 - **Resizing** lays the fan out again rather than closing it (a window
   resize, the visual viewport changing, or a scroll, once a frame at most):
   the centre, the visible arc, the ring, the sizes and the hint's place are
@@ -300,9 +310,9 @@ disk, within 48px of its centre, or within 24px of where the press began
 (so a wobble on the pill picks nothing), nothing is. "Add partner" lights up
 like any other option, and letting go there opens it. Letting go over nothing
 leaves the fan open for tapping. The pill takes pointer capture and
-`touch-action: none`, so a slide is never a scroll. The hint says what
-letting go will do, and a polite live region by the pill says the same to
-assistive tech, only when it changes.
+`touch-action: none`, so a slide is never a scroll. The hint names what is
+under the finger, and a polite live region by the pill says what letting go
+will do ("Let go to show Jun") to assistive tech, only when it changes.
 
 **Closing.** A click anywhere but on the pill, an option, the lit option's
 sector or the hint closes the fan: on the page, the nav, the middle of the
@@ -316,7 +326,7 @@ It used to be a `<button>`, which Web Awesome's native styles gave the form
 control's height: it covered a 43px strip along the top, darkened, and every
 click below it went to the page. The option buttons had the same height and
 `justify-content: center`, which moved every avatar 18px up from where the pill
-flew to, so the pill covered the current option's name.
+flew to, when an option was an avatar with a name under it.
 
 **Picking** a different context is one flight: the pill becomes the picked
 avatar where it stands on the ring, in the same frame as that avatar hides
@@ -481,7 +491,7 @@ that does not redirect, so it is the one refresh this does not cover.
 | `src/lib/space-colours.ts` | The palette, its labels, `resolveSpaceColours`, `storedSpaceColour`. Alias-free: the schema imports `SpaceColour` |
 | `src/lib/server/context.ts` | `listContextSpaces`, the per-request resolver, the cookie, `setSpaceColour`, `contextSpaceViews`, `contextSpaceIds` |
 | `src/lib/context-client.svelte.ts` | Names and avatars for the browser, `switchContext`, `storeContext` and `followInContext` |
-| `src/lib/context-fan.ts` | The fan's geometry and motion: the centre, the visible arc, even spacing, name widths, staggering, which sector a point is in, the hint's place, the wedge's shading and fill (Everyone's spectrum), the shared timing and easing. Pure, alias-free |
+| `src/lib/context-fan.ts` | The fan's geometry and motion: the centre, the visible arc, even spacing, room between avatars, staggering, which sector a point is in, the hint's place, the wedge's shading and fill (Everyone's spectrum), the shared timing and easing. Pure, alias-free |
 | `src/lib/navigation.ts`, `src/lib/enhance.ts` | Refreshes and `use:enhance` that wait for a navigation under way rather than dropping it |
 | `src/lib/components/context/` | `ContextSwitcher`, `ContextAvatar`, `SpaceChip`, `SpaceColourForm` |
 | `src/routes/api/context/+server.ts` | Switching |

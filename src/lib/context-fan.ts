@@ -2,7 +2,7 @@
  * The context switcher's fan as geometry: where its disk is centred, which
  * part of the ring round that centre can be seen, and where each option goes
  * on that part so that every one is the same angle from its neighbours and no
- * name runs into another option or off the screen. Pure and alias-free, so it
+ * avatar runs into another or off the screen. Pure and alias-free, so it
  * is unit-tested without a browser; `ContextSwitcher` measures the screen and
  * draws what this returns. See docs/contexts.md, "The fan".
  *
@@ -16,26 +16,19 @@ export type Point = { x: number; y: number };
 export type Box = { left: number; top: number; right: number; bottom: number };
 /** A run of the ring from `start` to `end`, `end` ≥ `start`; `end` may pass 360. */
 export type Arc = { start: number; end: number };
-/** An option's size: its avatar's diameter, and the widest its name may be. */
-export type OptionSize = { avatar: number; label: number };
-
-/** Between an avatar and the name under it. */
-export const LABEL_GAP = 3;
-/** One line of a name, at the size the switcher sets it. */
-export const LABEL_HEIGHT = 13;
 /**
- * Clear space kept between any two options. Wide enough that the avatar a
- * finger is over, drawn larger, still all but clears the names beside it.
+ * The least clear space kept between any two avatars, the one a finger is
+ * over drawn larger. An option is only its avatar: the name of the one lit
+ * is shown where the hint is, not under it.
  */
 export const OPTION_GAP = 4;
 /**
- * How much larger the lit option's avatar is drawn. Its name moves down by
- * the growth, so the two never meet, and every layout leaves room for that
- * around every option, since any of them may be lit.
+ * How much larger the lit option's avatar is drawn. Every layout leaves room
+ * for that around every option, since any of them may be lit.
  */
 export const HOVER_SCALE = 1.14;
 
-/** How far a lit avatar grows past its edge, all round, and so how far its name moves down. */
+/** How far a lit avatar grows past its edge, all round. */
 export function hoverShift(avatar: number): number {
 	return (avatar * (HOVER_SCALE - 1)) / 2;
 }
@@ -55,24 +48,20 @@ export const CENTRE_OFFSET = { x: 16, y: 24 } as const;
  * a sliver of its far side for nothing.
  */
 export const CENTRE_SNAP = 16;
-/** The avatars' sizes, largest first: a crowded fan trades size for room to name them. */
+/** The avatars' sizes, largest first: a crowded fan trades size for room between them. */
 export const AVATAR_SIZES = [56, 52, 48, 44, 40, 36] as const;
-/** A name this wide fits most first names whole; a fan that allows it stops growing. */
-export const LABEL_TARGET = 80;
 /**
- * Short of the target, a size of avatar that still allows names this wide
- * is kept rather than shrunk further: "Everyone" and "Add partner" fit.
- * With room to spare: "Add partner" is about 61px on macOS and wider on
- * Linux, whose Chromium rounds glyph advances, so 64 cut it short there.
+ * This much clear space between neighbouring avatars (one of them lit) reads
+ * as a fan of separate options rather than a string of beads; a ring that
+ * allows it stops growing. About the spacing the names under the avatars
+ * used to force, so the fan is no tighter than it was.
  */
-export const LABEL_GOOD = 72;
-/** The widest a name is ever drawn, however much room there is; longer ones end in "…". */
-export const LABEL_MAX = 120;
-/** Narrower than this a name is not worth drawing at all. */
-export const LABEL_MIN = 36;
+export const ROOM_TARGET = 24;
+/** Short of the target, a size of avatar that still leaves this much is kept rather than shrunk. */
+export const ROOM_GOOD = 12;
 /**
- * One ring that only fits its names with avatars smaller than this gives
- * way to a staggered one, if that keeps them bigger.
+ * One ring that only leaves its avatars room with avatars smaller than this
+ * gives way to a staggered one, if that keeps them bigger.
  */
 export const ONE_RING_AVATAR = 48;
 /** The ring is never tighter than this, so a short fan still reads as a fan. */
@@ -102,22 +91,10 @@ export function pointAt(centre: Point, radius: number, angle: number): Point {
 	};
 }
 
-/**
- * What an option centred on `at` covers: its avatar, and under it the box
- * its name may fill. The name is centred under the avatar and may be wider
- * than it.
- */
-export function optionBoxes(
-	at: Point,
-	{ avatar, label }: OptionSize,
-	lit = false
-): { avatar: Box; label: Box } {
+/** What an option centred on `at` covers: its avatar, grown when `lit`. */
+export function optionBox(at: Point, avatar: number, lit = false): Box {
 	const half = avatar / 2 + (lit ? hoverShift(avatar) : 0);
-	const top = at.y + avatar / 2 + LABEL_GAP + (lit ? hoverShift(avatar) * 2 : 0);
-	return {
-		avatar: { left: at.x - half, top: at.y - half, right: at.x + half, bottom: at.y + half },
-		label: { left: at.x - label / 2, top, right: at.x + label / 2, bottom: top + LABEL_HEIGHT }
-	};
+	return { left: at.x - half, top: at.y - half, right: at.x + half, bottom: at.y + half };
 }
 
 /** Whether two boxes come closer than `gap`. */
@@ -136,45 +113,40 @@ export function inset(box: Box, by: number): Box {
 }
 
 /**
- * Whether an option at `angle` on the ring is wholly inside `bounds`.
- * Inlined arithmetic rather than `optionBoxes`, since the layout asks this
- * a great many times.
+ * Whether an option at `angle` on the ring is wholly inside `bounds`, lit.
+ * Inlined arithmetic rather than `optionBox`, since the layout asks this a
+ * great many times.
  */
 function optionInside(
 	centre: Point,
 	radius: number,
 	angle: number,
-	{ avatar, label }: OptionSize,
+	avatar: number,
 	bounds: Box
 ): boolean {
 	const x = centre.x + radius * Math.cos(angle * RADIANS);
 	const y = centre.y + radius * Math.sin(angle * RADIANS);
-	const across = Math.max(avatar + 2 * hoverShift(avatar), label) / 2;
-	// Room for it lit: the avatar grown, the name moved down.
+	const half = avatar / 2 + hoverShift(avatar);
 	return (
-		x - across >= bounds.left &&
-		x + across <= bounds.right &&
-		y - avatar / 2 - hoverShift(avatar) >= bounds.top &&
-		y + avatar / 2 + 2 * hoverShift(avatar) + LABEL_GAP + LABEL_HEIGHT <= bounds.bottom
+		x - half >= bounds.left &&
+		x + half <= bounds.right &&
+		y - half >= bounds.top &&
+		y + half <= bounds.bottom
 	);
 }
 
 const SAMPLE_STEP = 2;
 
 /**
- * The longest unbroken run of the ring on which an option of `size` is wholly
- * inside `bounds`, or null when there is none. The whole ring when all of it
- * is. Found by sampling every 2° and then narrowing each end down to a
- * hundredth of a degree, so an end is where the option touches the edge.
+ * The longest unbroken run of the ring on which an option with an avatar of
+ * `avatar` is wholly inside `bounds`, or null when there is none. The whole
+ * ring when all of it is. Found by sampling every 2° and then narrowing each
+ * end down to a hundredth of a degree, so an end is where the option touches
+ * the edge.
  */
-export function visibleArc(
-	centre: Point,
-	radius: number,
-	bounds: Box,
-	size: OptionSize
-): Arc | null {
+export function visibleArc(centre: Point, radius: number, bounds: Box, avatar: number): Arc | null {
 	const count = 360 / SAMPLE_STEP;
-	const inside = (angle: number) => optionInside(centre, radius, angle, size, bounds);
+	const inside = (angle: number) => optionInside(centre, radius, angle, avatar, bounds);
 	const samples = Array.from({ length: count }, (_, index) => inside(index * SAMPLE_STEP));
 	const firstOut = samples.indexOf(false);
 	if (firstOut === -1) {
@@ -248,48 +220,23 @@ export function stepAlong(arc: Arc, count: number): number {
 }
 
 /**
- * The widest every name may be, with options centred on `points`, so that no
- * name comes within `OPTION_GAP` of another name or of another option's
- * avatar; at most `LABEL_MAX`. Negative infinity when two avatars already
- * collide, which no name width can mend.
+ * The clear space between the two nearest avatars of options centred on
+ * `points`, either of them lit: their centres' distance less both radii and
+ * the growth. Every pair, not only neighbours, since a staggered fan's
+ * inner row comes near the outer one. Infinity for a single option.
  */
-export function labelBudget(points: readonly Point[], avatar: number): number {
-	// Any option may be lit: its avatar grown by `shift` all round and its
-	// name moved down by twice that. So each name is allowed for down to its
-	// lit place, and each avatar at its lit size.
-	const shift = hoverShift(avatar);
-	const half = avatar / 2 + shift;
-	let budget: number = LABEL_MAX;
+export function roomBetween(points: readonly Point[], avatar: number): number {
+	const reach = avatar + hoverShift(avatar);
+	let room = Number.POSITIVE_INFINITY;
 	for (const [i, a] of points.entries()) {
-		for (const [j, b] of points.entries()) {
-			if (i === j) {
-				continue;
-			}
-			const across = Math.abs(a.x - b.x);
-			if (i < j) {
-				const apart = avatar + shift + OPTION_GAP;
-				if (across < apart && Math.abs(a.y - b.y) < apart) {
-					return Number.NEGATIVE_INFINITY;
-				}
-				// Two names on the same line, either moved down, need their
-				// whole widths apart.
-				if (Math.abs(a.y - b.y) < LABEL_HEIGHT + 2 * shift + OPTION_GAP) {
-					budget = Math.min(budget, across - OPTION_GAP);
-				}
-			}
-			// a's name, at rest or moved down, level with b's avatar, grown,
-			// needs half of each apart.
-			const labelTop = a.y + avatar / 2 + LABEL_GAP;
-			const labelBottom = labelTop + LABEL_HEIGHT + 2 * shift;
-			if (labelTop < b.y + half + OPTION_GAP && labelBottom + OPTION_GAP > b.y - half) {
-				budget = Math.min(budget, 2 * (across - half - OPTION_GAP));
-			}
+		for (const b of points.slice(i + 1)) {
+			room = Math.min(room, Math.hypot(a.x - b.x, a.y - b.y) - reach);
 		}
 	}
-	return budget;
+	return room;
 }
 
-type Fit = { label: number; arc: Arc };
+type Fit = { room: number; arc: Arc };
 
 /** The radius of the `index`th option: every other one is `stagger` further in. */
 function radiusOf(index: number, radius: number, stagger: number): number {
@@ -316,16 +263,12 @@ function sharedArc(a: Arc, b: Arc): Arc | null {
 }
 
 /**
- * The widest names a fan of `count` avatars of `avatar` on the ring of
- * `radius` (every other one `stagger` further in, when crowded) can have,
- * and the arc they go on; null when it cannot have even `LABEL_MIN`. The two
- * depend on each other: a wider name needs more margin at the screen's
- * edges, which shortens the arc and so crowds the options, which allows
- * narrower names. So a width is tried by laying the fan out for it and
- * checking the spacing allows it, and the widest that passes is found by
- * halving the range, to the pixel.
+ * The arc a fan of `count` avatars of `avatar` on the ring of `radius`
+ * (every other one `stagger` further in, when crowded) goes on, and the room
+ * it leaves between them; null when some part of it would not show, or two
+ * avatars would come closer than `OPTION_GAP`.
  */
-function fitLabel(
+function fitRing(
 	centre: Point,
 	radius: number,
 	bounds: Box,
@@ -333,42 +276,18 @@ function fitLabel(
 	avatar: number,
 	stagger: number
 ): Fit | null {
-	const attempt = (label: number): Fit | null => {
-		const outer = visibleArc(centre, radius, bounds, { avatar, label });
-		const inner =
-			stagger > 0 && count > 1
-				? visibleArc(centre, radius - stagger, bounds, { avatar, label })
-				: outer;
-		const arc = outer && inner ? sharedArc(outer, inner) : null;
-		if (!arc) {
-			return null;
-		}
-		const points = spreadEvenly(arc, count).map((angle, index) =>
-			pointAt(centre, radiusOf(index, radius, stagger), angle)
-		);
-		return labelBudget(points, avatar) >= label ? { label, arc } : null;
-	};
-	const widest = attempt(LABEL_MAX);
-	if (widest) {
-		return widest;
-	}
-	let best = attempt(LABEL_MIN);
-	if (!best) {
+	const outer = visibleArc(centre, radius, bounds, avatar);
+	const inner =
+		stagger > 0 && count > 1 ? visibleArc(centre, radius - stagger, bounds, avatar) : outer;
+	const arc = outer && inner ? sharedArc(outer, inner) : null;
+	if (!arc) {
 		return null;
 	}
-	let low = LABEL_MIN;
-	let high = LABEL_MAX;
-	while (high - low > 1) {
-		const middle = Math.floor((low + high) / 2);
-		const fit = attempt(middle);
-		if (fit) {
-			best = fit;
-			low = middle;
-		} else {
-			high = middle;
-		}
-	}
-	return best;
+	const points = spreadEvenly(arc, count).map((angle, index) =>
+		pointAt(centre, radiusOf(index, radius, stagger), angle)
+	);
+	const room = roomBetween(points, avatar);
+	return room >= OPTION_GAP ? { room, arc } : null;
 }
 
 export type FanLayout = {
@@ -377,12 +296,12 @@ export type FanLayout = {
 	radius: number;
 	/**
 	 * How much further in every other option sits: 0 on one ring. Only a fan
-	 * too crowded for one ring to leave its names room staggers.
+	 * too crowded for one ring to leave its avatars room staggers.
 	 */
 	stagger: number;
 	avatar: number;
-	/** The widest each name is drawn. */
-	label: number;
+	/** The clear space between the two nearest avatars, either lit. */
+	room: number;
 	/** The part of the ring the options are spread along. */
 	arc: Arc;
 	/** The angle between neighbours, and so the selection wedge's width. */
@@ -391,7 +310,7 @@ export type FanLayout = {
 	angles: number[];
 	/** Each option's avatar's centre, in the switcher's order. */
 	points: Point[];
-	/** The disk's radius: past the names of the options on the ring. */
+	/** The disk's radius: past the avatars of the options on the ring. */
 	disk: number;
 	/** False when nothing fitted and the options are drawn regardless, overlapping. */
 	fits: boolean;
@@ -407,21 +326,21 @@ function build(centre: Point, chosen: Candidate, count: number, fits: boolean): 
 		radius,
 		stagger,
 		avatar,
-		label: fit.label,
+		room: fit.room,
 		arc: fit.arc,
 		step: stepAlong(fit.arc, count),
 		angles,
 		points: angles.map((angle, index) => pointAt(centre, radiusOf(index, radius, stagger), angle)),
-		disk: radius + avatar / 2 + 2 * hoverShift(avatar) + LABEL_GAP + LABEL_HEIGHT + 12,
+		disk: radius + avatar / 2 + hoverShift(avatar) + 12,
 		fits
 	};
 }
 
 /**
  * The best fan with every other option `stagger` in (0 for one ring): the
- * first, from the largest avatars down, whose smallest ring gives names
- * `LABEL_TARGET`; failing that the largest avatars that still give them
- * `LABEL_GOOD`; failing that whatever gives them the most.
+ * first, from the largest avatars down, whose smallest ring leaves them
+ * `ROOM_TARGET`; failing that the largest avatars that still leave them
+ * `ROOM_GOOD`; failing that whatever leaves them the most.
  */
 function search(
 	centre: Point,
@@ -435,15 +354,15 @@ function search(
 		let best: Candidate | null = null;
 		const inward = stagger(avatar);
 		for (let radius = MIN_RADIUS + inward; radius <= farthest; radius += RADIUS_STEP) {
-			const fit = fitLabel(centre, radius, bounds, count, avatar, inward);
+			const fit = fitRing(centre, radius, bounds, count, avatar, inward);
 			if (!fit) {
 				continue;
 			}
 			const candidate = { radius, avatar, stagger: inward, fit };
-			if (fit.label >= LABEL_TARGET) {
+			if (fit.room >= ROOM_TARGET) {
 				return candidate;
 			}
-			if (!best || fit.label > best.fit.label) {
+			if (!best || fit.room > best.fit.room) {
 				best = candidate;
 			}
 		}
@@ -452,9 +371,9 @@ function search(
 		}
 	}
 	return (
-		roomiest.find((candidate) => candidate.fit.label >= LABEL_GOOD) ??
+		roomiest.find((candidate) => candidate.fit.room >= ROOM_GOOD) ??
 		roomiest.reduce<Candidate | null>(
-			(most, candidate) => (!most || candidate.fit.label > most.fit.label ? candidate : most),
+			(most, candidate) => (!most || candidate.fit.room > most.fit.room ? candidate : most),
 			null
 		)
 	);
@@ -466,12 +385,12 @@ function search(
  *
  * The options go evenly along all of the ring that can be seen, which is a
  * quarter when the centre is a corner and a half when it is the middle of the
- * top edge. Of the layouts where no name collides, it takes the largest
- * avatars, and for those the smallest ring that gives every name
- * `LABEL_TARGET` (see `search`). A fan that one ring cannot give even
- * `LABEL_GOOD` with avatars of `ONE_RING_AVATAR` (five or six partners on a
- * phone, eight or nine options on a quarter circle) staggers instead: every other option a row further in, at the same even
- * angles, so each name has the room of two steps rather than one.
+ * top edge. Of the layouts where no avatar collides, it takes the largest
+ * avatars, and for those the smallest ring that leaves them `ROOM_TARGET`
+ * apart (see `search`). A fan that one ring cannot leave even `ROOM_GOOD`
+ * with avatars of `ONE_RING_AVATAR` (many partners on a phone's quarter
+ * circle) staggers instead: every other option a row further in, at the same
+ * even angles, so each avatar has the room of two steps rather than one.
  */
 export function layoutFan({
 	centre,
@@ -492,28 +411,28 @@ export function layoutFan({
 		].map(([x = 0, y = 0]) => Math.hypot(x - centre.x, y - centre.y))
 	);
 	const single = search(centre, bounds, count, farthest, () => 0);
-	if (single && single.fit.label >= LABEL_GOOD && single.avatar >= ONE_RING_AVATAR) {
+	if (single && single.fit.room >= ROOM_GOOD && single.avatar >= ONE_RING_AVATAR) {
 		return build(centre, single, count, true);
 	}
-	// A row in by about an avatar and its name, so an inner option's avatar
-	// sits level with its outer neighbours' names rather than on them.
+	// A row in by an avatar, grown, so an inner option sits between its outer
+	// neighbours rather than on them.
 	const staggered = search(
 		centre,
 		bounds,
 		count,
 		farthest,
-		(diameter) => diameter + 2 * hoverShift(diameter) + LABEL_GAP + LABEL_HEIGHT
+		(diameter) => diameter + 2 * hoverShift(diameter) + OPTION_GAP
 	);
-	// Names with room first, then the larger avatars, then the roomier names.
+	// Room first, then the larger avatars, then the roomier fan.
 	const better = (a: Candidate, b: Candidate) => {
-		const roomy = a.fit.label >= LABEL_GOOD;
-		if (roomy !== b.fit.label >= LABEL_GOOD) {
+		const roomy = a.fit.room >= ROOM_GOOD;
+		if (roomy !== b.fit.room >= ROOM_GOOD) {
 			return roomy;
 		}
 		if (a.avatar !== b.avatar) {
 			return a.avatar > b.avatar;
 		}
-		return a.fit.label > b.fit.label;
+		return a.fit.room > b.fit.room;
 	};
 	const chosen = staggered && (!single || better(staggered, single)) ? staggered : single;
 	if (chosen) {
@@ -522,11 +441,10 @@ export function layoutFan({
 	// A window too small for any fan: the smallest avatars on the tightest
 	// ring, along whatever of it shows, overlapping as they must.
 	const avatar = AVATAR_SIZES.at(-1) ?? 36;
-	const size = { avatar, label: LABEL_MIN };
-	const arc = visibleArc(centre, MIN_RADIUS, bounds, size) ?? { start: 90, end: 180 };
+	const arc = visibleArc(centre, MIN_RADIUS, bounds, avatar) ?? { start: 90, end: 180 };
 	return build(
 		centre,
-		{ radius: MIN_RADIUS, avatar, stagger: 0, fit: { label: LABEL_MIN, arc } },
+		{ radius: MIN_RADIUS, avatar, stagger: 0, fit: { room: 0, arc } },
 		count,
 		false
 	);
@@ -539,12 +457,18 @@ export const HINT_INSET = 12;
  * The share of the disk's radius that may be cut off on the right before
  * the hint moves to the right edge of the page. "More than a third of the
  * circle's right side is cut off" means: the disk's rightmost point, its
- * centre plus its radius (`disk`, out past the names), lies more than a
+ * centre plus its radius (`disk`, out past the avatars), lies more than a
  * third of that radius beyond the shell's right edge. On a phone the centre
  * is the edge itself, so the whole right half is cut off; on a wide screen
  * the disk sits clear of the edge and nothing is.
  */
 export const HINT_RIGHT_CUT = 1 / 3;
+
+/**
+ * How far, as a share of its width, the hint may move aside from its place
+ * to clear an option before it moves down instead.
+ */
+export const HINT_SLIDE = 0.5;
 
 /** Which way the hint sits: against the right edge, or centred over the disk. */
 export type HintSide = 'right' | 'centre';
@@ -563,9 +487,10 @@ export function hintSide(layout: FanLayout, bounds: Box): HintSide {
  * edge with its text right-aligned when more than a third of the disk is
  * cut off there (`hintSide`), centred over the disk's centre with its text
  * centred otherwise, and inside `bounds` either way. Its top-left corner,
- * and which side. Where that would cover an option (avatar or name, the
- * pill standing in for the current one included) it moves down, a few
- * pixels at a time, until clear: below the top row rather than over it.
+ * and which side. Where that would cover an option (the pill standing in
+ * for the current one included) it moves aside, by up to `HINT_SLIDE` of
+ * its width, nearest first; failing that down, a few pixels at a time,
+ * until clear: below the top row rather than over it.
  * Null only when nothing clear is found on the page at all.
  */
 export function hintPlacement(
@@ -577,18 +502,25 @@ export function hintPlacement(
 	const width = Math.min(size.width, bounds.right - bounds.left - 2 * HINT_INSET);
 	const wanted = side === 'right' ? bounds.right - HINT_INSET - width : layout.centre.x - width / 2;
 	const x = Math.min(Math.max(wanted, bounds.left + HINT_INSET), bounds.right - HINT_INSET - width);
-	const options = layout.points.map((at) => optionBoxes(at, layout));
+	// Lit, any of them may be.
+	const options = layout.points.map((at) => optionBox(at, layout.avatar, true));
+	const clear = (left: number, top: number) => {
+		const box = { left, top, right: left + width, bottom: top + size.height };
+		return options.every((option) => !boxesOverlap(box, option, OPTION_GAP));
+	};
+	const lowest = bounds.left + HINT_INSET;
+	const highest = bounds.right - HINT_INSET - width;
+	const slide = width * HINT_SLIDE;
 	for (let y = bounds.top + HINT_INSET; y + size.height <= bounds.bottom - HINT_INSET; y += 4) {
-		const box = { left: x, top: y, right: x + width, bottom: y + size.height };
-		const clear = options.every(
-			(option) =>
-				!(
-					boxesOverlap(box, option.avatar, OPTION_GAP) ||
-					boxesOverlap(box, option.label, OPTION_GAP)
-				)
-		);
-		if (clear) {
-			return { x, y, side };
+		// Aside a little, nearest first, before ever down: an option clipping
+		// a corner (Add partner, as a resize brings the disk's edge in) used
+		// to drop the hint below the whole fan and back again.
+		for (let by = 0; by <= slide; by += 2) {
+			for (const to of by === 0 ? [x] : [x - by, x + by]) {
+				if (to >= lowest && to <= highest && clear(to, y)) {
+					return { x: to, y, side };
+				}
+			}
 		}
 	}
 	return null;

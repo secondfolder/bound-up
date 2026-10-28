@@ -18,23 +18,20 @@ import {
 	hintPlacement,
 	hintSide,
 	hoverShift,
-	LABEL_GAP,
-	LABEL_GOOD,
-	LABEL_HEIGHT,
-	LABEL_MAX,
-	LABEL_MIN,
-	labelBudget,
 	layoutFan,
 	OPTION_GAP,
 	OPTION_MS,
 	OPTION_STAGGER_MS,
 	optionAt,
-	optionBoxes,
+	optionBox,
 	optionShare,
 	optionTiming,
 	pillDuration,
 	pointAt,
+	ROOM_GOOD,
+	ROOM_TARGET,
 	rightCut,
+	roomBetween,
 	SPECTRUM_EDGE_WEIGHT,
 	SPECTRUM_SHARE,
 	spectrumStops,
@@ -54,27 +51,26 @@ const shell = (width: number, height: number): Box => ({
 	bottom: height
 });
 
-/** Every option's avatar and name, as drawn at the layout's sizes. */
+/** Every option's avatar, as drawn at the layout's size. */
 function boxes(layout: FanLayout) {
-	return layout.points.map((at) => optionBoxes(at, layout));
+	return layout.points.map((at) => optionBox(at, layout.avatar));
 }
 
-/** Every pair of options that collide, by what collides: none in a good fan. */
-function collisions(layout: FanLayout): string[] {
-	const all = boxes(layout);
+/**
+ * Every pair of avatars closer than `OPTION_GAP`, with the `lit` one drawn
+ * grown (or none): none in a good fan. Measured as circles, which they are.
+ */
+function collisions(layout: FanLayout, lit: number | null = null): string[] {
 	const found: string[] = [];
-	for (const [i, a] of all.entries()) {
-		for (const [j, b] of all.entries()) {
-			if (i === j) {
+	const radius = (index: number) =>
+		layout.avatar / 2 + (index === lit ? hoverShift(layout.avatar) : 0);
+	for (const [i, a] of layout.points.entries()) {
+		for (const [j, b] of layout.points.entries()) {
+			if (j <= i) {
 				continue;
 			}
-			if (boxesOverlap(a.label, b.label)) {
-				found.push(`names ${i} and ${j}`);
-			}
-			if (boxesOverlap(a.label, b.avatar)) {
-				found.push(`name ${i} and avatar ${j}`);
-			}
-			if (boxesOverlap(a.avatar, b.avatar)) {
+			const apart = Math.hypot(a.x - b.x, a.y - b.y) - radius(i) - radius(j);
+			if (apart < OPTION_GAP - 1e-9) {
 				found.push(`avatars ${i} and ${j}`);
 			}
 		}
@@ -82,37 +78,15 @@ function collisions(layout: FanLayout): string[] {
 	return found;
 }
 
-/** Every collision with the `lit` option drawn lit: grown, its name moved down. */
-function litCollisions(layout: FanLayout, lit: number): string[] {
-	const all = layout.points.map((at, index) => optionBoxes(at, layout, index === lit));
-	const self = all[lit];
-	const found: string[] = [];
-	if (self && boxesOverlap(self.avatar, self.label)) {
-		found.push(`${lit}'s own name`);
-	}
-	for (const [index, other] of all.entries()) {
-		if (index === lit || !self) {
-			continue;
-		}
-		if (boxesOverlap(self.label, other.label) || boxesOverlap(self.label, other.avatar)) {
-			found.push(`${lit}'s name and ${index}`);
-		}
-		if (boxesOverlap(other.label, self.avatar)) {
-			found.push(`${index}'s name and ${lit}'s avatar`);
-		}
-	}
-	return found;
-}
-
-/** Every option that is not wholly inside `bounds`, less the edge margin. */
+/** Every option that, lit, is not wholly inside `bounds`, less the edge margin. */
 function outside(layout: FanLayout, bounds: Box): number[] {
 	const within = (box: Box) =>
 		box.left >= bounds.left + EDGE_MARGIN - 0.01 &&
 		box.right <= bounds.right - EDGE_MARGIN + 0.01 &&
 		box.top >= bounds.top + EDGE_MARGIN - 0.01 &&
 		box.bottom <= bounds.bottom - EDGE_MARGIN + 0.01;
-	return boxes(layout).flatMap((option, index) =>
-		within(option.avatar) && within(option.label) ? [] : [index]
+	return layout.points.flatMap((at, index) =>
+		within(optionBox(at, layout.avatar, true)) ? [] : [index]
 	);
 }
 
@@ -148,7 +122,7 @@ describe('fanCentre', () => {
 });
 
 describe('visibleArc', () => {
-	const size = { avatar: 56, label: 80 };
+	const size = 56;
 
 	it('is about a quarter of the ring round a top-right corner', () => {
 		const arc = visibleArc({ x: 390, y: 0 }, 250, shell(390, 800), size);
@@ -171,9 +145,9 @@ describe('visibleArc', () => {
 		const bounds = shell(390, 800);
 		const arc = visibleArc(centre, 250, bounds, size);
 		// Lit, its avatar's top is on the top edge, to a hundredth of a degree.
-		const end = optionBoxes(pointAt(centre, 250, arc?.end ?? 0), size, true);
-		expect(end.avatar.top).toBeGreaterThanOrEqual(0);
-		expect(end.avatar.top).toBeLessThan(0.1);
+		const end = optionBox(pointAt(centre, 250, arc?.end ?? 0), size, true);
+		expect(end.top).toBeGreaterThanOrEqual(0);
+		expect(end.top).toBeLessThan(0.1);
 	});
 
 	it('is the whole ring when all of it shows, and null when none does', () => {
@@ -206,45 +180,55 @@ describe('spreadEvenly', () => {
 	});
 });
 
-describe('labelBudget', () => {
-	it('is the gap between two options side by side, less the clear space', () => {
+describe('roomBetween', () => {
+	it('is the clear space between two avatars side by side, one of them lit', () => {
 		expect(
-			labelBudget(
+			roomBetween(
 				[
 					{ x: 0, y: 0 },
 					{ x: 100, y: 0 }
 				],
 				56
 			)
-		).toBe(100 - OPTION_GAP);
+		).toBeCloseTo(100 - 56 - hoverShift(56), 9);
 	});
 
-	it('keeps a name off the avatar beside it, one row down', () => {
-		// b sits level with a's name: a's name may reach to the clear space short of b's avatar.
-		const budget = labelBudget(
-			[
-				{ x: 0, y: 0 },
-				{ x: 80, y: 60 }
-			],
-			56
-		);
-		expect(budget).toBeCloseTo(2 * (80 - 28 - hoverShift(56) - OPTION_GAP), 9);
-	});
-
-	it('is the most a name is ever given when nothing is near', () => {
-		expect(labelBudget([{ x: 0, y: 0 }], 56)).toBe(LABEL_MAX);
-	});
-
-	it('cannot mend two avatars on top of each other', () => {
+	it('measures the avatars as circles, across a diagonal too', () => {
 		expect(
-			labelBudget(
+			roomBetween(
+				[
+					{ x: 0, y: 0 },
+					{ x: 60, y: 80 }
+				],
+				56
+			)
+		).toBeCloseTo(100 - 56 - hoverShift(56), 9);
+	});
+
+	it('is the nearest pair, neighbours or not', () => {
+		expect(
+			roomBetween(
+				[
+					{ x: 0, y: 0 },
+					{ x: 200, y: 0 },
+					{ x: 70, y: 0 }
+				],
+				56
+			)
+		).toBeCloseTo(70 - 56 - hoverShift(56), 9);
+	});
+
+	it('is unbounded for one option, and negative for two on top of each other', () => {
+		expect(roomBetween([{ x: 0, y: 0 }], 56)).toBe(Number.POSITIVE_INFINITY);
+		expect(
+			roomBetween(
 				[
 					{ x: 0, y: 0 },
 					{ x: 20, y: 20 }
 				],
 				56
 			)
-		).toBe(Number.NEGATIVE_INFINITY);
+		).toBeLessThan(0);
 	});
 });
 
@@ -258,17 +242,18 @@ describe('layoutFan', () => {
 	];
 
 	for (const viewport of viewports) {
-		for (const count of [4, 5, 6, 7, 8, 9]) {
-			it(`fits ${count} options on a ${viewport.name}, evenly, with no name in the way`, () => {
+		// Two is Me and "Add partner", for someone with no partner yet.
+		for (const count of [2, 3, 4, 5, 6, 7, 8, 9]) {
+			it(`fits ${count} options on a ${viewport.name}, evenly, with room between them`, () => {
 				const bounds = shell(viewport.width, viewport.height - 70);
 				const centre = fanCentre(viewport.control, shell(viewport.width, viewport.height));
 				const layout = layoutFan({ centre, bounds, count });
 				expect(layout.fits).toBe(true);
 				expect(layout.points).toHaveLength(count);
-				expect(layout.label).toBeGreaterThanOrEqual(LABEL_MIN);
+				expect(layout.room).toBeGreaterThanOrEqual(ROOM_GOOD);
 				expect(collisions(layout)).toEqual([]);
-				// Lit, any one of them, its name moved down out of its avatar's way.
-				expect(layout.points.flatMap((_, lit) => litCollisions(layout, lit))).toEqual([]);
+				// Lit, any one of them, grown into the room left for it.
+				expect(layout.points.flatMap((_, lit) => collisions(layout, lit))).toEqual([]);
 				expect(outside(layout, bounds)).toEqual([]);
 				expect(Math.max(...unevenness(layout))).toBe(0);
 			});
@@ -287,15 +272,22 @@ describe('layoutFan', () => {
 		// From near the right of the centre round to near its left.
 		expect(layout.arc.start).toBeLessThan(20);
 		expect(layout.arc.end).toBeGreaterThan(160);
-		expect(layout.label).toBeGreaterThanOrEqual(80);
+		expect(layout.room).toBeGreaterThanOrEqual(ROOM_TARGET);
 	});
 
-	it('staggers a fan too crowded for one ring, rather than let names collide', () => {
+	it('takes the smallest ring that leaves the avatars room, not a larger one', () => {
+		const layout = layoutFan({ centre: { x: 390, y: 0 }, bounds: shell(390, 774), count: 4 });
+		expect(layout.room).toBeGreaterThanOrEqual(ROOM_TARGET);
+		// A ring a step tighter would crowd them: the room is barely past the target.
+		expect(layout.room).toBeLessThan(ROOM_TARGET + 4);
+	});
+
+	it('staggers a fan too crowded for one ring, rather than shrink or crowd its avatars', () => {
 		const roomy = layoutFan({ centre: { x: 390, y: 0 }, bounds: shell(390, 784), count: 4 });
 		expect(roomy.stagger).toBe(0);
 		const crowded = layoutFan({ centre: { x: 390, y: 0 }, bounds: shell(390, 784), count: 9 });
 		expect(crowded.stagger).toBeGreaterThan(0);
-		expect(crowded.label).toBeGreaterThanOrEqual(LABEL_GOOD);
+		expect(crowded.room).toBeGreaterThanOrEqual(ROOM_GOOD);
 		// Every other option a row further in, at the same even angles.
 		const distances = crowded.points.map((point) => Math.hypot(point.x - 390, point.y));
 		expect(distances[0]).toBeCloseTo(crowded.radius, 6);
@@ -318,7 +310,8 @@ describe('layoutFan', () => {
 });
 
 describe('where the hint goes', () => {
-	const hint = { width: 150, height: 46 };
+	// The switcher's `HINT`.
+	const hint = { width: 150, height: 60 };
 	/** A fan whose disk is `disk` across, centred at `x` on the top edge of a shell 1000 wide. */
 	const fanAt = (x: number, disk = 300): FanLayout => ({
 		...layoutFan({ centre: { x, y: 0 }, bounds: shell(1000, 800), count: 4 }),
@@ -382,11 +375,32 @@ describe('where the hint goes', () => {
 				right: (at?.x ?? 0) + hint.width,
 				bottom: (at?.y ?? 0) + hint.height
 			};
-			const covered = boxes(layout).filter(
-				(option) => boxesOverlap(box, option.avatar) || boxesOverlap(box, option.label)
-			);
+			const covered = boxes(layout).filter((option) => boxesOverlap(box, option));
 			expect(covered).toEqual([]);
 		}
+	});
+
+	it('slides aside, never down below the fan, as a resize brings an option into its corner', () => {
+		const bounds = shell(1000, 700);
+		const places: { x: number; y: number }[] = [];
+		for (let fromEdge = 0; fromEdge <= 400; fromEdge += 2) {
+			const layout = layoutFan({ centre: { x: 1000 - fromEdge, y: 0 }, bounds, count: 4 });
+			const at = hintPlacement(layout, bounds, hint);
+			expect(at?.y, `${fromEdge}px from the edge`).toBe(HINT_INSET);
+			const box = {
+				left: at?.x ?? 0,
+				top: at?.y ?? 0,
+				right: (at?.x ?? 0) + hint.width,
+				bottom: (at?.y ?? 0) + hint.height
+			};
+			expect(boxes(layout).filter((option) => boxesOverlap(box, option))).toEqual([]);
+			places.push({ x: at?.x ?? 0, y: at?.y ?? 0 });
+		}
+		// And it moves smoothly: no step between neighbouring widths jumps far.
+		const steps = places
+			.slice(1)
+			.map((place, index) => Math.abs(place.x - (places[index]?.x ?? 0)));
+		expect(Math.max(...steps)).toBeLessThan(40);
 	});
 
 	it('moves down when the top row is taken', () => {
@@ -395,7 +409,7 @@ describe('where the hint goes', () => {
 		// An option right where the hint would go.
 		const crowded = { ...layout, points: [{ x: 500, y: 30 }] };
 		const at = hintPlacement(crowded, bounds, hint);
-		expect(at?.y).toBeGreaterThan(30 + layout.avatar / 2 + LABEL_GAP + LABEL_HEIGHT);
+		expect(at?.y).toBeGreaterThan(30 + layout.avatar / 2);
 	});
 });
 
@@ -406,7 +420,7 @@ describe('optionAt', () => {
 		radius: 250,
 		stagger: 0,
 		avatar: 56,
-		label: 80,
+		room: 24,
 		arc: { start: 90, end: 180 },
 		step: 30,
 		angles: [180, 150, 120, 90],
@@ -486,11 +500,11 @@ describe('optionAt', () => {
 
 describe('the disk and the options, opening and closing', () => {
 	const layout = layoutFan({ centre: { x: 390, y: 0 }, bounds: shell(390, 774), count: 9 });
-	/** How far from the centre an option reaches at a share of the way out: its avatar and name, grown by the same share. */
+	/** How far from the centre an option reaches at a share of the way out: its avatar, grown by the same share. */
 	const reach = (index: number, share: number) => {
 		const at = layout.points[index] ?? layout.centre;
 		const distance = Math.hypot(at.x - layout.centre.x, at.y - layout.centre.y);
-		return Math.max(share, 0) * (distance + layout.avatar / 2 + LABEL_GAP + LABEL_HEIGHT);
+		return Math.max(share, 0) * (distance + layout.avatar / 2);
 	};
 
 	for (const opening of [true, false]) {
