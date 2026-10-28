@@ -433,8 +433,9 @@ transitions are off and the fan's transitions and the pick's pause are zero.
 
 ## The add button's fan
 
-The list pages' add button (`src/lib/components/AddButton.svelte`; tasks,
-rewards and the notebook) asks, in a context with more than one space
+The add button (`src/lib/components/AddButton.svelte`; tasks, rewards, the
+notebook, and Messages' "Write something", with a pen in place of the +)
+asks, in a context with more than one space
 something can be added to (Everyone), whose a new item is, with the same fan:
 an avatar per such space, in the switcher's order, and nothing for Everyone
 or "Add partner", which are not places. Picking one hands its space to the
@@ -600,7 +601,7 @@ that does not redirect, so it is the one refresh this does not cover.
 | `src/lib/context-fan.ts` | The fan's geometry and motion: the centre, the visible arc, even spacing, room between avatars, staggering, which sector a point is in, the hint's place, the wedge's shading and fill (Everyone's spectrum), the shared timing and easing. Pure, alias-free |
 | `src/lib/navigation.ts`, `src/lib/enhance.ts` | Refreshes and `use:enhance` that wait for a navigation under way rather than dropping it |
 | `src/lib/components/context/` | `ContextSelectorFan` (the fan), `ContextSwitcher` (the pill), `ContextAvatar`, `SpaceChip`, `SpaceColourForm` |
-| `src/lib/components/AddButton.svelte` | The list pages' add button, and its fan in Everyone |
+| `src/lib/components/AddButton.svelte` | The add button (tasks, rewards, the notebook, Messages' "Write something"), and its fan in Everyone |
 | `src/routes/api/context/+server.ts` | Switching |
 | `drizzle/0050_add_space_member_colour.sql` | `space_members.colour`, a plain `ADD COLUMN` |
 | `drizzle/0054_map_space_colours_to_signature_hues.sql` | Moves the old palette's stored names to the signature hues |

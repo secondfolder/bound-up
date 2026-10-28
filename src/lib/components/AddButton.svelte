@@ -5,9 +5,9 @@
 	import ContextSelectorFan, { type FanOption } from './context/ContextSelectorFan.svelte';
 
 	/**
-	 * A list page's add button: round, at the bottom right over the list, as
-	 * Messages' "Write something" is. Where a new item goes is a space the
-	 * viewer may add to (`targets`):
+	 * A page's add button: round, at the bottom right over its list (tasks,
+	 * rewards, the notebook, and Messages' "Write something"). Where a new
+	 * item goes is a space the viewer may add to (`targets`):
 	 *
 	 * - one: the button adds there straight away;
 	 * - several (Everyone): it fans out their avatars, as the context switcher
@@ -28,19 +28,32 @@
 		you,
 		onadd,
 		lead,
+		icon = 'plus',
+		forName = (name) => `${label} for ${name}`,
 		busy = false
 	}: {
 		/** What the button does, as its accessible name: "Add a task". */
 		label: string;
 		/** Over the lit avatar's name on the fan: "New task for". */
 		lead: string;
+		/**
+		 * Its Font Awesome icon: a + to add, Messages' pen to write. A + turns
+		 * into a × while the fan is open; anything else is swapped for one.
+		 */
+		icon?: string;
+		/** An avatar's accessible name on the fan, from whose it is ("me", "Jun"). */
+		forName?: (name: string) => string;
 		/** The ids of the spaces a new item may go to, in the switcher's order. */
 		targets: readonly string[];
 		/** The switcher's spaces, for each target's name, colour and avatar. */
 		spaces: readonly ContextSpaceView[];
 		/** The viewer's own name, for their avatar's initials. */
 		you: string;
-		onadd: (spaceId: string) => void;
+		/**
+		 * Adds for the space, with where the button is on the screen, for
+		 * whatever opens to grow out of it (Messages' composer).
+		 */
+		onadd: (spaceId: string, from: DOMRect | null) => void;
 		/** While an add is under way: the button waits rather than adding twice. */
 		busy?: boolean;
 	} = $props();
@@ -53,13 +66,16 @@
 				kind: shown.kind,
 				people: shown.people,
 				name: shown.name,
-				label: `${label} for ${shown.kind === 'solo' ? 'me' : shown.name}`,
+				label: forName(shown.kind === 'solo' ? 'me' : shown.name),
 				colour: shown.colour
 			}))
 	);
 	const only = $derived(options.length === 1 ? options[0] : undefined);
 
 	let fan: ContextSelectorFan | undefined = $state();
+	let round: HTMLButtonElement | undefined = $state();
+
+	const from = () => round?.getBoundingClientRect() ?? null;
 
 	/**
 	 * The disk is centred on the button itself, which is also home, and the
@@ -72,8 +88,9 @@
 	}
 
 	function pick(key: string) {
+		const at = from();
 		fan?.close(false);
-		onadd(key);
+		onadd(key, at);
 	}
 </script>
 
@@ -87,11 +104,12 @@
 			<button
 				type="button"
 				class="round"
+				bind:this={round}
 				disabled={busy}
 				aria-label={label}
-				onclick={() => onadd(only.key)}
+				onclick={() => onadd(only.key, from())}
 			>
-				<wa-icon name="plus" variant="solid"></wa-icon>
+				<wa-icon name={icon} variant="solid"></wa-icon>
 			</button>
 		{:else}
 			<ContextSelectorFan
@@ -114,6 +132,8 @@
 						type="button"
 						class="round"
 						class:open
+						class:turns={icon === 'plus'}
+						bind:this={round}
 						disabled={busy}
 						{@attach anchor}
 						{@attach button}
@@ -121,7 +141,7 @@
 						aria-haspopup="true"
 						aria-label="{label}: choose whose it’s for"
 					>
-						<wa-icon name="plus" variant="solid"></wa-icon>
+						<wa-icon name={open && icon !== 'plus' ? 'xmark' : icon} variant="solid"></wa-icon>
 					</button>
 				{/snippet}
 			</ContextSelectorFan>
@@ -190,8 +210,9 @@
 			opacity: 0.7;
 		}
 
-		/* The + turns into a ×: tapping it again closes the fan. */
-		&.open wa-icon {
+		/* The + turns into a ×: tapping it again closes the fan. Any other
+		   icon is swapped for a × instead, since it would not turn into one. */
+		&.open.turns wa-icon {
 			rotate: 45deg;
 		}
 	}

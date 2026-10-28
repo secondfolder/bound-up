@@ -78,7 +78,8 @@ describe('the add button', () => {
 		const button = screen.getByRole('button', { name: 'Add a task' });
 		expect(button).not.toHaveAttribute('aria-expanded');
 		await userEvent.click(button);
-		expect(onadd).toHaveBeenCalledWith(JUN);
+		// With where the button is, for whatever opens to grow out of it.
+		expect(onadd).toHaveBeenCalledWith(JUN, expect.any(DOMRect));
 		expect(document.querySelector('[data-fan-option]')).toBeNull();
 	});
 
@@ -103,7 +104,8 @@ describe('the add button', () => {
 			expect(document.querySelector('.wedge')).toHaveAttribute('data-fan-wedge', JUN)
 		);
 		await userEvent.click(screen.getByRole('button', { name: 'Add a task for Jun' }));
-		expect(onadd).toHaveBeenCalledWith(JUN);
+		// With where the button is, for whatever opens to grow out of it.
+		expect(onadd).toHaveBeenCalledWith(JUN, expect.any(DOMRect));
 		await vi.waitFor(() => expect(button).toHaveAttribute('aria-expanded', 'false'));
 	});
 
@@ -191,6 +193,30 @@ describe('the add button', () => {
 		} finally {
 			shell.remove();
 		}
+	});
+
+	it('swaps any icon but a + for a × while its fan is open, and names avatars as asked', async () => {
+		render(AddButton, {
+			props: {
+				label: 'Write something',
+				lead: 'Write to',
+				icon: 'pen-to-square',
+				forName: (name: string) => `Write to ${name}`,
+				targets: [JUN, MO],
+				spaces: [solo, jun, mo],
+				you: 'Ada',
+				onadd: vi.fn()
+			}
+		});
+		const button = screen.getByRole('button', { name: /^Write something: choose whose/ });
+		// A property once upgraded, which Svelte sets rather than the attribute.
+		const icon = () => button.querySelector<HTMLElement & { name?: string }>('wa-icon')?.name;
+		expect(icon()).toBe('pen-to-square');
+		await userEvent.click(button);
+		await vi.waitFor(() => expect(icon()).toBe('xmark'));
+		expect(screen.getByRole('button', { name: 'Write to Jun' })).toBeVisible();
+		await userEvent.keyboard('{Escape}');
+		await vi.waitFor(() => expect(icon()).toBe('pen-to-square'));
 	});
 
 	it('waits while an add is under way', () => {

@@ -779,7 +779,8 @@ both headers keep the prop for one that turns out to need it, and what one
 used to say goes in the body or the empty state. See
 [docs/theme.md](docs/theme.md#page-layout).
 
-**A list page adds with `AddButton`, never a row or button of its own.** It
+**A list page adds with `AddButton`, never a row or button of its own**
+(Messages' "Write something" is one, with a pen for its icon). It
 is round, at the bottom right, sticky as the page root's last child (the
 root is a flex column filling `<main>`), and given the spaces the viewer may
 add to: with one it adds there, with several it asks whose with the context

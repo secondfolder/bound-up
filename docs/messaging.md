@@ -188,12 +188,15 @@ the board shows:
   thread page, each for its own partnership. The board only shows each
   thread's tags.
 
-**A new thread names its partnership.** "Write something" opens the dialog
-for the board's partnership; in Everyone over several, the dialog asks "For
-whom?" first (`ForWhom`, remembered on the device as
-`bound-up:messages-for-whom`), among partners only, and the composer — with
-that partnership's own draft and tags (`NewThreadComposer`) — appears once it
-is answered. The partnerships it could go to are fixed when the dialog opens,
+**A new thread names its partnership.** "Write something" (the page's
+`AddButton`) opens the dialog for the board's partnership; in Everyone over
+several, it fans out an avatar per partner you may write to, as the other
+pages' add buttons do ([contexts.md](contexts.md#the-add-buttons-fan)), and
+the dialog opens for the one picked ("Write to Jun"), with that
+partnership's own draft and tags (`NewThreadComposer`). Opened by its URL
+(`/messages/new`) with nothing picked, the dialog asks "For whom?" first
+(`ForWhom`, remembered on the device as `bound-up:messages-for-whom`), among
+partners only, and the composer appears once it is answered. The partnerships it could go to are fixed when the dialog opens,
 and the send posts to `/api/spaces/[spaceId]/threads` for the one chosen. So
 another tab switching the context, which reloads this board when the tab
 comes back to the front, leaves an open dialog going where it was going
@@ -328,7 +331,9 @@ the two sides of a conversation ended up a whole desktop apart. The thread's
 composer band still spans the pane: it is painted with a border image's
 outset rather than a background, which as ink overflow never scrolls sideways.
 The board's "Write something" button floats with a shadow and no band behind
-it, and shows a pen: the paper plane is the composer's own Send.
+it, and shows a pen: the paper plane is the composer's own Send. While its
+fan is open the pen is swapped for a ×, since a pen cannot turn into one as
+the other pages' + does.
 
 A sticker the live feed has just brought in, or a notification's tap points
 at, gets a ring that fades over four seconds and, motion allowed, two halo
@@ -746,7 +751,8 @@ the message is sent or its text deleted. The code is `src/lib/messaging/drafts.t
 - **One draft per composer.** Each thread's reply box has its own
   (`thread:<threadId>`), and so does each partnership's "Write something"
   dialog (`new-thread:<partnershipId>`), wherever the dialog is opened from:
-  choosing another partner under "For whom?" opens theirs. Writing in one
+  picking another partner on the write button's fan, or under "For whom?",
+  opens theirs. Writing in one
   never touches another.
   Daydreams' composer keeps its drafts the same way, under
   `daydream:<daydreamId>` ([docs/daydreams.md](daydreams.md)).

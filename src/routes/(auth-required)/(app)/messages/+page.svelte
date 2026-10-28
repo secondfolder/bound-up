@@ -3,6 +3,7 @@
 	import { afterNavigate, goto, pushState, replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import AddButton from '$lib/components/AddButton.svelte';
 	import ContextSwitcher from '$lib/components/context/ContextSwitcher.svelte';
 	import ForWhom from '$lib/components/ForWhom.svelte';
 	import NewMessageDialog from '$lib/components/NewMessageDialog.svelte';
@@ -217,6 +218,7 @@
 			pushed = composing;
 			if (!composing) {
 				pinned = null;
+				picked = null;
 			}
 		};
 		addEventListener('popstate', sync);
@@ -233,20 +235,31 @@
 	 */
 	let pinned = $state<BoardPartnershipView[] | null>(null);
 	// `/new` loaded outright opens with the page, before trust has said where
-	// it may send: pinned as soon as it has.
+	// it may send: pinned once it has, for every partner. Each is worked out
+	// on its own, and pinned at the first, an Everyone board of two opened
+	// addressed to whichever came first and never asked "For whom?".
+	const trustKnown = $derived(boards.every((board) => trustFor(board.id).status !== 'unknown'));
 	$effect(() => {
-		if (composing && pinned === null && sendable.length > 0) {
+		if (composing && pinned === null && trustKnown && sendable.length > 0) {
 			pinned = [...sendable];
 		}
 	});
 	const choices = $derived(pinned ?? sendable);
 	/** Chosen under "For whom?", when there is more than one. */
 	let chosen = $state<ItemTarget | null>(null);
-	const composeId = $derived(
-		choices.length === 1
-			? (choices[0]?.id ?? null)
-			: (choices.find((choice) => choice.id === chosen?.spaceId)?.id ?? null)
-	);
+	/**
+	 * Picked on the write button's fan, in a context of several partners: the
+	 * dialog opens addressed to them and does not ask again. Null when it
+	 * opened with the page (`/new` loaded outright), which asks.
+	 */
+	let picked = $state<string | null>(null);
+	const pickedChoice = $derived(choices.find((choice) => choice.id === picked) ?? null);
+	const composeId = $derived.by(() => {
+		if (choices.length === 1) {
+			return choices[0]?.id ?? null;
+		}
+		return pickedChoice?.id ?? choices.find((choice) => choice.id === chosen?.spaceId)?.id ?? null;
+	});
 	/** Its tags as the board has them now, a tag just made included. */
 	const composeTags = $derived(
 		(
@@ -266,13 +279,13 @@
 	 */
 	let composeOrigin: { x: number; y: number } | null = $state(null);
 
-	function startComposing(event: MouseEvent) {
-		const button = event.currentTarget;
-		if (button instanceof Element) {
-			const rect = button.getBoundingClientRect();
-			composeOrigin = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+	/** Opens the dialog for the partnership picked (or the only one), from the write button. */
+	function startComposing(partnershipId: string, from: DOMRect | null) {
+		if (from) {
+			composeOrigin = { x: from.left + from.width / 2, y: from.top + from.height / 2 };
 		}
 		pinned = [...sendable];
+		picked = partnershipId;
 		composing = true;
 		pushed = true;
 		pushState(resolve('/(auth-required)/(app)/messages/new'), {});
@@ -287,6 +300,7 @@
 		}
 		composing = false;
 		pinned = null;
+		picked = null;
 		if (pushed) {
 			pushed = false;
 			// Back to the board's own entry, so Back afterwards leaves the board
@@ -431,25 +445,23 @@
 				}}
 			/>
 
-			{#if sendable.length > 0}
-				<div class="new">
-					<!-- "Write something" rather than "New message": Today already has
-					     a "new messages from …" link, and two controls must not share an
-					     accessible name. Named by its icon's label, which is what reaches
-					     the inner <button>. A pen, not the paper plane it used to be: a
-					     paper plane is the composer's own Send, and this starts writing. -->
-					<wa-button
-						variant="brand"
-						appearance="filled"
-						size="xl"
-						pill
-						class="fab"
-						onclick={startComposing}
-					>
-						<wa-icon name="pen-to-square" variant="solid" label="Write something"></wa-icon>
-					</wa-button>
-				</div>
-			{/if}
+			<!-- "Write something" rather than "New message": Today already has
+			     a "new messages from …" link, and two controls must not share an
+			     accessible name. A pen, not the paper plane it used to be: a paper
+			     plane is the composer's own Send, and this starts writing. In a
+			     context of several partners (Everyone) it fans out their avatars,
+			     as the other pages' add buttons do, and the one picked is who the
+			     thread is with. -->
+			<AddButton
+				label="Write something"
+				lead="Write to"
+				icon="pen-to-square"
+				forName={(name) => `Write to ${name}`}
+				targets={sendable.map((board) => board.id)}
+				spaces={data.contextSpaces}
+				you={data.user?.name ?? ''}
+				onadd={startComposing}
+			/>
 
 			{#if composing && choices.length > 0}
 				<NewMessageDialog
@@ -457,7 +469,7 @@
 					partnershipId={composeId}
 					tags={composeTags}
 					origin={composeOrigin}
-					forWhom={choices.length > 1 ? forWhom : undefined}
+					forWhom={choices.length > 1 && pickedChoice === null ? forWhom : undefined}
 					{send}
 					permanentMedia={hasFeature(data.features, 'permanentMedia')}
 					highQualityMedia={hasFeature(data.features, 'highQualityMedia')}
@@ -553,32 +565,6 @@
 		}
 	}
 
-	/* An icon button is square at the control's height, and `pill` rounds it. */
-	wa-button.fab {
-		--wa-form-control-height: 3.75rem;
-	}
-
-	wa-button.fab::part(button) {
-		/* Darker than a light theme's shadow would be: with no band behind the
-		   button any more, this is what separates it from a sticker under it,
-		   on a background that is already dark. */
-		box-shadow: 0 0.6rem 1.4rem rgb(0 0 0 / 45%);
-	}
-
-	wa-button.fab::part(label) {
-		display: grid;
-		place-items: center;
-		inline-size: 100%;
-		block-size: 100%;
-		/* No optical nudge: the paper plane this used to show leaned up and to
-		   the right and needed one, and the pen sits square in its box. */
-
-		wa-icon {
-			display: block;
-			line-height: 1;
-		}
-	}
-
 	.board {
 		display: flex;
 		flex-direction: column;
@@ -592,25 +578,6 @@
 			display: flex;
 			flex-direction: column;
 			gap: var(--wa-space-s);
-		}
-	}
-
-	.new {
-		position: sticky;
-		inset-block-end: 0;
-		z-index: 1;
-		margin-block-start: auto;
-		display: flex;
-		justify-content: flex-end;
-		padding: var(--wa-space-s) var(--page-gutter) var(--wa-space-m);
-		/* No band behind it. The thread's composer has one because text
-		   scrolls under it; this is one round button, and its shadow is enough
-		   to lift it off a sticker passing underneath. As a band it read as an
-		   empty footer across the whole board. */
-		pointer-events: none;
-
-		wa-button {
-			pointer-events: auto;
 		}
 	}
 </style>

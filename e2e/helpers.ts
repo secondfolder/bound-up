@@ -556,7 +556,7 @@ export async function reply(page: Page, text: string): Promise<void> {
 
 /** Writes a new thread and waits for the thread page it lands on. */
 export async function writeThread(page: Page, text: string): Promise<void> {
-	await clickWaButton(page, 'Write something');
+	await startAdding(page, 'Write something');
 	await fillRichText(page, text);
 	// Asserted rather than assumed. The send button is disabled while there is
 	// nothing to send, so if the fill did not reach the component's state the

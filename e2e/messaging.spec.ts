@@ -21,6 +21,7 @@ import {
 	settle,
 	shellScroll,
 	showContext,
+	startAdding,
 	typeRichText,
 	writeThread
 } from './helpers';
@@ -368,7 +369,7 @@ test.describe('the board', () => {
 			await openBoard(ada.page, 'Jun');
 			const shell = ada.page.locator('wa-dialog.composer-dialog');
 			await expect(shell).toHaveCount(0);
-			await clickWaButton(ada.page, 'Write something');
+			await startAdding(ada.page, 'Write something');
 			await expect(shell).toHaveCount(1);
 			const measured = await shell.evaluate(async (element) => {
 				const root = element.shadowRoot;
@@ -655,7 +656,7 @@ test.describe('attachments', () => {
 
 			await openBoard(ada.page, 'Jun');
 			await expect(ada.page.locator('wa-dialog.composer-dialog')).toHaveCount(0);
-			await clickWaButton(ada.page, 'Write something');
+			await startAdding(ada.page, 'Write something');
 			await ada.page
 				.locator('input[type="file"]')
 				.setInputFiles({ name: 'sunset.png', mimeType: 'image/png', buffer: Png });
@@ -716,7 +717,7 @@ test.describe('attachments', () => {
 			await linkAccounts(ada, jun);
 
 			await openBoard(ada.page, 'Jun');
-			await clickWaButton(ada.page, 'Write something');
+			await startAdding(ada.page, 'Write something');
 			await fillRichText(ada.page, 'look at these');
 			await ada.page.locator('input[type="file"]').setInputFiles([
 				{ name: 'one.png', mimeType: 'image/png', buffer: Png },
@@ -821,7 +822,7 @@ test.describe('attachments', () => {
 
 			await openBoard(ada.page, 'Jun');
 			await expect(ada.page.locator('wa-dialog.composer-dialog')).toHaveCount(0);
-			await clickWaButton(ada.page, 'Write something');
+			await startAdding(ada.page, 'Write something');
 			await fillRichText(ada.page, 'private');
 			await ada.page
 				.locator('input[type="file"]')
@@ -886,7 +887,7 @@ test.describe('attachments', () => {
 			await linkAccounts(ada, jun);
 
 			await openBoard(ada.page, 'Jun');
-			await clickWaButton(ada.page, 'Write something');
+			await startAdding(ada.page, 'Write something');
 			// No choice to make until there is a file to make it for.
 			await expect(ada.page.getByRole('button', { name: /self-destructs after/i })).toHaveCount(0);
 			await ada.page
@@ -990,7 +991,7 @@ test.describe('attachments', () => {
 			/** Opens the self-destruct menu with a file attached, and returns its trigger. */
 			const openPicker = async (page: Page, partner: string) => {
 				await openBoard(page, partner);
-				await clickWaButton(page, 'Write something');
+				await startAdding(page, 'Write something');
 				await page
 					.locator('input[type="file"]')
 					.setInputFiles({ name: 'forever.png', mimeType: 'image/png', buffer: Png });
@@ -1104,7 +1105,7 @@ test.describe('attachments', () => {
 			await linkAccounts(ada, jun);
 
 			await openBoard(ada.page, 'Jun');
-			await clickWaButton(ada.page, 'Write something');
+			await startAdding(ada.page, 'Write something');
 			await ada.page
 				.locator('input[type="file"]')
 				.setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: await photo(ada.page) });
@@ -1147,7 +1148,7 @@ test.describe('attachments', () => {
 			);
 
 			await openBoard(ada.page, 'Jun');
-			await clickWaButton(ada.page, 'Write something');
+			await startAdding(ada.page, 'Write something');
 			await ada.page
 				.locator('input[type="file"]')
 				.setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: await photo(ada.page) });
@@ -1230,7 +1231,7 @@ test.describe('thread tags', () => {
 
 			await openBoard(ada.page, 'Jun');
 
-			await clickWaButton(ada.page, 'Write something');
+			await startAdding(ada.page, 'Write something');
 			// The composer's textarea, not the `wa-dialog` host: the host itself
 			// carries no bounding box while the visible panel lives in its shadow
 			// DOM, so a visibility assertion on the host is always "hidden".
@@ -1302,7 +1303,7 @@ test.describe('thread tags', () => {
 			const board = new URL(ada.page.url()).pathname;
 			const composer = ada.page.getByLabel('Message to Jun');
 
-			await clickWaButton(ada.page, 'Write something');
+			await startAdding(ada.page, 'Write something');
 			await expect(composer).toBeVisible();
 			await expect(ada.page).toHaveURL(`${board}/new`);
 
@@ -1311,7 +1312,7 @@ test.describe('thread tags', () => {
 			await expect(composer).toBeHidden();
 			await expect(ada.page).toHaveURL(board);
 
-			await clickWaButton(ada.page, 'Write something');
+			await startAdding(ada.page, 'Write something');
 			await expect(ada.page).toHaveURL(`${board}/new`);
 			await ada.page.reload();
 			await expect(composer).toBeVisible();
@@ -1543,7 +1544,7 @@ test.describe('embeds', () => {
 			await linkAccounts(ada, jun);
 
 			await openBoard(ada.page, 'Jun');
-			await clickWaButton(ada.page, 'Write something');
+			await startAdding(ada.page, 'Write something');
 
 			/**
 			 * A reddit share link embeds in the composer too. It is the one kind
@@ -1938,7 +1939,7 @@ test.describe('embeds', () => {
 			await linkAccounts(ada, jun);
 
 			await openBoard(ada.page, 'Jun');
-			await clickWaButton(ada.page, 'Write something');
+			await startAdding(ada.page, 'Write something');
 
 			const url = 'https://www.youtube.com/watch?v=GTx1UYV9Y-o';
 			const embed = ada.page.locator('.richtext-editor .composer-embed');
@@ -2112,7 +2113,7 @@ test.describe('drafts', () => {
 			// 4. Neither reply draft leaks into the new-message dialog, and writing
 			// there touches neither of them.
 			await ada.page.goto(board);
-			await clickWaButton(ada.page, 'Write something');
+			await startAdding(ada.page, 'Write something');
 			const dialog = ada.page.locator('wa-dialog');
 			await expect(ada.page.getByLabel('Message to Jun')).toBeVisible();
 			await expect(surface(dialog)).toHaveText('');
@@ -2161,7 +2162,7 @@ test.describe('drafts', () => {
 			const chip = dialog.getByRole('button', { name: 'Edit planning' });
 
 			async function openDialog() {
-				await clickWaButton(ada.page, 'Write something');
+				await startAdding(ada.page, 'Write something');
 				await expect(composer).toBeVisible();
 			}
 			async function closeDialog() {

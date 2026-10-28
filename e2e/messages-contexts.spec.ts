@@ -11,6 +11,7 @@ import {
 	openBoard,
 	type Side,
 	showContext,
+	startAdding,
 	waitForHydration,
 	writeThread
 } from './helpers';
@@ -172,20 +173,31 @@ test.describe('messages in every context', () => {
 		}
 	});
 
-	test('a new thread in Everyone asks for whom, and goes there', async ({ browser }) => {
+	test('a new thread in Everyone asks for whom with the write button’s fan, and goes there', async ({
+		browser
+	}) => {
 		const { ada, bo, cy, withCy } = await boWithTwoPartners(browser);
 		try {
 			await showContext(bo.page, 'all');
 			await bo.page.goto('/messages');
 			await waitForHydration(bo.page);
-			await expect(bo.page.getByRole('button', { name: 'Write something' })).toBeVisible();
-			await clickWaButton(bo.page, 'Write something');
+			// Opened by its URL, with nothing picked, the dialog asks instead.
+			await bo.page.goto('/messages/new');
 			await expect(bo.page.getByRole('combobox', { name: 'For whom?' })).toBeVisible();
-			// No composer until it is answered.
-			await expect(bo.page.locator('wa-dialog.composer-dialog .richtext-editor')).toHaveCount(0);
+			await bo.page.goto('/messages');
+			await waitForHydration(bo.page);
 
-			await bo.page.locator('wa-select[name="spaceId"]').click();
-			await bo.page.getByRole('option', { name: 'Cy' }).click();
+			// The write button fans out a partner each, as the other pages' add
+			// buttons do, and nothing opens until one is picked.
+			await bo.page.getByRole('button', { name: 'Write something: choose whose it’s for' }).click();
+			await expect(bo.page.locator('[data-fan-option]')).toHaveCount(2);
+			await expect(bo.page.getByRole('button', { name: 'Write to Ada' })).toBeVisible();
+			await expect(bo.page.locator('wa-dialog.composer-dialog')).toHaveCount(0);
+
+			await bo.page.getByRole('button', { name: 'Write to Cy', exact: true }).click();
+			// Addressed already: no "For whom?" to answer.
+			await expect(bo.page.locator('wa-dialog.composer-dialog .richtext-editor')).toBeVisible();
+			await expect(bo.page.getByRole('combobox', { name: 'For whom?' })).toHaveCount(0);
 			await fillRichText(bo.page, 'for Cy only');
 			await expect(bo.page.getByRole('button', { name: 'Send' })).toBeEnabled();
 			await clickWaButton(bo.page, 'Send');
@@ -215,7 +227,7 @@ test.describe('messages in every context', () => {
 			await bo.page.goto('/messages');
 			await waitForHydration(bo.page);
 			await expect(control(bo.page)).toHaveAccessibleName(/^Showing Ada/);
-			await clickWaButton(bo.page, 'Write something');
+			await startAdding(bo.page, 'Write something');
 			await fillRichText(bo.page, 'meant for Ada');
 
 			const second = await bo.page.context().newPage();
