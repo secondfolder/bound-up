@@ -431,11 +431,17 @@ describe('the fan', () => {
 		// One keyline at most (it keeps the avatar off its own colour on the
 		// wedge), never the two-part amber ring there used to be.
 		expect(shadows(getComputedStyle(litAvatar).boxShadow)).toBeLessThanOrEqual(1);
-		const name = defined(
-			junOption.querySelector('.slot-name'),
-			'Jun’s name'
-		).getBoundingClientRect();
-		expect(name.top).toBeGreaterThanOrEqual(litAvatar.getBoundingClientRect().bottom);
+		const nameElement = defined(junOption.querySelector('.slot-name'), 'Jun’s name');
+		expect(nameElement.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+			litAvatar.getBoundingClientRect().bottom
+		);
+		// Bold, but the same colour as a name not lit.
+		const meName = defined(
+			screen.getByRole('button', { name: 'Show Me' }).querySelector('.slot-name'),
+			'Me’s name'
+		);
+		expect(getComputedStyle(nameElement).fontWeight).toBe('800');
+		expect(getComputedStyle(nameElement).color).toBe(getComputedStyle(meName).color);
 
 		// Off the disk: back to the one showing.
 		move({ clientX: disk.right + 200, clientY: disk.bottom + 200 });

@@ -744,38 +744,56 @@ export function diskScale(elapsed: number, count: number, opening: boolean): num
 }
 
 /**
- * How the selection wedge is shaded, as shares of the disk's radius and, for
- * its sides, degrees. Only the drawing: the sector a slide hit-tests
- * (`optionAt`) is the whole slice, edge to edge and centre to rim.
- *
- * - `feather`: each straight side fades in over this many degrees, inside
- *   the sector, so the two radial edges are soft rather than a hard line.
- *   The rim is not softened: the wedge meets it with the disk's own edge.
- * - `clear` to `full`: transparent at `clear`, well short of the centre,
- *   and solid from `full`, just inside the innermost avatar on the ring, out
- *   to the rim, so the slice reads as lighting the option rather than
- *   pointing out of the corner. One radius for every option, the inner
- *   row's when the fan is staggered, so the shading does not jump as the
- *   wedge glides.
+ * How the selection wedge fades inwards, as shares of the disk's radius:
+ * transparent at `clear`, well short of the centre, and solid from `full`,
+ * just inside the innermost avatar on the ring, out to the rim, so the slice
+ * reads as lighting the option rather than pointing out of the corner. One
+ * radius for every option, the inner row's when the fan is staggered, so the
+ * shading does not jump as the wedge glides. Its sides are cut sharp
+ * (`wedgePolygon`), and the rim is the disk's own edge.
  */
-export function wedgeShading(layout: FanLayout): { feather: number; clear: number; full: number } {
+export function wedgeShading(layout: FanLayout): { clear: number; full: number } {
 	const inner = layout.radius - layout.stagger - layout.avatar / 2 - OPTION_GAP;
 	const full = Math.max(inner / layout.disk, 0.2);
-	return {
-		feather: Math.min(layout.step * 0.22, 8),
-		clear: full * 0.45,
-		full
-	};
+	return { clear: full * 0.45, full };
 }
 
 /**
- * How much wider the first and last colours' bands are than a middle one's
- * in Everyone's spectrum wedge. The wedge's feathered sides fade the edge
- * colours out, so at equal shares they looked thinner than the rest. Chosen
- * by eye from wedges of 3 to 7 colours side by side: at 1.6 the edge
- * colours still looked narrower, at 2 they began to look wider with three.
+ * The selection wedge's outline, as a CSS `polygon()` in the wedge
+ * element's own box (a square round the disk's centre), pointing up and
+ * `width` degrees wide: the centre, then points far out past the rim along
+ * the sector, so the disk's own round edge is the rim. Sharp sides drawn as
+ * geometry rather than as a gradient's hard stops: Chrome anti-aliases a
+ * clip path's edges but not a conic gradient's stops, which drew every side
+ * not quite vertical or horizontal as a staircase. In the element's own
+ * coordinates, so it turns with the element as the wedge glides. Points
+ * every 20° or less, at twice the disk's radius, so the straight edges
+ * between them stay outside the rim however wide the wedge.
  */
-export const SPECTRUM_EDGE_WEIGHT = 1.9;
+export function wedgePolygon(width: number): string {
+	const span = Math.min(Math.max(width, 0), 359);
+	const count = Math.max(2, Math.ceil(span / 20));
+	const points = ['50% 50%'];
+	for (let index = 0; index <= count; index += 1) {
+		const angle = ((-span / 2 + (span * index) / count) * Math.PI) / 180;
+		points.push(
+			`${(50 + 100 * Math.sin(angle)).toFixed(3)}% ${(50 - 100 * Math.cos(angle)).toFixed(3)}%`
+		);
+	}
+	return `polygon(${points.join(', ')})`;
+}
+
+/**
+ * How wide the first and last colours' bands are against a middle one's in
+ * Everyone's spectrum wedge. With sharp sides and the end colours pinned to
+ * them, an end colour runs solid from the side to the middle of its band
+ * and blends on one side only, while a middle one blends on both, so at
+ * equal shares the ends looked wider than the rest. Chosen by eye from
+ * sharp-sided wedges of 3, 4 and 7 colours at 0.7 to 1.15: at 1 the middle
+ * colour of three looked thinnest, at 0.7 the ends of seven did. (It was 1.9
+ * while the sides were feathered, which faded the end colours out.)
+ */
+export const SPECTRUM_EDGE_WEIGHT = 0.9;
 
 /**
  * How much of each member's own colour Everyone's spectrum keeps, mixed
@@ -787,8 +805,9 @@ export const SPECTRUM_SHARE = 38;
 /**
  * Where each of `count` colours sits across a wedge `width` degrees wide,
  * in order from its start: the middle of each colour's band, the first and
- * last bands `edgeWeight` times as wide as the others. A gradient through
- * these blends smoothly from one colour to the next, with no hard bands.
+ * last bands `edgeWeight` times as wide as the others (narrower below 1).
+ * A gradient through these blends smoothly from one colour to the next,
+ * with no hard bands.
  */
 export function spectrumStops(
 	count: number,
@@ -839,47 +858,40 @@ export function wedgeSpan(layout: FanLayout, index: number): { from: number; to:
 }
 
 /**
- * The selection wedge's fill, as a CSS `conic-gradient` pointing up, `width`
- * degrees wide: its two straight sides fading in over `feather` degrees, and
- * between them one colour solid, or several (Everyone's members, in the
- * pie's order) each washed well towards `wash` and blended smoothly into the
- * next at `spectrumStops`, across `span` (the part that can be seen,
- * `wedgeSpan`; all of it by default). None of the colours sits nearer a side
- * than the feather, which fades it in.
+ * The selection wedge's fill, for a wedge pointing up `width` degrees wide
+ * (cut to shape by `wedgePolygon`): one colour solid, or several (Everyone's
+ * members, in the pie's order) each washed well towards `wash` and blended
+ * smoothly into the next, at the middles of their bands (`spectrumStops`)
+ * across `span` (the part that can be seen, `wedgeSpan`; all of it by
+ * default), with the first and last pinned to the span's ends.
  */
 export function wedgeGradient(
 	colours: readonly string[],
 	width: number,
-	feather: number,
 	{
 		wash,
 		edgeWeight = SPECTRUM_EDGE_WEIGHT,
 		span = { from: 0, to: width }
 	}: { wash: string; edgeWeight?: number; span?: { from: number; to: number } }
 ): string {
-	const degrees = (value: number) => `${value.toFixed(2)}deg`;
 	const [only] = colours;
-	let fill: string;
-	if (colours.length > 1) {
-		const low = Math.max(span.from, feather);
-		const high = Math.max(Math.min(span.to, width - feather), low);
-		const stops = spectrumStops(colours.length, high - low, edgeWeight);
-		const washed = colours.map(
-			(colour) => `color-mix(in oklab, ${colour} ${SPECTRUM_SHARE}%, ${wash})`
-		);
-		// The first and last colours are pinned to the span's ends as well as
-		// their bands' centres. With only the centres, the gradient faded from
-		// transparent at the side to the first colour half a band in, a soft
-		// edge the feather did not control, so the sides stayed blurred with
-		// the feather at 0.
-		fill = [
-			`${washed[0]} ${degrees(low)}`,
-			...washed.map((colour, index) => `${colour} ${degrees(low + (stops[index] ?? 0))}`),
-			`${washed.at(-1)} ${degrees(high)}`
-		].join(', ');
-	} else {
-		const colour = only ?? 'transparent';
-		fill = `${colour} ${degrees(feather)}, ${colour} ${degrees(width - feather)}`;
+	if (colours.length <= 1) {
+		return only ?? 'transparent';
 	}
-	return `conic-gradient(from ${degrees(-width / 2)}, transparent 0deg, ${fill}, transparent ${degrees(width)})`;
+	const degrees = (value: number) => `${value.toFixed(2)}deg`;
+	const low = Math.max(span.from, 0);
+	const high = Math.max(Math.min(span.to, width), low);
+	const stops = spectrumStops(colours.length, high - low, edgeWeight);
+	const washed = colours.map(
+		(colour) => `color-mix(in oklab, ${colour} ${SPECTRUM_SHARE}%, ${wash})`
+	);
+	// Pinned to the span's ends as well as their bands' middles, so the
+	// first and last colours run solid to the sides rather than blending in
+	// from whatever the gradient would otherwise put there.
+	const fill = [
+		`${washed[0]} ${degrees(low)}`,
+		...washed.map((colour, index) => `${colour} ${degrees(low + (stops[index] ?? 0))}`),
+		`${washed.at(-1)} ${degrees(high)}`
+	].join(', ');
+	return `conic-gradient(from ${degrees(-width / 2)}, ${fill})`;
 }

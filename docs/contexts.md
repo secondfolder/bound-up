@@ -181,9 +181,12 @@ before; the current one's name fades in under it as the pill arrives. Under
 A **selection wedge** is the selected option's sector of the disk in its
 colour (the accent for "Add partner"), solid and opaque round the avatar and
 out to the rim, which the disk's own edge cuts crisply. Its two straight sides
-are feathered over a few degrees inside the sector, and inwards, once past
-the avatars, it fades to nothing well before the centre (`wedgeShading`: a
-conic gradient for the sides, a radial mask for the fade). The selected
+are sharp and anti-aliased: the wedge is cut out by a `clip-path: polygon()`
+(`wedgePolygon`, in the element's own box, so it turns with it), not by a
+gradient's hard stops, since Chrome anti-aliases a clip path's edges but not
+a conic gradient's stops, which drew every side not quite vertical or
+horizontal as a staircase. Inwards, once past the avatars, it fades to
+nothing well before the centre (`wedgeShading`, a radial mask). The selected
 option's name sits on a chip of the disk's surface, since the light space
 colours under it would take its contrast, and its avatar has a 2px keyline
 of the disk's colour, without which it vanished into a wedge of its own
@@ -200,16 +203,19 @@ it takes no wedge (the wedge fades out under it): a soft cream glow behind its
 a partner's, filled with every member's colour in the pie's order, you
 first, each mixed well towards the cream (`SPECTRUM_SHARE`, 38% of the
 colour) and blended smoothly into the next, so it reads as a light with a
-hint of each rather than a second pie. The feathered sides fade the first
-and last colours, which made them look thinner, so their bands are wider
-than a middle one's (`spectrumStops`, `SPECTRUM_EDGE_WEIGHT` 1.9, chosen by
-eye from wedges of three to seven colours) and each colour sits in the
-middle of its band. The colours are spread over the part of the wedge that
-can be seen (`wedgeSpan`): Everyone is always at an end of the arc, where
-half its sector is past the screen's edge, and spread over all of it half
-the colours were off the screen. It is built from the members' colours as they are, so a
-change of palette needs nothing here. Its name sits on the same surface chip
-as any selected name.
+hint of each rather than a second pie. Each colour sits in the middle of
+its band (`spectrumStops`), and the first and last are pinned to the sides
+too, so they run solid to them. That makes an end colour, which blends on
+one side only, look wider than a middle one at equal shares, so the end
+bands are a little narrower (`SPECTRUM_EDGE_WEIGHT` 0.9, chosen by eye from
+sharp-sided wedges of three, four and seven colours; it was 1.9 while the
+sides were feathered and faded the end colours). The colours are spread
+over the part of the wedge that can be seen (`wedgeSpan`): Everyone is
+always at an end of the arc, where half its sector is past the screen's
+edge, and spread over all of it half the colours were off the screen. It
+is built from the members' colours as they are, so a change of palette
+needs nothing here. Its name sits on the same surface chip as any selected
+name.
 
 **Lit**, an avatar grows 14% (`HOVER_SCALE`) and its name moves down by the
 growth on the same transition, so the two never meet; the layout leaves room

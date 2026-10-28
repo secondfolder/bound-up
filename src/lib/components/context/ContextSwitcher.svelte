@@ -25,6 +25,7 @@
 		type Point,
 		pillDuration,
 		wedgeGradient,
+		wedgePolygon,
 		wedgeShading,
 		wedgeSpan
 	} from '$lib/context-fan';
@@ -219,8 +220,9 @@
 		const share = (value: number) => `${(value * 100).toFixed(1)}%`;
 		const shown = contexts.find((candidate) => candidate.key === selected);
 		// Solid in the selected context's colour; for Everyone, a pale blend
-		// of its members' colours, you first (`wedgeGradient`). Either way its
-		// two straight sides fade in over the feather, inside the sector.
+		// of its members' colours, you first (`wedgeGradient`). Cut to the
+		// sector by a clip path, whose sides Chrome anti-aliases
+		// (`wedgePolygon`).
 		const colours =
 			shown?.kind === 'all' && shown.people.length > 1
 				? shown.people.map((person) => person.colour)
@@ -229,7 +231,8 @@
 			selected,
 			// Up is -90° on the screen.
 			rotate: angle + 90,
-			background: wedgeGradient(colours, width, shading.feather, {
+			clip: wedgePolygon(width),
+			background: wedgeGradient(colours, width, {
 				wash: 'var(--wa-color-text-normal)',
 				span: wedgeSpan(layout, Math.max(slotKeys.indexOf(selected), 0))
 			}),
@@ -818,6 +821,7 @@
 							data-fan-wedge={wedge.selected}
 							style:rotate="{wedge.rotate.toFixed(2)}deg"
 							style:background={wedge.background}
+							style:clip-path={wedge.clip}
 							style:mask-image={wedge.mask}
 						></div>
 					{/if}
@@ -1206,7 +1210,9 @@
 
 	/* Lit: the avatar grows (`HOVER_SCALE`) and its name moves down by the
 	   growth, on the same transition, so the two never meet. The layout
-	   leaves room for both. No ring: the wedge is the marker. */
+	   leaves room for both. No ring: the wedge is the marker. The name
+	   keeps its colour (the slot's cream) in every state; only its weight
+	   changes. */
 	.slot.hovered {
 		.slot-avatar {
 			transform: scale(var(--lit-scale));
@@ -1215,7 +1221,6 @@
 		.slot-name {
 			transform: translateY(calc(var(--avatar) * (var(--lit-scale) - 1)));
 			font-weight: 800;
-			color: var(--accent-color);
 		}
 	}
 

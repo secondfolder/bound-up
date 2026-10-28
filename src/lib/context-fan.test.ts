@@ -42,6 +42,7 @@ import {
 	stepAlong,
 	visibleArc,
 	wedgeGradient,
+	wedgePolygon,
 	wedgeShading,
 	wedgeSpan
 } from './context-fan';
@@ -595,8 +596,6 @@ describe('wedgeShading', () => {
 			);
 			expect(shading.full * layout.disk).toBeLessThanOrEqual(nearest);
 			expect(shading.clear).toBeLessThan(shading.full * 0.5);
-			expect(shading.feather).toBeGreaterThan(0);
-			expect(shading.feather).toBeLessThan(layout.step / 2);
 		}
 	});
 });
@@ -632,43 +631,77 @@ describe('spectrumStops', () => {
 		expect(spectrumStops(1, 30)).toEqual([15]);
 		expect(spectrumStops(0, 30)).toEqual([]);
 		expect(spectrumStops(3, 30, 1)).toEqual([5, 15, 25]);
-		expect(SPECTRUM_EDGE_WEIGHT).toBeGreaterThan(1);
+		expect(SPECTRUM_EDGE_WEIGHT).toBeGreaterThan(0.5);
+		expect(SPECTRUM_EDGE_WEIGHT).toBeLessThan(1.5);
 	});
 });
 
 describe('wedgeGradient', () => {
 	const wash = 'var(--cream)';
 
-	it('is one colour, solid between its feathered sides', () => {
-		expect(wedgeGradient(['red'], 40, 8, { wash })).toBe(
-			'conic-gradient(from -20.00deg, transparent 0deg, red 8.00deg, red 32.00deg, transparent 40.00deg)'
-		);
+	it('is one colour, plain: the clip path gives it its sides', () => {
+		expect(wedgeGradient(['red'], 40, { wash })).toBe('red');
 	});
 
-	it('blends several, washed towards the cream, in order, between the feathers', () => {
-		// Three even bands across 8° to 32°: their middles, with the first and
-		// last colours also pinned to 8° and 32° so the only fade at the sides
-		// is the feather's.
-		const gradient = wedgeGradient(['red', 'green', 'blue'], 40, 8, { wash, edgeWeight: 1 });
+	it('blends several, washed towards the cream, in order, the ends pinned to the sides', () => {
+		// Three even bands across 0° to 40°: their middles, with the first and
+		// last colours also pinned to 0° and 40°.
+		const gradient = wedgeGradient(['red', 'green', 'blue'], 40, { wash, edgeWeight: 1 });
 		expect(gradient).toBe(
-			'conic-gradient(from -20.00deg, transparent 0deg, ' +
-				`color-mix(in oklab, red ${SPECTRUM_SHARE}%, var(--cream)) 8.00deg, ` +
-				`color-mix(in oklab, red ${SPECTRUM_SHARE}%, var(--cream)) 12.00deg, ` +
+			'conic-gradient(from -20.00deg, ' +
+				`color-mix(in oklab, red ${SPECTRUM_SHARE}%, var(--cream)) 0.00deg, ` +
+				`color-mix(in oklab, red ${SPECTRUM_SHARE}%, var(--cream)) 6.67deg, ` +
 				`color-mix(in oklab, green ${SPECTRUM_SHARE}%, var(--cream)) 20.00deg, ` +
-				`color-mix(in oklab, blue ${SPECTRUM_SHARE}%, var(--cream)) 28.00deg, ` +
-				`color-mix(in oklab, blue ${SPECTRUM_SHARE}%, var(--cream)) 32.00deg, transparent 40.00deg)`
+				`color-mix(in oklab, blue ${SPECTRUM_SHARE}%, var(--cream)) 33.33deg, ` +
+				`color-mix(in oklab, blue ${SPECTRUM_SHARE}%, var(--cream)) 40.00deg)`
 		);
 	});
 
 	it('spreads the colours over only the part of the wedge that can be seen', () => {
-		const gradient = wedgeGradient(['red', 'blue'], 40, 8, {
+		const gradient = wedgeGradient(['red', 'blue'], 40, {
 			wash,
 			edgeWeight: 1,
 			span: { from: 8, to: 24 }
 		});
 		// Two bands across 8° to 24°.
+		expect(gradient).toContain('red 38%, var(--cream)) 8.00deg');
 		expect(gradient).toContain('red 38%, var(--cream)) 12.00deg');
 		expect(gradient).toContain('blue 38%, var(--cream)) 20.00deg');
+		expect(gradient).toContain('blue 38%, var(--cream)) 24.00deg');
+	});
+});
+
+describe('wedgePolygon', () => {
+	/** The polygon's points, in the element's box, as fractions round its centre. */
+	const points = (polygon: string) =>
+		[...polygon.matchAll(/(?<x>-?[\d.]+)% (?<y>-?[\d.]+)%/g)].map((match) => ({
+			x: (Number(match.groups?.x) - 50) / 100,
+			y: (Number(match.groups?.y) - 50) / 100
+		}));
+
+	it('runs from the centre out along the sector, pointing up, its sides at half the width either way', () => {
+		const [centre, first, ...rest] = points(wedgePolygon(40));
+		const last = rest.at(-1);
+		expect(centre).toEqual({ x: 0, y: 0 });
+		// Screen angles from up, clockwise: -20° and 20°.
+		expect((Math.atan2(first?.x ?? 0, -(first?.y ?? 0)) * 180) / Math.PI).toBeCloseTo(-20, 2);
+		expect((Math.atan2(last?.x ?? 0, -(last?.y ?? 0)) * 180) / Math.PI).toBeCloseTo(20, 2);
+	});
+
+	it('keeps every edge between outer points outside the rim, however wide the wedge', () => {
+		for (const width of [10, 45, 90, 179, 300]) {
+			const [, ...outer] = points(wedgePolygon(width));
+			// The nearest any outer edge comes to the centre, as a share of the
+			// box: more than the rim's half.
+			const nearest = Math.min(
+				...outer.slice(1).map((point, index) => {
+					const from = outer[index] ?? point;
+					const middle = { x: (from.x + point.x) / 2, y: (from.y + point.y) / 2 };
+					return Math.hypot(middle.x, middle.y);
+				})
+			);
+			expect(nearest).toBeGreaterThan(0.5);
+		}
 	});
 });
 

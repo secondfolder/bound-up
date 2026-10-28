@@ -62,8 +62,12 @@ type Fan = {
 };
 
 /** Ada, with `count` partners linked, on Today. The partners' own browsers are closed again. */
-async function adaWithPartners(browser: Browser, count: number): Promise<Side> {
-	const ada = await newSide(browser, 'Ada');
+async function adaWithPartners(
+	browser: Browser,
+	count: number,
+	options: Parameters<typeof newSide>[2] = {}
+): Promise<Side> {
+	const ada = await newSide(browser, 'Ada', options);
 	const partners: Side[] = [];
 	for (const name of PARTNER_NAMES.slice(0, count)) {
 		const side = await newSide(browser, 'Partner');
@@ -728,5 +732,63 @@ test('a pick flies the picked avatar straight from its place on the ring into th
 		}
 	} finally {
 		await ada.close();
+	}
+});
+
+test('the wedge’s sides are sharp and anti-aliased, to look at', async ({ browser }) => {
+	// biome-ignore lint/suspicious/noSkippedTests: it only takes screenshots, for a person to look at; it asserts nothing a run needs.
+	test.skip(!SHOTS, 'Screenshots only: set SWITCHER_SHOTS to a directory.');
+	test.setTimeout(240_000);
+	for (const scale of [1, 2]) {
+		const ada = await adaWithPartners(browser, 4, { deviceScaleFactor: scale });
+		const { page } = ada;
+		try {
+			for (const viewport of [PHONE, { width: 1920, height: 1080 }]) {
+				await page.setViewportSize(viewport);
+				for (const name of ['Me', LONG_NAME, 'Mo']) {
+					await switchTo(page, name);
+					await openFan(page);
+					const fan = await readFan(page);
+					const shown = fan.options.find((option) => option.current);
+					expect(shown?.name).toBe(`Show ${name}`);
+					const at = {
+						x: ((shown?.avatar.left ?? 0) + (shown?.avatar.right ?? 0)) / 2,
+						y: ((shown?.avatar.top ?? 0) + (shown?.avatar.bottom ?? 0)) / 2
+					};
+					// The wedge's two sides, half a step either side of the option,
+					// part way out where the wedge is solid.
+					const angle = Math.atan2(at.y - fan.centre.y, at.x - fan.centre.x);
+					const neighbours = fan.options
+						.map((option) =>
+							Math.atan2(
+								(option.avatar.top + option.avatar.bottom) / 2 - fan.centre.y,
+								(option.avatar.left + option.avatar.right) / 2 - fan.centre.x
+							)
+						)
+						.map((other) => Math.abs(other - angle))
+						.filter((gap) => gap > 0.001);
+					const half = Math.min(...neighbours) / 2;
+					const distance = Math.hypot(at.x - fan.centre.x, at.y - fan.centre.y) * 0.85;
+					for (const [side, turn] of [
+						['start', -half],
+						['end', half]
+					] as const) {
+						const x = fan.centre.x + distance * Math.cos(angle + turn);
+						const y = fan.centre.y + distance * Math.sin(angle + turn);
+						if (x < 12 || y < 12 || x > viewport.width - 12 || y > fan.navTop - 12) {
+							continue;
+						}
+						const degrees = Math.round((((angle + turn) * 180) / Math.PI + 360) % 180);
+						await page.screenshot({
+							path: `${SHOTS}/aa/app-dpr${scale}-${viewport.width}-${name.split(' ')[0]}-${side}-${degrees}deg.png`,
+							clip: { x: x - 12, y: y - 12, width: 24, height: 24 }
+						});
+					}
+					await closeFan(page);
+				}
+			}
+		} finally {
+			await ada.close();
+		}
 	}
 });
