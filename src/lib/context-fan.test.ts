@@ -35,10 +35,15 @@ import {
 	pillDuration,
 	pointAt,
 	rightCut,
+	SPECTRUM_EDGE_WEIGHT,
+	SPECTRUM_SHARE,
+	spectrumStops,
 	spreadEvenly,
 	stepAlong,
 	visibleArc,
-	wedgeShading
+	wedgeGradient,
+	wedgeShading,
+	wedgeSpan
 } from './context-fan';
 
 const shell = (width: number, height: number): Box => ({
@@ -593,5 +598,91 @@ describe('wedgeShading', () => {
 			expect(shading.feather).toBeGreaterThan(0);
 			expect(shading.feather).toBeLessThan(layout.step / 2);
 		}
+	});
+});
+
+describe('spectrumStops', () => {
+	for (let count = 2; count <= 7; count += 1) {
+		it(`places ${count} colours in order, the edge ones in wider bands, filling the wedge`, () => {
+			const width = 40;
+			const stops = spectrumStops(count, width, 1.6);
+			expect(stops).toHaveLength(count);
+			const ordered = stops.every((stop, index) => index === 0 || stop > (stops[index - 1] ?? 0));
+			expect(ordered).toBe(true);
+			// Each stop is the middle of its band, so the bands are twice the
+			// distance from each band's start; the first starts at 0.
+			const bands: number[] = [];
+			let start = 0;
+			for (const stop of stops) {
+				const band = 2 * (stop - start);
+				bands.push(band);
+				start += band;
+			}
+			expect(start).toBeCloseTo(width, 9);
+			const first = bands[0] ?? 0;
+			const last = bands.at(-1) ?? 0;
+			expect(first).toBeCloseTo(last, 9);
+			// With middle colours, an edge band is 1.6 of a middle one; with two,
+			// both are edges.
+			expect(first / (bands[1] ?? 1)).toBeCloseTo(count > 2 ? 1.6 : 1, 9);
+		});
+	}
+
+	it('centres one colour, places none for nobody, and is even with no edge weight', () => {
+		expect(spectrumStops(1, 30)).toEqual([15]);
+		expect(spectrumStops(0, 30)).toEqual([]);
+		expect(spectrumStops(3, 30, 1)).toEqual([5, 15, 25]);
+		expect(SPECTRUM_EDGE_WEIGHT).toBeGreaterThan(1);
+	});
+});
+
+describe('wedgeGradient', () => {
+	const wash = 'var(--cream)';
+
+	it('is one colour, solid between its feathered sides', () => {
+		expect(wedgeGradient(['red'], 40, 8, { wash })).toBe(
+			'conic-gradient(from -20.00deg, transparent 0deg, red 8.00deg, red 32.00deg, transparent 40.00deg)'
+		);
+	});
+
+	it('blends several, washed towards the cream, in order, between the feathers', () => {
+		// Three even bands across 8° to 32°: their middles.
+		const gradient = wedgeGradient(['red', 'green', 'blue'], 40, 8, { wash, edgeWeight: 1 });
+		expect(gradient).toBe(
+			'conic-gradient(from -20.00deg, transparent 0deg, ' +
+				`color-mix(in oklab, red ${SPECTRUM_SHARE}%, var(--cream)) 12.00deg, ` +
+				`color-mix(in oklab, green ${SPECTRUM_SHARE}%, var(--cream)) 20.00deg, ` +
+				`color-mix(in oklab, blue ${SPECTRUM_SHARE}%, var(--cream)) 28.00deg, transparent 40.00deg)`
+		);
+	});
+
+	it('spreads the colours over only the part of the wedge that can be seen', () => {
+		const gradient = wedgeGradient(['red', 'blue'], 40, 8, {
+			wash,
+			edgeWeight: 1,
+			span: { from: 8, to: 24 }
+		});
+		// Two bands across 8° to 24°.
+		expect(gradient).toContain('red 38%, var(--cream)) 12.00deg');
+		expect(gradient).toContain('blue 38%, var(--cream)) 20.00deg');
+	});
+});
+
+describe('wedgeSpan', () => {
+	const layout = layoutFan({ centre: { x: 390, y: 0 }, bounds: shell(390, 774), count: 5 });
+
+	it('is the whole wedge for an option in the middle of the arc', () => {
+		expect(wedgeSpan(layout, 2)).toEqual({ from: 0, to: layout.step });
+	});
+
+	it('is the half on the screen for one at an end, out past its avatar', () => {
+		const first = wedgeSpan(layout, 0);
+		expect(first.from).toBe(0);
+		expect(first.to).toBeGreaterThan(layout.step / 2);
+		expect(first.to).toBeLessThan(layout.step);
+		const last = wedgeSpan(layout, 4);
+		expect(last.from).toBeGreaterThan(0);
+		expect(last.from).toBeLessThan(layout.step / 2);
+		expect(last.to).toBe(layout.step);
 	});
 });

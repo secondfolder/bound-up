@@ -767,3 +767,112 @@ export function wedgeShading(layout: FanLayout): { feather: number; clear: numbe
 		full
 	};
 }
+
+/**
+ * How much wider the first and last colours' bands are than a middle one's
+ * in Everyone's spectrum wedge. The wedge's feathered sides fade the edge
+ * colours out, so at equal shares they looked thinner than the rest. Chosen
+ * by eye from wedges of 3 to 7 colours side by side: at 1.6 the edge
+ * colours still looked narrower, at 2 they began to look wider with three.
+ */
+export const SPECTRUM_EDGE_WEIGHT = 1.9;
+
+/**
+ * How much of each member's own colour Everyone's spectrum keeps, mixed
+ * into the cream: a pale light with a hint of each, rather than a stripe of
+ * strong colours that would read as a pie of its own.
+ */
+export const SPECTRUM_SHARE = 38;
+
+/**
+ * Where each of `count` colours sits across a wedge `width` degrees wide,
+ * in order from its start: the middle of each colour's band, the first and
+ * last bands `edgeWeight` times as wide as the others. A gradient through
+ * these blends smoothly from one colour to the next, with no hard bands.
+ */
+export function spectrumStops(
+	count: number,
+	width: number,
+	edgeWeight = SPECTRUM_EDGE_WEIGHT
+): number[] {
+	if (count <= 0) {
+		return [];
+	}
+	if (count === 1) {
+		return [width / 2];
+	}
+	const weights = Array.from({ length: count }, (_, index) =>
+		index === 0 || index === count - 1 ? edgeWeight : 1
+	);
+	const total = weights.reduce((sum, weight) => sum + weight, 0);
+	const stops: number[] = [];
+	let start = 0;
+	for (const weight of weights) {
+		const band = (weight / total) * width;
+		stops.push(start + band / 2);
+		start += band;
+	}
+	return stops;
+}
+
+/**
+ * The part of the `index`th option's wedge, in degrees from the wedge's
+ * start (`step` wide in all), that can be seen: an end option sits where
+ * its avatar touches the screen's edge, so half its sector, the half past
+ * it, is off the screen. A spectrum spread over the whole sector lost half
+ * its colours there, and Everyone is always at an end. Out to the far edge
+ * of the avatar, so the last colour still reaches past it.
+ */
+export function wedgeSpan(layout: FanLayout, index: number): { from: number; to: number } {
+	const angle = layout.angles[index] ?? 0;
+	const start = angle - layout.step / 2;
+	const radius = Math.max(layout.radius - layout.stagger, 1);
+	const reach =
+		(Math.asin(Math.min(1, (layout.avatar / 2 + EDGE_MARGIN) / radius)) * 180) / Math.PI;
+	if (layout.arc.end - layout.arc.start >= 360) {
+		return { from: 0, to: layout.step };
+	}
+	return {
+		from: Math.max(0, layout.arc.start - reach - start),
+		to: Math.min(layout.step, layout.arc.end + reach - start)
+	};
+}
+
+/**
+ * The selection wedge's fill, as a CSS `conic-gradient` pointing up, `width`
+ * degrees wide: its two straight sides fading in over `feather` degrees, and
+ * between them one colour solid, or several (Everyone's members, in the
+ * pie's order) each washed well towards `wash` and blended smoothly into the
+ * next at `spectrumStops`, across `span` (the part that can be seen,
+ * `wedgeSpan`; all of it by default). None of the colours sits nearer a side
+ * than the feather, which fades it in.
+ */
+export function wedgeGradient(
+	colours: readonly string[],
+	width: number,
+	feather: number,
+	{
+		wash,
+		edgeWeight = SPECTRUM_EDGE_WEIGHT,
+		span = { from: 0, to: width }
+	}: { wash: string; edgeWeight?: number; span?: { from: number; to: number } }
+): string {
+	const degrees = (value: number) => `${value.toFixed(2)}deg`;
+	const [only] = colours;
+	let fill: string;
+	if (colours.length > 1) {
+		const low = Math.max(span.from, feather);
+		const high = Math.max(Math.min(span.to, width - feather), low);
+		const stops = spectrumStops(colours.length, high - low, edgeWeight);
+		fill = colours
+			.map(
+				(colour, index) =>
+					`color-mix(in oklab, ${colour} ${SPECTRUM_SHARE}%, ${wash}) ${degrees(low + (stops[index] ?? 0))}`
+			)
+			.join(', ');
+	} else {
+		const colour = only ?? 'transparent';
+		fill = `${colour} ${degrees(feather)}, ${colour} ${degrees(width - feather)}`;
+	}
+	return `conic-gradient(from ${degrees(-width / 2)}, transparent 0deg, ${fill}, transparent ${degrees(width)})`;
+}

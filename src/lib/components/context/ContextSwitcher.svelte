@@ -24,7 +24,9 @@
 		optionTiming,
 		type Point,
 		pillDuration,
-		wedgeShading
+		wedgeGradient,
+		wedgeShading,
+		wedgeSpan
 	} from '$lib/context-fan';
 	import type { ContextSpaceView } from '$lib/types';
 	import ContextAvatar from './ContextAvatar.svelte';
@@ -215,15 +217,23 @@
 				: (contexts.find((candidate) => candidate.key === selected) ?? current).colour;
 		const width = layout.step;
 		const shading = wedgeShading(layout);
-		const degrees = (value: number) => `${value.toFixed(2)}deg`;
 		const share = (value: number) => `${(value * 100).toFixed(1)}%`;
+		const shown = contexts.find((candidate) => candidate.key === selected);
+		// Solid in the selected context's colour; for Everyone, a pale blend
+		// of its members' colours, you first (`wedgeGradient`). Either way its
+		// two straight sides fade in over the feather, inside the sector.
+		const colours =
+			shown?.kind === 'all' && shown.people.length > 1
+				? shown.people.map((person) => person.colour)
+				: [colour];
 		return {
 			selected,
 			// Up is -90° on the screen.
 			rotate: angle + 90,
-			// Solid in the selected context's colour, its two straight sides
-			// fading in over the feather, inside the sector.
-			background: `conic-gradient(from ${degrees(-width / 2)}, transparent 0deg, ${colour} ${degrees(shading.feather)}, ${colour} ${degrees(width - shading.feather)}, transparent ${degrees(width)})`,
+			background: wedgeGradient(colours, width, shading.feather, {
+				wash: 'var(--wa-color-text-normal)',
+				span: wedgeSpan(layout, Math.max(slotKeys.indexOf(selected), 0))
+			}),
 			// Fading out towards the centre once past the avatars, and solid out
 			// to the rim, which the disk's own edge cuts crisply. Round the
 			// disk's centre, so turning the wedge leaves it as it is.

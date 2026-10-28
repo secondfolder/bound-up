@@ -435,6 +435,26 @@ describe('the fan', () => {
 		expect(trigger().style.getPropertyValue('--flight-ms')).toBe(`${CLOSE_MS}ms`);
 	});
 
+	it('lights Everyone with a pale spectrum of its members, you first, and a partner in theirs', async () => {
+		const { container } = renderSwitcher({ kind: 'all' });
+		await userEvent.click(trigger());
+		await fanSettled();
+		const wedge = defined(container.querySelector<HTMLElement>('.wedge'), 'the wedge');
+		const everyone = wedge.style.background;
+		const you = everyone.indexOf('var(--space-colour-me)');
+		const partner = everyone.indexOf('var(--space-colour-violet)');
+		expect(you).toBeGreaterThan(-1);
+		expect(partner).toBeGreaterThan(you);
+		// Washed towards the cream, not the colours themselves.
+		expect(everyone).toContain('var(--wa-color-text-normal)');
+
+		// Lit on Jun instead, the wedge is Jun's colour alone.
+		screen.getByRole('button', { name: 'Show Jun' }).focus();
+		await vi.waitFor(() => expect(wedge).toHaveAttribute('data-fan-wedge', JUN));
+		expect(wedge.style.background).toContain('var(--space-colour-violet)');
+		expect(wedge.style.background).not.toContain('var(--space-colour-me)');
+	});
+
 	it('lights the option keyboard focus is on', async () => {
 		const { container } = renderSwitcher({ kind: 'all' });
 		trigger().focus();

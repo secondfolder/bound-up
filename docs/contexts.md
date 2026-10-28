@@ -194,8 +194,22 @@ follow what is selected. Only the drawing is softened: the sector
 
 **"Add partner" glows instead.** It is not a context like the others, so lit
 it takes no wedge (the wedge fades out under it): a soft cream glow behind its
-"+" and a brighter dashed edge. Its hit area is still its sector. Everyone is
-lit with a wedge like the partners, for now.
+"+" and a brighter dashed edge. Its hit area is still its sector.
+
+**Everyone's wedge is a pale spectrum** (`wedgeGradient`): the same shape as
+a partner's, filled with every member's colour in the pie's order, you
+first, each mixed well towards the cream (`SPECTRUM_SHARE`, 38% of the
+colour) and blended smoothly into the next, so it reads as a light with a
+hint of each rather than a second pie. The feathered sides fade the first
+and last colours, which made them look thinner, so their bands are wider
+than a middle one's (`spectrumStops`, `SPECTRUM_EDGE_WEIGHT` 1.9, chosen by
+eye from wedges of three to seven colours) and each colour sits in the
+middle of its band. The colours are spread over the part of the wedge that
+can be seen (`wedgeSpan`): Everyone is always at an end of the arc, where
+half its sector is past the screen's edge, and spread over all of it half
+the colours were off the screen. It is built from the members' colours as they are, so a
+change of palette needs nothing here. Its name sits on the same surface chip
+as any selected name.
 
 **Lit**, an avatar grows 14% (`HOVER_SCALE`) and its name moves down by the
 growth on the same transition, so the two never meet; the layout leaves room
@@ -411,7 +425,7 @@ that does not redirect, so it is the one refresh this does not cover.
 | `src/lib/space-colours.ts` | The palette, its labels, `resolveSpaceColours`. Alias-free: the schema imports `SpaceColour` |
 | `src/lib/server/context.ts` | `listContextSpaces`, the per-request resolver, the cookie, `setSpaceColour`, `contextSpaceViews`, `contextSpaceIds` |
 | `src/lib/context-client.svelte.ts` | Names and avatars for the browser, `switchContext`, `storeContext` and `followInContext` |
-| `src/lib/context-fan.ts` | The fan's geometry and motion: the centre, the visible arc, even spacing, name widths, staggering, which sector a point is in, the hint's place, the wedge's shading, the shared timing and easing. Pure, alias-free |
+| `src/lib/context-fan.ts` | The fan's geometry and motion: the centre, the visible arc, even spacing, name widths, staggering, which sector a point is in, the hint's place, the wedge's shading and fill (Everyone's spectrum), the shared timing and easing. Pure, alias-free |
 | `src/lib/navigation.ts`, `src/lib/enhance.ts` | Refreshes and `use:enhance` that wait for a navigation under way rather than dropping it |
 | `src/lib/components/context/` | `ContextSwitcher`, `ContextAvatar`, `SpaceChip`, `SpaceColourForm` |
 | `src/routes/api/context/+server.ts` | Switching |
