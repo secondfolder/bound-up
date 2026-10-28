@@ -50,11 +50,17 @@
 
 	// svelte-ignore state_referenced_locally
 	// Captured once, as every superform is: the stores are the live connection.
-	const superform = superForm(defaults({ spaceId: '' }, zod4Client(schema), { id: 'move-entry' }), {
-		SPA: true,
-		resetForm: false,
-		validators: zod4Client(schema)
-	});
+	// With only one place it could go, that one is already chosen.
+	const superform = superForm(
+		defaults({ spaceId: targets.length === 1 ? (targets[0]?.id ?? '') : '' }, zod4Client(schema), {
+			id: 'move-entry'
+		}),
+		{
+			SPA: true,
+			resetForm: false,
+			validators: zod4Client(schema)
+		}
+	);
 	const { form } = superform;
 
 	const options = $derived(

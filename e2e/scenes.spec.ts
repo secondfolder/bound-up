@@ -637,8 +637,9 @@ test.describe('a scene moved out of its shared space', () => {
 			const dialog = bo.page.locator('wa-dialog').filter({
 				has: bo.page.locator('wa-select[name="spaceId"]')
 			});
-			await dialog.locator('wa-select[name="spaceId"]').click();
-			await bo.page.getByRole('option', { name: 'Me', exact: true }).click();
+			// Bo's own space is the only other place it could go, so it is
+			// already chosen, and the dialog says what moving there does.
+			await expect(dialog.locator('wa-select[name="spaceId"]')).not.toHaveJSProperty('value', '');
 			await expect(dialog).toContainText('Ada’s surprises in it are taken out.');
 			await dialog.locator('wa-button', { hasText: 'Move' }).click();
 			await expect(dialog).toHaveCount(0, { timeout: 15_000 });

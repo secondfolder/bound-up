@@ -227,7 +227,8 @@ An entry can be moved to another of your spaces: a note you now want to share
 into a partnership's space, or a shared one back into your own. **Move**, beside
 History, opens a dialog (`MoveEntryDialog`) that says where it is now ("This
 note is currently shared with Bo", or just for you), lists
-your other spaces, each with its colour, and says what the move does: who stops
+your other spaces, each with its colour (the only one already chosen, when
+there is only one), and says what the move does: who stops
 seeing it, who starts (with all of its history), and, for a scene leaving a
 shared space, that the partner's surprises in it are taken out. The space chip
 in the page's corner opens the same dialog.
