@@ -239,7 +239,11 @@ would cover an option it moves down until clear rather than over it. A
 resize across the threshold glides it there (a transform transition), and
 the text is drawn once each way, cross-fading, so its alignment never jumps.
 It is part of the fan, above the dim: its words can be selected and copied,
-and a click on it does not close the fan.
+and a click on it does not close the fan. It lies over part of some options'
+sectors (Add partner's, at the top of the disk, most often), and a click
+there picks that option like a click anywhere else in its sector, so over a
+sector it shows the pointer, not the text cursor. Dragging across it still
+selects its words, and the click that ends a selection picks nothing.
 
 ### The fan's layout
 

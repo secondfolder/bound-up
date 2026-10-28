@@ -864,12 +864,19 @@ export function wedgeGradient(
 		const low = Math.max(span.from, feather);
 		const high = Math.max(Math.min(span.to, width - feather), low);
 		const stops = spectrumStops(colours.length, high - low, edgeWeight);
-		fill = colours
-			.map(
-				(colour, index) =>
-					`color-mix(in oklab, ${colour} ${SPECTRUM_SHARE}%, ${wash}) ${degrees(low + (stops[index] ?? 0))}`
-			)
-			.join(', ');
+		const washed = colours.map(
+			(colour) => `color-mix(in oklab, ${colour} ${SPECTRUM_SHARE}%, ${wash})`
+		);
+		// The first and last colours are pinned to the span's ends as well as
+		// their bands' centres. With only the centres, the gradient faded from
+		// transparent at the side to the first colour half a band in, a soft
+		// edge the feather did not control, so the sides stayed blurred with
+		// the feather at 0.
+		fill = [
+			`${washed[0]} ${degrees(low)}`,
+			...washed.map((colour, index) => `${colour} ${degrees(low + (stops[index] ?? 0))}`),
+			`${washed.at(-1)} ${degrees(high)}`
+		].join(', ');
 	} else {
 		const colour = only ?? 'transparent';
 		fill = `${colour} ${degrees(feather)}, ${colour} ${degrees(width - feather)}`;

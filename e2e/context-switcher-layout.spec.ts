@@ -464,6 +464,89 @@ test('the fan stays open through a resize, laid out again, and closes on a click
 	}
 });
 
+test('the pointer shows wherever a click picks, even over the hint, and the hint can still be selected', async ({
+	browser
+}) => {
+	test.setTimeout(180_000);
+	// The hint lies over part of some sectors (Add partner's, at the top of the
+	// disk, most often), and used to show the text cursor there, though a click
+	// there picks: every lit point must show the pointer, whatever is under it.
+	const ada = await adaWithPartners(browser, 3);
+	const { page } = ada;
+	try {
+		for (const size of [PHONE, { width: 1920, height: 1080 }]) {
+			await page.setViewportSize(size);
+			await openFan(page);
+			const fan = await readFan(page);
+			const radius = Math.max(
+				...fan.options.map((option) =>
+					Math.hypot(
+						(option.avatar.left + option.avatar.right) / 2 - fan.centre.x,
+						(option.avatar.top + option.avatar.bottom) / 2 - fan.centre.y
+					)
+				)
+			);
+			const misses: string[] = [];
+			let lit = 0;
+			for (let angle = 0; angle < 360; angle += 3) {
+				for (let share = 0.2; share <= 1.2; share += 0.1) {
+					const x = fan.centre.x + Math.cos((angle * Math.PI) / 180) * radius * share;
+					const y = fan.centre.y + Math.sin((angle * Math.PI) / 180) * radius * share;
+					if (x < 1 || y < 1 || x > size.width - 1 || y > size.height - 1) {
+						continue;
+					}
+					await page.mouse.move(x, y);
+					const under = await page.evaluate(
+						([px, py]) => {
+							const element = document.elementFromPoint(px, py);
+							return {
+								lit: document.querySelector('[data-fan-option].hovered') !== null,
+								cursor: element ? getComputedStyle(element).cursor : null,
+								what: element
+									? `${element.tagName.toLowerCase()}.${[...element.classList].join('.')}`
+									: null
+							};
+						},
+						[x, y]
+					);
+					if (under.lit) {
+						lit += 1;
+						if (under.cursor !== 'pointer') {
+							misses.push(`${Math.round(x)},${Math.round(y)} over ${under.what}: ${under.cursor}`);
+						}
+					}
+				}
+			}
+			expect(lit, 'points that light an option').toBeGreaterThan(20);
+			expect(misses, `${size.width}px: lit points without the pointer`).toEqual([]);
+
+			// Dragging across the hint's words selects them, and neither picks
+			// nor closes, wherever the hint lies.
+			const hint = page.locator('[data-fan-hint] span').filter({ visible: true }).first();
+			const box = await hint.boundingBox();
+			if (box === null) {
+				throw new Error('The hint has no box to drag across');
+			}
+			const before = await control(page).getAttribute('aria-label');
+			await page.mouse.move(box.x + 2, box.y + box.height / 2);
+			await page.mouse.down();
+			await page.mouse.move(box.x + box.width - 2, box.y + box.height / 2, { steps: 8 });
+			await page.mouse.up();
+			expect(await page.evaluate(() => document.getSelection()?.toString() ?? '')).not.toBe('');
+			await expect(control(page)).toHaveAttribute('aria-expanded', 'true');
+			expect(await control(page).getAttribute('aria-label')).toBe(before);
+			await page.evaluate(() => document.getSelection()?.removeAllRanges());
+			// Closed by a click off the fan: pressing on the hint took focus out
+			// of the switcher, so Escape (heard by the switcher) is not the way.
+			await page.mouse.click(5, size.height / 2);
+			await expect(control(page)).toHaveAttribute('aria-expanded', 'false');
+			await expect(page.locator('[data-fan-option]')).toHaveCount(0);
+		}
+	} finally {
+		await ada.close();
+	}
+});
+
 test('frames part way through opening and closing, to look at', async ({ browser }) => {
 	// biome-ignore lint/suspicious/noSkippedTests: it only takes screenshots, for a person to look at; it asserts nothing a run needs.
 	test.skip(!SHOTS, 'Screenshots only: set SWITCHER_SHOTS to a directory.');

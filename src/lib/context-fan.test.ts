@@ -646,13 +646,17 @@ describe('wedgeGradient', () => {
 	});
 
 	it('blends several, washed towards the cream, in order, between the feathers', () => {
-		// Three even bands across 8° to 32°: their middles.
+		// Three even bands across 8° to 32°: their middles, with the first and
+		// last colours also pinned to 8° and 32° so the only fade at the sides
+		// is the feather's.
 		const gradient = wedgeGradient(['red', 'green', 'blue'], 40, 8, { wash, edgeWeight: 1 });
 		expect(gradient).toBe(
 			'conic-gradient(from -20.00deg, transparent 0deg, ' +
+				`color-mix(in oklab, red ${SPECTRUM_SHARE}%, var(--cream)) 8.00deg, ` +
 				`color-mix(in oklab, red ${SPECTRUM_SHARE}%, var(--cream)) 12.00deg, ` +
 				`color-mix(in oklab, green ${SPECTRUM_SHARE}%, var(--cream)) 20.00deg, ` +
-				`color-mix(in oklab, blue ${SPECTRUM_SHARE}%, var(--cream)) 28.00deg, transparent 40.00deg)`
+				`color-mix(in oklab, blue ${SPECTRUM_SHARE}%, var(--cream)) 28.00deg, ` +
+				`color-mix(in oklab, blue ${SPECTRUM_SHARE}%, var(--cream)) 32.00deg, transparent 40.00deg)`
 		);
 	});
 

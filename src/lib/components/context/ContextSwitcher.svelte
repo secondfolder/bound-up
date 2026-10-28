@@ -498,6 +498,14 @@
 			// option, as a slide's letting go there does: the wedge says so.
 			const under = event.detail > 0 && !sliding ? slotAt(event.clientX, event.clientY) : null;
 			const onOption = target instanceof Node && (group?.contains(target) ?? false);
+			// The hint lies over part of some sectors, and its words can be
+			// selected: a click that ends a selection there is the selecting,
+			// not a pick, so it leaves the fan as it is.
+			const onHint = target instanceof Node && (hintElement?.contains(target) ?? false);
+			const selecting = onHint && !(document.getSelection()?.isCollapsed ?? true);
+			if (selecting) {
+				return;
+			}
 			if (under && under === hover && !onOption) {
 				event.preventDefault();
 				event.stopPropagation();
@@ -539,8 +547,11 @@
 			hover = slotAt(event.clientX, event.clientY);
 			// A click anywhere in that sector picks, so the pointer says so:
 			// on the backdrop, whose cursor shows over the disk, which takes no
-			// pointer events of its own.
+			// pointer events of its own, and on the hint, which lies over part
+			// of some sectors (Add partner's, often) and otherwise showed the
+			// text cursor there. Its words can still be selected by dragging.
 			backdrop?.classList.toggle('pointing', hover !== null);
+			hintElement?.classList.toggle('pointing', hover !== null);
 		};
 		document.addEventListener('pointermove', follow);
 		return () => document.removeEventListener('pointermove', follow);
@@ -1044,6 +1055,12 @@
 		/* Above the backdrop like the rest of the fan, and selectable. */
 		user-select: text;
 		cursor: text;
+
+		/* Over a sector a click picks, as it does on the backdrop beside it, so
+		   the pointer shows (`follow` sets the class); dragging still selects. */
+		&:global(.pointing) {
+			cursor: pointer;
+		}
 		transition: transform 320ms cubic-bezier(0.25, 0.8, 0.25, 1);
 
 		/* The two alignments, stacked in one cell, one showing at a time. */
