@@ -136,8 +136,16 @@
 	let historyOpen = $state(false);
 	let deleteDialog: (HTMLElement & { open: boolean }) | undefined = $state();
 	let moveOpen = $state(false);
+	/**
+	 * Opens the Move dialog, or null where it would have nothing to offer: an
+	 * entry the viewer may not move, or one with nowhere else to go (no
+	 * partner yet). Then neither the Move button nor the tappable space shows.
+	 */
 	const openMove = $derived(
-		move && entry.canMove && session?.phase === 'ready' && session.canWrite
+		move?.spaces.some((space) => space.id !== move.currentSpaceId) &&
+			entry.canMove &&
+			session?.phase === 'ready' &&
+			session.canWrite
 			? () => {
 					moveOpen = true;
 				}
@@ -145,25 +153,17 @@
 	);
 
 	/**
-	 * Moves the entry (`NotebookSession.moveTo`). A scene leaving a shared
-	 * space first loses the partner's surprises, as an ordinary edit, which
-	 * the move then carries along with everything else.
+	 * Moves the entry (`NotebookSession.moveTo`). The document goes as it is:
+	 * a scene's surprises stay surprises for whoever they were hidden from,
+	 * wherever it goes.
 	 */
 	async function moveEntry(
 		target: { scope: SealScope; spaceId: string },
 		onProgress: (done: number, total: number) => void
 	): Promise<{ ok: true } | { ok: false; error: string }> {
 		const current = session;
-		if (!(current && live)) {
+		if (!current) {
 			return { ok: false, error: 'This page is still getting ready. Try again in a moment.' };
-		}
-		if (
-			entry.kind === 'scene' &&
-			sealScope.kind === 'partnership' &&
-			target.scope.kind === 'self' &&
-			lexicalEditor
-		) {
-			live.leaveSharedSpace(lexicalEditor);
 		}
 		const result = await current.moveTo(target, onProgress);
 		if (result.ok) {

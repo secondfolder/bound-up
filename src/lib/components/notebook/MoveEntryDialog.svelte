@@ -13,8 +13,7 @@
 	/**
 	 * Moving an entry to another of the viewer's spaces (docs/notebook.md,
 	 * "Moving an entry"). Says what the move does before it is made: who stops
-	 * seeing it, who starts, and, for a scene leaving a shared space, that the
-	 * partner's surprises in it go. The move itself is the session's
+	 * seeing it and who starts. The move itself is the session's
 	 * (`NotebookSession.moveTo`); this only asks where to, and shows how far it
 	 * has got.
 	 *
@@ -45,6 +44,7 @@
 	let dialog: ResponsiveDialog | undefined = $state();
 
 	const targets = $derived(spaces.filter((space) => space.id !== currentSpaceId));
+	const current = $derived(spaces.find((space) => space.id === currentSpaceId) ?? null);
 
 	const schema = z.object({ spaceId: z.string().min(1, 'Choose where it goes') });
 
@@ -91,9 +91,6 @@
 		} else {
 			lines.push('It will be just for you.');
 		}
-		if (kind === 'scene' && partnerLabel) {
-			lines.push(`${partnerLabel}’s surprises in it are taken out.`);
-		}
 		return lines;
 	});
 
@@ -124,48 +121,65 @@
 </script>
 
 <ResponsiveDialog bind:this={dialog} label={`Move this ${what}`} {onclose} lightDismiss={!busy}>
-	{#if targets.length === 0}
-		<p>There’s nowhere else to move it yet. Once you’ve linked with a partner, you can move it to the space you share.</p>
-	{:else}
-		<p class="current">
-			{partnerLabel
-				? `This ${what} is currently shared with ${partnerLabel}.`
-				: `This ${what} is currently just for you.`}
-		</p>
-		<SelectField {superform} field="spaceId" title="Move it to" {options} placeholder="Choose where it goes" />
-		{#each consequences as line (line)}
-			<p class="consequence">{line}</p>
-		{/each}
-		{#if progress && progress.total > 1}
-			<p class="quiet" role="status">Moving its history: {progress.done} of {progress.total}</p>
-		{:else if busy}
-			<p class="quiet" role="status">Moving…</p>
+	<p class="current">
+		{#if partnerLabel}
+			This {what} is currently shared with
+			<span class="whose"
+				>{#if current}<span class="dot" style:background={shownSpace(current).colour} aria-hidden="true"
+					></span>{/if}{partnerLabel}</span
+			>.
+		{:else}
+			This {what} is currently just for you.
 		{/if}
-		{#if problem}
-			<wa-callout variant="danger">
-				<wa-icon slot="icon" name="triangle-exclamation"></wa-icon>
-				{problem}
-			</wa-callout>
-		{/if}
+	</p>
+	<SelectField {superform} field="spaceId" title="Move it to" {options} placeholder="Choose where it goes" />
+	{#each consequences as line (line)}
+		<p class="consequence">{line}</p>
+	{/each}
+	{#if progress && progress.total > 1}
+		<p class="quiet" role="status">Moving its history: {progress.done} of {progress.total}</p>
+	{:else if busy}
+		<p class="quiet" role="status">Moving…</p>
+	{/if}
+	{#if problem}
+		<wa-callout variant="danger">
+			<wa-icon slot="icon" name="triangle-exclamation"></wa-icon>
+			{problem}
+		</wa-callout>
 	{/if}
 	{#snippet footer()}
 		<wa-button appearance="outlined" disabled={busy} onclick={() => dialog?.close()}>Cancel</wa-button>
-		{#if targets.length > 0}
-			<wa-button
-				variant="brand"
-				appearance={target ? 'accent' : 'outlined'}
-				disabled={!target || busy}
-				onclick={move}
-			>
-				{busy ? 'Moving…' : 'Move'}
-			</wa-button>
-		{/if}
+		<wa-button
+			variant="brand"
+			appearance={target ? 'accent' : 'outlined'}
+			disabled={!target || busy}
+			onclick={move}
+		>
+			{busy ? 'Moving…' : 'Move'}
+		</wa-button>
 	{/snippet}
 </ResponsiveDialog>
 
 <style>
 	.current {
 		margin: 0 0 var(--wa-space-m);
+	}
+
+	/* The name with its space's dot before it, kept on one line. */
+	.whose {
+		white-space: nowrap;
+	}
+
+	/* The same dot as `SpaceChip`'s and the select's. */
+	.dot {
+		display: inline-block;
+		inline-size: 0.5rem;
+		block-size: 0.5rem;
+		/* A little more before it than after: the word space before it, plus
+		   this, so the dot sits with the name it belongs to. */
+		margin-inline: 0.15em 0.3em;
+		border-radius: 50%;
+		vertical-align: 0.1em;
 	}
 
 	.consequence {

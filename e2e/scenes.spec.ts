@@ -607,7 +607,7 @@ test.describe('blocks', () => {
 });
 
 test.describe('a scene moved out of its shared space', () => {
-	test('loses the partner’s surprises, and keeps the rest', async ({ browser }) => {
+	test('keeps the partner’s surprise a surprise, there and back', async ({ browser }) => {
 		const { ada, bo } = await sharedNotebook(browser);
 		try {
 			// Bo starts it, so with control shared it is Bo's to move.
@@ -638,19 +638,36 @@ test.describe('a scene moved out of its shared space', () => {
 				has: bo.page.locator('wa-select[name="spaceId"]')
 			});
 			// Bo's own space is the only other place it could go, so it is
-			// already chosen, and the dialog says what moving there does.
+			// already chosen. Where it is and where it would go each carry
+			// their space's dot.
 			await expect(dialog.locator('wa-select[name="spaceId"]')).not.toHaveJSProperty('value', '');
-			await expect(dialog).toContainText('Ada’s surprises in it are taken out.');
+			await expect(dialog.locator('.current')).toHaveText(
+				/This scene is currently shared with\s+Ada\./
+			);
+			await expect(dialog.locator('.current .dot')).toHaveCount(1);
+			await expect(dialog.locator('wa-select[name="spaceId"] > .dot[slot="start"]')).toHaveCount(1);
+			await expect(dialog).not.toContainText('surprise');
 			await dialog.locator('wa-button', { hasText: 'Move' }).click();
 			await expect(dialog).toHaveCount(0, { timeout: 15_000 });
 
-			// Ada's page leaves; Bo's keeps everything but her surprise, which is
-			// not merely hidden but gone from the page.
+			// Ada's page leaves. Bo's has everything, Ada's surprise included,
+			// and it is still a surprise for Bo in Bo's own space.
 			await ada.page.waitForURL(/\/notebook$/, { timeout: 15_000 });
 			await expect(surface(bo.page)).toContainText('Candles first.');
 			await expect(surface(bo.page)).toContainText('Massage');
-			await expect(surface(bo.page).locator('.scene-menu-line.surprise')).toHaveCount(0);
-			await expect(surface(bo.page)).not.toContainText(secret);
+			await expect(surface(bo.page).locator('.scene-menu-line.surprise')).toHaveCount(1);
+			await expect(surface(bo.page)).not.toContainText(secret, { useInnerText: true });
+
+			// Back to the shared space: still Bo's surprise, and still Ada's to read.
+			await clickWaButton(bo.page, /^Move$/);
+			await dialog.locator('wa-button', { hasText: 'Move' }).click();
+			await expect(dialog).toHaveCount(0, { timeout: 15_000 });
+			await expect(surface(bo.page).locator('.scene-menu-line.surprise')).toHaveCount(1, {
+				timeout: 15_000
+			});
+			await ada.page.goto(sceneUrl);
+			await expect(surface(ada.page)).toContainText(secret, { useInnerText: true });
+			await expect(surface(ada.page).locator('.scene-menu-line.surprise')).toHaveCount(0);
 		} finally {
 			await ada.close();
 			await bo.close();

@@ -20,7 +20,7 @@ function browserOnly(): never {
 /** The entry page's live pieces: the session, the editor and the history drawer. */
 export const loadNotebookEditor = browser
 	? async () => {
-			const [session, editor, history, scenePrompts, sceneBlockBar, menuOptions, sceneBlocks] =
+			const [session, editor, history, scenePrompts, sceneBlockBar, menuOptions] =
 				await Promise.all([
 					import('./session.svelte'),
 					import('$lib/components/notebook/CollaborativeEditor.svelte'),
@@ -30,9 +30,7 @@ export const loadNotebookEditor = browser
 					import('$lib/components/scenes/ScenePrompts.svelte'),
 					import('$lib/components/scenes/SceneBlockBar.svelte'),
 					// A menu's own page's options, which need Lexical too.
-					import('$lib/components/scenes/MenuOptionsDrawer.svelte'),
-					// For a scene moved out of a shared space (`leaveSharedSpace`).
-					import('$lib/lexical/plugins/scene-blocks')
+					import('$lib/components/scenes/MenuOptionsDrawer.svelte')
 				]);
 			return {
 				NotebookSession: session.NotebookSession,
@@ -40,8 +38,7 @@ export const loadNotebookEditor = browser
 				VersionHistory: history.default,
 				ScenePrompts: scenePrompts.default,
 				SceneBlockBar: sceneBlockBar.default,
-				MenuOptionsDrawer: menuOptions.default,
-				leaveSharedSpace: sceneBlocks.leaveSharedSpace
+				MenuOptionsDrawer: menuOptions.default
 			};
 		}
 	: browserOnly;

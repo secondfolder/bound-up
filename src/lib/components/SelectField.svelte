@@ -32,6 +32,14 @@
 	const { value, errors } = formFieldProxy(superform, field);
 
 	/**
+	 * The chosen option's dot, for the closed select: it shows only the
+	 * option's text, so the dot goes in its own `start` slot.
+	 */
+	const chosenColour = $derived(
+		options.find((option) => option.value === String($value ?? ''))?.colour ?? null
+	);
+
+	/**
 	 * Follows the choice with a listener on the element itself. `wa-select`
 	 * reports it with a `change` on the host, and an `onchange=` attribute
 	 * would be delegated by Svelte to the root, which does not reliably hear
@@ -63,6 +71,7 @@
 		aria-invalid={$errors ? 'true' : undefined}
 		{...otherProps}
 	>
+		{#if chosenColour}<span slot="start" class="dot" style:background={chosenColour} aria-hidden="true"></span>{/if}
 		{#each options as option (option.value)}
 			<wa-option value={option.value}>
 				{#if option.colour}<span slot="start" class="dot" style:background={option.colour} aria-hidden="true"></span>{/if}
@@ -74,11 +83,16 @@
 </div>
 
 <style>
-	/* The same dot as `SpaceChip`'s. */
+	/* The same dot as `SpaceChip`'s. Its gap is an option's (0.5em), in the
+	   closed select too, which otherwise puts a whole form control's inline
+	   padding after its start slot and leaves the name adrift of the dot.
+	   A rule on the slotted element itself outranks the component's
+	   `::slotted` one. */
 	.dot {
 		display: inline-block;
 		inline-size: 0.5rem;
 		block-size: 0.5rem;
+		margin-inline-end: 0.5em;
 		border-radius: 50%;
 	}
 

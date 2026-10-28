@@ -268,6 +268,21 @@ test.describe('moving an entry', () => {
 		await expect(dialog).toHaveCount(0, { timeout: 15_000 });
 	}
 
+	test('is not offered with nowhere else to go', async ({ browser }) => {
+		const side = await newSide(browser, 'Ada');
+		try {
+			await newAccount(side.page, side.who);
+			await side.page.goto('/notebook');
+			await startEntry(side.page, 'note');
+			await expect(side.page.getByRole('button', { name: 'History' })).toBeVisible();
+			// No partner yet: no Move button, and the space in the corner is not one.
+			await expect(side.page.getByRole('button', { name: /Move/ })).toHaveCount(0);
+			await expect(side.page.locator('.whose')).toHaveCount(0);
+		} finally {
+			await side.close();
+		}
+	});
+
 	test('out of a shared space and back, with its history, while the partner watches', async ({
 		browser
 	}) => {

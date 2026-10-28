@@ -229,9 +229,11 @@ History, opens a dialog (`MoveEntryDialog`) that says where it is now ("This
 note is currently shared with Bo", or just for you), lists
 your other spaces, each with its colour (the only one already chosen, when
 there is only one), and says what the move does: who stops
-seeing it, who starts (with all of its history), and, for a scene leaving a
-shared space, that the partner's surprises in it are taken out. The space chip
-in the page's corner opens the same dialog.
+seeing it and who starts (with all of its history). The document moves as it
+is: a scene's surprises stay surprises for whoever they were hidden from
+([scenes.md](scenes.md#surprises)). The space chip
+in the page's corner opens the same dialog. With nowhere else to go (no partner
+yet), neither the button nor a tappable chip is shown.
 
 **Who may.** The owner of a solo entry; for a shared one, whoever may change who
 else sees it (`canMoveEntry`, which is `canSetAccess`), since taking it out of
