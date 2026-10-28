@@ -221,6 +221,73 @@ the stored rows on every load, action and endpoint (invariant 14).
   made non-editable only as display. Deleting needs edit access, and takes the
   entry's edits, versions and snapshots with it.
 
+## Moving an entry
+
+An entry can be moved to another of your spaces: a note you now want to share
+into a partnership's space, or a shared one back into your own. **Move**, beside
+History, opens a dialog (`MoveEntryDialog`) that says where it is now ("This
+note is currently shared with Bo", or just for you), lists
+your other spaces, each with its colour, and says what the move does: who stops
+seeing it, who starts (with all of its history), and, for a scene leaving a
+shared space, that the partner's surprises in it are taken out. The space chip
+in the page's corner opens the same dialog.
+
+**Who may.** The owner of a solo entry; for a shared one, whoever may change who
+else sees it (`canMoveEntry`, which is `canSetAccess`), since taking it out of
+the space takes it from everyone else, hiding it with no way back. They need
+edit access too, and must be a member of the target and able to write into its
+vault (the trust check, `writableVault`). The server re-checks all of it from
+the rows (`mayMoveEntry`, and `requireSpaceMember` on the posted `spaceId`): a
+move names its space, like any write, and never reads the context.
+
+**It is a re-seal, not an update.** Every record is bound to its vault's id
+([encryption.md](encryption.md#sealed-records)), so the device that moves it
+(`NotebookSession.moveTo`) does the work:
+
+1. It sends what is waiting and catches up, so it holds everything stored.
+2. It opens every version with the entry's vault, re-seals it under the
+   target's with the **same id**, and stages it, one request each
+   (`PUT .../move/versions/[versionId]`, `stageMovedVersion`), under the
+   prefix the entry will have afterwards. One request per version keeps a long
+   history from making one request too large.
+3. When there are edits after the newest version, it cuts a **head version**
+   over all of them and stages that too. No stored edit is re-sealed: the head
+   snapshot carries them, and the server deletes every edit it covers.
+4. It commits (`POST .../move`, `moveEntry`) with the header re-sealed for the
+   target, naming every version it staged and the `seq` it is up to.
+
+The commit is one `db.batch()`, every statement conditioned on the entry row's
+own move having happened, which is conditioned on its revision, its old vault
+and there being no edit after the `seq` the device named. The row takes the
+target's `owner_id` / `partnership_id`, `space_id` and `vault_id`, and its
+access goes back to `edit`, since a restriction is between the members of the
+space it was set in. Then the old prefix is deleted, the old room is told
+`{ type: 'moved' }`, members of the old space not in the new one are evicted
+from the entry's topic, and both spaces' lists refresh.
+
+**Racing it.** Something stored while the device was staging (another device's
+edit, a version cut) makes the commit `stale` (409): its staged objects are
+deleted and the device starts again from what is stored, up to three times. An
+edit arriving after the commit is refused, because `appendUpdate` inserts with
+an `INSERT … SELECT` conditioned on the entry still having the vault the edit
+was sealed under, and answered with a 409, which the page takes as "reload":
+its batch is still in the outbox, and goes again sealed for where the entry is
+now. Without that condition, an edit read and written either side of the
+commit would land under the old vault, newer than every snapshot, and no
+device could open the entry again.
+
+**Open pages follow.** On `moved`, a page asks for the history through the
+ordinary path: a 404 (no longer theirs) leaves for the list, anything else
+reloads the entry in its new space. The entry page draws the session only once
+it is the one for the vault as loaded (`NotebookEntryPage`'s `session`), so for
+the moment between the load and the rebuilt session it shows that it is
+opening rather than the old session with the new entry's buttons.
+
+**Staged and never committed.** A move abandoned between staging and commit
+leaves its objects under the target's prefix for that entry. A later move to
+the same space overwrites them, and a partnership's go with
+`purgePartnershipMedia`; there is no sweep for the rest.
+
 ## Data model
 
 - `notebook_entries`: one row per entry, scoped to `owner_id` **or**
@@ -283,10 +350,12 @@ partnership's in its context. Following it shows what it previewed.
 | Route | |
 | --- | --- |
 | `/notebook` | Journal, Notes and Scenes tabs in the current context; a new entry; `?/create` (naming its `spaceId`), and `?/show` for a hidden entry the viewer may show again (naming the entry's space). |
-| `/notebook/[entryId]` | The entry, in its own space: title (its save status, Settings, History and Delete at the end of its row, or on a row above it where they do not fit), editor, presence, history; `?/setAccess` (who else can see it, in the Settings popover, for whoever has the say over that) and `?/delete`. |
+| `/notebook/[entryId]` | The entry, in its own space: title (its save status, Settings, History, Move and Delete at the end of its row, or on a row above it where they do not fit), editor, presence, history; `?/setAccess` (who else can see it, in the Settings popover, for whoever has the say over that) and `?/delete`. |
 | `/notebook/[entryId]/menus/[menuId]` | A scene's menu on a page of its own, read only until Edit, its to-dos tickable by a writer ([scenes.md](scenes.md#a-menus-own-page)). |
 | `api/notebook/entries/[entryId]/updates` | `GET` edits after a seq (with the latest version on open); `POST` a batch and/or a caret. |
-| `.../header` | `POST` the sealed header, compare-and-swap. |
+| `.../header` | `GET` its revision (for a move starting again); `POST` the sealed header, compare-and-swap. |
+| `.../move` | `POST` the commit of a move to another space. |
+| `.../move/versions/[versionId]` | `PUT` one version re-sealed for the space it is moving to. |
 | `.../versions` | `GET` the history; `POST` a version. |
 | `.../versions/[versionId]` | `GET` one version's sealed snapshot. |
 

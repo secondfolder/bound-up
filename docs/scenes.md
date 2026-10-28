@@ -397,6 +397,12 @@ it again.
   anything hidden from anyone; what the page mentions is read without the
   viewer's surprises; a version preview draws them as surprises; help from
   the model is sent the page as the asker sees it.
+- **Moving a scene out of its shared space takes the partner's out**
+  (`leaveSharedSpace`, before the move is made): in the mover's own space
+  nobody would be left who may see them, so they would be "A surprise" for
+  good, which nobody could open or delete. The mover's own are shown again.
+  It is an ordinary edit, so the history still holds them, drawn as
+  surprises. See [notebook.md](notebook.md#moving-an-entry).
 
 ## Menu designs
 

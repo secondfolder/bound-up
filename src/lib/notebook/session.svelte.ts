@@ -60,6 +60,8 @@ const HEADER_DELAY_MS = 5000;
 /** How often the page checks whether a version is due. */
 const VERSION_CHECK_MS = 15_000;
 const MAX_RETRY_MS = 30_000;
+/** How many times a move starts again because the entry changed while it was staging. */
+const MOVE_ATTEMPTS = 3;
 
 /** The origin edits replayed from the outbox are applied with: local, but already batched. */
 const OUTBOX_ORIGIN = 'notebook-outbox';
@@ -119,6 +121,8 @@ type SessionFlags = {
 	resyncAgain: boolean;
 	/** This page wrote something since the last version, so it may cut the next. */
 	editedHereSinceVersion: boolean;
+	/** This page moved the entry, and is reloading it already. */
+	movedFromHere: boolean;
 };
 
 export class NotebookSession {
@@ -142,6 +146,11 @@ export class NotebookSession {
 	versionsChanged = $state(0);
 
 	readonly #options: SessionOptions;
+
+	/** The vault this session opens and seals with: the entry's, as it was loaded. */
+	get vaultId(): string {
+		return this.#options.vaultId;
+	}
 	/**
 	 * Where this page has got to. In one object rather than six fields, and
 	 * typed by `SessionFlags`, because Biome's inference reads a class field's
@@ -154,7 +163,8 @@ export class NotebookSession {
 		sending: false,
 		awarenessDirty: false,
 		resyncAgain: false,
-		editedHereSinceVersion: false
+		editedHereSinceVersion: false,
+		movedFromHere: false
 	};
 	readonly #timings = readTimings();
 	#vault: OpenVault | null = null;
@@ -388,6 +398,142 @@ export class NotebookSession {
 		return opened ? fromBase64(opened.state) : null;
 	}
 
+	/**
+	 * Moves the entry to another space: every version re-sealed under that
+	 * space's vault and staged one at a time, then one commit. See
+	 * docs/notebook.md, "Moving an entry", and `moveEntry` on the server.
+	 *
+	 * Starts again from what is stored when the commit says something changed
+	 * meanwhile (another device typing, or a version being cut), a few times.
+	 * The server tells every open copy, this one included, to reload once it
+	 * has moved.
+	 */
+	async moveTo(
+		target: { scope: SealScope; spaceId: string },
+		onProgress: (done: number, total: number) => void = () => undefined
+	): Promise<{ ok: true } | { ok: false; error: string }> {
+		const vault = this.#vault;
+		if (!(vault && this.#grant && this.canWrite)) {
+			return { ok: false, error: 'This entry can’t be moved from this device.' };
+		}
+		const writable = await writableVault(target.scope);
+		if (typeof writable === 'string') {
+			return { ok: false, error: writable };
+		}
+		const failed = (response: Response | null) => {
+			reportRequestFailure(response);
+			return { ok: false as const, error: 'It hasn’t been moved. Try again in a moment.' };
+		};
+		for (let attempt = 0; attempt < MOVE_ATTEMPTS; attempt += 1) {
+			await this.flushNow();
+			if (this.saveState !== 'saved') {
+				return {
+					ok: false,
+					error: 'Your last changes haven’t saved yet. Try again once it says Saved.'
+				};
+			}
+			await this.resync();
+			const upToSeq = this.#fetchedThrough;
+			const listed = await tryFetch(this.#path('versions'));
+			if (!listed?.ok) {
+				return failed(listed);
+			}
+			const { versions } = (await listed.json()) as {
+				versions: { id: string; upToSeq: number }[];
+			};
+			const newest = Math.max(0, ...versions.map((version) => version.upToSeq));
+			const head = upToSeq > newest ? crypto.randomUUID() : null;
+			const total = versions.length + (head ? 1 : 0);
+			onProgress(0, total);
+
+			const stage = async (id: string, state: string) => {
+				const sealed = await sealRecord(notebookSnapshotKind, {
+					recordId: id,
+					payload: { state },
+					vault: writable.vault,
+					grant: writable.grant
+				});
+				const response = await tryFetch(this.#path(`move/versions/${id}`), {
+					method: 'PUT',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({ spaceId: target.spaceId, vaultId: writable.vault.id, ...sealed })
+				});
+				return response?.ok
+					? {
+							ok: true as const,
+							moved: { id, payloadVersion: sealed.payloadVersion, size: sealed.ciphertext.length }
+						}
+					: { ok: false as const, response };
+			};
+
+			const moved: { id: string; payloadVersion: number; size: number }[] = [];
+			for (const version of versions) {
+				const response = await tryFetch(this.#path(`versions/${version.id}`));
+				if (!response?.ok) {
+					return failed(response);
+				}
+				const body = (await response.json()) as SealedEnvelope;
+				const opened = await this.#open(notebookSnapshotKind, { ...body, id: version.id });
+				if (!opened) {
+					return {
+						ok: false,
+						error:
+							'Part of this entry’s history can’t be opened on this device, so it can’t be moved from here. Try another device.'
+					};
+				}
+				const staged = await stage(version.id, opened.state);
+				if (!staged.ok) {
+					return failed(staged.response);
+				}
+				moved.push(staged.moved);
+				onProgress(moved.length, total);
+			}
+			let headVersion: { id: string; payloadVersion: number; size: number } | null = null;
+			if (head) {
+				const staged = await stage(head, toBase64(encodeStateAsUpdate(this.doc)));
+				if (!staged.ok) {
+					return failed(staged.response);
+				}
+				headVersion = staged.moved;
+				onProgress(total, total);
+			}
+
+			const header = await sealRecord(notebookEntryKind, {
+				recordId: this.#options.entryId,
+				payload: this.#headerPayload(),
+				vault: writable.vault,
+				grant: writable.grant
+			});
+			const committed = await tryFetch(this.#path('move'), {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					spaceId: target.spaceId,
+					revision: this.#headerRevision,
+					upToSeq,
+					header: { vaultId: writable.vault.id, ...header },
+					versions: moved,
+					head: headVersion
+				})
+			});
+			if (committed?.ok) {
+				// The room is about to say so too; this page has it in hand.
+				this.#is.movedFromHere = true;
+				return { ok: true };
+			}
+			if (committed?.status !== 409) {
+				return failed(committed);
+			}
+			// Something changed while staging. The header's revision may be one of
+			// those things, so it is read again with the rest.
+			await this.#refreshHeaderRevision();
+		}
+		return {
+			ok: false,
+			error: 'This entry kept changing while it was being moved. Try again once it’s quiet.'
+		};
+	}
+
 	/** Stops everything. Sends what it can on the way out. */
 	destroy(): void {
 		if (this.#is.destroyed) {
@@ -572,6 +718,18 @@ export class NotebookSession {
 			case 'access':
 				this.#tell('onAccessChanged');
 				return;
+			case 'moved': {
+				if (this.#is.movedFromHere) {
+					return;
+				}
+				// Moved to another space. Someone not in that one can no longer
+				// read it, and reloading the page would show them a 404 where
+				// leaving for the list is what happens to an entry that goes; so
+				// ask first, through the ordinary authorised path.
+				const response = await tryFetch(this.#path('versions'));
+				this.#tell(response?.status === 404 ? 'onGone' : 'onAccessChanged');
+				return;
+			}
 			case 'deleted':
 				this.#tell('onGone');
 				return;
@@ -710,6 +868,13 @@ export class NotebookSession {
 					}
 					continue;
 				}
+				if (response?.status === 409) {
+					// Moved to another space, so sealed under a vault it no longer
+					// uses. The page reloads it; the batch stays in the outbox and is
+					// sent again, sealed for where the entry is now.
+					this.#tell('onAccessChanged');
+					break;
+				}
 				if (response?.status === 403) {
 					// Made read-only while typing. What was typed stays in the outbox
 					// on this device, and the page reloads what it may do.
@@ -768,19 +933,36 @@ export class NotebookSession {
 		this.#headerTimer = setTimeout(() => void this.#saveHeader(), HEADER_DELAY_MS);
 	}
 
-	async #saveHeader(retried = false): Promise<void> {
-		const vault = this.#vault;
-		const grant = this.#grant;
-		if (!(vault && grant && this.canWrite)) {
-			return;
-		}
-		const header = {
+	/** The title and list excerpt, as the header seals them. */
+	#headerPayload(): { title: string; excerpt: string } {
+		return {
 			title: this.title.toString().trim().slice(0, NOTEBOOK_LIMITS.title),
 			excerpt: (this.#excerpt?.() ?? '')
 				.replace(/\s+/g, ' ')
 				.trim()
 				.slice(0, NOTEBOOK_LIMITS.excerpt)
 		};
+	}
+
+	/**
+	 * Reads the header's revision again, for a move that lost its
+	 * compare-and-swap. The move needs only the number: the header it writes
+	 * is this page's own.
+	 */
+	async #refreshHeaderRevision(): Promise<void> {
+		const response = await tryFetch(this.#path('header'));
+		if (response?.ok) {
+			this.#headerRevision = ((await response.json()) as { revision: number }).revision;
+		}
+	}
+
+	async #saveHeader(retried = false): Promise<void> {
+		const vault = this.#vault;
+		const grant = this.#grant;
+		if (!(vault && grant && this.canWrite)) {
+			return;
+		}
+		const header = this.#headerPayload();
 		const key = JSON.stringify(header);
 		if (key === this.#lastHeader) {
 			return;

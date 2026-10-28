@@ -606,6 +606,57 @@ test.describe('blocks', () => {
 	});
 });
 
+test.describe('a scene moved out of its shared space', () => {
+	test('loses the partner’s surprises, and keeps the rest', async ({ browser }) => {
+		const { ada, bo } = await sharedNotebook(browser);
+		try {
+			// Bo starts it, so with control shared it is Bo's to move.
+			const sceneUrl = await startScene(bo.page);
+			await typeRichText(bo.page, 'Candles first.');
+			await expect(bo.page.getByText('Saved')).toBeVisible();
+			await ada.page.goto(sceneUrl);
+			await expect(surface(ada.page)).toContainText('Candles first.');
+
+			// Ada adds a menu whose second item is a surprise for Bo.
+			await surface(ada.page).press('End');
+			await column(ada.page).getByRole('button', { name: 'Menu', exact: true }).click();
+			await expect(surface(ada.page).locator('.scene-menu')).toBeVisible();
+			await ada.page.keyboard.type('Massage');
+			await ada.page.keyboard.press('Enter');
+			const secret = `blindfold-${crypto.randomUUID().slice(0, 6)}`;
+			await ada.page.keyboard.type(secret);
+			await surface(ada.page).getByText(secret).click({ clickCount: 3 });
+			const toolbar = ada.page.getByRole('toolbar', { name: 'Text formatting' });
+			await toolbar.getByRole('button', { name: 'Make a surprise' }).click();
+			await expect(ada.page.getByText('Saved')).toBeVisible();
+			await expect(surface(bo.page).locator('.scene-menu-line.surprise')).toHaveCount(1, {
+				timeout: 15_000
+			});
+
+			await clickWaButton(bo.page, /^Move$/);
+			const dialog = bo.page.locator('wa-dialog').filter({
+				has: bo.page.locator('wa-select[name="spaceId"]')
+			});
+			await dialog.locator('wa-select[name="spaceId"]').click();
+			await bo.page.getByRole('option', { name: 'Me', exact: true }).click();
+			await expect(dialog).toContainText('Ada’s surprises in it are taken out.');
+			await dialog.locator('wa-button', { hasText: 'Move' }).click();
+			await expect(dialog).toHaveCount(0, { timeout: 15_000 });
+
+			// Ada's page leaves; Bo's keeps everything but her surprise, which is
+			// not merely hidden but gone from the page.
+			await ada.page.waitForURL(/\/notebook$/, { timeout: 15_000 });
+			await expect(surface(bo.page)).toContainText('Candles first.');
+			await expect(surface(bo.page)).toContainText('Massage');
+			await expect(surface(bo.page).locator('.scene-menu-line.surprise')).toHaveCount(0);
+			await expect(surface(bo.page)).not.toContainText(secret);
+		} finally {
+			await ada.close();
+			await bo.close();
+		}
+	});
+});
+
 test.describe('a menu’s own page', () => {
 	/** A menu with one to-do in it, and a line after it, so the caret can leave it. */
 	async function menuWithToDo(page: Page) {

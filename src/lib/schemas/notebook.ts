@@ -58,3 +58,32 @@ export const notebookCreateSchema = z.object({
 export const partnerAccessSchema = z.object({
 	access: z.string().refine(isPartnerAccess, 'Expected edit, read or hidden')
 });
+
+/**
+ * Moving an entry, first half: one version's snapshot re-sealed for the
+ * space it is going to, named by `spaceId`, which the server checks the
+ * mover is in (docs/contexts.md, "Writes name their space").
+ */
+export const notebookMoveStageSchema = sealed(NOTEBOOK_LIMITS.snapshotCiphertext).extend({
+	spaceId: z.string().min(1)
+});
+
+const movedVersion = z.object({
+	id: clientId,
+	payloadVersion: z.number().int().positive(),
+	size: z.number().int().positive().max(NOTEBOOK_LIMITS.snapshotCiphertext)
+});
+
+/**
+ * Moving an entry, second half: the commit. Names every version the device
+ * staged, the head version it cut over the edits after them (if there were
+ * any), and the header sealed for the new space.
+ */
+export const notebookMoveSchema = z.object({
+	spaceId: z.string().min(1),
+	revision: z.number().int().nonnegative(),
+	upToSeq: z.number().int().nonnegative(),
+	header: sealed(NOTEBOOK_LIMITS.headerCiphertext),
+	versions: z.array(movedVersion),
+	head: movedVersion.nullable()
+});

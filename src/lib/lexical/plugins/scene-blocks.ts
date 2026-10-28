@@ -2123,6 +2123,53 @@ export function setHidden(editor: LexicalEditor, key: string, hiddenFrom: string
 }
 
 /**
+ * Readies a scene to leave its shared space for the viewer's own
+ * (docs/notebook.md, "Moving an entry"): the partner's surprises, hidden from
+ * the viewer, are taken out, and the viewer's own are shown again.
+ *
+ * The partner's go because nobody would be left who may see them: in the
+ * viewer's own space they would be "A surprise" for good, which nobody could
+ * open or delete. Taken out as an ordinary edit, so the scene's history still
+ * has them, drawn as surprises as it always draws them. Made at once
+ * (`discrete`), so the session has it to send by the time this returns.
+ */
+export function leaveSharedSpace(editor: LexicalEditor): void {
+	const viewer = sceneViewerOf(editor);
+	editor.update(
+		() => {
+			const hideable: HideableSceneNode[] = [];
+			const walk = (node: LexicalNode) => {
+				if (isHideableSceneNode(node)) {
+					hideable.push(node as HideableSceneNode);
+				}
+				if (isElementNode(node)) {
+					for (const child of node.getChildren()) {
+						walk(child);
+					}
+				}
+			};
+			walk(getRoot());
+			for (const node of hideable) {
+				if (!node.isAttached()) {
+					continue;
+				}
+				const hidden = node.getHiddenFrom();
+				if (isSurpriseFor(hidden, viewer)) {
+					node.remove();
+				} else if (hidden !== null) {
+					node.setHiddenFrom(null);
+				}
+			}
+			// The root is never left without a line to write on.
+			if (getRoot().getChildrenSize() === 0) {
+				getRoot().append(createParagraphNode());
+			}
+		},
+		{ discrete: true }
+	);
+}
+
+/**
  * The edits made from outside the page's text, in the menu's options or a
  * question beside an item, are made without putting the page's selection
  * back on screen: doing that moves focus to the page, out of the field being

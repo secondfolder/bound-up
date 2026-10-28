@@ -55,6 +55,7 @@
 	{describeUser}
 	{cursorLabel}
 	partnerLabel={partnershipId ? name : null}
+	move={{ currentSpaceId: data.space.id, spaces: data.contextSpaces }}
 	menuHref={(menuId) =>
 		resolve('/(auth-required)/(app)/notebook/[entryId]/menus/[menuId]', {
 			entryId: data.entry.id,
@@ -62,7 +63,24 @@
 		})}
 	onGone={() => goto(resolve('/(auth-required)/(app)/notebook'))}
 >
-	{#snippet whose()}
-		{#if space}<SpaceChip {space} />{/if}
+	{#snippet whose(openMove: (() => void) | null)}
+		{#if space && openMove}
+			<!-- The space it is in is what is tapped to move it elsewhere. -->
+			<wa-button appearance="plain" size="s" class="whose" onclick={openMove}>
+				<SpaceChip {space} />
+				<wa-icon slot="end" name="chevron-down" label="Move to another space"></wa-icon>
+			</wa-button>
+		{:else if space}
+			<SpaceChip {space} />
+		{/if}
 	{/snippet}
 </NotebookEntryPage>
+
+<style>
+	/* A chip that can be tapped, not a button that shouts: as small as the
+	   chip beside a list's row. */
+	.whose {
+		--wa-form-control-height: auto;
+		--wa-form-control-padding-inline: var(--wa-space-2xs);
+	}
+</style>

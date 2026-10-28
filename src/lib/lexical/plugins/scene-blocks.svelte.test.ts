@@ -63,6 +63,7 @@ import {
 	$canMakeMenu as canMakeMenu,
 	insertMenu,
 	insertMenuFrom,
+	leaveSharedSpace,
 	registerOnlyMenu,
 	selectionToMenu,
 	setCourseArt,
@@ -1677,6 +1678,41 @@ describe('a surprise', () => {
 		await settled(forAda);
 		const [shown] = stored(forAda).root.children;
 		expect(shown).toMatchObject({ hiddenFrom: null });
+	});
+});
+
+describe('a scene leaving its shared space', () => {
+	it('loses the partner’s surprises and shows the viewer’s own again', async () => {
+		const editor = sceneEditor('ada');
+		build(editor, () => [
+			createSceneSectionNode('story', 'ada').append(lineOf('Bo’s secret')),
+			createSceneSectionNode('story', 'bo').append(lineOf('Ada’s secret')),
+			lineOf('For both')
+		]);
+
+		leaveSharedSpace(editor);
+		await settled(editor);
+
+		const text = documentToPlainText(stored(editor));
+		expect(text).not.toContain('Bo’s secret');
+		expect(text).toContain('Ada’s secret');
+		expect(text).toContain('For both');
+		expect(
+			stored(editor).root.children.filter(
+				(block) => 'hiddenFrom' in block && block.hiddenFrom !== null
+			)
+		).toEqual([]);
+	});
+
+	it('leaves a line to write on when the partner’s surprises were all there was', async () => {
+		const editor = sceneEditor('ada');
+		build(editor, () => [createSceneSectionNode('story', 'ada').append(lineOf('Bo’s secret'))]);
+
+		leaveSharedSpace(editor);
+		await settled(editor);
+
+		expect(documentToPlainText(stored(editor))).toBe('');
+		expect(stored(editor).root.children).toHaveLength(1);
 	});
 });
 

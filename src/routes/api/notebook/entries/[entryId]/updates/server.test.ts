@@ -9,6 +9,7 @@ import {
 	createTestNotebookEntry,
 	createTestPartnership,
 	createTestUser,
+	ensureTestSelfVault,
 	fakeSealed,
 	readNotebookUpdateRows,
 	type TestUser
@@ -110,6 +111,22 @@ describe('POST /api/notebook/entries/[entryId]/updates', () => {
 			post(bo, entry.id, { origin: crypto.randomUUID(), update: sealed(entry.vaultId) })
 		);
 		expect(result).toMatchObject({ type: 'error', status: 403 });
+	});
+
+	it('answers an edit or cursor sealed under a vault the entry no longer uses with a 409', async () => {
+		// What a page still open on an entry that has since moved sends: a 409
+		// has it reload, where a 400 left it retrying for ever.
+		const entry = await createTestNotebookEntry(harness.db, ada, { partnershipId });
+		const elsewhere = await ensureTestSelfVault(harness.db, ada.id);
+		const edit = await runAndCatch(() =>
+			post(ada, entry.id, { origin: crypto.randomUUID(), update: sealed(elsewhere) })
+		);
+		expect(edit).toMatchObject({ type: 'error', status: 409 });
+		const cursor = await runAndCatch(() =>
+			post(ada, entry.id, { origin: crypto.randomUUID(), awareness: sealed(elsewhere) })
+		);
+		expect(cursor).toMatchObject({ type: 'error', status: 409 });
+		expect(await readNotebookUpdateRows(harness.db, entry.id)).toHaveLength(1);
 	});
 
 	it("relays a reader's cursor, which is never stored", async () => {

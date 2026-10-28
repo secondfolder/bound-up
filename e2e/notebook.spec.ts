@@ -246,6 +246,113 @@ test.describe('a shared note', () => {
 });
 
 /**
+ * Moving an entry between spaces (docs/notebook.md, "Moving an entry"): out
+ * of a shared space while the partner has it open, back in again, history
+ * and all, and only by whoever has the say over it.
+ */
+test.describe('moving an entry', () => {
+	/**
+	 * Opens the Move dialog, from the toolbar's button or from the space in
+	 * the page's corner, picks where to, and moves it.
+	 */
+	async function moveTo(page: Page, where: string, from: 'button' | 'space' = 'button') {
+		await clickWaButton(page, from === 'button' ? /^Move$/ : /Move to another space/);
+		// The host, not its inner <dialog>: the select is slotted into it, so a
+		// search from the shadow root's dialog never finds it.
+		const dialog = page.locator('wa-dialog').filter({
+			has: page.locator('wa-select[name="spaceId"]')
+		});
+		await dialog.locator('wa-select[name="spaceId"]').click();
+		await page.getByRole('option', { name: where, exact: true }).click();
+		await dialog.locator('wa-button', { hasText: 'Move' }).click();
+		await expect(dialog).toHaveCount(0, { timeout: 15_000 });
+	}
+
+	test('out of a shared space and back, with its history, while the partner watches', async ({
+		browser
+	}) => {
+		const { ada, bo, notebookUrl } = await sharedNotebook(browser, 'me');
+		try {
+			// Versions after half a second of quiet, so the entry has a history.
+			await ada.page.addInitScript(() => {
+				localStorage.setItem(
+					'bound-up:notebook-timings',
+					JSON.stringify({ idleMs: 500, checkMs: 300 })
+				);
+			});
+			await ada.page.goto(notebookUrl);
+			const url = await startEntry(ada.page, 'note');
+			const entryId = url.split('/').at(-1) ?? '';
+			await setTitle(ada.page, 'Moving day');
+			await typeRichText(ada.page, 'First draft.');
+			await expect(ada.page.getByText('Saved')).toBeVisible();
+			await expect
+				.poll(
+					async () =>
+						(await sql('SELECT id FROM notebook_versions WHERE entry_id = ?', [entryId])).rows
+							.length,
+					{ timeout: 15_000 }
+				)
+				.toBeGreaterThan(0);
+			await surface(ada.page).press('End');
+			await surface(ada.page).pressSequentially(' Then more.', { delay: 10 });
+			await expect(ada.page.getByText('Saved')).toBeVisible();
+
+			// Bo has it open, and only Ada, who holds control, may move it.
+			await bo.page.goto(url);
+			await expect(surface(bo.page)).toContainText('First draft. Then more.');
+			await expect(bo.page.getByRole('button', { name: 'History' })).toBeVisible();
+			await expect(bo.page.getByRole('button', { name: /Move/ })).toHaveCount(0);
+
+			await moveTo(ada.page, 'Me');
+
+			// Bo's open page leaves for the list, where it no longer is.
+			await bo.page.waitForURL(/\/notebook$/, { timeout: 15_000 });
+			await bo.page.getByRole('tab', { name: 'Notes' }).click();
+			await expect(bo.page.getByRole('link', { name: /Moving day/ })).toHaveCount(0);
+			expect((await bo.page.goto(url))?.status()).toBe(404);
+
+			// Ada's is the same entry, in her own space, sealed under her own vault.
+			await expect(surface(ada.page)).toContainText('First draft. Then more.');
+			const [row] = (
+				await sql(
+					`SELECT e.owner_id AS owner, e.partnership_id AS partnership,
+					        (SELECT count(*) FROM notebook_versions v
+					          WHERE v.entry_id = e.id AND v.vault_id <> e.vault_id) AS stray
+					   FROM notebook_entries e WHERE e.id = ?`,
+					[entryId]
+				)
+			).rows as { owner: string | null; partnership: string | null; stray: number }[];
+			expect(row).toMatchObject({ partnership: null, stray: 0 });
+			expect(row?.owner).toBeTruthy();
+
+			// Its history came too, and opens.
+			await clickWaButton(ada.page, 'History');
+			await ada.page.locator('.versions .version').last().click();
+			await expect(ada.page.locator('.preview')).toContainText('First draft.');
+			await ada.page.keyboard.press('Escape');
+			await expect(ada.page.locator('wa-drawer')).toHaveCount(0);
+
+			// It still takes writing, and then goes back to Bo, from the space it
+			// says it is in.
+			await surface(ada.page).locator('p').last().click();
+			await surface(ada.page).press('End');
+			await surface(ada.page).pressSequentially(' Mine now.', { delay: 10 });
+			await expect(ada.page.getByText('Saved')).toBeVisible();
+			await moveTo(ada.page, 'Bo', 'space');
+
+			await bo.page.goto(notebookUrl);
+			await bo.page.getByRole('tab', { name: 'Notes' }).click();
+			await bo.page.getByRole('link', { name: /Moving day/ }).click({ timeout: 15_000 });
+			await expect(surface(bo.page)).toContainText('First draft. Then more. Mine now.');
+		} finally {
+			await ada.close();
+			await bo.close();
+		}
+	});
+});
+
+/**
  * One list for every context (docs/contexts.md): the switcher re-filters it
  * in place, Everyone shows every space with each row's owner, a new entry in
  * Everyone asks whose it is, and nothing the context says ever moves a write.

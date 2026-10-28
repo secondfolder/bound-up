@@ -92,12 +92,16 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 
 	if (
 		awareness &&
-		!(
-			sealedIsAcceptable(notebookAwarenessKind, awareness.ciphertext, awareness.payloadVersion) &&
-			awareness.vaultId === context.entry.vaultId
-		)
+		!sealedIsAcceptable(notebookAwarenessKind, awareness.ciphertext, awareness.payloadVersion)
 	) {
 		error(400, 'That cursor is not sealed for this entry');
+	}
+	// Sealed under a vault the entry no longer uses: it has moved to another
+	// space since the page loaded. A 409 has the page reload it rather than
+	// retry for ever; what it typed is still in its outbox, and goes again
+	// sealed for where the entry is now.
+	if (awareness && awareness.vaultId !== context.entry.vaultId) {
+		error(409, 'wrong-vault');
 	}
 
 	let seq: number | null = null;
@@ -105,6 +109,10 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 	if (update) {
 		const result = await appendUpdate(locals.db, context, locals.user.id, update);
 		if (!result.ok) {
+			// `wrong-vault` is the entry having moved; see the cursor's check above.
+			if (result.reason === 'wrong-vault') {
+				error(409, result.reason);
+			}
 			error(result.reason === 'read-only' ? 403 : 400, result.reason);
 		}
 		({ seq, duplicate } = result);

@@ -12,10 +12,16 @@
 	import type { RichTextDocument } from '$lib/richtext';
 	import type { ScenePreferencesData } from '$lib/scenes/preferences-store.svelte';
 	import type { SealScope } from '$lib/sealed-forms';
-	import type { DaydreamLibraryItemView, KinkListView, SealedRefView } from '$lib/types';
+	import type {
+		ContextSpaceView,
+		DaydreamLibraryItemView,
+		KinkListView,
+		SealedRefView
+	} from '$lib/types';
 	import AccessControl from './AccessControl.svelte';
 	import type CollaborativeEditor from './CollaborativeEditor.svelte';
 	import EntryTitle from './EntryTitle.svelte';
+	import MoveEntryDialog from './MoveEntryDialog.svelte';
 
 	/**
 	 * One notebook entry, open for writing (or reading), for either scope. The
@@ -32,6 +38,7 @@
 		revision: number;
 		canWrite: boolean;
 		canSetAccess: boolean;
+		canMove: boolean;
 		partnerAccess: PartnerAccess;
 		restrictedByViewer: boolean;
 	};
@@ -48,6 +55,7 @@
 		cursorLabel,
 		partnerLabel = null,
 		menuHref = null,
+		move = null,
 		onGone,
 		whose
 	}: {
@@ -78,13 +86,20 @@
 		partnerLabel?: string | null;
 		/** A scene menu's own page (docs/scenes.md, "A menu's own page"). */
 		menuHref?: ((menuId: string) => string) | null;
+		/**
+		 * Where the entry could be moved to, for the Move button: the space it is
+		 * in and every space the viewer is in. Null on a page that offers no move.
+		 */
+		move?: { currentSpaceId: string; spaces: readonly ContextSpaceView[] } | null;
 		/** The entry is gone or no longer readable: leave for the list. */
 		onGone: () => void;
 		/**
 		 * Whose space the entry is in, at the end of the back link's line: an
-		 * entry shows as its own space's whatever the context is.
+		 * entry shows as its own space's whatever the context is. Given a way
+		 * to open the Move dialog when the viewer may move it, so the space
+		 * can be what is tapped to change it.
 		 */
-		whose?: Snippet;
+		whose?: Snippet<[(() => void) | null]>;
 	} = $props();
 
 	const opened = entrySession(() => ({
@@ -101,7 +116,15 @@
 	}));
 	/** The live pieces, loaded in the browser only: see `loadNotebookEditor`. */
 	const live = $derived(opened.live);
-	const session = $derived(opened.session);
+	/**
+	 * The session, once it is the one for the entry as loaded. After a move
+	 * the load says the new vault before the session for it has been built,
+	 * and for that moment the page would draw the old session's toolbar with
+	 * the new entry's buttons: a settings popover mounted and torn down again
+	 * before Web Awesome had drawn it, which then threw looking for its
+	 * anchor. Until they agree the page shows that it is opening.
+	 */
+	const session = $derived(opened.session?.vaultId === entry.vaultId ? opened.session : null);
 	const entryId = $derived(entry.id);
 	let editor: CollaborativeEditor | undefined = $state();
 	/** The entry's settings popover, for its Cancel to close. */
@@ -112,6 +135,44 @@
 	let columnMode = $state<'prompts' | 'menu'>('prompts');
 	let historyOpen = $state(false);
 	let deleteDialog: (HTMLElement & { open: boolean }) | undefined = $state();
+	let moveOpen = $state(false);
+	const openMove = $derived(
+		move && entry.canMove && session?.phase === 'ready' && session.canWrite
+			? () => {
+					moveOpen = true;
+				}
+			: null
+	);
+
+	/**
+	 * Moves the entry (`NotebookSession.moveTo`). A scene leaving a shared
+	 * space first loses the partner's surprises, as an ordinary edit, which
+	 * the move then carries along with everything else.
+	 */
+	async function moveEntry(
+		target: { scope: SealScope; spaceId: string },
+		onProgress: (done: number, total: number) => void
+	): Promise<{ ok: true } | { ok: false; error: string }> {
+		const current = session;
+		if (!(current && live)) {
+			return { ok: false, error: 'This page is still getting ready. Try again in a moment.' };
+		}
+		if (
+			entry.kind === 'scene' &&
+			sealScope.kind === 'partnership' &&
+			target.scope.kind === 'self' &&
+			lexicalEditor
+		) {
+			live.leaveSharedSpace(lexicalEditor);
+		}
+		const result = await current.moveTo(target, onProgress);
+		if (result.ok) {
+			// The server tells every open copy to reload, this one included; this
+			// is for the page not to wait on the room to hear it.
+			void invalidate(dependency);
+		}
+		return result;
+	}
 
 	const readOnly = $derived(!session?.canWrite);
 
@@ -212,6 +273,10 @@
 
 <!-- Stretched to the foot of the page, so a click anywhere below the text
      lands in the editor rather than on nothing. -->
+{#snippet corner()}
+	{@render whose?.(openMove)}
+{/snippet}
+
 {#snippet body()}
 	{#if scene && live && lexicalEditor}
 		<live.SceneBlockBar editor={lexicalEditor} partnerId={scene.partnerId} {readOnly} />
@@ -245,7 +310,7 @@
 		backHref={back.href}
 		backLabel={back.label}
 		backText={back.text}
-		corner={whose}
+		corner={whose ? corner : undefined}
 	/>
 
 	<div class="content">
@@ -315,6 +380,12 @@
 							<wa-icon slot="start" name="clock-rotate-left"></wa-icon>
 							History
 						</wa-button>
+						{#if openMove}
+							<wa-button size="s" appearance="outlined" onclick={openMove}>
+								<wa-icon slot="start" name="arrow-right-arrow-left"></wa-icon>
+								Move
+							</wa-button>
+						{/if}
 						{#if entry.canWrite}
 							<wa-button size="s" appearance="outlined" variant="danger" onclick={openDelete}>
 								<wa-icon slot="start" name="trash-can"></wa-icon>
@@ -383,6 +454,19 @@
 		{viewerId}
 		onRestore={restore}
 		onclose={closeHistory}
+	/>
+{/if}
+
+{#if moveOpen && move}
+	<MoveEntryDialog
+		kind={entry.kind}
+		currentSpaceId={move.currentSpaceId}
+		spaces={move.spaces}
+		{partnerLabel}
+		onmove={moveEntry}
+		onclose={() => {
+			moveOpen = false;
+		}}
 	/>
 {/if}
 

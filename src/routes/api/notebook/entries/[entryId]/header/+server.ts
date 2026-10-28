@@ -6,6 +6,22 @@ import { createNotifier } from '$lib/server/realtime/backend';
 import type { RequestHandler } from './$types';
 
 /**
+ * The header's revision as stored, for a move that lost its compare-and-swap
+ * and starts again (`NotebookSession.moveTo`). Only the number: the page has
+ * the title itself.
+ */
+export const GET: RequestHandler = async ({ locals, params }) => {
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
+	const context = await getEntryContext(locals.db, params.entryId, locals.user.id);
+	if (!context) {
+		error(404, 'Not found');
+	}
+	return json({ revision: context.entry.revision });
+};
+
+/**
  * Rewrites an entry's sealed title and excerpt: the cache lists read, kept by
  * whichever page is editing. A lost compare-and-swap is a 409 carrying the
  * current revision, so the page can write once more over it. See

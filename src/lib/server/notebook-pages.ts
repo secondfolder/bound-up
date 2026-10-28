@@ -24,6 +24,7 @@ import {
 	getEntryContext,
 	liftHiddenEntry,
 	listEntries,
+	mayMoveEntry,
 	type NotebookScope,
 	type ResolvedScope,
 	resolveScope,
@@ -278,6 +279,8 @@ export type NotebookEntryData = {
 		createdByUserId: string | null;
 		canWrite: boolean;
 		canSetAccess: boolean;
+		/** Whether the viewer may move it to another of their spaces (`mayMoveEntry`). */
+		canMove: boolean;
 		partnerAccess: PartnerAccess;
 		/** Whether the restriction, if any, is one the viewer set. */
 		restrictedByViewer: boolean;
@@ -380,6 +383,7 @@ function entryView(
 		createdByUserId: entry.createdByUserId,
 		canWrite: context.access === 'edit',
 		canSetAccess: context.canSetAccess,
+		canMove: mayMoveEntry(context, userId),
 		partnerAccess: entry.partnerAccess,
 		restrictedByViewer: entry.accessSetByUserId === userId
 	};

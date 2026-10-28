@@ -70,7 +70,9 @@ the same way, picked from the add button's fan when the context shows more
 than one space it could go to ([below](#the-add-buttons-fan)), or under "For
 whom?" (`ForWhom`) on an add sheet opened by its URL; completing, undoing, claiming and editing name
 the task, completion or reward, which carries its own space; setting credits
-names the space and the member.
+names the space and the member. Moving a notebook entry posts the space it
+goes to, and is checked against both that space and the entry's own
+([notebook.md](notebook.md#moving-an-entry)).
 
 ## Items carry their own space
 

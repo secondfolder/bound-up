@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	canMoveEntry,
 	canSetAccess,
 	compactionBound,
 	entryAccessFor,
@@ -119,6 +120,25 @@ describe('holdsAccessAuthority', () => {
 		expect(holdsAccessAuthority(left, bo, group)).toBe(true);
 		expect(entryAccessFor(shared('hidden', ada), stranger, group)).toBe('none');
 		expect(entryAccessFor(shared('read', ada), stranger, group)).toBe('read');
+	});
+});
+
+describe('canMoveEntry', () => {
+	it('is for the owner of a solo entry and nobody else', () => {
+		expect(canMoveEntry({ scope: 'self', ownerId: ada }, ada)).toBe(true);
+		expect(canMoveEntry({ scope: 'self', ownerId: ada }, bo)).toBe(false);
+	});
+
+	it('is for whoever has the say over a shared entry, as setting its access is', () => {
+		expect(canMoveEntry(shared('edit'), ada, partnership('inviter'))).toBe(true);
+		expect(canMoveEntry(shared('edit'), bo, partnership('inviter'))).toBe(false);
+		expect(canMoveEntry(shared('edit', null, bo), bo, partnership('both'))).toBe(true);
+		expect(canMoveEntry(shared('edit', null, bo), ada, partnership('both'))).toBe(false);
+		expect(canMoveEntry(shared('edit'), stranger, partnership('both'))).toBe(false);
+	});
+
+	it('is never for a shared entry without its space to check against', () => {
+		expect(canMoveEntry(shared('edit'), ada)).toBe(false);
 	});
 });
 

@@ -164,6 +164,25 @@ export function canSetAccess(
 	return !holdsAccessAuthority(entry, entry.accessSetByUserId as string, space);
 }
 
+/**
+ * Whether `userId` may move `entry` to another space (docs/notebook.md,
+ * "Moving an entry"): its owner, for a solo entry; for a shared one, the
+ * member who may change who else sees it (`canSetAccess`), since taking it
+ * out of the space takes it from everyone else in it, which is hiding it
+ * with no way back. Where it may go is checked separately: any space the
+ * viewer is a member of and can write into.
+ */
+export function canMoveEntry(
+	entry: EntryForAccess,
+	userId: string,
+	space?: SpaceForAccess
+): boolean {
+	if (entry.scope === 'self') {
+		return entry.ownerId === userId;
+	}
+	return space !== undefined && canSetAccess(entry, userId, space);
+}
+
 /** Whether `access` lets its holder write. */
 export function canWrite(access: EntryAccess): boolean {
 	return access === 'edit';
@@ -292,6 +311,8 @@ export type NotebookFrame =
 	| ({ type: 'awareness'; origin: string } & SealedEnvelope)
 	| { type: 'version'; id: string; upToSeq: number }
 	| { type: 'access' }
+	/** It is in another space now, sealed under that space's vault: reload it. */
+	| { type: 'moved' }
 	| { type: 'deleted' };
 
 /** What travels on the list topic: that something changed, and nothing about what. */

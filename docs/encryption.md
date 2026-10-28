@@ -757,6 +757,11 @@ plaintext `payload_version` was edited to have it read as an older shape. The
 without guessing. Record ids are chosen by the browser, because they are part
 of what the ciphertext is bound to.
 
+So something that moves to another space moves to another vault, and can only
+be **re-sealed**: opened and sealed again in the browser, by someone who holds
+both keys, never copied across by the server. A notebook entry is the one
+thing that moves today ([notebook.md](notebook.md#moving-an-entry)).
+
 A kind may be **compressed** (`compressed` on `defineSealedKind`): its JSON
 is deflated (raw DEFLATE) before it is encrypted, and the ciphertext starts
 `sz1.` instead, with the same IV, tag and associated data. Compressing first

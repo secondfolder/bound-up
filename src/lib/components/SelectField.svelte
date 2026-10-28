@@ -21,7 +21,8 @@
 		superform: SuperForm<T>;
 		field: FormPathLeaves<T>;
 		title: string;
-		options: readonly { value: string; label: string }[];
+		/** `colour`, when given, is a dot before the option's label: a space's, say. */
+		options: readonly { value: string; label: string; colour?: string }[];
 		// Spread onto the <wa-select>, as InputField does onto its <wa-input>.
 		[attribute: string]: unknown;
 	} = $props();
@@ -63,13 +64,24 @@
 		{...otherProps}
 	>
 		{#each options as option (option.value)}
-			<wa-option value={option.value}>{option.label}</wa-option>
+			<wa-option value={option.value}>
+				{#if option.colour}<span slot="start" class="dot" style:background={option.colour} aria-hidden="true"></span>{/if}
+				{option.label}
+			</wa-option>
 		{/each}
 	</wa-select>
 	{#if $errors}<span class="invalid">{$errors}</span>{/if}
 </div>
 
 <style>
+	/* The same dot as `SpaceChip`'s. */
+	.dot {
+		display: inline-block;
+		inline-size: 0.5rem;
+		block-size: 0.5rem;
+		border-radius: 50%;
+	}
+
 	.invalid {
 		color: var(--wa-color-text-danger);
 	}

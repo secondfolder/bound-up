@@ -1,5 +1,6 @@
 import { and, desc, eq, gt, inArray, lt, lte, max, or, sql } from 'drizzle-orm';
 import {
+	canMoveEntry,
 	canSetAccess,
 	compactionBound,
 	type EntryAccess,
@@ -396,6 +397,7 @@ export type NotebookRefusal =
 	| 'exists'
 	| 'conflict'
 	| 'stale'
+	| 'same-space'
 	| 'not-found';
 
 export type NotebookResult<T = object> =
@@ -532,16 +534,36 @@ export async function appendUpdate(
 	}
 	const now = new Date();
 	const [inserted] = await db.batch([
+		// An `INSERT … SELECT` conditioned on the entry still being sealed under
+		// this vault, rather than trusting the read above: an entry moved to
+		// another space between that read and this write would otherwise get
+		// an edit under its old vault, newer than the move, which no device
+		// could open once the entry is opened under the new one. See
+		// `moveEntry`.
 		db
 			.insert(notebookUpdates)
-			.values({
-				id: update.id,
-				entryId: context.entry.id,
-				authorUserId: userId,
-				vaultId: update.vaultId,
-				payloadVersion: update.payloadVersion,
-				ciphertext: update.ciphertext
-			})
+			.select(
+				db
+					.select({
+						// Every column, in order, is what an insert from a select takes;
+						// a null seq is the next one, as it would be from `values()`.
+						seq: sql<number>`null`.as('seq'),
+						id: sql<string>`${update.id}`.as('id'),
+						entryId: notebookEntries.id,
+						authorUserId: sql<string>`${userId}`.as('author_user_id'),
+						vaultId: notebookEntries.vaultId,
+						payloadVersion: sql<number>`${update.payloadVersion}`.as('payload_version'),
+						ciphertext: sql<string>`${update.ciphertext}`.as('ciphertext'),
+						createdAt: sql<Date>`${now.getTime()}`.as('created_at')
+					})
+					.from(notebookEntries)
+					.where(
+						and(
+							eq(notebookEntries.id, context.entry.id),
+							eq(notebookEntries.vaultId, update.vaultId)
+						)
+					)
+			)
 			.returning({ seq: notebookUpdates.seq }),
 		// A no-op unless the stamp is stale, so most batches write one row.
 		db
@@ -559,7 +581,9 @@ export async function appendUpdate(
 	]);
 	const seq = inserted[0]?.seq;
 	if (seq === undefined) {
-		throw new Error('Inserting a notebook edit returned no seq');
+		// The entry was moved to another vault since it was read: the device
+		// reloads it and sends the edit again, sealed for where it is now.
+		return { ok: false, reason: 'wrong-vault' };
 	}
 	return { ok: true, seq, duplicate: false };
 }
@@ -915,6 +939,278 @@ export async function deleteEntry(
 	await db.delete(notebookEntries).where(eq(notebookEntries.id, context.entry.id));
 	try {
 		await store.deletePrefix(notebookEntryPrefix(context.entry));
+		return { ok: true, purgeFailed: false };
+	} catch {
+		return { ok: true, purgeFailed: true };
+	}
+}
+
+/**
+ * Whether `userId` may move the entry out of its space: they must be able to
+ * write it, and have the say `canMoveEntry` describes. Re-read from the
+ * stored rows, like every rule here.
+ */
+export function mayMoveEntry(context: EntryContext, userId: string): boolean {
+	return (
+		context.access === 'edit' &&
+		canMoveEntry(forAccess(context.entry), userId, context.partnership ?? undefined)
+	);
+}
+
+/** Where a moved entry's columns point: the target scope's, the mover's own for a solo one. */
+function placementIn(
+	target: ResolvedScope,
+	userId: string
+): { ownerId: string | null; partnershipId: string | null; spaceId: string } {
+	return target.scope.kind === 'self'
+		? { ownerId: userId, partnershipId: null, spaceId: target.spaceId }
+		: { ownerId: null, partnershipId: target.scope.partnershipId, spaceId: target.spaceId };
+}
+
+/** Why a move cannot even start, or null when it can. */
+function moveRefusal(
+	context: EntryContext,
+	userId: string,
+	target: ResolvedScope,
+	vaultId: string
+): NotebookRefusal | null {
+	if (!mayMoveEntry(context, userId)) {
+		return 'read-only';
+	}
+	if (target.spaceId === entrySpaceId(context.entry)) {
+		return 'same-space';
+	}
+	if (!vaultMatches(target, vaultId)) {
+		return 'wrong-vault';
+	}
+	return null;
+}
+
+/** The media store key a version takes once the entry is in `target`. */
+function stagedKey(
+	context: EntryContext,
+	target: ResolvedScope,
+	userId: string,
+	versionId: string
+): string {
+	return notebookSnapshotKey({ id: context.entry.id, ...placementIn(target, userId) }, versionId);
+}
+
+/**
+ * The first half of moving an entry: one version's snapshot, re-sealed by
+ * the mover's device under the target space's vault, stored where it will
+ * live once the move is committed. Versions go one request each, so a long
+ * history never makes one request too large. See docs/notebook.md, "Moving
+ * an entry".
+ *
+ * `id` is a version the entry has, or a new one: the head version the move
+ * cuts. A new id must not be anyone else's version.
+ */
+export async function stageMovedVersion(
+	db: Db,
+	store: MediaStore,
+	context: EntryContext,
+	userId: string,
+	target: ResolvedScope,
+	input: { id: string; snapshot: SealedWrite }
+): Promise<NotebookResult> {
+	const { snapshot } = input;
+	const refusal = moveRefusal(context, userId, target, snapshot.vaultId);
+	if (refusal) {
+		return { ok: false, reason: refusal };
+	}
+	if (!sealedIsAcceptable(notebookSnapshotKind, snapshot.ciphertext, snapshot.payloadVersion)) {
+		return { ok: false, reason: 'bad-content' };
+	}
+	const [existing] = await db
+		.select({ entryId: notebookVersions.entryId })
+		.from(notebookVersions)
+		.where(eq(notebookVersions.id, input.id))
+		.limit(1);
+	if (existing && existing.entryId !== context.entry.id) {
+		return { ok: false, reason: 'exists' };
+	}
+	const bytes = new TextEncoder().encode(snapshot.ciphertext);
+	// A Response's body, for the length R2 needs: see `createVersion`.
+	await store.put(
+		stagedKey(context, target, userId, input.id),
+		new Response(bytes).body as ReadableStream<Uint8Array>,
+		bytes.byteLength
+	);
+	return { ok: true };
+}
+
+/** A staged version as the commit names it: what its row will say once moved. */
+export type MovedVersion = { id: string; payloadVersion: number; size: number };
+
+/**
+ * The second half of moving an entry to another space: everything the
+ * device staged becomes the entry, in one batch.
+ *
+ * The device re-sealed every version (`stageMovedVersion`) and, when there
+ * were edits after the newest, cut a new head version covering them all, so
+ * no stored edit needs re-sealing: every one up to `upToSeq` is deleted, the
+ * head snapshot carrying them. The entry row takes the target's scope, vault
+ * and re-sealed header, and its access goes back to the default, since a
+ * restriction is between the members of the space it was set in.
+ *
+ * The batch is conditioned, statement by statement, on the entry row's move
+ * having happened: that is conditioned on its revision, its old vault, and
+ * there being no edit after `upToSeq`. An edit stored after the device
+ * staged (another device typing) makes it `stale`, and nothing changes; an
+ * edit arriving after the commit is refused as `wrong-vault` by
+ * `appendUpdate`'s own condition, and its device reloads and resends it.
+ *
+ * The old prefix's snapshots go after the rows, and a failure there is
+ * reported rather than thrown, as in `deleteEntry`. On `stale`, the staged
+ * objects go instead.
+ */
+export async function moveEntry(
+	db: Db,
+	store: MediaStore,
+	context: EntryContext,
+	userId: string,
+	target: ResolvedScope,
+	input: {
+		revision: number;
+		upToSeq: number;
+		header: SealedWrite;
+		versions: MovedVersion[];
+		head: MovedVersion | null;
+	}
+): Promise<NotebookResult<{ purgeFailed: boolean }>> {
+	const { header } = input;
+	const refusal = moveRefusal(context, userId, target, header.vaultId);
+	if (refusal) {
+		return { ok: false, reason: refusal };
+	}
+	if (!sealedIsAcceptable(notebookEntryKind, header.ciphertext, header.payloadVersion)) {
+		return { ok: false, reason: 'bad-content' };
+	}
+	const { entry } = context;
+	const newVaultId = header.vaultId;
+	const [stored, [latestSeq]] = await db.batch([
+		db
+			.select({ id: notebookVersions.id, upToSeq: notebookVersions.upToSeq })
+			.from(notebookVersions)
+			.where(eq(notebookVersions.entryId, entry.id)),
+		db
+			.select({ seq: max(notebookUpdates.seq) })
+			.from(notebookUpdates)
+			.where(eq(notebookUpdates.entryId, entry.id))
+	]);
+	const newestVersion = Math.max(0, ...stored.map((row) => row.upToSeq));
+	const storedIds = new Set(stored.map((row) => row.id));
+	const namedIds = new Set(input.versions.map((version) => version.id));
+	// Up to date with what is stored, or it would leave something out: a
+	// version cut, or an edit stored, since the device read the entry.
+	const current =
+		input.upToSeq === Math.max(latestSeq?.seq ?? 0, newestVersion) &&
+		storedIds.size === namedIds.size &&
+		[...storedIds].every((id) => namedIds.has(id)) &&
+		// A head exactly when there are edits after the newest version.
+		(input.head !== null) === input.upToSeq > newestVersion &&
+		(input.head === null || !storedIds.has(input.head.id));
+	const staged = [...input.versions, ...(input.head ? [input.head] : [])];
+	const stagedKeys = staged.map((version) => stagedKey(context, target, userId, version.id));
+	const discardStaged = () => store.delete(stagedKeys).catch(() => undefined);
+	if (!current) {
+		await discardStaged();
+		return { ok: false, reason: 'stale' };
+	}
+	// Every snapshot must be there before any row points at it.
+	for (const key of stagedKeys) {
+		const object = await store.get(key);
+		if (!object) {
+			return { ok: false, reason: 'stale' };
+		}
+		await object.body.cancel();
+	}
+
+	const contributors = input.head
+		? await db
+				.selectDistinct({ userId: notebookUpdates.authorUserId })
+				.from(notebookUpdates)
+				.where(
+					and(
+						eq(notebookUpdates.entryId, entry.id),
+						gt(notebookUpdates.seq, newestVersion),
+						lte(notebookUpdates.seq, input.upToSeq)
+					)
+				)
+		: [];
+
+	const moved = and(eq(notebookEntries.id, entry.id), eq(notebookEntries.vaultId, newVaultId));
+	const isMoved = sql`exists (select 1 from ${notebookEntries} where ${moved})`;
+	const placement = placementIn(target, userId);
+	const now = new Date();
+	const [entryRows] = await db.batch([
+		db
+			.update(notebookEntries)
+			.set({
+				...placement,
+				vaultId: newVaultId,
+				ciphertext: header.ciphertext,
+				payloadVersion: header.payloadVersion,
+				partnerAccess: 'edit',
+				accessSetByUserId: null,
+				revision: input.revision + 1,
+				updatedAt: now
+			})
+			.where(
+				and(
+					eq(notebookEntries.id, entry.id),
+					eq(notebookEntries.vaultId, entry.vaultId),
+					eq(notebookEntries.revision, input.revision),
+					sql`not exists (select 1 from ${notebookUpdates} where ${notebookUpdates.entryId} = ${entry.id} and ${notebookUpdates.seq} > ${input.upToSeq})`
+				)
+			)
+			.returning({ id: notebookEntries.id }),
+		...input.versions.map((version) =>
+			db
+				.update(notebookVersions)
+				.set({ vaultId: newVaultId, payloadVersion: version.payloadVersion, size: version.size })
+				.where(
+					and(eq(notebookVersions.id, version.id), eq(notebookVersions.entryId, entry.id), isMoved)
+				)
+		),
+		...(input.head
+			? [
+					db.insert(notebookVersions).select(
+						db
+							.select({
+								// Every column, in order, as `appendUpdate`'s insert.
+								id: sql<string>`${input.head.id}`.as('id'),
+								entryId: notebookEntries.id,
+								upToSeq: sql<number>`${input.upToSeq}`.as('up_to_seq'),
+								vaultId: notebookEntries.vaultId,
+								payloadVersion: sql<number>`${input.head.payloadVersion}`.as('payload_version'),
+								size: sql<number>`${input.head.size}`.as('size'),
+								contributorUserIds: sql<string>`${JSON.stringify(
+									contributors.flatMap((row) => (row.userId ? [row.userId] : []))
+								)}`.as('contributor_user_ids'),
+								restoredFromVersionId: sql<null>`null`.as('restored_from_version_id'),
+								createdByUserId: sql<string>`${userId}`.as('created_by_user_id'),
+								createdAt: sql<Date>`${now.getTime()}`.as('created_at')
+							})
+							.from(notebookEntries)
+							.where(moved)
+					)
+				]
+			: []),
+		// Every edit is in a snapshot now, sealed under the new vault.
+		db
+			.delete(notebookUpdates)
+			.where(
+				and(eq(notebookUpdates.entryId, entry.id), lte(notebookUpdates.seq, input.upToSeq), isMoved)
+			)
+	]);
+	if (entryRows.length === 0) {
+		await discardStaged();
+		return { ok: false, reason: 'stale' };
+	}
+	try {
+		await store.deletePrefix(notebookEntryPrefix(entry));
 		return { ok: true, purgeFailed: false };
 	} catch {
 		return { ok: true, purgeFailed: true };
