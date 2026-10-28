@@ -274,6 +274,51 @@ describe('the fan', () => {
 		await vi.waitFor(() => expect(trigger()).toHaveAttribute('aria-expanded', 'false'));
 	});
 
+	it('hands a picked avatar to the pill where it is: its own hides, the old one’s shows', async () => {
+		// The switch stays under way, as it is while the pill flies home.
+		// (Only the switch's: the icons fetch their pictures too.)
+		const answer = Promise.withResolvers<Response>();
+		fetchMock.mockImplementation((url: unknown) =>
+			url === '/api/context' ? answer.promise : Promise.resolve(new Response(null, { status: 404 }))
+		);
+		const { container } = renderSwitcher({ kind: 'all' });
+		try {
+			await userEvent.click(trigger());
+			await fanSettled();
+			const junOption = screen.getByRole('button', { name: 'Show Jun' });
+			const junAvatar = defined(
+				junOption.querySelector<HTMLElement>('.slot-avatar'),
+				'Jun’s avatar'
+			);
+			junOption.click();
+			// The pick's own updates, and no frame yet: what the screen shows
+			// next, before the pill starts home.
+			await new Promise((done) => setTimeout(done, 0));
+			expect(junAvatar).toHaveClass('standing-in');
+			expect(trigger()).toHaveClass('landing');
+			const everyone = defined(
+				screen.getByRole('button', { name: 'Show Everyone' }).querySelector('.slot-avatar'),
+				'Everyone’s avatar'
+			);
+			expect(everyone).not.toHaveClass('standing-in');
+			// The pill is on Jun's place, at Jun's size, before it moves anywhere.
+			const where = junAvatar.getBoundingClientRect();
+			const pill = defined(
+				container.querySelector('.control-avatar'),
+				'the pill'
+			).getBoundingClientRect();
+			expect(Math.abs(pill.left + pill.width / 2 - (where.left + where.width / 2))).toBeLessThan(
+				1.5
+			);
+			expect(Math.abs(pill.top + pill.height / 2 - (where.top + where.height / 2))).toBeLessThan(
+				1.5
+			);
+			expect(Math.abs(pill.width - where.width)).toBeLessThan(1.5);
+		} finally {
+			answer.resolve(new Response(null, { status: 204 }));
+		}
+	});
+
 	it('picks by holding the control and sliding onto an avatar', async () => {
 		renderSwitcher({ kind: 'all' });
 		const control = trigger();

@@ -67,8 +67,6 @@
 	const PRESS_QUIET = 24;
 	/** How long a press is held before it opens the fan to slide in. */
 	const HOLD_MS = 280;
-	/** How long a picked avatar stays on the arc before the pill flies home. */
-	const PICK_MS = 240;
 
 	/** The hint's box: at most three lines, wrapping within this width. */
 	const HINT = { width: 150, height: 46 };
@@ -118,6 +116,7 @@
 	);
 	const hintAt = $derived(layout && measured ? hintPlacement(layout, measured.bounds, HINT) : null);
 
+	let labelInner: HTMLElement | undefined = $state();
 	let root: HTMLElement | undefined = $state();
 	let anchor: HTMLElement | undefined = $state();
 	let trigger: HTMLButtonElement | undefined = $state();
@@ -314,8 +313,6 @@
 		}
 	}
 
-	let closing: ReturnType<typeof setTimeout> | undefined;
-
 	function pick(key: string) {
 		cancelHold();
 		press = null;
@@ -324,13 +321,38 @@
 			closeFan();
 			return;
 		}
-		// Two steps: the pill first glides to the picked avatar's place on the
-		// ring and becomes it, then flies home and unfolds with the new name.
+		// One flight, from the picked avatar's place on the ring into the
+		// control. The pill becomes the picked avatar where it is, unseen (no
+		// transition), and then flies home with the fan closing round it.
+		//
+		// It used to glide from the old one's place to the picked one's first,
+		// and it jumped before that: the new name changed the pill's closed
+		// width, which moved its anchor (it ends its row, so its left edge
+		// moves) a frame later, when the label's size was next observed, and
+		// the pill with it, before its transform caught up. So the new name's
+		// width is read at once, and the anchor resized and measured, all
+		// before the next paint.
 		pending = key;
 		sliding = false;
 		hover = null;
-		clearTimeout(closing);
-		closing = setTimeout(() => closeFan(), reducedMotion() ? 0 : PICK_MS);
+		// No transition while it does: a class set here rather than state,
+		// since nothing else reads it.
+		trigger?.classList.add('landing');
+		void tick().then(async () => {
+			labelWidth = labelInner?.offsetWidth ?? labelWidth;
+			await tick();
+			measure();
+			await tick();
+			// Committed where it is before the transitions come back on.
+			trigger?.getBoundingClientRect();
+			// And from there straight home, from the next frame: no pause on
+			// the ring, which only left a tap on the pill in that time closing
+			// the fan it meant to open.
+			requestAnimationFrame(() => {
+				trigger?.classList.remove('landing');
+				closeFan();
+			});
+		});
 		void switchContext(shown.context).finally(() => {
 			// By now the page's data says what the server has; anything else
 			// (a refusal) puts the pill back to it.
@@ -595,7 +617,6 @@
 	});
 
 	$effect(() => () => {
-		clearTimeout(closing);
 		cancelHold();
 	});
 
@@ -755,7 +776,7 @@
 					class="label"
 					style:inline-size={labelSize}
 				>
-					<span class="label-inner" bind:offsetWidth={labelWidth}>
+					<span class="label-inner" bind:this={labelInner} bind:offsetWidth={labelWidth}>
 						{current.name}
 						<wa-icon name="chevron-down" variant="solid"></wa-icon>
 					</span>
@@ -993,6 +1014,13 @@
 		.label {
 			opacity: 0;
 		}
+	}
+
+	/* Becoming a picked avatar in its place: at once, unseen. Set from the
+	   script (`pick`), so :global to Svelte. */
+	.control:global(.landing),
+	.control:global(.landing) .label {
+		transition: none;
 	}
 
 	/* Very slight, and even over the whole shell: the fan is what stands out.

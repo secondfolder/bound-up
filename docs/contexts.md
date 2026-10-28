@@ -309,9 +309,19 @@ click below it went to the page. The option buttons had the same height and
 `justify-content: center`, which moved every avatar 18px up from where the pill
 flew to, so the pill covered the current option's name.
 
-**Picking** a different context glides the pill to the picked avatar's slot,
-then it flies home and unfolds with the new name, while `POST /api/context`
-and `invalidate('app:context')` re-run the page in place. A refusal shows the
+**Picking** a different context is one flight: the pill becomes the picked
+avatar where it stands on the ring, in the same frame as that avatar hides
+and the old context's own avatar shows again, so nothing on screen moves;
+from the next frame it flies home and unfolds with the new name, while the
+old context's avatar falls back into the disk with the rest, and `POST
+/api/context` and `invalidate('app:context')` re-run the page in place. It
+used to glide from the old context's place to the picked one's first, and
+jumped before that: the new name changed the pill's closed width, which moved
+its anchor (the end of its row) a frame late, when the label's size was next
+observed, so the new width is now read, the anchor resized and the fan
+measured before the next paint. `e2e/context-switcher-layout.spec.ts`
+records the pill's place every frame through a pick and fails on any step
+away from home. A refusal shows the
 app-wide notice ([request-failures.md](request-failures.md)) and puts the pill
 back to what the page's data says.
 

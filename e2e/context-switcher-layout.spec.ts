@@ -278,6 +278,7 @@ for (const count of [1, 2, 4, 6]) {
 		test.setTimeout(240_000);
 		const ada = await adaWithPartners(browser, count);
 		const { page } = ada;
+
 		try {
 			// A long name when there is one, to be cut short.
 			const partner = count > 1 ? LONG_NAME : JUN;
@@ -632,6 +633,99 @@ test('frames part way through opening and closing, to look at', async ({ browser
 		await settled(page);
 		await shot(page, '900x1080-hint-right');
 		await devtools.detach();
+	} finally {
+		await ada.close();
+	}
+});
+
+test('a pick flies the picked avatar straight from its place on the ring into the control', async ({
+	browser
+}) => {
+	test.setTimeout(180_000);
+	const ada = await adaWithPartners(browser, 2);
+	const { page } = ada;
+	try {
+		for (const viewport of [PHONE, { width: 1920, height: 1080 }]) {
+			await page.setViewportSize(viewport);
+			const size = `${viewport.width}x${viewport.height}`;
+			// From whatever shows now to the other partner, each time.
+			const now = await control(page).getAttribute('aria-label');
+			const picked = now?.startsWith(`Showing ${JUN}.`) ? LONG_NAME : JUN;
+			await openFan(page);
+			const option = page.getByRole('button', { name: `Show ${picked}`, exact: true });
+			const start = await option.locator('[data-fan-avatar]').boundingBox();
+
+			// Record where the pill's avatar is, every frame, from the pick until
+			// it is home and still.
+			await page.evaluate(() => {
+				const frames: { x: number; y: number; width: number }[] = [];
+				(globalThis as unknown as { pillFrames: typeof frames }).pillFrames = frames;
+				const avatar = document.querySelector('[data-context-switcher] .control-avatar');
+				const record = () => {
+					const box = avatar?.getBoundingClientRect();
+					if (box) {
+						frames.push({
+							x: box.left + box.width / 2,
+							y: box.top + box.height / 2,
+							width: box.width
+						});
+					}
+					if (frames.length < 120) {
+						requestAnimationFrame(record);
+					}
+				};
+				requestAnimationFrame(record);
+			});
+			if (SHOTS) {
+				const devtools = await page.context().newCDPSession(page);
+				await devtools.send('Animation.enable');
+				await devtools.send('Animation.setPlaybackRate', { playbackRate: 0.1 });
+				await option.click();
+				for (let frame = 0; frame < 8; frame += 1) {
+					await shot(page, `${size}-pick-${frame}`);
+					// biome-ignore lint/nursery/noPlaywrightWaitForTimeout: frames 40ms apart in a slowed animation, which nothing on the page signals.
+					await page.waitForTimeout(400);
+				}
+				await devtools.send('Animation.setPlaybackRate', { playbackRate: 1 });
+				await devtools.detach();
+			} else {
+				await option.click();
+			}
+			await expect(control(page)).toHaveAccessibleName(new RegExp(`^Showing ${picked}\\.`));
+			await expect(page.locator('[data-fan-option]')).toHaveCount(0);
+			await settled(page);
+			const frames = await page.evaluate(
+				() =>
+					(globalThis as unknown as { pillFrames: { x: number; y: number; width: number }[] })
+						.pillFrames
+			);
+			const home = frames.at(-1) ?? { x: 0, y: 0, width: 0 };
+			const distances = frames.map((frame) => Math.hypot(frame.x - home.x, frame.y - home.y));
+			// The pill steps into the picked avatar's place in one frame, as that
+			// avatar hides and the old one's shows again, so nothing on screen
+			// moves; from there it only flies home. It used to jump 46px out of
+			// the old one's place (its anchor resized a frame late for the new
+			// name), glide to the picked one, and only then fly home.
+			const startCentre = {
+				x: (start?.x ?? 0) + (start?.width ?? 0) / 2,
+				y: (start?.y ?? 0) + (start?.height ?? 0) / 2
+			};
+			const leaving = frames.findIndex(
+				(frame) => Math.hypot(frame.x - startCentre.x, frame.y - startCentre.y) < 3
+			);
+			expect(leaving, `${size}: the pill starts on the picked avatar`).toBeGreaterThan(-1);
+			const flight = distances.slice(leaving);
+			// Only ever closer to home: no jump away, no doubling back.
+			const away = flight
+				.slice(1)
+				.map((distance, index) => distance - (flight[index] ?? 0))
+				.filter((step) => step > 2);
+			expect(away, `${size}: steps away from home, px`).toEqual([]);
+			// And nothing before it, out of the fan's current place, jumped far.
+			const before = distances.slice(0, Math.max(leaving, 0));
+			const jumps = before.filter((distance) => distance > (distances[0] ?? 0) + 3);
+			expect(jumps, `${size}: jumps before the flight`).toEqual([]);
+		}
 	} finally {
 		await ada.close();
 	}
