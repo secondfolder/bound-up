@@ -1,25 +1,42 @@
+import { backOut } from 'svelte/easing';
 import { describe, expect, it } from 'vitest';
 import {
 	AVATAR_SIZES,
 	type Box,
 	boxesOverlap,
+	cssEasing,
 	DEAD_ZONE,
+	diskScale,
 	EDGE_MARGIN,
+	FAN_CSS_EASING,
 	type FanLayout,
 	fanCentre,
+	fanDuration,
+	HINT_INSET,
+	HINT_RIGHT_CUT,
 	hintPlacement,
+	hintSide,
+	hoverShift,
+	LABEL_GAP,
 	LABEL_GOOD,
+	LABEL_HEIGHT,
 	LABEL_MAX,
 	LABEL_MIN,
 	labelBudget,
 	layoutFan,
 	OPTION_GAP,
+	OPTION_MS,
+	OPTION_STAGGER_MS,
 	optionAt,
 	optionBoxes,
+	optionShare,
+	optionTiming,
 	pointAt,
+	rightCut,
 	spreadEvenly,
 	stepAlong,
-	visibleArc
+	visibleArc,
+	wedgeShading
 } from './context-fan';
 
 const shell = (width: number, height: number): Box => ({
@@ -52,6 +69,28 @@ function collisions(layout: FanLayout): string[] {
 			if (boxesOverlap(a.avatar, b.avatar)) {
 				found.push(`avatars ${i} and ${j}`);
 			}
+		}
+	}
+	return found;
+}
+
+/** Every collision with the `lit` option drawn lit: grown, its name moved down. */
+function litCollisions(layout: FanLayout, lit: number): string[] {
+	const all = layout.points.map((at, index) => optionBoxes(at, layout, index === lit));
+	const self = all[lit];
+	const found: string[] = [];
+	if (self && boxesOverlap(self.avatar, self.label)) {
+		found.push(`${lit}'s own name`);
+	}
+	for (const [index, other] of all.entries()) {
+		if (index === lit || !self) {
+			continue;
+		}
+		if (boxesOverlap(self.label, other.label) || boxesOverlap(self.label, other.avatar)) {
+			found.push(`${lit}'s name and ${index}`);
+		}
+		if (boxesOverlap(other.label, self.avatar)) {
+			found.push(`${index}'s name and ${lit}'s avatar`);
 		}
 	}
 	return found;
@@ -123,8 +162,8 @@ describe('visibleArc', () => {
 		const centre = { x: 390, y: 0 };
 		const bounds = shell(390, 800);
 		const arc = visibleArc(centre, 250, bounds, size);
-		const end = optionBoxes(pointAt(centre, 250, arc?.end ?? 0), size);
-		// Its avatar's top is on the top edge, to a hundredth of a degree.
+		// Lit, its avatar's top is on the top edge, to a hundredth of a degree.
+		const end = optionBoxes(pointAt(centre, 250, arc?.end ?? 0), size, true);
 		expect(end.avatar.top).toBeGreaterThanOrEqual(0);
 		expect(end.avatar.top).toBeLessThan(0.1);
 	});
@@ -181,7 +220,7 @@ describe('labelBudget', () => {
 			],
 			56
 		);
-		expect(budget).toBe(2 * (80 - 28 - OPTION_GAP));
+		expect(budget).toBeCloseTo(2 * (80 - 28 - hoverShift(56) - OPTION_GAP), 9);
 	});
 
 	it('is the most a name is ever given when nothing is near', () => {
@@ -220,6 +259,8 @@ describe('layoutFan', () => {
 				expect(layout.points).toHaveLength(count);
 				expect(layout.label).toBeGreaterThanOrEqual(LABEL_MIN);
 				expect(collisions(layout)).toEqual([]);
+				// Lit, any one of them, its name moved down out of its avatar's way.
+				expect(layout.points.flatMap((_, lit) => litCollisions(layout, lit))).toEqual([]);
 				expect(outside(layout, bounds)).toEqual([]);
 				expect(Math.max(...unevenness(layout))).toBe(0);
 			});
@@ -268,23 +309,85 @@ describe('layoutFan', () => {
 	});
 });
 
-describe('hintPlacement', () => {
-	it('puts the hint inside the ring, clear of every option', () => {
+describe('where the hint goes', () => {
+	const hint = { width: 150, height: 46 };
+	/** A fan whose disk is `disk` across, centred at `x` on the top edge of a shell 1000 wide. */
+	const fanAt = (x: number, disk = 300): FanLayout => ({
+		...layoutFan({ centre: { x, y: 0 }, bounds: shell(1000, 800), count: 4 }),
+		centre: { x, y: 0 },
+		disk
+	});
+
+	it('moves to the right edge only when more than a third of the disk is cut off there', () => {
+		const bounds = shell(1000, 800);
+		// The disk's right edge at 1000 + 100 - 1: just under a third of 300.
+		expect(rightCut(fanAt(799), bounds)).toBeCloseTo(99 / 300, 6);
+		expect(hintSide(fanAt(799), bounds)).toBe('centre');
+		// Exactly a third is still centred: "more than" a third moves it.
+		expect(hintSide(fanAt(800), bounds)).toBe('centre');
+		expect(hintSide(fanAt(801), bounds)).toBe('right');
+		expect(HINT_RIGHT_CUT).toBeCloseTo(1 / 3, 9);
+		// Clear of the edge, nothing is cut off.
+		expect(rightCut(fanAt(400), bounds)).toBe(0);
+	});
+
+	it('sits at the top, against the right edge with a phone’s disk in the corner', () => {
 		const bounds = shell(390, 774);
 		const layout = layoutFan({ centre: { x: 390, y: 0 }, bounds, count: 5 });
-		const at = hintPlacement(layout, bounds, { width: 120, height: 46 });
-		expect(at).not.toBeNull();
-		const box = {
-			left: at?.x ?? 0,
-			top: at?.y ?? 0,
-			right: (at?.x ?? 0) + 120,
-			bottom: (at?.y ?? 0) + 46
-		};
-		for (const option of boxes(layout)) {
-			expect(boxesOverlap(box, option.avatar)).toBe(false);
-			expect(boxesOverlap(box, option.label)).toBe(false);
+		const at = hintPlacement(layout, bounds, hint);
+		expect(at?.side).toBe('right');
+		expect(at?.x).toBe(390 - HINT_INSET - hint.width);
+		expect(at?.y).toBe(HINT_INSET);
+	});
+
+	it('sits at the top, centred over the disk, where little or none of it is cut off', () => {
+		const bounds = shell(1920, 1010);
+		const layout = layoutFan({ centre: { x: 1272, y: 0 }, bounds, count: 5 });
+		const at = hintPlacement(layout, bounds, hint);
+		expect(at?.side).toBe('centre');
+		expect((at?.x ?? 0) + hint.width / 2).toBe(1272);
+		expect(at?.y).toBe(HINT_INSET);
+	});
+
+	it('stays inside the shell however near its edge the disk is centred', () => {
+		const bounds = shell(1000, 800);
+		const at = hintPlacement(fanAt(20, 600), bounds, hint);
+		expect(at?.x).toBe(HINT_INSET);
+		const narrow = hintPlacement(fanAt(100, 100), shell(120, 800), hint);
+		expect(narrow?.x).toBe(HINT_INSET);
+	});
+
+	it('never covers an option, moving down below them rather than over them', () => {
+		for (const [width, height, centre, count] of [
+			[390, 774, 390, 9],
+			[768, 954, 768, 9],
+			[1280, 730, 952, 9],
+			[1920, 1010, 1272, 4]
+		] as const) {
+			const bounds = shell(width, height);
+			const layout = layoutFan({ centre: { x: centre, y: 0 }, bounds, count });
+			const at = hintPlacement(layout, bounds, hint);
+			expect(at).not.toBeNull();
+			const box = {
+				left: at?.x ?? 0,
+				top: at?.y ?? 0,
+				right: (at?.x ?? 0) + hint.width,
+				bottom: (at?.y ?? 0) + hint.height
+			};
+			const covered = boxes(layout).filter(
+				(option) => boxesOverlap(box, option.avatar) || boxesOverlap(box, option.label)
+			);
+			expect(covered).toEqual([]);
 		}
-		expect(box.right).toBeLessThanOrEqual(390);
+	});
+
+	it('moves down when the top row is taken', () => {
+		const bounds = shell(1000, 800);
+		const layout = fanAt(500);
+		// An option right where the hint would go.
+		const crowded = { ...layout, points: [{ x: 500, y: 30 }] };
+		const at = hintPlacement(crowded, bounds, hint);
+		expect(at?.y).toBeGreaterThan(30 + layout.avatar / 2 + LABEL_GAP + LABEL_HEIGHT);
 	});
 });
 
@@ -369,6 +472,107 @@ describe('optionAt', () => {
 			for (const [index, point] of layout.points.entries()) {
 				expect(optionAt(layout, point)).toBe(index);
 			}
+		}
+	});
+});
+
+describe('the disk and the options, opening and closing', () => {
+	const layout = layoutFan({ centre: { x: 390, y: 0 }, bounds: shell(390, 774), count: 9 });
+	/** How far from the centre an option reaches at a share of the way out: its avatar and name, grown by the same share. */
+	const reach = (index: number, share: number) => {
+		const at = layout.points[index] ?? layout.centre;
+		const distance = Math.hypot(at.x - layout.centre.x, at.y - layout.centre.y);
+		return Math.max(share, 0) * (distance + layout.avatar / 2 + LABEL_GAP + LABEL_HEIGHT);
+	};
+
+	for (const opening of [true, false]) {
+		it(`never leaves an option outside the disk while ${opening ? 'opening' : 'closing'}`, () => {
+			const count = layout.points.length;
+			const outsideAt: number[] = [];
+			for (let elapsed = 0; elapsed <= fanDuration(count, opening); elapsed += 5) {
+				// Drawn at no less than nothing: past the centre, both are out of sight.
+				const disk = Math.max(diskScale(elapsed, count, opening), 0) * layout.disk;
+				for (let index = 0; index < count; index += 1) {
+					if (reach(index, optionShare(index, elapsed, opening)) > disk + 0.01) {
+						outsideAt.push(elapsed);
+					}
+				}
+			}
+			expect(outsideAt).toEqual([]);
+		});
+	}
+
+	it('opens on the first option’s clock, curve and bounce, staggered after it', () => {
+		const first = optionTiming(0, true);
+		const last = optionTiming(8, true);
+		expect(first).toEqual({ delay: 0, duration: OPTION_MS });
+		expect(last.delay).toBe(8 * OPTION_STAGGER_MS);
+		expect(fanDuration(9, true)).toBe(last.delay + last.duration);
+		// The disk is the first option's share while that is furthest out,
+		// overshoot included, and never less than any option's.
+		for (const elapsed of [20, 100, 180]) {
+			expect(diskScale(elapsed, 9, true)).toBeCloseTo(optionShare(0, elapsed, true), 9);
+		}
+		expect(Math.max(...[0, 100, 200, 300, 400].map((t) => diskScale(t, 9, true)))).toBeGreaterThan(
+			1
+		);
+	});
+
+	it('closes exactly with the options: same start, same length, same curve', () => {
+		for (let index = 0; index < 9; index += 1) {
+			expect(optionTiming(index, false)).toEqual({ delay: 0, duration: OPTION_MS });
+		}
+		expect(fanDuration(9, false)).toBe(OPTION_MS);
+		for (let elapsed = 0; elapsed <= OPTION_MS; elapsed += 10) {
+			const disk = diskScale(elapsed, 9, false);
+			for (let index = 0; index < 9; index += 1) {
+				expect(optionShare(index, elapsed, false)).toBeCloseTo(disk, 9);
+			}
+		}
+		expect(diskScale(0, 9, false)).toBeCloseTo(1, 6);
+		expect(diskScale(OPTION_MS, 9, false)).toBeCloseTo(0, 6);
+	});
+	it('bounces opening, disk and options alike, and closes without any bounce', () => {
+		const samples = (opening: boolean, share: (elapsed: number) => number) =>
+			Array.from({ length: 101 }, (_, step) => share((step / 100) * fanDuration(9, opening)));
+		// Opening: past 1 somewhere, for the disk and for every option.
+		expect(Math.max(...samples(true, (t) => diskScale(t, 9, true)))).toBeGreaterThan(1.05);
+		for (let index = 0; index < 9; index += 1) {
+			expect(Math.max(...samples(true, (t) => optionShare(index, t, true)))).toBeGreaterThan(1.05);
+		}
+		// Closing: from 1 down to 0, never above 1, never below 0, never back up.
+		const closing = samples(false, (t) => diskScale(t, 9, false));
+		expect(Math.max(...closing)).toBeLessThanOrEqual(1);
+		expect(Math.min(...closing)).toBeGreaterThanOrEqual(0);
+		const rises = closing.slice(1).filter((value, index) => value > (closing[index] ?? 0) + 1e-9);
+		expect(rises).toEqual([]);
+	});
+
+	it('gives the pill the same curve as the options, sampled into CSS', () => {
+		const points = (css: string) => (css.match(/-?\d*\.?\d+/g) ?? []).map(Number);
+		const opening = points(FAN_CSS_EASING.opening);
+		expect(opening).toHaveLength(41);
+		const misfit = opening.map((value, step) => Math.abs(value - backOut(step / 40)));
+		expect(Math.max(...misfit)).toBeLessThan(1e-4);
+		// The same overshoot, and none going home.
+		expect(Math.max(...opening)).toBeGreaterThan(1.05);
+		expect(Math.max(...points(FAN_CSS_EASING.home))).toBeLessThanOrEqual(1);
+		expect(cssEasing((t) => t, 2)).toBe('linear(0.0000, 0.5000, 1.0000)');
+	});
+});
+
+describe('wedgeShading', () => {
+	it('is full strength from just inside the avatars out, and clear well short of the centre', () => {
+		for (const count of [4, 9]) {
+			const layout = layoutFan({ centre: { x: 390, y: 0 }, bounds: shell(390, 774), count });
+			const shading = wedgeShading(layout);
+			const nearest = Math.min(
+				...layout.points.map((at) => Math.hypot(at.x - 390, at.y) - layout.avatar / 2)
+			);
+			expect(shading.full * layout.disk).toBeLessThanOrEqual(nearest);
+			expect(shading.clear).toBeLessThan(shading.full * 0.5);
+			expect(shading.feather).toBeGreaterThan(0);
+			expect(shading.feather).toBeLessThan(layout.step / 2);
 		}
 	});
 });

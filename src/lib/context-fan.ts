@@ -10,6 +10,8 @@
  * because y grows downwards, so 90 is straight down and 180 is left.
  */
 
+import { backOut, cubicIn, cubicOut } from 'svelte/easing';
+
 export type Point = { x: number; y: number };
 export type Box = { left: number; top: number; right: number; bottom: number };
 /** A run of the ring from `start` to `end`, `end` ≥ `start`; `end` may pass 360. */
@@ -26,6 +28,18 @@ export const LABEL_HEIGHT = 13;
  * finger is over, drawn larger, still all but clears the names beside it.
  */
 export const OPTION_GAP = 4;
+/**
+ * How much larger the lit option's avatar is drawn. Its name moves down by
+ * the growth, so the two never meet, and every layout leaves room for that
+ * around every option, since any of them may be lit.
+ */
+export const HOVER_SCALE = 1.14;
+
+/** How far a lit avatar grows past its edge, all round, and so how far its name moves down. */
+export function hoverShift(avatar: number): number {
+	return (avatar * (HOVER_SCALE - 1)) / 2;
+}
+
 /** Clear space kept between an option and the edge of what can be seen. */
 export const EDGE_MARGIN = 8;
 /**
@@ -91,9 +105,13 @@ export function pointAt(centre: Point, radius: number, angle: number): Point {
  * its name may fill. The name is centred under the avatar and may be wider
  * than it.
  */
-export function optionBoxes(at: Point, { avatar, label }: OptionSize): { avatar: Box; label: Box } {
-	const half = avatar / 2;
-	const top = at.y + half + LABEL_GAP;
+export function optionBoxes(
+	at: Point,
+	{ avatar, label }: OptionSize,
+	lit = false
+): { avatar: Box; label: Box } {
+	const half = avatar / 2 + (lit ? hoverShift(avatar) : 0);
+	const top = at.y + avatar / 2 + LABEL_GAP + (lit ? hoverShift(avatar) * 2 : 0);
 	return {
 		avatar: { left: at.x - half, top: at.y - half, right: at.x + half, bottom: at.y + half },
 		label: { left: at.x - label / 2, top, right: at.x + label / 2, bottom: top + LABEL_HEIGHT }
@@ -129,12 +147,13 @@ function optionInside(
 ): boolean {
 	const x = centre.x + radius * Math.cos(angle * RADIANS);
 	const y = centre.y + radius * Math.sin(angle * RADIANS);
-	const across = Math.max(avatar, label) / 2;
+	const across = Math.max(avatar + 2 * hoverShift(avatar), label) / 2;
+	// Room for it lit: the avatar grown, the name moved down.
 	return (
 		x - across >= bounds.left &&
 		x + across <= bounds.right &&
-		y - avatar / 2 >= bounds.top &&
-		y + avatar / 2 + LABEL_GAP + LABEL_HEIGHT <= bounds.bottom
+		y - avatar / 2 - hoverShift(avatar) >= bounds.top &&
+		y + avatar / 2 + 2 * hoverShift(avatar) + LABEL_GAP + LABEL_HEIGHT <= bounds.bottom
 	);
 }
 
@@ -233,7 +252,11 @@ export function stepAlong(arc: Arc, count: number): number {
  * collide, which no name width can mend.
  */
 export function labelBudget(points: readonly Point[], avatar: number): number {
-	const half = avatar / 2;
+	// Any option may be lit: its avatar grown by `shift` all round and its
+	// name moved down by twice that. So each name is allowed for down to its
+	// lit place, and each avatar at its lit size.
+	const shift = hoverShift(avatar);
+	const half = avatar / 2 + shift;
 	let budget: number = LABEL_MAX;
 	for (const [i, a] of points.entries()) {
 		for (const [j, b] of points.entries()) {
@@ -242,17 +265,20 @@ export function labelBudget(points: readonly Point[], avatar: number): number {
 			}
 			const across = Math.abs(a.x - b.x);
 			if (i < j) {
-				if (across < avatar + OPTION_GAP && Math.abs(a.y - b.y) < avatar + OPTION_GAP) {
+				const apart = avatar + shift + OPTION_GAP;
+				if (across < apart && Math.abs(a.y - b.y) < apart) {
 					return Number.NEGATIVE_INFINITY;
 				}
-				// Two names on the same line need their whole widths apart.
-				if (Math.abs(a.y - b.y) < LABEL_HEIGHT + OPTION_GAP) {
+				// Two names on the same line, either moved down, need their
+				// whole widths apart.
+				if (Math.abs(a.y - b.y) < LABEL_HEIGHT + 2 * shift + OPTION_GAP) {
 					budget = Math.min(budget, across - OPTION_GAP);
 				}
 			}
-			// a's name level with b's avatar needs half of each apart.
-			const labelTop = a.y + half + LABEL_GAP;
-			const labelBottom = labelTop + LABEL_HEIGHT;
+			// a's name, at rest or moved down, level with b's avatar, grown,
+			// needs half of each apart.
+			const labelTop = a.y + avatar / 2 + LABEL_GAP;
+			const labelBottom = labelTop + LABEL_HEIGHT + 2 * shift;
 			if (labelTop < b.y + half + OPTION_GAP && labelBottom + OPTION_GAP > b.y - half) {
 				budget = Math.min(budget, 2 * (across - half - OPTION_GAP));
 			}
@@ -384,7 +410,7 @@ function build(centre: Point, chosen: Candidate, count: number, fits: boolean): 
 		step: stepAlong(fit.arc, count),
 		angles,
 		points: angles.map((angle, index) => pointAt(centre, radiusOf(index, radius, stagger), angle)),
-		disk: radius + avatar / 2 + LABEL_GAP + LABEL_HEIGHT + 14,
+		disk: radius + avatar / 2 + 2 * hoverShift(avatar) + LABEL_GAP + LABEL_HEIGHT + 12,
 		fits
 	};
 }
@@ -474,7 +500,7 @@ export function layoutFan({
 		bounds,
 		count,
 		farthest,
-		(diameter) => diameter + LABEL_GAP + LABEL_HEIGHT
+		(diameter) => diameter + 2 * hoverShift(diameter) + LABEL_GAP + LABEL_HEIGHT
 	);
 	// Names with room first, then the larger avatars, then the roomier names.
 	const better = (a: Candidate, b: Candidate) => {
@@ -504,34 +530,54 @@ export function layoutFan({
 	);
 }
 
+/** The hint's distance from the top of the shell, and from its right edge when it sits there. */
+export const HINT_INSET = 12;
+
 /**
- * Where a hint of `size` goes: inside the ring, on the line through the
- * middle of the arc, clear of every option and inside `bounds`. Its top-left
- * corner, or null when the ring is too tight to hold it.
+ * The share of the disk's radius that may be cut off on the right before
+ * the hint moves to the right edge of the page. "More than a third of the
+ * circle's right side is cut off" means: the disk's rightmost point, its
+ * centre plus its radius (`disk`, out past the names), lies more than a
+ * third of that radius beyond the shell's right edge. On a phone the centre
+ * is the edge itself, so the whole right half is cut off; on a wide screen
+ * the disk sits clear of the edge and nothing is.
+ */
+export const HINT_RIGHT_CUT = 1 / 3;
+
+/** Which way the hint sits: against the right edge, or centred over the disk. */
+export type HintSide = 'right' | 'centre';
+
+/** How far past the shell's right edge the disk reaches, as a share of its radius; 0 when it does not. */
+export function rightCut(layout: FanLayout, bounds: Box): number {
+	return Math.max(0, layout.centre.x + layout.disk - bounds.right) / layout.disk;
+}
+
+export function hintSide(layout: FanLayout, bounds: Box): HintSide {
+	return rightCut(layout, bounds) > HINT_RIGHT_CUT ? 'right' : 'centre';
+}
+
+/**
+ * Where a hint of `size` goes, at the top of the page: against its right
+ * edge with its text right-aligned when more than a third of the disk is
+ * cut off there (`hintSide`), centred over the disk's centre with its text
+ * centred otherwise, and inside `bounds` either way. Its top-left corner,
+ * and which side. Where that would cover an option (avatar or name, the
+ * pill standing in for the current one included) it moves down, a few
+ * pixels at a time, until clear: below the top row rather than over it.
+ * Null only when nothing clear is found on the page at all.
  */
 export function hintPlacement(
 	layout: FanLayout,
 	bounds: Box,
 	size: { width: number; height: number }
-): Point | null {
-	const inner = inset(bounds, EDGE_MARGIN);
-	const middle = (layout.arc.start + layout.arc.end) / 2;
-	const room = layout.radius - layout.stagger - layout.avatar / 2 - OPTION_GAP;
+): { x: number; y: number; side: HintSide } | null {
+	const side = hintSide(layout, bounds);
+	const width = Math.min(size.width, bounds.right - bounds.left - 2 * HINT_INSET);
+	const wanted = side === 'right' ? bounds.right - HINT_INSET - width : layout.centre.x - width / 2;
+	const x = Math.min(Math.max(wanted, bounds.left + HINT_INSET), bounds.right - HINT_INSET - width);
 	const options = layout.points.map((at) => optionBoxes(at, layout));
-	for (const share of [0.5, 0.42, 0.34, 0.26, 0.58]) {
-		const at = pointAt(layout.centre, layout.radius * share, middle);
-		const left = Math.min(Math.max(at.x - size.width / 2, inner.left), inner.right - size.width);
-		const top = Math.min(Math.max(at.y - size.height / 2, inner.top), inner.bottom - size.height);
-		const box = { left, top, right: left + size.width, bottom: top + size.height };
-		const corners = [
-			[box.left, box.top],
-			[box.right, box.top],
-			[box.left, box.bottom],
-			[box.right, box.bottom]
-		];
-		const withinRing = corners.every(
-			([x = 0, y = 0]) => Math.hypot(x - layout.centre.x, y - layout.centre.y) <= room
-		);
+	for (let y = bounds.top + HINT_INSET; y + size.height <= bounds.bottom - HINT_INSET; y += 4) {
+		const box = { left: x, top: y, right: x + width, bottom: y + size.height };
 		const clear = options.every(
 			(option) =>
 				!(
@@ -539,8 +585,8 @@ export function hintPlacement(
 					boxesOverlap(box, option.label, OPTION_GAP)
 				)
 		);
-		if (withinRing && clear && left >= inner.left && top >= inner.top) {
-			return { x: left, y: top };
+		if (clear) {
+			return { x, y, side };
 		}
 	}
 	return null;
@@ -592,4 +638,116 @@ export function optionAt(
 		return ((index % count) + count) % count;
 	}
 	return index >= 0 && index < count ? index : null;
+}
+
+/** How long an option takes to spring out of the disk's centre, or back into it. */
+export const OPTION_MS = 440;
+/** Opening, each option starts this long after the one before it. */
+export const OPTION_STAGGER_MS = 35;
+
+export type Timing = { delay: number; duration: number };
+
+/**
+ * The fan's easing, the one curve the disk, the options and the pill all
+ * move on. Opening springs: out past its place and back (Penner's back-out,
+ * which is Svelte's `backOut`). Closing is a clean ease-in, with no
+ * overshoot at the end: the back-out run backwards had the disk and the
+ * options swell, then shoot through the centre and out the other side.
+ */
+export function fanEase(opening: boolean): (t: number) => number {
+	return opening ? backOut : cubicIn;
+}
+
+/** An easing as a CSS `linear()` function, sampled at `steps` points: the same curve, overshoot and all. */
+export function cssEasing(ease: (t: number) => number, steps = 40): string {
+	const points = Array.from({ length: steps + 1 }, (_, step) => ease(step / steps).toFixed(4));
+	return `linear(${points.join(', ')})`;
+}
+
+/**
+ * The fan's curves as CSS, for the pill, which flies to its place on the
+ * ring by a CSS transition rather than a Svelte one: opening, the options'
+ * own curve sampled into `linear()`, so it lands with the same bounce they
+ * do (a `cubic-bezier` fit of back-out was off by nearly 5%). Going home it
+ * does not fall into the centre, so it eases out, with no bounce.
+ */
+export const FAN_CSS_EASING = {
+	opening: cssEasing(backOut),
+	home: cssEasing(cubicOut)
+} as const;
+
+/**
+ * When the `index`th option springs out, or back. Opening is staggered, so
+ * the fan unfolds in order; closing is not, so every option falls back
+ * together, on exactly the disk's own clock. Staggered both ways, the disk
+ * could either wait for the last option, and was left hanging out round the
+ * others as they went in, or keep up with the first and leave the rest
+ * outside it.
+ */
+export function optionTiming(index: number, opening: boolean): Timing {
+	return { delay: opening ? index * OPTION_STAGGER_MS : 0, duration: OPTION_MS };
+}
+
+/** How long the whole fan takes to open or close: until its last option lands. */
+export function fanDuration(count: number, opening: boolean): number {
+	const last = optionTiming(Math.max(count - 1, 0), opening);
+	return last.delay + last.duration;
+}
+
+/**
+ * How far out the `index`th option is, `elapsed` ms into opening or closing
+ * a fan: the eased share of the way from the disk's centre to its place,
+ * which may pass 1 where the easing overshoots.
+ */
+export function optionShare(index: number, elapsed: number, opening: boolean): number {
+	const { delay, duration } = optionTiming(index, opening);
+	const progress = Math.min(Math.max((elapsed - delay) / duration, 0), 1);
+	// Svelte runs an `out:` transition as one less the eased progress.
+	const ease = fanEase(opening);
+	return opening ? ease(progress) : 1 - ease(progress);
+}
+
+/**
+ * The disk's scale `elapsed` ms into opening or closing a fan of `count`:
+ * the share of the option furthest out, on the options' own clock, easing
+ * and overshoot. Each option moves along its ray, and grows, by its own
+ * share of the way, so a disk scaled by the largest share holds every one,
+ * avatar and name, and is never bigger than they need. Opening, that is the
+ * first option's curve until it settles while the later ones still
+ * overshoot; closing, when they all move together, it is exactly theirs.
+ */
+export function diskScale(elapsed: number, count: number, opening: boolean): number {
+	if (count === 0) {
+		return 0;
+	}
+	let largest = Number.NEGATIVE_INFINITY;
+	for (let index = 0; index < count; index += 1) {
+		largest = Math.max(largest, optionShare(index, elapsed, opening));
+	}
+	return largest;
+}
+
+/**
+ * How the selection wedge is shaded, as shares of the disk's radius and, for
+ * its sides, degrees. Only the drawing: the sector a slide hit-tests
+ * (`optionAt`) is the whole slice, edge to edge and centre to rim.
+ *
+ * - `feather`: each straight side fades in over this many degrees, inside
+ *   the sector, so the two radial edges are soft rather than a hard line.
+ *   The rim is not softened: the wedge meets it with the disk's own edge.
+ * - `clear` to `full`: transparent at `clear`, well short of the centre,
+ *   and solid from `full`, just inside the innermost avatar on the ring, out
+ *   to the rim, so the slice reads as lighting the option rather than
+ *   pointing out of the corner. One radius for every option, the inner
+ *   row's when the fan is staggered, so the shading does not jump as the
+ *   wedge glides.
+ */
+export function wedgeShading(layout: FanLayout): { feather: number; clear: number; full: number } {
+	const inner = layout.radius - layout.stagger - layout.avatar / 2 - OPTION_GAP;
+	const full = Math.max(inner / layout.disk, 0.2);
+	return {
+		feather: Math.min(layout.step * 0.22, 8),
+		clear: full * 0.45,
+		full
+	};
 }

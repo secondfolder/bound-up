@@ -153,16 +153,76 @@ slight dim of the whole app shell, nav included. The pill morphs into its own
 avatar on the ring: it is pinned by its avatar's left edge (its anchor holds
 the measured closed width), so as the label folds into the avatar the avatar
 never jumps, and it flies straight to its place, scaled to the others' size.
-Every other option springs out of the disk's centre with a slight overshoot,
-each 35ms after the one before, and springs back into it on closing; the
-current one's name fades in under it as the pill arrives. The hint inside the
-ring ("Tap one, or next time hold the button and slide") fades in last, once
-the options have mostly landed, and fades out first on closing. Under
+Every other option springs out of the disk's centre, each 35ms after the one
+before; the current one's name fades in under it as the pill arrives. Under
 `prefers-reduced-motion` all of it simply appears and goes.
 
-A **selection wedge**, the selected option's sector of the disk tinted in its
-colour (the accent's for "Add partner"), turns about the disk's centre to
-follow the finger while sliding.
+**One clock and one curve** (`context-fan.ts`: `OPTION_MS`, `optionTiming`,
+`fanEase`, `diskScale`, `FAN_CSS_EASING`):
+
+- **Opening bounces**, the disk, the options and the pill alike: back-out,
+  out past their places and back. The disk is scaled to the share of the way
+  out of the option furthest out, so it is the first option's curve, bounce
+  and all, and no option is ever outside it. The pill flies by a CSS
+  transition on the same curve, sampled into `linear()` (a `cubic-bezier`
+  fit of back-out was off by nearly 5%), over the same 440ms.
+- **Closing does not bounce**: every option falls back together, unstaggered,
+  on a clean cubic ease-in, and the disk shrinks on exactly that curve, so it
+  neither hangs out round them nor leaves them outside. Back-out run
+  backwards had them swell first and shoot through the centre, and with the
+  stagger kept on closing the disk either waited for the last option or left
+  the rest outside it. The pill goes home on a plain ease-out.
+- **The hint** fades in last, once the options have mostly landed, and out
+  first on closing.
+
+A **selection wedge** is the selected option's sector of the disk in its
+colour (the accent for "Add partner"), solid and opaque round the avatar and
+out to the rim, which the disk's own edge cuts crisply. Its two straight sides
+are feathered over a few degrees inside the sector, and inwards, once past
+the avatars, it fades to nothing well before the centre (`wedgeShading`: a
+conic gradient for the sides, a radial mask for the fade). The selected
+option's name sits on a chip of the disk's surface, since the light space
+colours under it would take its contrast, and its avatar has a 2px keyline
+of the disk's colour, without which it vanished into a wedge of its own
+colour. There is no amber ring round the current or the lit avatar any
+more: the wedge is the marker. The wedge turns about the disk's centre to
+follow what is selected. Only the drawing is softened: the sector
+`optionAt` hit-tests is the whole slice.
+
+**"Add partner" glows instead.** It is not a context like the others, so lit
+it takes no wedge (the wedge fades out under it): a soft cream glow behind its
+"+" and a brighter dashed edge. Its hit area is still its sector. Everyone is
+lit with a wedge like the partners, for now.
+
+**Lit**, an avatar grows 14% (`HOVER_SCALE`) and its name moves down by the
+growth on the same transition, so the two never meet; the layout leaves room
+for any one option to be lit (`labelBudget`, `visibleArc`). Keyboard focus is
+shown, on `:focus-visible` only, by a thin cream outline round the avatar,
+not the theme's amber focus ring, which would look like the old marker. Over
+the disk the pointer is the hand anywhere in an option's sector, where a
+click picks it, and the arrow elsewhere.
+
+**What is selected**: the current context, until something else is pointed
+at. Sliding, it is the option under the finger. Opened by a tap, a mouse
+over the fan lights the option whose sector it is in, the same way, and the
+hint says what a click will do ("Click to show Jun", "Click to add a
+partner"); a click anywhere in that sector picks it. Off the disk, the
+current one is lit again. Keyboard focus on an option lights it too. Touch
+has no hover, so a tap-opened fan on touch shows the current context until a
+tap picks one.
+
+**The hint** (`hintPlacement`) sits at the top of the page, 12px down. When
+more than a third of the disk is cut off by the page's right edge
+(`HINT_RIGHT_CUT`: the disk's rightmost point, centre plus radius, lies more
+than a third of the radius beyond the shell's right edge), it sits against
+that edge, 12px in, right-aligned; a phone's disk, centred on the corner,
+always is. Otherwise it is centred over the disk's centre, centred. It is at
+most 150px wide, wraps to three lines, stays inside the shell, and where it
+would cover an option it moves down until clear rather than over it. A
+resize across the threshold glides it there (a transform transition), and
+the text is drawn once each way, cross-fading, so its alignment never jumps.
+It is part of the fan, above the dim: its words can be selected and copied,
+and a click on it does not close the fan.
 
 ### The fan's layout
 
@@ -196,12 +256,13 @@ The geometry is a pure module, `src/lib/context-fan.ts`, unit-tested in
   fan's names are a size smaller.
 - **Resizing** lays the fan out again rather than closing it (a window
   resize, the visual viewport changing, or a scroll, once a frame at most):
-  the centre, the visible arc, the ring and the sizes are recomputed, and the
-  pill flies to its recomputed place.
+  the centre, the visible arc, the ring, the sizes and the hint's place are
+  recomputed, and the pill flies to its recomputed place.
 
 **Holding** the pill (280ms) or **pressing and sliding** opens the same fan.
-While sliding, what is under the finger is **the option whose sector of the
-disk it is in** (`optionAt`), not only its avatar: each option owns the slice
+While sliding, what is under the finger, as for a mouse over a tap-opened
+fan, is **the option whose sector of the disk it is in** (`optionAt`), not
+only its avatar: each option owns the slice
 of the disk round it, from the centre to the disk's edge, with its borders
 halfway to its neighbours (and half a step past either end), which is exactly
 the wedge drawn under it, so what lights up is what letting go picks. Off the
@@ -213,11 +274,14 @@ leaves the fan open for tapping. The pill takes pointer capture and
 letting go will do, and a polite live region by the pill says the same to
 assistive tech, only when it changes.
 
-**Closing.** A click anywhere but on the pill or an option closes the fan: on
-the page, the nav, the empty part of the disk, or something drawn above the
-dim such as the app-wide notice (a capture-phase listener on the document).
-The dim takes the click, so nothing under it is acted on, and stops taking
-clicks the moment the fan starts closing, so a tap just after is not lost.
+**Closing.** A click anywhere but on the pill, an option, the lit option's
+sector or the hint closes the fan: on the page, the nav, the middle of the
+disk, or something drawn above the dim such as the app-wide notice (a
+capture-phase listener on the document). The dim takes the click, so nothing
+under it is acted on, and stops taking clicks the moment the fan starts
+closing, so a tap just after is not lost; opened again while still closing
+(Svelte turns the closing fan round rather than drawing a new one), it takes
+them again, or a tap on the nav went through the open fan and changed page.
 It used to be a `<button>`, which Web Awesome's native styles gave the form
 control's height: it covered a 43px strip along the top, darkened, and every
 click below it went to the page. The option buttons had the same height and
@@ -344,7 +408,7 @@ that does not redirect, so it is the one refresh this does not cover.
 | `src/lib/space-colours.ts` | The palette, its labels, `resolveSpaceColours`. Alias-free: the schema imports `SpaceColour` |
 | `src/lib/server/context.ts` | `listContextSpaces`, the per-request resolver, the cookie, `setSpaceColour`, `contextSpaceViews`, `contextSpaceIds` |
 | `src/lib/context-client.svelte.ts` | Names and avatars for the browser, `switchContext`, `storeContext` and `followInContext` |
-| `src/lib/context-fan.ts` | The fan's geometry: the centre, the visible arc, even spacing, name widths, staggering, which sector a point is in. Pure, alias-free |
+| `src/lib/context-fan.ts` | The fan's geometry and motion: the centre, the visible arc, even spacing, name widths, staggering, which sector a point is in, the hint's place, the wedge's shading, the shared timing and easing. Pure, alias-free |
 | `src/lib/navigation.ts`, `src/lib/enhance.ts` | Refreshes and `use:enhance` that wait for a navigation under way rather than dropping it |
 | `src/lib/components/context/` | `ContextSwitcher`, `ContextAvatar`, `SpaceChip`, `SpaceColourForm` |
 | `src/routes/api/context/+server.ts` | Switching |

@@ -65,6 +65,11 @@ function renderSwitcher(
 
 const trigger = () => screen.getByRole('button', { name: /^Showing / });
 
+/** How many shadows a computed `box-shadow` has: commas outside parentheses part them. */
+function shadows(boxShadow: string): number {
+	return boxShadow === 'none' ? 0 : boxShadow.split(/,(?![^(]*\))/).length;
+}
+
 /**
  * Once the fan's options have sprung out to their places: they are measured
  * where they land. Until a few quiet frames, not one await: Svelte spends a
@@ -180,6 +185,25 @@ describe('the fan', () => {
 		}
 	});
 
+	it('keeps its hint above the backdrop: its text can be selected, and clicking it does not close', async () => {
+		const { container } = renderSwitcher();
+		await userEvent.click(trigger());
+		await fanSettled();
+		const hint = defined(container.querySelector<HTMLElement>('.hint'), 'the hint');
+		const text = defined(hint.querySelector<HTMLElement>('.hint-centred'), 'its text');
+		const box = text.getBoundingClientRect();
+		// What a pointer there reaches is the hint, not the backdrop under it.
+		expect(hint.contains(document.elementFromPoint(box.left + box.width / 2, box.top + 4))).toBe(
+			true
+		);
+		await userEvent.tripleClick(hint);
+		const selected = globalThis.getSelection()?.toString() ?? '';
+		expect(selected).toContain('Tap one');
+		// Once: the copy drawn for the other alignment is not selectable.
+		expect(selected.split('Tap one')).toHaveLength(2);
+		expect(trigger()).toHaveAttribute('aria-expanded', 'true');
+	});
+
 	it('dims the whole screen evenly, not a strip along the top', async () => {
 		const { container } = renderSwitcher();
 		await userEvent.click(trigger());
@@ -199,6 +223,20 @@ describe('the fan', () => {
 			'the leaving backdrop'
 		);
 		expect(getComputedStyle(backdrop).pointerEvents).toBe('none');
+	});
+
+	it('takes clicks again when opened while it is still closing', async () => {
+		const { container } = renderSwitcher();
+		await userEvent.click(trigger());
+		await fanSettled();
+		await userEvent.keyboard('{Escape}');
+		trigger().focus();
+		await userEvent.keyboard('{Enter}');
+		expect(trigger()).toHaveAttribute('aria-expanded', 'true');
+		const backdrops = [...container.querySelectorAll<HTMLElement>('.backdrop')];
+		expect(backdrops.map((backdrop) => getComputedStyle(backdrop).pointerEvents)).toContain('auto');
+		const live = backdrops.at(-1);
+		expect(live && getComputedStyle(live).pointerEvents).toBe('auto');
 	});
 
 	it('stays open when the window is resized, and lays itself out again', async () => {
@@ -310,6 +348,100 @@ describe('the fan', () => {
 		);
 	});
 
+	it('lights the option a mouse is over, opened by a tap, and a click in its wedge picks it', async () => {
+		const { container } = renderSwitcher({ kind: 'all' });
+		await userEvent.click(trigger());
+		await fanSettled();
+		const wedge = () => container.querySelector('.wedge')?.getAttribute('data-fan-wedge');
+		const hint = () => container.querySelector('.hint-centred')?.textContent?.trim();
+		const disk = defined(
+			container.querySelector('[data-fan-disk]'),
+			'the disk'
+		).getBoundingClientRect();
+		const centre = { x: disk.left + disk.width / 2, y: disk.top + disk.height / 2 };
+		const junOption = screen.getByRole('button', { name: 'Show Jun' });
+		const avatar = defined(
+			junOption.querySelector('.slot-avatar'),
+			'Jun’s avatar'
+		).getBoundingClientRect();
+		// Half way in from Jun's avatar: in its wedge, off the avatar.
+		const inWedge = {
+			clientX: centre.x + (avatar.left + avatar.width / 2 - centre.x) * 0.5,
+			clientY: centre.y + (avatar.top + avatar.height / 2 - centre.y) * 0.5
+		};
+		const move = (point: { clientX: number; clientY: number }) =>
+			document.dispatchEvent(new PointerEvent('pointermove', { pointerType: 'mouse', ...point }));
+
+		move(inWedge);
+		await vi.waitFor(() => expect(junOption).toHaveClass('hovered'));
+		expect(wedge()).toBe(JUN);
+		expect(hint()).toBe('Click to show Jun');
+		const backdrop = defined(container.querySelector<HTMLElement>('.backdrop'), 'the backdrop');
+		// The pointer anywhere in the sector, since a click there picks.
+		expect(getComputedStyle(backdrop).cursor).toBe('pointer');
+		// Lit: grown, with no ring round it, and its name moved down clear of it.
+		await fanSettled();
+		const litAvatar = defined(junOption.querySelector<HTMLElement>('.slot-avatar'), 'Jun’s avatar');
+		// One keyline at most (it keeps the avatar off its own colour on the
+		// wedge), never the two-part amber ring there used to be.
+		expect(shadows(getComputedStyle(litAvatar).boxShadow)).toBeLessThanOrEqual(1);
+		const name = defined(
+			junOption.querySelector('.slot-name'),
+			'Jun’s name'
+		).getBoundingClientRect();
+		expect(name.top).toBeGreaterThanOrEqual(litAvatar.getBoundingClientRect().bottom);
+
+		// Off the disk: back to the one showing.
+		move({ clientX: disk.right + 200, clientY: disk.bottom + 200 });
+		await vi.waitFor(() => expect(junOption).not.toHaveClass('hovered'));
+		expect(wedge()).toBe('all');
+		expect(getComputedStyle(backdrop).cursor).not.toBe('pointer');
+
+		// A touch has no hover: it leaves the one showing lit.
+		document.dispatchEvent(new PointerEvent('pointermove', { pointerType: 'touch', ...inWedge }));
+		await new Promise((done) => requestAnimationFrame(done));
+		expect(wedge()).toBe('all');
+
+		// Back over Jun's wedge, and a click there (on what is under the fan) picks Jun.
+		move(inWedge);
+		await vi.waitFor(() => expect(wedge()).toBe(JUN));
+		backdrop.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1, ...inWedge }));
+		await vi.waitFor(() =>
+			expect(fetchMock).toHaveBeenCalledWith(
+				'/api/context',
+				expect.objectContaining({ body: JSON.stringify({ context: JUN }) })
+			)
+		);
+	});
+
+	it('draws no ring round the pill standing in on the ring', async () => {
+		const { container } = renderSwitcher();
+		await userEvent.click(trigger());
+		await fanSettled();
+		const avatar = defined(
+			container.querySelector<HTMLElement>('.control-avatar'),
+			'the pill’s avatar'
+		);
+		expect(shadows(getComputedStyle(avatar).boxShadow)).toBeLessThanOrEqual(1);
+	});
+
+	it('lights the option keyboard focus is on', async () => {
+		const { container } = renderSwitcher({ kind: 'all' });
+		trigger().focus();
+		await userEvent.keyboard('{Enter}');
+		await fanSettled();
+		await userEvent.keyboard('{Tab}');
+		const me = screen.getByRole('button', { name: 'Show Me' });
+		await vi.waitFor(() => expect(me).toHaveFocus());
+		expect(me).toHaveClass('hovered');
+		expect(container.querySelector('.wedge')).toHaveAttribute('data-fan-wedge', SOLO);
+		// Keyboard focus shows, as a thin outline round the avatar.
+		const outline = getComputedStyle(defined(me.querySelector('.slot-avatar'), 'Me’s avatar'));
+		expect(outline.outlineStyle).toBe('solid');
+		expect(outline.outlineWidth).toBe('2px');
+		expect(container.querySelector('.hint-centred')?.textContent?.trim()).toBe('Click to show Me');
+	});
+
 	it('highlights Add partner while sliding over it, and opens it on letting go', async () => {
 		const { container } = renderSwitcher({ kind: 'all' });
 		const control = trigger();
@@ -333,9 +465,16 @@ describe('the fan', () => {
 		};
 		pointer('pointermove', over);
 		await vi.waitFor(() => expect(add).toHaveClass('hovered'));
-		// The wedge turns to it, and the hint says what letting go does.
-		expect(container.querySelector('.wedge')).toHaveAttribute('data-fan-wedge', 'add');
-		expect(container.querySelector('.hint')?.textContent?.trim()).toBe('Let go to add a partner');
+		// It glows rather than taking the wedge, which fades out under it, and
+		// the hint says what letting go does.
+		const wedge = defined(container.querySelector<HTMLElement>('.wedge'), 'the wedge');
+		expect(wedge).toHaveAttribute('data-fan-wedge', 'add');
+		expect(wedge).toHaveClass('hidden');
+		const glow = defined(add.querySelector('.slot-avatar'), 'Add partner’s avatar');
+		await vi.waitFor(() => expect(getComputedStyle(glow, '::before').opacity).toBe('1'));
+		expect(container.querySelector('.hint-centred')?.textContent?.trim()).toBe(
+			'Let go to add a partner'
+		);
 		pointer('pointerup', over);
 		expect(followed).toHaveBeenCalled();
 	});
@@ -372,10 +511,10 @@ describe('the fan', () => {
 		expect(Number(getComputedStyle(hint).opacity)).toBe(1);
 
 		await userEvent.keyboard('{Escape}');
-		await new Promise((done) => setTimeout(done, 160));
+		await new Promise((done) => setTimeout(done, 115));
 		// Faded out, though it stays in the page until the options are back.
 		expect(Number(getComputedStyle(hint).opacity)).toBeLessThan(0.05);
-		// Me's option, still on its way back to the centre.
+		// Me's option, still on its way back to the centre: the hint went first.
 		expect(
 			Number(getComputedStyle(screen.getByRole('button', { name: 'Show Me' })).opacity)
 		).toBeGreaterThan(0.2);
@@ -399,6 +538,91 @@ describe('the fan', () => {
 		await vi.waitFor(() => expect(live.textContent).toBe('Slide onto one, then let go'));
 		control.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerId: 5 }));
 		await vi.waitFor(() => expect(live.textContent).toBe(''));
+	});
+
+	it('keeps every option inside the disk as it grows and as it shrinks back', async () => {
+		const { container } = renderSwitcher();
+		/** Options whose avatar reaches outside the disk, frame by frame until the fan is gone. */
+		const strays = async (until: () => boolean) => {
+			const found: string[] = [];
+			while (!until()) {
+				await new Promise((done) => requestAnimationFrame(done));
+				const disk = container.querySelector('[data-fan-disk]')?.getBoundingClientRect();
+				if (!disk) {
+					continue;
+				}
+				const centre = { x: disk.left + disk.width / 2, y: disk.top + disk.height / 2 };
+				// Not the one showing now: the pill stands in for it, flying from
+				// the control rather than the centre.
+				for (const option of container.querySelectorAll<HTMLElement>(
+					'[data-fan-option]:not([aria-current])'
+				)) {
+					const avatar = option.querySelector('[data-fan-avatar]')?.getBoundingClientRect();
+					if (!avatar || Number(getComputedStyle(option).opacity) < 0.05) {
+						continue;
+					}
+					const far =
+						Math.hypot(
+							avatar.left + avatar.width / 2 - centre.x,
+							avatar.top + avatar.height / 2 - centre.y
+						) +
+						avatar.width / 2;
+					if (far > disk.width / 2 + 0.5) {
+						found.push(
+							`${option.getAttribute('aria-label') ?? 'Add partner'} ${far.toFixed(1)} > ${(disk.width / 2).toFixed(1)}`
+						);
+					}
+				}
+			}
+			return found;
+		};
+		await userEvent.click(trigger());
+		let opened = false;
+		const growing = strays(() => opened);
+		await fanSettled();
+		opened = true;
+		expect(await growing).toEqual([]);
+		await userEvent.keyboard('{Escape}');
+		expect(await strays(() => container.querySelector('[data-fan-disk]') === null)).toEqual([]);
+	});
+
+	it('shrinks the disk with the options as they fall back, neither behind nor ahead', async () => {
+		const { container } = renderSwitcher();
+		await userEvent.click(trigger());
+		await fanSettled();
+		const diskRadius = () =>
+			(container.querySelector('[data-fan-disk]')?.getBoundingClientRect().width ?? 0) / 2;
+		const disk = defined(
+			container.querySelector('[data-fan-disk]'),
+			'the disk'
+		).getBoundingClientRect();
+		const centre = { x: disk.left + disk.width / 2, y: disk.top + disk.height / 2 };
+		const meDistance = () => {
+			const avatar = screen
+				.queryByRole('button', { name: 'Show Me' })
+				?.querySelector('[data-fan-avatar]')
+				?.getBoundingClientRect();
+			return avatar
+				? Math.hypot(
+						avatar.left + avatar.width / 2 - centre.x,
+						avatar.top + avatar.height / 2 - centre.y
+					)
+				: 0;
+		};
+		const restDisk = diskRadius();
+		const restMe = meDistance();
+		await userEvent.keyboard('{Escape}');
+		const gaps: number[] = [];
+		while (container.querySelector('[data-fan-disk]')) {
+			await new Promise((done) => requestAnimationFrame(done));
+			const share = meDistance() / restMe;
+			if (share > 0.05 && container.querySelector('[data-fan-disk]')) {
+				gaps.push(Math.abs(diskRadius() / restDisk - share));
+			}
+		}
+		expect(gaps.length).toBeGreaterThan(3);
+		// One clock and one curve: the same share of the way at every frame.
+		expect(Math.max(...gaps)).toBeLessThan(0.03);
 	});
 
 	it('does not move when asked for reduced motion: the fan goes at once', async () => {

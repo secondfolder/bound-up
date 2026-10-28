@@ -1,19 +1,28 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import { backOut, cubicOut } from 'svelte/easing';
+	import { cubicOut } from 'svelte/easing';
 	import { resolve } from '$app/paths';
 	import { type AppContext, serialiseContext } from '$lib/context';
 	import { type ContextShown, shownContexts, switchContext } from '$lib/context-client.svelte';
 	import {
 		type Box,
+		diskScale,
+		FAN_CSS_EASING,
 		fanCentre,
+		fanDuration,
+		fanEase,
+		HOVER_SCALE,
 		hintPlacement,
 		LABEL_GAP,
 		LABEL_GOOD,
 		LABEL_HEIGHT,
 		layoutFan,
+		OPTION_MS,
+		OPTION_STAGGER_MS,
 		optionAt,
-		type Point
+		optionTiming,
+		type Point,
+		wedgeShading
 	} from '$lib/context-fan';
 	import type { ContextSpaceView } from '$lib/types';
 	import ContextAvatar from './ContextAvatar.svelte';
@@ -50,20 +59,15 @@
 	const GAP = 8;
 	const PAD_END = 12;
 	const BORDER = 1;
-	/** How much larger the avatar under a sliding finger is drawn. */
-	const HOVER_SCALE = 1.14;
 	/** How near where a press began the finger still counts as on the pill, not the fan. */
 	const PRESS_QUIET = 24;
 	/** How long a press is held before it opens the fan to slide in. */
 	const HOLD_MS = 280;
 	/** How long a picked avatar stays on the arc before the pill flies home. */
 	const PICK_MS = 240;
-	/** How long the options take to spring out: each starts 35ms after the one before. */
-	const OPTION_MS = 440;
-	const OPTION_STAGGER_MS = 35;
 
-	/** The hint's box: three short lines. */
-	const HINT = { width: 120, height: 46 };
+	/** The hint's box: at most three lines, wrapping within this width. */
+	const HINT = { width: 150, height: 46 };
 
 	const contexts = $derived(shownContexts(spaces, you));
 	/**
@@ -115,6 +119,7 @@
 	let trigger: HTMLButtonElement | undefined = $state();
 	let group: HTMLElement | undefined = $state();
 	let backdrop: HTMLElement | undefined = $state();
+	let hintElement: HTMLElement | undefined = $state();
 	const slotButtons: (HTMLElement | undefined)[] = $state([]);
 
 	/** The label's width: folded into the avatar while open, measured otherwise (auto until it is). */
@@ -200,29 +205,44 @@
 		// "Add partner" too: letting go there opens it, so it is what is selected.
 		const selected = hover ?? currentKey;
 		const angle = layout.angles[Math.max(slotKeys.indexOf(selected), 0)] ?? 0;
-		// "Add partner" has no space of its own, so no colour: the accent's.
+		// "Add partner" has no space of its own, so no colour (and glows rather
+		// than drawing the wedge, which fades out under it).
 		const colour =
 			selected === 'add'
 				? 'var(--accent-color)'
 				: (contexts.find((candidate) => candidate.key === selected) ?? current).colour;
 		const width = layout.step;
+		const shading = wedgeShading(layout);
+		const degrees = (value: number) => `${value.toFixed(2)}deg`;
+		const share = (value: number) => `${(value * 100).toFixed(1)}%`;
 		return {
 			selected,
 			// Up is -90° on the screen.
 			rotate: angle + 90,
-			background: `conic-gradient(from ${(-width / 2).toFixed(2)}deg, color-mix(in oklab, ${colour} 34%, transparent) 0deg ${width.toFixed(2)}deg, transparent ${width.toFixed(2)}deg)`
+			// Solid in the selected context's colour, its two straight sides
+			// fading in over the feather, inside the sector.
+			background: `conic-gradient(from ${degrees(-width / 2)}, transparent 0deg, ${colour} ${degrees(shading.feather)}, ${colour} ${degrees(width - shading.feather)}, transparent ${degrees(width)})`,
+			// Fading out towards the centre once past the avatars, and solid out
+			// to the rim, which the disk's own edge cuts crisply. Round the
+			// disk's centre, so turning the wedge leaves it as it is.
+			mask: `radial-gradient(circle closest-side, transparent ${share(shading.clear)}, black ${share(shading.full)})`
 		};
 	});
 
 	const hint = $derived.by(() => {
-		if (!sliding) {
-			return 'Tap one, or next time hold the button and slide';
-		}
+		// Sliding, letting go picks; opened by a tap, a mouse over an option
+		// (or the keyboard's focus on one) says a click will.
+		const verb = sliding ? 'Let go' : 'Click';
 		if (hover === 'add') {
-			return 'Let go to add a partner';
+			return `${verb} to add a partner`;
 		}
 		const over = contexts.find((shown) => shown.key === hover);
-		return over ? `Let go to show ${over.name}` : 'Slide onto one, then let go';
+		if (over && (sliding || over.key !== currentKey)) {
+			return `${verb} to show ${over.name}`;
+		}
+		return sliding
+			? 'Slide onto one, then let go'
+			: 'Tap one, or next time hold the button and slide';
 	});
 
 	/** Where an option's button goes: its avatar centred on its point, its name under it. */
@@ -248,6 +268,14 @@
 
 	function openFan(bySliding: boolean) {
 		measure();
+		// Opened again while still closing, Svelte turns the closing fan
+		// round rather than drawing a new one, so the backdrop is the one
+		// `closeFan` let clicks through: it has to take them again, or a tap
+		// on the nav under the open fan went through and changed page.
+		if (backdrop) {
+			backdrop.style.pointerEvents = '';
+			backdrop.classList.remove('pointing');
+		}
 		open = true;
 		sliding = bySliding;
 		hover = null;
@@ -442,7 +470,7 @@
 	}
 
 	/**
-	 * A click anywhere but on the pill or an option closes the fan. On the
+	 * A click anywhere but on the pill, an option or the hint closes the fan. On the
 	 * document, in the capture phase, rather than only on the backdrop: the
 	 * backdrop covers the shell, but the app-wide notice is drawn above it,
 	 * and a click there must close the fan too. A click the backdrop takes
@@ -454,7 +482,24 @@
 		}
 		const outside = (event: MouseEvent) => {
 			const { target } = event;
-			if (target instanceof Node && (trigger?.contains(target) || group?.contains(target))) {
+			// A mouse click in the sector of the option lit under it picks that
+			// option, as a slide's letting go there does: the wedge says so.
+			const under = event.detail > 0 && !sliding ? slotAt(event.clientX, event.clientY) : null;
+			const onOption = target instanceof Node && (group?.contains(target) ?? false);
+			if (under && under === hover && !onOption) {
+				event.preventDefault();
+				event.stopPropagation();
+				if (under === 'add') {
+					slotButtons[slotKeys.indexOf('add')]?.click();
+				} else {
+					pick(under);
+				}
+				return;
+			}
+			// The hint is part of the switcher too: its text can be selected
+			// and copied without the fan closing under the pointer.
+			const parts = [trigger, group, hintElement];
+			if (target instanceof Node && parts.some((part) => part?.contains(target))) {
 				return;
 			}
 			closeFan();
@@ -462,6 +507,44 @@
 		document.addEventListener('click', outside, true);
 		return () => document.removeEventListener('click', outside, true);
 	});
+
+	/**
+	 * Opened by a tap, a mouse moving over the fan lights the option whose
+	 * sector it is in, as a slide does, so it is plain what a click there
+	 * will do; off the disk, the one showing is lit again. Not for touch,
+	 * which has no hover: a tap-opened fan shows the current context until a
+	 * tap picks one. On the document, since the disk under the pointer takes
+	 * no events of its own.
+	 */
+	$effect(() => {
+		if (!open) {
+			return;
+		}
+		const follow = (event: PointerEvent) => {
+			if (sliding || press || event.pointerType === 'touch') {
+				return;
+			}
+			hover = slotAt(event.clientX, event.clientY);
+			// A click anywhere in that sector picks, so the pointer says so:
+			// on the backdrop, whose cursor shows over the disk, which takes no
+			// pointer events of its own.
+			backdrop?.classList.toggle('pointing', hover !== null);
+		};
+		document.addEventListener('pointermove', follow);
+		return () => document.removeEventListener('pointermove', follow);
+	});
+
+	/** Keyboard focus on an option lights it the same way. */
+	function onfocusin(event: FocusEvent) {
+		if (sliding) {
+			return;
+		}
+		const index = slotButtons.findIndex((button) => button !== undefined && button === event.target);
+		const key = index === -1 ? null : (slotKeys[index] ?? null);
+		// The one showing is lit already; focus lands on it as the fan opens,
+		// which is not a choice.
+		hover = key === currentKey ? null : key;
+	}
 
 	/**
 	 * A resize lays the fan out again rather than closing it: the shell, and
@@ -507,7 +590,13 @@
 	 */
 	function fromCentre(
 		_node: Element,
-		{ dx, dy, delay, isCurrent }: { dx: number; dy: number; delay: number; isCurrent: boolean }
+		{
+			dx,
+			dy,
+			delay,
+			isCurrent,
+			opening
+		}: { dx: number; dy: number; delay: number; isCurrent: boolean; opening: boolean }
 	) {
 		if (reducedMotion()) {
 			return { duration: 0 };
@@ -526,18 +615,31 @@
 		return {
 			delay,
 			duration: OPTION_MS,
-			easing: backOut,
+			easing: fanEase(opening),
+			// Out along its ray by the eased share `t`, and grown by the same
+			// share, so the disk (`unfold`, scaled by `t` on the clock of the
+			// option furthest out) always holds it: avatar, name and all.
 			css: (t: number) =>
-				`opacity: ${Math.min(1, t * 1.5)}; transform: translate(${(dx * (1 - t)).toFixed(1)}px, ${(dy * (1 - t)).toFixed(1)}px) scale(${0.2 + 0.8 * t})`
+				`opacity: ${Math.min(1, t * 1.5)}; transform: translate(${(dx * (1 - t)).toFixed(1)}px, ${(dy * (1 - t)).toFixed(1)}px) scale(${Math.max(t, 0).toFixed(3)})`
 		};
 	}
 
-	/** The disk unfolding from its centre. */
-	function unfold(_node: Element) {
+	/**
+	 * The disk growing from its centre and shrinking back into it, in step
+	 * with the options, on their clock and easing (`diskScale`): scaled to
+	 * the option furthest out, so none is ever outside it and it never hangs
+	 * out round them.
+	 */
+	function unfold(_node: Element, { count, opening }: { count: number; opening: boolean }) {
+		if (reducedMotion()) {
+			return { duration: 0 };
+		}
+		const duration = fanDuration(count, opening);
 		return {
-			duration: reducedMotion() ? 0 : 300,
-			easing: cubicOut,
-			css: (t: number) => `transform: scale(${t})`
+			duration,
+			// `t` runs 1 to 0 closing, so the time gone is measured from its end.
+			css: (t: number) =>
+				`transform: scale(${diskScale((opening ? t : 1 - t) * duration, count, opening).toFixed(3)})`
 		};
 	}
 
@@ -606,6 +708,8 @@
 				aria-expanded={open}
 				aria-haspopup="true"
 				aria-label="Showing {current.name}. Choose whose to show"
+				style:--flight-ease={open ? FAN_CSS_EASING.opening : FAN_CSS_EASING.home}
+				style:--flight-ms="{OPTION_MS}ms"
 				style:transform={flight
 					? `translate(${flight.x.toFixed(1)}px, ${flight.y.toFixed(1)}px) scale(${flight.scale.toFixed(3)})`
 					: undefined}
@@ -651,7 +755,8 @@
 				<div
 					class="disk"
 					data-fan-disk
-					transition:unfold
+					in:unfold|global={{ count: slotKeys.length, opening: true }}
+					out:unfold|global={{ count: slotKeys.length, opening: false }}
 					style:left="{measured.centre.x - measured.bounds.left - layout.disk}px"
 					style:top="{measured.centre.y - measured.bounds.top - layout.disk}px"
 					style:--disk="{layout.disk * 2}px"
@@ -659,34 +764,46 @@
 					{#if wedge}
 						<div
 							class="wedge"
+							class:hidden={wedge.selected === 'add'}
 							data-fan-wedge={wedge.selected}
 							style:rotate="{wedge.rotate.toFixed(2)}deg"
 							style:background={wedge.background}
+							style:mask-image={wedge.mask}
 						></div>
 					{/if}
 				</div>
 			</div>
 			{#if hintAt}
-				<!-- Shown, not read: the live region by the pill says what matters. -->
+				<!-- Shown, not read: the live region by the pill says what matters.
+				     At the top of the page: right-aligned against its right edge
+				     when the disk is mostly cut off there, centred over the disk
+				     otherwise (`hintPlacement`). Moved by a transform, so it glides
+				     between the two, and the text is drawn twice, once each way,
+				     cross-fading, so its alignment never jumps. -->
 				<p
 					class="hint"
+					class:right={hintAt.side === 'right'}
+					bind:this={hintElement}
 					aria-hidden="true"
+					data-fan-hint={hintAt.side}
 					in:hintIn|global={{ count: slotKeys.length }}
 					out:hintOut|global
-					style:left="{hintAt.x}px"
-					style:top="{hintAt.y}px"
+					style:transform="translate({hintAt.x.toFixed(1)}px, {hintAt.y.toFixed(1)}px)"
 					style:width="{HINT.width}px"
 					style:height="{HINT.height}px"
 				>
-					{hint}
+					<span class="hint-centred">{hint}</span>
+					<span class="hint-right">{hint}</span>
 				</p>
 			{/if}
 			<fieldset
 				class="slots"
+				{onfocusin}
 				aria-label="Whose to show"
 				class:crowded={layout.label < LABEL_GOOD}
 				bind:this={group}
 				style:--avatar="{layout.avatar}px"
+				style:--lit-scale={HOVER_SCALE}
 				style:--label="{layout.label}px"
 				style:--label-gap="{LABEL_GAP}px"
 				style:--label-height="{LABEL_HEIGHT}px"
@@ -698,6 +815,7 @@
 						type="button"
 						class="slot"
 						class:hovered={hover === shown.key}
+						class:selected={wedge?.selected === shown.key}
 						data-fan-option
 						bind:this={slotButtons[index]}
 						aria-label="Show {shown.name}"
@@ -706,12 +824,8 @@
 						style:top="{place.top}px"
 						style:width="{place.width}px"
 						style:height="{place.height}px"
-						transition:fromCentre|global={{
-							dx: place.dx,
-							dy: place.dy,
-							delay: index * OPTION_STAGGER_MS,
-							isCurrent
-						}}
+						in:fromCentre|global={{ dx: place.dx, dy: place.dy, delay: optionTiming(index, true).delay, isCurrent, opening: true }}
+						out:fromCentre|global={{ dx: place.dx, dy: place.dy, delay: optionTiming(index, false).delay, isCurrent, opening: false }}
 						onclick={() => pick(shown.key)}
 					>
 						<!-- The one showing now is the pill itself, flown here, so its
@@ -723,8 +837,9 @@
 					</button>
 				{/each}
 				<a
-					class="slot"
+					class="slot add"
 					class:hovered={hover === 'add'}
+					class:selected={wedge?.selected === 'add'}
 					data-fan-option
 					href={resolve('/(auth-required)/(app)/settings/partners/new')}
 					bind:this={slotButtons[addIndex]}
@@ -732,12 +847,8 @@
 					style:top="{addPlace.top}px"
 					style:width="{addPlace.width}px"
 					style:height="{addPlace.height}px"
-					transition:fromCentre|global={{
-						dx: addPlace.dx,
-						dy: addPlace.dy,
-						delay: addIndex * OPTION_STAGGER_MS,
-						isCurrent: false
-					}}
+					in:fromCentre|global={{ dx: addPlace.dx, dy: addPlace.dy, delay: optionTiming(addIndex, true).delay, isCurrent: false, opening: true }}
+					out:fromCentre|global={{ dx: addPlace.dx, dy: addPlace.dy, delay: optionTiming(addIndex, false).delay, isCurrent: false, opening: false }}
 				>
 					<span class="slot-avatar" data-fan-avatar>
 						<ContextAvatar kind="add" size={layout.avatar} />
@@ -822,7 +933,9 @@
 		-webkit-tap-highlight-color: transparent;
 		transform-origin: 20px 20px;
 		transition:
-			transform 380ms cubic-bezier(0.25, 0.9, 0.3, 1.08),
+			/* The options' curve and time (`FAN_CSS_EASING`, `OPTION_MS`), so the
+			   pill lands on the ring with the same bounce as they do. */
+			transform var(--flight-ms) var(--flight-ease),
 			gap 340ms ease,
 			padding 340ms ease,
 			background-color 300ms ease,
@@ -834,7 +947,10 @@
 		}
 	}
 
-	/* Open, the pill is only its avatar, ringed, standing in on the ring. */
+	/* Open, the pill is only its avatar, standing in on the ring. No amber
+	   ring round it: the wedge under it says it is the one showing. Only a
+	   keyline of the disk's own colour, since the wedge is the avatar's own
+	   colour and the avatar vanished into it without one. */
 	.control.open {
 		gap: 0;
 		padding: 0;
@@ -842,9 +958,7 @@
 		background: transparent;
 
 		.control-avatar {
-			box-shadow:
-				0 0 0 2px var(--wa-color-surface-default),
-				0 0 0 3.5px var(--accent-color);
+			box-shadow: 0 0 0 2px var(--wa-color-surface-default);
 		}
 
 		.label {
@@ -852,12 +966,19 @@
 		}
 	}
 
-	/* Very slight, and even over the whole shell: the fan is what stands out. */
+	/* Very slight, and even over the whole shell: the fan is what stands out.
+	   The disk takes no pointer events, so over it the cursor is this one's:
+	   the pointer anywhere in an option's sector, where a click picks it. */
 	.backdrop {
 		position: fixed;
 		inset: 0;
 		z-index: 20;
 		background: color-mix(in oklab, var(--wa-color-overlay-modal) 45%, transparent);
+
+		/* Set from the script (`follow`), so it is :global to Svelte. */
+		&:global(.pointing) {
+			cursor: pointer;
+		}
 	}
 
 	.stage {
@@ -882,26 +1003,72 @@
 		position: absolute;
 		inset: 0;
 		border-radius: 50%;
-		transition: rotate 220ms cubic-bezier(0.25, 0.9, 0.3, 1.1);
+		transition:
+			rotate 220ms cubic-bezier(0.25, 0.9, 0.3, 1.1),
+			opacity 160ms ease;
+
+		/* Under "Add partner", which glows instead. */
+		&.hidden {
+			opacity: 0;
+		}
 	}
 
 	.hint {
 		position: fixed;
+		inset-block-start: 0;
+		inset-inline-start: 0;
 		z-index: 22;
+		display: grid;
 		margin: 0;
-		overflow: hidden;
-		display: -webkit-box;
-		-webkit-box-orient: vertical;
-		-webkit-line-clamp: 3;
-		line-clamp: 3;
-		text-align: center;
 		font-size: var(--wa-font-size-2xs);
 		line-height: 1.4;
 		color: var(--wa-color-text-quiet);
-		pointer-events: none;
+		/* Above the backdrop like the rest of the fan, and selectable. */
+		user-select: text;
+		cursor: text;
+		transition: transform 320ms cubic-bezier(0.25, 0.8, 0.25, 1);
+
+		/* The two alignments, stacked in one cell, one showing at a time. */
+		span {
+			grid-area: 1 / 1;
+			overflow: hidden;
+			display: -webkit-box;
+			-webkit-box-orient: vertical;
+			-webkit-line-clamp: 3;
+			line-clamp: 3;
+			transition: opacity 320ms ease;
+		}
+
+		.hint-centred {
+			text-align: center;
+		}
+
+		/* The copy not showing can be neither pointed at nor selected, so a
+		   selection starts in the one that shows and copies its words once. */
+		.hint-right {
+			text-align: end;
+			opacity: 0;
+			pointer-events: none;
+			user-select: none;
+		}
+
+		&.right {
+			.hint-centred {
+				opacity: 0;
+				pointer-events: none;
+				user-select: none;
+			}
+
+			.hint-right {
+				opacity: 1;
+				pointer-events: auto;
+				user-select: text;
+			}
+		}
 	}
 
 	.slot-avatar {
+		position: relative;
 		display: flex;
 		flex: none;
 		border-radius: 50%;
@@ -924,6 +1091,7 @@
 		font-size: var(--wa-font-size-2xs);
 		line-height: var(--label-height);
 		font-weight: var(--wa-font-weight-semibold);
+		transition: transform 120ms ease-out;
 	}
 
 	/* Sized and placed by the layout. Every property Web Awesome's native
@@ -955,12 +1123,14 @@
 		-webkit-tap-highlight-color: transparent;
 	}
 
-	/* The ring goes round the avatar, not the whole button and its label. */
+	/* Keyboard focus only: a thin cream outline round the avatar, not the
+	   whole button and its label. Not the theme's amber focus ring, which
+	   would look like the ring that used to mark the lit option. */
 	.slot:focus-visible {
 		outline: none;
 
 		.slot-avatar {
-			outline: var(--wa-focus-ring);
+			outline: 2px solid var(--wa-color-text-normal);
 			outline-offset: 3px;
 		}
 	}
@@ -971,18 +1141,63 @@
 		font-size: calc(var(--wa-font-size-2xs) - 1px);
 	}
 
+	/* Lit: the avatar grows (`HOVER_SCALE`) and its name moves down by the
+	   growth, on the same transition, so the two never meet. The layout
+	   leaves room for both. No ring: the wedge is the marker. */
 	.slot.hovered {
 		.slot-avatar {
-			transform: scale(1.14);
-			box-shadow:
-				0 0 0 3px var(--wa-color-surface-default),
-				0 0 0 5px var(--accent-color);
+			transform: scale(var(--lit-scale));
 		}
 
 		.slot-name {
+			transform: translateY(calc(var(--avatar) * (var(--lit-scale) - 1)));
 			font-weight: 800;
 			color: var(--accent-color);
 		}
+	}
+
+	/* "Add partner" is not a context like the others, so lit it has no
+	   wedge: a soft cream glow behind its "+", and a brighter dashed edge. */
+	.slot.add {
+		.slot-avatar::before {
+			content: '';
+			position: absolute;
+			inset: -60%;
+			z-index: -1;
+			border-radius: 50%;
+			background: radial-gradient(
+				circle closest-side,
+				color-mix(in oklab, var(--wa-color-text-normal) 45%, transparent),
+				transparent
+			);
+			opacity: 0;
+			transition: opacity 160ms ease;
+		}
+
+		&.selected {
+			.slot-avatar::before {
+				opacity: 1;
+			}
+
+			.slot-avatar :global(.avatar.add) {
+				border-color: var(--wa-color-text-normal);
+			}
+		}
+	}
+
+	/* The selected option sits on the wedge, solid in its own colour, which
+	   the light space colours would take the name's contrast from. So its
+	   name sits on a chip of the disk's own surface: as legible as the
+	   others, whatever the colour under it. */
+	/* The keyline that keeps an avatar from vanishing into its own colour. */
+	.slot.selected .slot-avatar {
+		box-shadow: 0 0 0 2px var(--wa-color-surface-default);
+	}
+
+	.slot.selected .slot-name {
+		padding-inline: 4px;
+		border-radius: var(--wa-border-radius-s);
+		background: var(--wa-color-surface-default);
 	}
 
 	.slot[aria-current='true'] .slot-name {
@@ -993,7 +1208,9 @@
 		.control,
 		.label,
 		.wedge,
-		.slot-avatar {
+		.slot-avatar,
+		.hint,
+		.hint span {
 			transition: none;
 		}
 	}

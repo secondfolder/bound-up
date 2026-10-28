@@ -57,6 +57,8 @@ type Fan = {
 	navTop: number;
 	viewport: { width: number; height: number };
 	wedge: string | null;
+	disk: Rect;
+	hint: { side: string | null; box: Rect };
 };
 
 /** Ada, with `count` partners linked, on Today. The partners' own browsers are closed again. */
@@ -152,7 +154,12 @@ function readFan(page: Page): Promise<Fan> {
 			pill: rect(pill),
 			navTop: rect(document.querySelector('nav[aria-label="Primary"]')).top,
 			viewport: { width: window.innerWidth, height: window.innerHeight },
-			wedge: document.querySelector('[data-fan-wedge]')?.getAttribute('data-fan-wedge') ?? null
+			wedge: document.querySelector('[data-fan-wedge]')?.getAttribute('data-fan-wedge') ?? null,
+			disk,
+			hint: {
+				side: document.querySelector('[data-fan-hint]')?.getAttribute('data-fan-hint') ?? null,
+				box: rect(document.querySelector('[data-fan-hint]'))
+			}
 		};
 	});
 }
@@ -222,6 +229,33 @@ function expectGoodFan(fan: Fan, count: number, current: string, where: string) 
 		false
 	);
 
+	// The hint: at the top of the page, inside it, over nothing. Against the
+	// right edge when more than a third of the disk's radius is cut off
+	// there, centred over the disk otherwise (HINT_RIGHT_CUT).
+	const radius = (fan.disk.right - fan.disk.left) / 2;
+	const cut = Math.max(0, fan.disk.right - fan.viewport.width) / radius;
+	expect(
+		fan.hint.side,
+		`${where}: the hint's side, with ${cut.toFixed(2)} of the disk cut off`
+	).toBe(cut > 1 / 3 ? 'right' : 'centre');
+	const { box } = fan.hint;
+	expect(box.top, `${where}: the hint is at the top`).toBeLessThan(fan.navTop / 3);
+	expect(
+		box.left >= 0 && box.top >= 0 && box.right <= fan.viewport.width && box.bottom <= fan.navTop,
+		`${where}: the hint is on the page`
+	).toBe(true);
+	const covered = fan.options
+		.filter((option) => overlap(box, option.avatar) || overlap(box, option.label))
+		.map((option) => option.name);
+	expect(covered, `${where}: what the hint covers`).toEqual([]);
+	expect(overlap(box, fan.pill), `${where}: the hint covers the pill`).toBe(false);
+	// Right: 12px in from the edge. Centred: over the disk's centre.
+	const misplaced =
+		fan.hint.side === 'right'
+			? fan.viewport.width - box.right - 12
+			: (box.left + box.right) / 2 - (fan.disk.left + fan.disk.right) / 2;
+	expect(Math.abs(misplaced), `${where}: the hint is off its place by`).toBeLessThan(1);
+
 	// Only a partner's name is ever cut short, and it is still whole in the
 	// option's accessible name.
 	const cutShort = fan.options
@@ -277,9 +311,24 @@ test('the fan stays open through a resize, laid out again, and closes on a click
 	const { page } = ada;
 	const partner = LONG_NAME;
 	try {
-		await page.setViewportSize({ width: 1280, height: 800 });
+		await page.setViewportSize({ width: 1920, height: 1080 });
 		await openFan(page);
-		expectGoodFan(await readFan(page), 2, 'Everyone', 'laptop');
+		const wide = await readFan(page);
+		expectGoodFan(wide, 2, 'Everyone', 'desktop');
+		expect(wide.hint.side).toBe('centre');
+
+		// The hint is part of the fan, above the backdrop: what a pointer on
+		// it reaches is the hint, its words can be selected, and doing so
+		// leaves the fan open.
+		const hint = page.locator('[data-fan-hint]');
+		const onHint = await hint.evaluate((element) => {
+			const box = element.getBoundingClientRect();
+			return element.contains(document.elementFromPoint(box.left + box.width / 2, box.top + 6));
+		});
+		expect(onHint).toBe(true);
+		await hint.click({ clickCount: 3 });
+		expect(await page.evaluate(() => getSelection()?.toString() ?? '')).toContain('Tap one');
+		await expect(control(page)).toHaveAttribute('aria-expanded', 'true');
 
 		for (const viewport of [VIEWPORTS[0], VIEWPORTS[3], VIEWPORTS[1]]) {
 			if (!viewport) {
@@ -289,7 +338,11 @@ test('the fan stays open through a resize, laid out again, and closes on a click
 			await settled(page);
 			await expect(control(page)).toHaveAttribute('aria-expanded', 'true');
 			const where = `resized to ${viewport.width}×${viewport.height}`;
-			expectGoodFan(await readFan(page), 2, 'Everyone', where);
+			const resized = await readFan(page);
+			expectGoodFan(resized, 2, 'Everyone', where);
+			// Across the threshold and back: the phone's disk is cut off by
+			// half, the desktop's not at all.
+			expect(resized.hint.side, where).toBe(viewport.width < 1000 ? 'right' : 'centre');
 		}
 
 		// Off the fan, over the page: the bottom-left of the screen, clear of every option.
@@ -308,20 +361,61 @@ test('the fan stays open through a resize, laid out again, and closes on a click
 		await expect(control(page)).toHaveAttribute('aria-expanded', 'false');
 		expect(new URL(page.url()).pathname).toBe('/today');
 
-		// Over the disk, between its centre and the options.
+		// A mouse over a partner's wedge, well off their avatar, lights them and
+		// says a click will show them; off the disk, the one showing is lit
+		// again. Then a click in the middle of the disk, where no option's
+		// sector reaches, closes the fan.
 		await openFan(page);
 		const open = await readFan(page);
-		const towards = open.options.reduce(
-			(sum, option) => ({
-				x: sum.x + (option.avatar.left + option.avatar.right) / 2 / open.options.length,
-				y: sum.y + (option.avatar.top + option.avatar.bottom) / 2 / open.options.length
-			}),
-			{ x: 0, y: 0 }
+		const target = open.options.find((option) => option.name === 'Show Jun');
+		const targetCentre = {
+			x: ((target?.avatar.left ?? 0) + (target?.avatar.right ?? 0)) / 2,
+			y: ((target?.avatar.top ?? 0) + (target?.avatar.bottom ?? 0)) / 2
+		};
+		await page.mouse.move(
+			open.centre.x + (targetCentre.x - open.centre.x) * 0.55,
+			open.centre.y + (targetCentre.y - open.centre.y) * 0.55,
+			{ steps: 4 }
 		);
-		await page.mouse.click(
-			open.centre.x + (towards.x - open.centre.x) * 0.35,
-			Math.max(open.centre.y + (towards.y - open.centre.y) * 0.35, 4)
+		await expect(page.getByRole('button', { name: 'Show Jun', exact: true })).toHaveClass(
+			/hovered/
 		);
+		await expect(page.locator('[data-fan-hint]')).toContainText('Click to show Jun');
+		// Lit, Jun's avatar grows and its name moves down out of its way:
+		// nothing overlaps, its own avatar included.
+		await settled(page);
+		const lit = await readFan(page);
+		const jun = lit.options.find((option) => option.name === 'Show Jun');
+		expect(jun && overlap(jun.label, jun.avatar), 'Jun’s name under its grown avatar').toBe(false);
+		expectGoodFan(lit, 2, 'Everyone', 'Jun lit');
+		expect(
+			await page.locator('.backdrop').evaluate((element) => getComputedStyle(element).cursor)
+		).toBe('pointer');
+		await page.mouse.move(4, open.navTop - 4, { steps: 4 });
+		await expect(page.getByRole('button', { name: 'Show Jun', exact: true })).not.toHaveClass(
+			/hovered/
+		);
+		// Near the centre, inside the disk but in no option's sector, and clear
+		// of the hint (which is part of the fan, so a click on it keeps it open).
+		const inside = (box: Rect, x: number, y: number) =>
+			x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
+		const quiet = [20, 30, 40]
+			.flatMap((distance) =>
+				Array.from({ length: 24 }, (_, step) => ({
+					x: open.centre.x + distance * Math.cos((step * Math.PI) / 12),
+					y: open.centre.y + distance * Math.sin((step * Math.PI) / 12)
+				}))
+			)
+			.find(
+				(point) =>
+					point.x > 1 &&
+					point.y > 1 &&
+					point.x < open.viewport.width - 1 &&
+					!inside(open.hint.box, point.x, point.y) &&
+					!inside(open.pill, point.x, point.y)
+			);
+		expect(quiet, 'somewhere near the disk’s centre to click').toBeDefined();
+		await page.mouse.click(quiet?.x ?? 0, quiet?.y ?? 0);
 		await expect(control(page)).toHaveAttribute('aria-expanded', 'false');
 
 		// The morphed pill closes it too.
@@ -381,24 +475,79 @@ test('frames part way through opening and closing, to look at', async ({ browser
 		// options leaving the disk's centre, the pill leaving its place.
 		const devtools = await page.context().newCDPSession(page);
 		await devtools.send('Animation.enable');
+		await page.setViewportSize(PHONE);
+		await switchTo(page, LONG_NAME);
 		for (const viewport of [PHONE, { width: 1920, height: 1080 }]) {
 			await page.setViewportSize(viewport);
 			const size = `${viewport.width}x${viewport.height}`;
 			await devtools.send('Animation.setPlaybackRate', { playbackRate: 0.1 });
 			await control(page).click();
-			// biome-ignore lint/nursery/noPlaywrightWaitForTimeout: a frame at a moment in a slowed animation, which nothing on the page signals.
-			await page.waitForTimeout(2500);
-			await shot(page, `${size}-opening`);
-			// biome-ignore lint/nursery/noPlaywrightWaitForTimeout: as above, once the hint has come in.
-			await page.waitForTimeout(6000);
-			await shot(page, `${size}-opened-hint`);
+			for (const [at, name] of [
+				[1000, 'opening-1'],
+				[1000, 'opening-2'],
+				[1500, 'opening-3']
+			] as const) {
+				// biome-ignore lint/nursery/noPlaywrightWaitForTimeout: frames at moments in a slowed animation, which nothing on the page signals.
+				await page.waitForTimeout(at);
+				await shot(page, `${size}-${name}`);
+			}
+			await devtools.send('Animation.setPlaybackRate', { playbackRate: 1 });
+			await settled(page);
+			// The wedge at rest under a partner, the one showing.
+			await shot(page, `${size}-wedge-partner`);
+			await devtools.send('Animation.setPlaybackRate', { playbackRate: 0.1 });
 			await page.keyboard.press('Escape');
-			// biome-ignore lint/nursery/noPlaywrightWaitForTimeout: as above, part way back.
-			await page.waitForTimeout(2000);
-			await shot(page, `${size}-closing`);
+			for (const [at, name] of [
+				[1000, 'closing-1'],
+				[1000, 'closing-2'],
+				[1000, 'closing-3']
+			] as const) {
+				// biome-ignore lint/nursery/noPlaywrightWaitForTimeout: as above, on the way back.
+				await page.waitForTimeout(at);
+				await shot(page, `${size}-${name}`);
+			}
 			await devtools.send('Animation.setPlaybackRate', { playbackRate: 1 });
 			await expect(page.locator('[data-fan-option]')).toHaveCount(0);
+
+			// Slid onto "Add partner": the wedge under it in the accent.
+			await settled(page);
+			const pill = await control(page).boundingBox();
+			const start = { x: (pill?.x ?? 0) + 20, y: (pill?.y ?? 0) + 20 };
+			await page.mouse.move(start.x, start.y);
+			await page.mouse.down();
+			await page.mouse.move(start.x - 20, start.y + 20, { steps: 3 });
+			await settled(page);
+			const add = await page
+				.getByRole('link', { name: 'Add partner' })
+				.locator('[data-fan-avatar]')
+				.boundingBox();
+			await page.mouse.move(
+				(add?.x ?? 0) + (add?.width ?? 0) / 2,
+				(add?.y ?? 0) + (add?.height ?? 0) / 2,
+				{
+					steps: 5
+				}
+			);
+			await settled(page);
+			await shot(page, `${size}-wedge-add`);
+			// Let go over nothing, then close.
+			await page.mouse.move(2, (pill?.y ?? 0) + 400, { steps: 3 });
+			await page.mouse.up();
+			await closeFan(page);
 		}
+		// The hint gliding from centred over the disk to the right edge, as a
+		// resize crosses the threshold.
+		await page.setViewportSize({ width: 1920, height: 1080 });
+		await openFan(page);
+		await shot(page, '1920x1080-hint-centred');
+		await devtools.send('Animation.setPlaybackRate', { playbackRate: 0.1 });
+		await page.setViewportSize({ width: 900, height: 1080 });
+		// biome-ignore lint/nursery/noPlaywrightWaitForTimeout: a frame part way through a slowed glide, which nothing on the page signals.
+		await page.waitForTimeout(1500);
+		await shot(page, '900x1080-hint-moving');
+		await devtools.send('Animation.setPlaybackRate', { playbackRate: 1 });
+		await settled(page);
+		await shot(page, '900x1080-hint-right');
 		await devtools.detach();
 	} finally {
 		await ada.close();
