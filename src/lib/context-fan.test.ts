@@ -38,6 +38,7 @@ import {
 	roomBetween,
 	SPECTRUM_EDGE_WEIGHT,
 	SPECTRUM_SHARE,
+	sectorOf,
 	spectrumStops,
 	spreadEvenly,
 	stepAlong,
@@ -589,9 +590,48 @@ describe('where the hint goes', () => {
 });
 
 describe('optionAt', () => {
+	it('with wrapped ends, picks an option anywhere on the disk that shows, the far parts the nearer end’s', () => {
+		// The add button's fan: its disk goes on above the nav past the run of
+		// edge the avatars are spread along. Every point of it above the nav,
+		// outside the dead zone, is some option's.
+		for (const count of [2, 3, 5]) {
+			const bounds = shell(390, 784);
+			const centre = { x: 344, y: 738 };
+			const layout = layoutFan({ centre, bounds, count, clear: 30, wrapEnds: true });
+			for (let x = 0; x <= 390; x += 3) {
+				for (let y = 0; y <= 784; y += 3) {
+					const distance = Math.hypot(x - centre.x, y - centre.y);
+					if (distance > layout.disk - 0.5 || distance < DEAD_ZONE + 0.5) {
+						continue;
+					}
+					expect(optionAt(layout, { x, y }), `${count}: (${x}, ${y})`).not.toBeNull();
+				}
+			}
+			// Each avatar still in the middle of its share of the edge that
+			// shows, and picked there.
+			for (const [index, point] of layout.points.entries()) {
+				expect(optionAt(layout, point)).toBe(index);
+			}
+			// Just above the nav, left of the button, past the edge's run: the
+			// end option nearest the nav. Straight right of it, past the other
+			// end: the first.
+			expect(optionAt(layout, { x: centre.x - DEAD_ZONE - 10, y: 782 })).toBe(count - 1);
+			expect(optionAt(layout, { x: centre.x + DEAD_ZONE + 1, y: centre.y - 5 })).toBe(0);
+			// The sectors cover the whole circle, and the middle ones stay shares.
+			const sectors = layout.angles.map((_, index) => sectorOf(layout, index));
+			const total = sectors.reduce((sum, sector) => sum + sector.end - sector.start, 0);
+			expect(total).toBeCloseTo(360, 6);
+			for (const sector of sectors.slice(1, -1)) {
+				expect(sector.end - sector.start).toBeCloseTo(layout.step, 6);
+			}
+		}
+	});
+
 	it('picks nothing under the bottom nav: every sector is on the part of the disk that shows', () => {
 		// The add button's fan, whose disk runs on under the nav (left undimmed,
-		// taking its own taps). Every point under the nav and inside the disk.
+		// taking its own taps), without wrapped ends: every point under the nav
+		// and inside the disk. With them, `slotAt` in the fan itself keeps a
+		// pointer off the nav from picking anything.
 		for (const count of [2, 3, 5, 9]) {
 			const bounds = shell(390, 784);
 			const layout = layoutFan({ centre: { x: 344, y: 738 }, bounds, count, clear: 30 });
@@ -929,7 +969,7 @@ describe('wedgeSpan', () => {
 	});
 
 	it('is the part on what shows for a sector that runs past it', () => {
-		const past = { ...layout, angles: [layout.arc.end] };
+		const past = { ...layout, angles: [layout.arc.end], sectors: undefined };
 		expect(wedgeSpan(past, 0)).toEqual({ from: 0, to: layout.step / 2 });
 	});
 });

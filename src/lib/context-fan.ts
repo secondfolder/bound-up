@@ -401,12 +401,47 @@ export type FanLayout = {
 	disk: number;
 	/** False when nothing fitted and the options are drawn regardless, overlapping. */
 	fits: boolean;
+	/**
+	 * Each option's sector of the disk, in the fan's order: its share of
+	 * `arc`, or (`wrapEnds`) for the two at the ends, that and half each of
+	 * the rest of the circle. What its wedge draws and what a pointer there
+	 * picks. Absent, each is its `step`-wide share round its angle.
+	 */
+	sectors?: Arc[];
 };
 
 type Candidate = { radius: number; avatar: number; stagger: number; fit: Fit };
 
-function build(centre: Point, chosen: Candidate, count: number, fits: boolean): FanLayout {
+/**
+ * The sectors of a fan with its options' middles at `angles`, `step` apart
+ * along `arc`, first at its end: a share each, and with `wrapEnds` the two
+ * end options' running on round the rest of the circle to meet halfway.
+ */
+function sectorsFor(angles: readonly number[], step: number, arc: Arc, wrapEnds: boolean): Arc[] {
+	const sectors = angles.map((angle) => ({ start: angle - step / 2, end: angle + step / 2 }));
+	const rest = 360 - (arc.end - arc.start);
+	const [first] = sectors;
+	const last = sectors.at(-1);
+	if (!(wrapEnds && rest > 0 && first && last)) {
+		return sectors;
+	}
+	if (first === last) {
+		return [{ start: arc.start - rest / 2, end: arc.end + rest / 2 }];
+	}
+	first.end = arc.end + rest / 2;
+	last.start = arc.start - rest / 2;
+	return sectors;
+}
+
+function build(
+	centre: Point,
+	chosen: Candidate,
+	count: number,
+	fits: boolean,
+	wrapEnds: boolean
+): FanLayout {
 	const { radius, avatar, stagger, fit } = chosen;
+	const step = stepAlong(fit.arc, count);
 	return {
 		centre,
 		radius,
@@ -414,8 +449,9 @@ function build(centre: Point, chosen: Candidate, count: number, fits: boolean): 
 		avatar,
 		room: fit.room,
 		arc: fit.arc,
-		step: stepAlong(fit.arc, count),
+		step,
 		angles: fit.angles,
+		sectors: sectorsFor(fit.angles, step, fit.arc, wrapEnds),
 		points: fit.placed.map((angle, index) =>
 			pointAt(centre, radiusOf(index, radius, stagger), angle)
 		),
@@ -493,7 +529,8 @@ export function layoutFan({
 	centre,
 	bounds: shown,
 	count,
-	clear = null
+	clear = null,
+	wrapEnds = false
 }: {
 	centre: Point;
 	bounds: Box;
@@ -504,6 +541,14 @@ export function layoutFan({
 	 * at `MIN_RADIUS`, so the disk is only as big as its avatars need.
 	 */
 	clear?: number | null;
+	/**
+	 * Whether the two end options' sectors take the rest of the circle as
+	 * well as their share of what can be seen (`sectors`): for a fan whose
+	 * disk shows past the run of its edge the avatars are spread along (the
+	 * add button's, whose disk goes on above the nav at the far ends), so
+	 * every part of it that can be seen is some option's.
+	 */
+	wrapEnds?: boolean;
 }): FanLayout {
 	const bounds = inset(shown, EDGE_MARGIN);
 	const farthest = Math.max(
@@ -564,7 +609,7 @@ export function layoutFan({
 	const chosen =
 		centred && (!nudged || centred.avatar >= nudged.avatar) ? centred : (nudged ?? centred);
 	if (chosen) {
-		return build(centre, chosen, count, true);
+		return build(centre, chosen, count, true, wrapEnds);
 	}
 	// A window too small for any fan: the smallest avatars on the tightest
 	// ring, along whatever of it shows, overlapping as they must.
@@ -576,7 +621,8 @@ export function layoutFan({
 		centre,
 		{ radius: tightest, avatar, stagger: 0, fit: { room: 0, arc, angles, placed: angles } },
 		count,
-		false
+		false,
+		wrapEnds
 	);
 }
 
@@ -715,22 +761,37 @@ export function optionAt(
 	if (still && Math.hypot(at.x - still.x, at.y - still.y) < quiet) {
 		return null;
 	}
-	const { step } = layout;
 	const angle = (Math.atan2(at.y - layout.centre.y, at.x - layout.centre.x) * 180) / Math.PI;
-	const first = layout.angles[0] ?? 0;
-	// How far round from the first option, the way the options go (towards smaller angles).
-	let along = (((first - angle) % 360) + 360) % 360;
+	const sectors = layout.angles.map((_, index) => sectorOf(layout, index));
 	const whole = layout.arc.end - layout.arc.start >= 360;
-	if (!whole && along > 360 - step / 2) {
-		// Just past the first option, on its far side.
-		along -= 360;
+	for (const [index, sector] of sectors.entries()) {
+		// Half-open, the end with the larger angle belonging to the next
+		// option round, except at the fan's far end, where it is the last's.
+		const closed = !whole && index === sectors.length - 1;
+		for (const turn of [0, -360, 360, -720, 720]) {
+			const turned = angle + turn;
+			if (turned > sector.start && (turned < sector.end || (closed && turned === sector.end))) {
+				return index;
+			}
+			if (turned === sector.start) {
+				return index;
+			}
+		}
 	}
-	// `|| 0`: just before the first option rounds to -0.
-	const index = Math.round(along / step) || 0;
-	if (whole) {
-		return ((index % count) + count) % count;
+	return null;
+}
+
+/**
+ * The `index`th option's sector of the disk (`FanLayout.sectors`): what its
+ * wedge draws and what a pointer in it picks.
+ */
+export function sectorOf(layout: FanLayout, index: number): Arc {
+	const given = layout.sectors?.[index];
+	if (given) {
+		return given;
 	}
-	return index >= 0 && index < count ? index : null;
+	const angle = layout.angles[index] ?? 0;
+	return { start: angle - layout.step / 2, end: angle + layout.step / 2 };
 }
 
 /** How long an option takes to spring out of the disk's centre. */
@@ -936,12 +997,13 @@ export function spectrumStops(
  * colours there, and Everyone is always at an end.
  */
 export function wedgeSpan(layout: FanLayout, index: number): { from: number; to: number } {
+	const sector = sectorOf(layout, index);
+	const width = sector.end - sector.start;
 	if (layout.arc.end - layout.arc.start >= 360) {
-		return { from: 0, to: layout.step };
+		return { from: 0, to: width };
 	}
-	const start = (layout.angles[index] ?? 0) - layout.step / 2;
-	const from = Math.min(Math.max(0, layout.arc.start - start), layout.step);
-	const to = Math.max(Math.min(layout.step, layout.arc.end - start), from);
+	const from = Math.min(Math.max(0, layout.arc.start - sector.start), width);
+	const to = Math.max(Math.min(width, layout.arc.end - sector.start), from);
 	return { from, to };
 }
 

@@ -95,7 +95,13 @@ describe('the add button', () => {
 		);
 		expect(options).toEqual(['Add a task for me', 'Add a task for Jun', 'Add a task for Mo']);
 		// Nothing is selected yet: there is no "showing now" to start on.
-		expect(document.querySelector('.wedge')?.classList.contains('hidden')).toBe(true);
+		expect(document.querySelector('.wedge')).toBeNull();
+		// Lit, the wedge appears already in its own sector, rather than
+		// swinging round from the first option's as it fades in.
+		screen.getByRole('button', { name: 'Add a task for Jun' }).focus();
+		await vi.waitFor(() =>
+			expect(document.querySelector('.wedge')).toHaveAttribute('data-fan-wedge', JUN)
+		);
 		await userEvent.click(screen.getByRole('button', { name: 'Add a task for Jun' }));
 		expect(onadd).toHaveBeenCalledWith(JUN);
 		await vi.waitFor(() => expect(button).toHaveAttribute('aria-expanded', 'false'));
@@ -127,6 +133,64 @@ describe('the add button', () => {
 		await userEvent.keyboard('{Escape}');
 		await vi.waitFor(() => expect(document.querySelector('[data-fan-option]')).toBeNull());
 		expect(onadd).not.toHaveBeenCalled();
+	});
+
+	it('lights an avatar from anywhere on its disk above the nav, and nothing from the nav over it', async () => {
+		// Inside an app shell with its bottom nav, the button just above it,
+		// as on a list page.
+		const shell = document.createElement('div');
+		shell.setAttribute('data-app-shell', '');
+		shell.style.cssText = 'position: fixed; inset: 0; display: flex; flex-direction: column;';
+		const page = document.createElement('div');
+		page.style.cssText = 'flex: 1 1 auto; display: flex; flex-direction: column;';
+		const nav = document.createElement('nav');
+		nav.style.cssText = 'flex: none; block-size: 60px;';
+		shell.append(page, nav);
+		document.body.append(shell);
+		try {
+			const onadd = vi.fn();
+			render(AddButton, {
+				target: page,
+				props: {
+					label: 'Add a task',
+					lead: 'New task for',
+					targets: [SOLO, JUN],
+					spaces: [solo, jun, mo],
+					you: 'Ada',
+					onadd
+				}
+			});
+			const button = screen.getByRole('button', { name: /^Add a task: choose whose/ });
+			await userEvent.click(button);
+			const box = button.getBoundingClientRect();
+			const centre = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+			const navTop = nav.getBoundingClientRect().top;
+			const move = (x: number, y: number) =>
+				document.dispatchEvent(
+					new PointerEvent('pointermove', { pointerType: 'mouse', clientX: x, clientY: y })
+				);
+			const lit = () =>
+				document.querySelector('[data-fan-option].hovered')?.getAttribute('aria-label');
+			// Left of the button and a little above the nav, past the run of
+			// edge the avatars are spread along: the end option nearest it.
+			move(centre.x - 70, navTop - 4);
+			await vi.waitFor(() => expect(lit()).toBe('Add a task for Jun'));
+			// The same, a little lower, over the nav: nothing.
+			move(centre.x - 70, navTop + 4);
+			await vi.waitFor(() => expect(lit()).toBeUndefined());
+			// And a click there picks nothing.
+			document.elementFromPoint(centre.x - 70, navTop + 4)?.dispatchEvent(
+				new MouseEvent('click', {
+					bubbles: true,
+					detail: 1,
+					clientX: centre.x - 70,
+					clientY: navTop + 4
+				})
+			);
+			expect(onadd).not.toHaveBeenCalled();
+		} finally {
+			shell.remove();
+		}
 	});
 
 	it('waits while an add is under way', () => {

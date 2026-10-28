@@ -102,6 +102,7 @@
 				letGo={(option) => `Let go to ${option.label.charAt(0).toLowerCase()}${option.label.slice(1)}`}
 				{place}
 				hintFrom="disk"
+				wrapEnds
 				litLead={lead}
 				dimNav={false}
 				onpick={pick}

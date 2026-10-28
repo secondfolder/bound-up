@@ -468,10 +468,23 @@ What differs from the switcher's fan:
   the switcher's names say that themselves, these do not.
 - **The nav is left as it is** (`dimNav` off): the dim stops above it, and it
   takes its own taps, which close the fan on the way. Over it, nothing is
-  lit and a click picks nothing: every sector is a share of the disk's edge
-  above the nav, and a pointer anywhere off the part of the disk that can be
-  seen is over no option (`slotAt`), in either fan. The end sectors used to
-  run on under the nav, where a pointer lit the option above it.
+  lit and a click picks nothing: a pointer anywhere off the part of the disk
+  that can be seen is over no option (`slotAt`), in either fan.
+- **The end options take the rest of the disk** (`wrapEnds`). The avatars are
+  spread along the run of the disk's edge that can be seen, but the disk
+  itself goes on above the nav past both ends of it, beside and below the
+  button. Those parts belong to the two end options, each running on round
+  the circle to meet the other halfway (`FanLayout.sectors`), so a pointer
+  anywhere on the disk that shows lights one and a click there picks it, and
+  each end's wedge fills its part. The middle options' sectors stay their
+  shares of the edge. The wedge is drawn only while an option is lit, so the
+  first one lit (nothing is, on opening) has it appear in place and fade in;
+  moving straight from one lit option to the next it glides across, with the
+  fan's bounce, as the switcher's does. It used to wait unseen in the first
+  option's sector, so lighting the other first swung it round from there.
+  The switcher's fan has none of this: its disk is
+  centred on the screen's corner or top edge, and the rest of its circle is
+  off the screen.
 
 Its options are named for what picking does ("Add a task for Jun", "New note
 for me") and the button for what it asks ("Add a task: choose whose it’s

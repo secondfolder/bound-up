@@ -48,6 +48,7 @@
 		layoutFan,
 		optionAt,
 		optionTiming,
+		sectorOf,
 		wedgeGradient,
 		wedgePolygon,
 		wedgeShading,
@@ -76,6 +77,7 @@
 		letGo,
 		place,
 		hintFrom = 'top',
+		wrapEnds = false,
 		litLead = null,
 		dimNav = true,
 		onpick,
@@ -101,6 +103,12 @@
 		place: (anchor: DOMRect, shell: Box) => { centre: Point; home: Point; clear?: number };
 		/** Where the hint starts looking for room: the top of the page, or just above the disk. */
 		hintFrom?: HintFrom;
+		/**
+		 * Whether the two end options take the rest of the disk too (see
+		 * `layoutFan`): for a fan whose disk shows past the run of edge its
+		 * avatars are spread along, so every part of it that shows picks one.
+		 */
+		wrapEnds?: boolean;
 		/**
 		 * Over a lit option's name in the hint, small, saying what picking it
 		 * does: "New task for", over "Jun". None for the switcher, whose
@@ -160,7 +168,8 @@
 					centre: measured.centre,
 					bounds: measured.bounds,
 					count: keys.length,
-					clear: measured.clear ?? null
+					clear: measured.clear ?? null,
+					wrapEnds
 				})
 			: null
 	);
@@ -244,8 +253,11 @@
 			return null;
 		}
 		const index = selectedOption ? keys.indexOf(selectedOption.key) : -1;
-		const angle = layout.angles[Math.max(index, 0)] ?? 0;
-		const width = layout.step;
+		// Its sector, which for an end option of a fan with `wrapEnds` runs on
+		// round the rest of the circle: what a pointer anywhere in it picks.
+		const sector = sectorOf(layout, Math.max(index, 0));
+		const angle = (sector.start + sector.end) / 2;
+		const width = sector.end - sector.start;
 		const shading = wedgeShading(layout);
 		const share = (value: number) => `${(value * 100).toFixed(1)}%`;
 		// Solid in the selected context's colour; for Everyone, a pale blend
@@ -824,8 +836,15 @@
 				style:top="{measured.centre.y - measured.bounds.top - layout.disk}px"
 				style:--disk="{layout.disk * 2}px"
 			>
-				{#if wedge}
+				<!-- Only while something is selected, so the first one lit (in a fan
+				     that adds, where nothing is at first) has it appear in its own
+				     sector and fade in. Drawn throughout, it waited unseen in the
+				     first option's sector, and lighting another swung it round
+				     from there as it faded in. Moving from one lit option to the
+				     next, it is the same element, and glides. -->
+				{#if wedge && wedge.selected !== null}
 					<div
+						transition:fade
 						class="wedge"
 						class:hidden={wedge.hidden}
 						data-fan-wedge={wedge.selected}
