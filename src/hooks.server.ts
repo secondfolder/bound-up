@@ -82,6 +82,22 @@ export const handle: Handle = async ({ event, resolve }) => {
 		return resolve(event);
 	}
 
+	// `vite dev` builds `event.url` as http:// whatever the browser was on
+	// (kit hard-codes the scheme from `server.https`), and the dev tunnel ends
+	// TLS and forwards plain HTTP. So every link the server made — the email
+	// confirmation link from Better Auth's `baseURL`, recovery links, push
+	// notification URLs — said http:// for a page on https://, and opened
+	// where `crypto.subtle` is missing. The tunnel says what the browser used
+	// in `X-Forwarded-Proto`. Dev only: the Node build reads `ORIGIN` (or
+	// adapter-node's `PROTOCOL_HEADER`) instead, and Workers sees the real URL.
+	if (
+		dev &&
+		event.url.protocol === 'http:' &&
+		event.request.headers.get('x-forwarded-proto') === 'https'
+	) {
+		event.url.protocol = 'https:';
+	}
+
 	const db = await createDb(event);
 
 	// The auth secret is one of the server's settings, generated the first

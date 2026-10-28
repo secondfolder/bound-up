@@ -220,6 +220,12 @@ page. On a fresh deployment, sign up straight after the first deploy. See
   workerd.
 - **Passkeys are bound to a hostname.** One registered on `localhost` will not work
   on a tunnel host or in production, and vice versa. That is WebAuthn, not a bug.
+- **Through the tunnel, the server's URLs are https because the tunnel says
+  so.** `vite dev` always builds `event.url` as http://, and the tunnel forwards
+  plain HTTP, so `hooks.server.ts` takes the scheme from `X-Forwarded-Proto`.
+  Without that, emailed links and invite links said http://, and opened where
+  the browser has no `crypto.subtle`. A proxy of your own needs to send that
+  header too.
 - **Logging in and signing up need JavaScript, and always did.** Every text
   field is a `<wa-input>` custom element whose real `<input>` only exists once
   Web Awesome upgrades it, so with scripting off there are no usable inputs on

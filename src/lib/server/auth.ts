@@ -148,8 +148,11 @@ export function createAuth(db: Db, config: AuthRequestConfig) {
 		// builds `event.url` as http://<host> (kit hard-codes the scheme), so the
 		// browser's Origin header is https while baseURL is http. `validateOrigin`
 		// runs on every cookie-bearing POST to /api/auth/* and would reject it.
-		// Trusting both forms of the same host fixes that without changing
-		// baseURL, which `isAuthPath` compares against the request origin.
+		// `hooks.server.ts` now corrects the scheme from `X-Forwarded-Proto`, so
+		// through the Cloudflare tunnel the two already agree; this still covers
+		// a proxy that does not send that header. Trusting both forms of the same
+		// host fixes that without changing baseURL, which `isAuthPath` compares
+		// against the request origin.
 		trustedOrigins: [config.origin, `https://${config.host}`],
 		// Sign-up over HTTP is off: the app signs up only from the sign-up form
 		// action, which calls `auth.api.signUpEmail` in-process, where this does
