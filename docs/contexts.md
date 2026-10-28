@@ -246,7 +246,9 @@ current one is lit again. Keyboard focus on an option lights it too. Touch
 has no hover, so a tap-opened fan on touch shows the current context until a
 tap picks one.
 
-**The hint** (`hintPlacement`) is what to do ("Tap one, or next time hold
+**The hint** (`hintPlacement`; in the add button's fan, with a small "New
+task for" over the lit name, `litLead`, and its text at the bottom of its box,
+next to the disk below it) is what to do ("Tap one, or next time hold
 the button and slide"; "Slide onto one, then let go") while nothing is lit,
 and the lit option's name ("Jun", "Add partner") in its place while one is:
 the options carry no names of their own, so this is where a name is read.
@@ -287,14 +289,34 @@ The geometry is a pure module, `src/lib/context-fan.ts`, unit-tested in
   the end of the header's first line, that is the screen's top-right corner;
   on a wide screen, where the page column has a maximum width, it is beside
   the pill, well in from the corner.
-- **What the options use**: the longest unbroken run of the ring that can be
-  seen (`visibleArc`): the angles at which an option's avatar, lit, is
-  wholly inside the shell above its bottom nav, 8px in. A quarter of the ring
-  round a corner, a half round the middle of the top edge. The options are
-  spread evenly along all of it, first at one end and "Add partner" at the
-  other, so every pair of neighbours is the same angle apart. The disk is a
-  circle round the centre, clipped to the same area, and the wedge is as wide
-  as that angle.
+- **What the options use**: the part of the disk's edge that can be seen
+  (`visibleArc` of the disk's own radius): the disk is a circle round the
+  centre, clipped to the shell above its bottom nav, so a quarter of it round
+  a corner, a half round the middle of the top edge, and for the add button
+  the run from the screen's right edge round to the nav. It is shared out
+  into equal sectors, one per option in the fan's order (first at one end,
+  "Add partner" at the other), and each avatar sits **in the middle of its
+  sector** (`spreadEvenly`), so every pair of neighbours is the same angle
+  apart and each owns as much of what can be seen as the next. The wedge is
+  that sector. Avatars used to sit on the ends of the arc, which put half of
+  each end option's sector past the edge: on the add button's fan of two,
+  most of each one's share was under the nav.
+- **Centred unless it costs avatar size.** `layoutFan` looks for a fan with
+  every avatar in its sector's middle, and takes it unless the only such fan
+  has smaller avatars than one with its end ones moved: a crowded fan (six
+  partners round a phone's corner) centres only with the smallest avatars,
+  under a comfortable tap. There the end avatars, whose middles are too near
+  the screen's edge for an avatar, lit, to be wholly inside it 8px in, move
+  inward just as far as they must (`clampToArc`), a couple of degrees. Their
+  sectors, and so their wedges and what a slide picks, stay where they are.
+- **The disk is never so big that most of its edge is off the screen**
+  (`RIM_SHARE`): it must show at least three quarters of the edge that a
+  disk reaching only as far as the screen's far side (left or right, and top
+  or bottom, whichever is further) shows from the same centre: a quarter
+  round a corner, a half round the middle of the top edge. A larger ring makes room for
+  more avatars, but past the screen's far edges its disk shows less and less
+  of its edge; centring first found a fan of six partners along a sliver of
+  a 738px ring at the far bottom left of a phone.
 - **Sizes**: an option is only its avatar. `layoutFan` tries avatars from
   56px down to 36px and, for each, rings from 140px out; it takes the largest
   avatars whose smallest ring leaves 24px clear between the nearest two, one
@@ -427,11 +449,26 @@ What differs from the switcher's fan:
   opening moves onto the first option lights nothing; only a choice does.
 - **The button stays where it is**, rather than flying onto the ring, and
   turns its + into a × to say a tap closes it. The disk is centred on it.
+- **The disk is only as big as its avatars need.** Nothing in this fan is
+  text, so its ring starts just outside the button (`clear`, half the
+  button's measured size, in place of the switcher's 140px `MIN_RADIUS`) and
+  grows only until the avatars have room: two places to add to make a disk
+  of about 120px on a phone, where the switcher's ring would make it 180.
+  More places, a smaller window, or one resized smaller make it bigger, and
+  may stagger it into two rows; it is laid out again on every resize, so the
+  avatars move to their new places and the disk follows.
 - **The hint starts just above the disk** (`hintPlacement`'s `disk`), not at
   the top of the page, which on a phone is most of the screen away from a
-  fan at the bottom.
+  fan at the bottom. Its text sits at the bottom of its box, so it is next to
+  the disk however many lines it runs to, and a lit name has what picking it
+  does over it, small ("New task for", "New journal entry for"; `litLead`):
+  the switcher's names say that themselves, these do not.
 - **The nav is left as it is** (`dimNav` off): the dim stops above it, and it
-  takes its own taps, which close the fan on the way.
+  takes its own taps, which close the fan on the way. Over it, nothing is
+  lit and a click picks nothing: every sector is a share of the disk's edge
+  above the nav, and a pointer anywhere off the part of the disk that can be
+  seen is over no option (`slotAt`), in either fan. The end sectors used to
+  run on under the nav, where a pointer lit the option above it.
 
 Its options are named for what picking does ("Add a task for Jun", "New note
 for me") and the button for what it asks ("Add a task: choose whose it’s

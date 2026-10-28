@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/svelte';
 import { userEvent } from 'vitest/browser';
+import { defined } from '$lib/testing/defined';
 import { testNamesSource } from '$lib/testing/names';
 import type { ContextSpaceView } from '$lib/types';
 
@@ -54,7 +55,14 @@ afterEach(() => {
 
 function renderButton(targets: string[], onadd = vi.fn()) {
 	const result = render(AddButton, {
-		props: { label: 'Add a task', targets, spaces: [solo, jun, mo], you: 'Ada Lovelace', onadd }
+		props: {
+			label: 'Add a task',
+			lead: 'New task for',
+			targets,
+			spaces: [solo, jun, mo],
+			you: 'Ada Lovelace',
+			onadd
+		}
 	});
 	return { ...result, onadd };
 }
@@ -102,13 +110,20 @@ describe('the add button', () => {
 		expect(options).toEqual(['Add a task for me', 'Add a task for Mo']);
 	});
 
-	it('names the lit avatar where the hint is, and closes on Escape without adding', async () => {
+	it('names the lit avatar where the hint is, under what picking it does, and closes on Escape without adding', async () => {
 		const { onadd } = renderButton([SOLO, JUN]);
 		await userEvent.click(screen.getByRole('button', { name: /^Add a task: choose whose/ }));
-		const hint = () => document.querySelector('.hint-right')?.textContent?.trim();
+		const hint = () => document.querySelector('.hint-right .text')?.textContent?.trim();
+		const lead = () => document.querySelector('.hint-right .lead')?.textContent?.trim();
 		expect(hint()).toMatch(/^Tap whose it’s for/);
+		expect(lead()).toBeUndefined();
 		screen.getByRole('button', { name: 'Add a task for Jun' }).focus();
+		// The name, with what picking it does over it.
 		await vi.waitFor(() => expect(hint()).toBe('Jun'));
+		expect(lead()).toBe('New task for');
+		// Above the disk, at the bottom of its box, next to the disk.
+		const copy = defined(document.querySelector<HTMLElement>('.hint-right'), 'the hint');
+		expect(getComputedStyle(copy).justifyContent).toBe('flex-end');
 		await userEvent.keyboard('{Escape}');
 		await vi.waitFor(() => expect(document.querySelector('[data-fan-option]')).toBeNull());
 		expect(onadd).not.toHaveBeenCalled();
@@ -118,6 +133,7 @@ describe('the add button', () => {
 		render(AddButton, {
 			props: {
 				label: 'Add a task',
+				lead: 'New task for',
 				targets: [JUN],
 				spaces: [solo, jun],
 				you: 'Ada',

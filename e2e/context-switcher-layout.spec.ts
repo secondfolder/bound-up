@@ -212,11 +212,17 @@ function expectGoodFan(fan: Fan, count: number, current: string, where: string) 
 		const turn = (angles[index] ?? 0) - angle;
 		return (((turn * 180) / Math.PI + 540) % 360) - 180;
 	});
-	const spread = Math.max(...gaps) - Math.min(...gaps);
-	expect(
-		spread,
-		`${where}: the gaps between options are ${gaps.map((gap) => gap.toFixed(2))}`
-	).toBeLessThan(0.5);
+	// Each in the middle of an equal share of the disk's edge, so the gaps
+	// are equal; in a fan too crowded for that with comfortable avatars, the
+	// end ones move inward as far as they must, so the gaps at the ends may
+	// be a little smaller, never larger (docs/contexts.md, "The fan's layout").
+	const described = `${where}: the gaps between options are ${gaps.map((gap) => gap.toFixed(2))}`;
+	const middle = gaps.length > 2 ? gaps.slice(1, -1) : gaps;
+	expect(Math.max(...middle) - Math.min(...middle), described).toBeLessThan(0.5);
+	for (const end of [gaps[0] ?? 0, gaps.at(-1) ?? 0]) {
+		expect(end, described).toBeLessThan(Math.max(...middle) + 0.5);
+		expect(end, described).toBeGreaterThan(Math.min(...middle) * 0.7);
+	}
 
 	// The pill on the place of the one showing now.
 	const shown = fan.options.find((option) => option.current);

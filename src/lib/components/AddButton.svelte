@@ -27,10 +27,13 @@
 		spaces,
 		you,
 		onadd,
+		lead,
 		busy = false
 	}: {
 		/** What the button does, as its accessible name: "Add a task". */
 		label: string;
+		/** Over the lit avatar's name on the fan: "New task for". */
+		lead: string;
 		/** The ids of the spaces a new item may go to, in the switcher's order. */
 		targets: readonly string[];
 		/** The switcher's spaces, for each target's name, colour and avatar. */
@@ -58,10 +61,14 @@
 
 	let fan: ContextSelectorFan | undefined = $state();
 
-	/** The disk is centred on the button itself, which is also home. */
+	/**
+	 * The disk is centred on the button itself, which is also home, and the
+	 * ring starts just outside it: no names or text go in this fan, so its
+	 * disk need only be as big as its avatars.
+	 */
 	function place(box: DOMRect, _shell: Box) {
 		const centre = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
-		return { centre, home: centre };
+		return { centre, home: centre, clear: Math.max(box.width, box.height) / 2 };
 	}
 
 	function pick(key: string) {
@@ -95,6 +102,7 @@
 				letGo={(option) => `Let go to ${option.label.charAt(0).toLowerCase()}${option.label.slice(1)}`}
 				{place}
 				hintFrom="disk"
+				litLead={lead}
 				dimNav={false}
 				onpick={pick}
 			>

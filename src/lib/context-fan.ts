@@ -65,9 +65,29 @@ export const ROOM_GOOD = 12;
  * gives way to a staggered one, if that keeps them bigger.
  */
 export const ONE_RING_AVATAR = 48;
-/** The ring is never tighter than this, so a short fan still reads as a fan. */
+/**
+ * The switcher's ring is never tighter than this, so a short fan still reads
+ * as a fan round the pill. A fan given a `clear` radius (the add button's)
+ * starts just outside that instead.
+ */
 export const MIN_RADIUS = 140;
+
+/**
+ * The tightest ring for avatars of `avatar`: `MIN_RADIUS`, or with a `clear`
+ * radius round the centre (the trigger itself), just far enough out that a
+ * lit avatar keeps `OPTION_GAP` off it.
+ */
+export function minRadiusFor(avatar: number, clear: number | null): number {
+	return clear === null ? MIN_RADIUS : clear + avatar / 2 + hoverShift(avatar) + OPTION_GAP;
+}
 const RADIUS_STEP = 4;
+/**
+ * The least share of the edge a disk clear of the screen's far side shows
+ * from a centre that a fan's disk must show too. A larger ring makes room for more avatars, but
+ * past the screen's far edges its disk shows less and less of its edge, and
+ * the options went along a sliver of it at the far side of the screen.
+ */
+export const RIM_SHARE = 0.75;
 
 /** Where a disk centred for a control at `control` goes, inside the app shell `shell`. */
 export function fanCentre(control: { right: number; middle: number }, shell: Box): Point {
@@ -194,30 +214,57 @@ export function visibleArc(centre: Point, radius: number, bounds: Box, avatar: n
 }
 
 /**
- * `count` angles evenly spread along `arc`, the first at its end and the last
- * at its start: on a disk centred at the top of the screen that is left to
- * right, so the fan reads in the switcher's order. Round a whole ring they
- * are evenly spread round it instead, since its two ends are one place.
+ * `count` angles evenly spread along `arc`, each the middle of its own equal
+ * share of it (its sector), the first from its end and the last from its
+ * start: on a disk centred at the top of the screen that is left to right,
+ * so the fan reads in the switcher's order. Round a whole ring they are
+ * evenly spread round it, since its two ends are one place.
+ *
+ * In the middle of each share, not from end to end: with the end options on
+ * the arc's ends, half of each one's sector lay past the edge (under the nav,
+ * for the add button's fan), so the two of a small fan each owned less of
+ * what could be seen than it looked.
  */
 export function spreadEvenly(arc: Arc, count: number): number[] {
 	if (count <= 0) {
 		return [];
 	}
-	const span = arc.end - arc.start;
-	if (count === 1) {
-		return [arc.start + span / 2];
-	}
-	const step = span >= 360 ? 360 / count : span / (count - 1);
-	return Array.from({ length: count }, (_, index) => arc.end - index * step);
+	const step = stepAlong(arc, count);
+	const offset = arc.end - arc.start >= 360 ? 0 : step / 2;
+	return Array.from({ length: count }, (_, index) => arc.end - offset - index * step);
 }
 
-/** The angle between neighbours in a fan of `count` along `arc`. */
+/** Each option's share of `arc` in a fan of `count`: the angle between neighbours, and a sector's width. */
 export function stepAlong(arc: Arc, count: number): number {
 	const span = arc.end - arc.start;
-	if (count <= 1) {
-		return Math.min(span, 90);
+	if (count <= 0) {
+		return span;
 	}
-	return span >= 360 ? 360 / count : span / (count - 1);
+	return span >= 360 ? 360 / count : span / count;
+}
+
+/**
+ * `angle`, or the nearest angle in `arc` to it when it is outside: where an
+ * option whose sector's middle would put its avatar off the screen goes
+ * instead, as little nearer the middle as fits.
+ */
+export function clampToArc(angle: number, arc: Arc): number {
+	if (arc.end - arc.start >= 360) {
+		return angle;
+	}
+	for (const turn of [0, -360, 360]) {
+		const turned = angle + turn;
+		if (turned >= arc.start && turned <= arc.end) {
+			return angle;
+		}
+	}
+	const distance = (to: number) => {
+		const apart = Math.abs(((((angle - to) % 360) + 540) % 360) - 180);
+		return apart;
+	};
+	const nearer = distance(arc.start) <= distance(arc.end) ? arc.start : arc.end;
+	// Into `angle`'s own turn, so it reads as a move from it rather than a lap.
+	return nearer + Math.round((angle - nearer) / 360) * 360;
 }
 
 /**
@@ -237,7 +284,19 @@ export function roomBetween(points: readonly Point[], avatar: number): number {
 	return room;
 }
 
-type Fit = { room: number; arc: Arc };
+/**
+ * A fan that fits: the room it leaves between avatars, the arc of the disk's
+ * edge that can be seen (spread into the sectors), each option's sector's
+ * middle (`angles`), and the angle its avatar is drawn at (`placed`): the
+ * same, or nearer the middle where the sector's middle would put the avatar
+ * off the screen.
+ */
+type Fit = { room: number; arc: Arc; angles: number[]; placed: number[] };
+
+/** The disk's radius for a fan whose (outer) avatars of `avatar` are on the ring of `radius`. */
+function diskRadius(radius: number, avatar: number): number {
+	return radius + avatar / 2 + hoverShift(avatar) + 12;
+}
 
 /** The radius of the `index`th option: every other one is `stagger` further in. */
 function radiusOf(index: number, radius: number, stagger: number): number {
@@ -264,31 +323,47 @@ function sharedArc(a: Arc, b: Arc): Arc | null {
 }
 
 /**
- * The arc a fan of `count` avatars of `avatar` on the ring of `radius`
- * (every other one `stagger` further in, when crowded) goes on, and the room
- * it leaves between them; null when some part of it would not show, or two
- * avatars would come closer than `OPTION_GAP`.
+ * A fan of `count` avatars of `avatar` on the ring of `radius` (every other
+ * one `stagger` further in, when crowded): the part of the disk's edge that
+ * can be seen inside `shown` is shared out into equal sectors, each avatar in
+ * the middle of its own, or as near it as an avatar wholly inside `bounds`
+ * can be. Null when no avatar fits, or two would come closer than
+ * `OPTION_GAP`, or (`centred`) any avatar is not in its sector's middle.
  */
 function fitRing(
 	centre: Point,
 	radius: number,
 	bounds: Box,
+	shown: Box,
 	count: number,
 	avatar: number,
-	stagger: number
+	stagger: number,
+	centred: boolean,
+	minRim: number
 ): Fit | null {
 	const outer = visibleArc(centre, radius, bounds, avatar);
 	const inner =
 		stagger > 0 && count > 1 ? visibleArc(centre, radius - stagger, bounds, avatar) : outer;
-	const arc = outer && inner ? sharedArc(outer, inner) : null;
-	if (!arc) {
+	const fits = outer && inner ? sharedArc(outer, inner) : null;
+	// The disk's edge, clipped as the disk is drawn: to what can be seen.
+	const rim = fits ? visibleArc(centre, diskRadius(radius, avatar), shown, 0) : null;
+	// A disk so big that most of its edge is off the screen strings the
+	// options along whatever sliver shows, far from the control: kept to a
+	// good share of what a small disk shows from the same centre.
+	if (!(fits && rim) || rim.end - rim.start < minRim) {
 		return null;
 	}
-	const points = spreadEvenly(arc, count).map((angle, index) =>
+	const angles = spreadEvenly(rim, count);
+	const placed = angles.map((angle) => clampToArc(angle, fits));
+	// Asked for every avatar in the middle of its sector: none may have moved.
+	if (centred && placed.some((angle, index) => Math.abs(angle - (angles[index] ?? angle)) > 1e-6)) {
+		return null;
+	}
+	const points = placed.map((angle, index) =>
 		pointAt(centre, radiusOf(index, radius, stagger), angle)
 	);
 	const room = roomBetween(points, avatar);
-	return room >= OPTION_GAP ? { room, arc } : null;
+	return room >= OPTION_GAP ? { room, arc: rim, angles, placed } : null;
 }
 
 export type FanLayout = {
@@ -303,13 +378,16 @@ export type FanLayout = {
 	avatar: number;
 	/** The clear space between the two nearest avatars, either lit. */
 	room: number;
-	/** The part of the ring the options are spread along. */
+	/** The part of the disk's edge that can be seen, shared out into the options' sectors. */
 	arc: Arc;
-	/** The angle between neighbours, and so the selection wedge's width. */
+	/** Each sector's width, the angle between neighbours, and so the selection wedge's width. */
 	step: number;
-	/** Each option's angle, in the switcher's order. */
+	/** The middle of each option's sector, in the fan's order: where its wedge points. */
 	angles: number[];
-	/** Each option's avatar's centre, in the switcher's order. */
+	/**
+	 * Each option's avatar's centre, in the fan's order: in the middle of its
+	 * sector, or as near it as the avatar fits on the screen.
+	 */
 	points: Point[];
 	/** The disk's radius: past the avatars of the options on the ring. */
 	disk: number;
@@ -321,7 +399,6 @@ type Candidate = { radius: number; avatar: number; stagger: number; fit: Fit };
 
 function build(centre: Point, chosen: Candidate, count: number, fits: boolean): FanLayout {
 	const { radius, avatar, stagger, fit } = chosen;
-	const angles = spreadEvenly(fit.arc, count);
 	return {
 		centre,
 		radius,
@@ -330,9 +407,11 @@ function build(centre: Point, chosen: Candidate, count: number, fits: boolean): 
 		room: fit.room,
 		arc: fit.arc,
 		step: stepAlong(fit.arc, count),
-		angles,
-		points: angles.map((angle, index) => pointAt(centre, radiusOf(index, radius, stagger), angle)),
-		disk: radius + avatar / 2 + hoverShift(avatar) + 12,
+		angles: fit.angles,
+		points: fit.placed.map((angle, index) =>
+			pointAt(centre, radiusOf(index, radius, stagger), angle)
+		),
+		disk: diskRadius(radius, avatar),
 		fits
 	};
 }
@@ -346,16 +425,24 @@ function build(centre: Point, chosen: Candidate, count: number, fits: boolean): 
 function search(
 	centre: Point,
 	bounds: Box,
+	shown: Box,
 	count: number,
 	farthest: number,
-	stagger: (avatar: number) => number
+	stagger: (avatar: number) => number,
+	centred: boolean,
+	minRim: number,
+	clear: number | null
 ): Candidate | null {
 	const roomiest: Candidate[] = [];
 	for (const avatar of AVATAR_SIZES) {
 		let best: Candidate | null = null;
 		const inward = stagger(avatar);
-		for (let radius = MIN_RADIUS + inward; radius <= farthest; radius += RADIUS_STEP) {
-			const fit = fitRing(centre, radius, bounds, count, avatar, inward);
+		for (
+			let radius = minRadiusFor(avatar, clear) + inward;
+			radius <= farthest;
+			radius += RADIUS_STEP
+		) {
+			const fit = fitRing(centre, radius, bounds, shown, count, avatar, inward, centred, minRim);
 			if (!fit) {
 				continue;
 			}
@@ -384,9 +471,10 @@ function search(
  * The fan for `count` options round `centre`, inside `bounds` (what can be
  * seen of the app shell above its bottom nav).
  *
- * The options go evenly along all of the ring that can be seen, which is a
+ * The options share out evenly the disk's edge that can be seen, which is a
  * quarter when the centre is a corner and a half when it is the middle of the
- * top edge. Of the layouts where no avatar collides, it takes the largest
+ * top edge, each avatar in the middle of its share where any layout lets
+ * every one be (see `fitRing`). Of the layouts where no avatar collides, it takes the largest
  * avatars, and for those the smallest ring that leaves them `ROOM_TARGET`
  * apart (see `search`). A fan that one ring cannot leave even `ROOM_GOOD`
  * with avatars of `ONE_RING_AVATAR` (many partners on a phone's quarter
@@ -396,11 +484,18 @@ function search(
 export function layoutFan({
 	centre,
 	bounds: shown,
-	count
+	count,
+	clear = null
 }: {
 	centre: Point;
 	bounds: Box;
 	count: number;
+	/**
+	 * A radius round the centre to keep clear, for a fan round its own
+	 * trigger (the add button): the ring starts just outside it rather than
+	 * at `MIN_RADIUS`, so the disk is only as big as its avatars need.
+	 */
+	clear?: number | null;
 }): FanLayout {
 	const bounds = inset(shown, EDGE_MARGIN);
 	const farthest = Math.max(
@@ -411,19 +506,16 @@ export function layoutFan({
 			[bounds.right, bounds.bottom]
 		].map(([x = 0, y = 0]) => Math.hypot(x - centre.x, y - centre.y))
 	);
-	const single = search(centre, bounds, count, farthest, () => 0);
-	if (single && single.fit.room >= ROOM_GOOD && single.avatar >= ONE_RING_AVATAR) {
-		return build(centre, single, count, true);
-	}
-	// A row in by an avatar, grown, so an inner option sits between its outer
-	// neighbours rather than on them.
-	const staggered = search(
-		centre,
-		bounds,
-		count,
-		farthest,
-		(diameter) => diameter + 2 * hoverShift(diameter) + OPTION_GAP
+	// How much of its edge a disk shows from here as long as it stays clear
+	// of the screen's far side, left or right and top or bottom, whichever is
+	// further away: a quarter round a corner, a half round the middle of the
+	// top edge. A disk past them shows less and less of its edge.
+	const reach = Math.min(
+		Math.max(centre.x - shown.left, shown.right - centre.x),
+		Math.max(centre.y - shown.top, shown.bottom - centre.y)
 	);
+	const natural = visibleArc(centre, reach, shown, 0);
+	const minRim = natural ? (natural.end - natural.start) * RIM_SHARE : 0;
 	// Room first, then the larger avatars, then the roomier fan.
 	const better = (a: Candidate, b: Candidate) => {
 		const roomy = a.fit.room >= ROOM_GOOD;
@@ -435,17 +527,46 @@ export function layoutFan({
 		}
 		return a.fit.room > b.fit.room;
 	};
-	const chosen = staggered && (!single || better(staggered, single)) ? staggered : single;
+	const choose = (strict: boolean): Candidate | null => {
+		const single = search(centre, bounds, shown, count, farthest, () => 0, strict, minRim, clear);
+		if (single && single.fit.room >= ROOM_GOOD && single.avatar >= ONE_RING_AVATAR) {
+			return single;
+		}
+		// A row in by an avatar, grown, so an inner option sits between its
+		// outer neighbours rather than on them.
+		const staggered = search(
+			centre,
+			bounds,
+			shown,
+			count,
+			farthest,
+			(diameter) => diameter + 2 * hoverShift(diameter) + OPTION_GAP,
+			strict,
+			minRim,
+			clear
+		);
+		return staggered && (!single || better(staggered, single)) ? staggered : single;
+	};
+	// Every avatar in the middle of its sector, unless that costs avatar
+	// size: a crowded fan (six partners round a phone's corner) is centred
+	// only with the smallest avatars, under a comfortable tap, so there the
+	// larger ones stay and the end ones move inward as far as they must.
+	const centred = choose(true);
+	const nudged = choose(false);
+	const chosen =
+		centred && (!nudged || centred.avatar >= nudged.avatar) ? centred : (nudged ?? centred);
 	if (chosen) {
 		return build(centre, chosen, count, true);
 	}
 	// A window too small for any fan: the smallest avatars on the tightest
 	// ring, along whatever of it shows, overlapping as they must.
 	const avatar = AVATAR_SIZES.at(-1) ?? 36;
-	const arc = visibleArc(centre, MIN_RADIUS, bounds, avatar) ?? { start: 90, end: 180 };
+	const tightest = minRadiusFor(avatar, clear);
+	const arc = visibleArc(centre, tightest, bounds, avatar) ?? { start: 90, end: 180 };
+	const angles = spreadEvenly(arc, count);
 	return build(
 		centre,
-		{ radius: MIN_RADIUS, avatar, stagger: 0, fit: { room: 0, arc } },
+		{ radius: tightest, avatar, stagger: 0, fit: { room: 0, arc, angles, placed: angles } },
 		count,
 		false
 	);
@@ -800,25 +921,20 @@ export function spectrumStops(
 
 /**
  * The part of the `index`th option's wedge, in degrees from the wedge's
- * start (`step` wide in all), that can be seen: an end option sits where
- * its avatar touches the screen's edge, so half its sector, the half past
- * it, is off the screen. A spectrum spread over the whole sector lost half
- * its colours there, and Everyone is always at an end. Out to the far edge
- * of the avatar, so the last colour still reaches past it.
+ * start (`step` wide in all), that is on the part of the disk's edge that
+ * can be seen (`layout.arc`). Each sector is a share of that arc, so this is
+ * the whole wedge; it is kept for a fan that drew nothing that fits, whose
+ * sectors may run past it. A spectrum spread past what can be seen lost its
+ * colours there, and Everyone is always at an end.
  */
 export function wedgeSpan(layout: FanLayout, index: number): { from: number; to: number } {
-	const angle = layout.angles[index] ?? 0;
-	const start = angle - layout.step / 2;
-	const radius = Math.max(layout.radius - layout.stagger, 1);
-	const reach =
-		(Math.asin(Math.min(1, (layout.avatar / 2 + EDGE_MARGIN) / radius)) * 180) / Math.PI;
 	if (layout.arc.end - layout.arc.start >= 360) {
 		return { from: 0, to: layout.step };
 	}
-	return {
-		from: Math.max(0, layout.arc.start - reach - start),
-		to: Math.min(layout.step, layout.arc.end + reach - start)
-	};
+	const start = (layout.angles[index] ?? 0) - layout.step / 2;
+	const from = Math.min(Math.max(0, layout.arc.start - start), layout.step);
+	const to = Math.max(Math.min(layout.step, layout.arc.end - start), from);
+	return { from, to };
 }
 
 /**

@@ -322,6 +322,7 @@
 
 	<AddButton
 		label={ADD_LABEL[tab]}
+		lead={`${ADD_LABEL[tab]} for`}
 		targets={spaces.map((space) => space.id)}
 		spaces={contextSpaces}
 		{you}

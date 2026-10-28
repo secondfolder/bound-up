@@ -15,10 +15,12 @@ import {
 	fanDuration,
 	HINT_INSET,
 	HINT_RIGHT_CUT,
+	HOVER_SCALE,
 	hintPlacement,
 	hintSide,
 	hoverShift,
 	layoutFan,
+	MIN_RADIUS,
 	OPTION_GAP,
 	OPTION_MS,
 	OPTION_STAGGER_MS,
@@ -28,6 +30,7 @@ import {
 	optionTiming,
 	pillDuration,
 	pointAt,
+	RIM_SHARE,
 	ROOM_GOOD,
 	ROOM_TARGET,
 	rightCut,
@@ -168,9 +171,9 @@ describe('visibleArc', () => {
 });
 
 describe('spreadEvenly', () => {
-	it('puts the first at the arc’s end and the last at its start, evenly between', () => {
-		expect(spreadEvenly({ start: 90, end: 180 }, 4)).toEqual([180, 150, 120, 90]);
-		expect(stepAlong({ start: 90, end: 180 }, 4)).toBe(30);
+	it('shares the arc out evenly, each in the middle of its share, from the arc’s end', () => {
+		expect(spreadEvenly({ start: 90, end: 180 }, 4)).toEqual([168.75, 146.25, 123.75, 101.25]);
+		expect(stepAlong({ start: 90, end: 180 }, 4)).toBe(22.5);
 	});
 
 	it('puts one in the middle, and spaces a whole ring by its count', () => {
@@ -260,11 +263,132 @@ describe('layoutFan', () => {
 		}
 	}
 
-	it('centres a phone’s fan on the corner and uses its quarter', () => {
+	it('centres a phone’s fan on the corner and shares out its quarter', () => {
 		const layout = layoutFan({ centre: { x: 390, y: 0 }, bounds: shell(390, 774), count: 4 });
-		expect(layout.arc.start).toBeGreaterThan(90);
-		expect(layout.arc.end).toBeLessThan(180);
+		// The disk's edge that shows is the whole quarter, each option a share of it.
+		expect(layout.arc.start).toBeCloseTo(90, 1);
+		expect(layout.arc.end).toBeCloseTo(180, 1);
+		expect(layout.step).toBeCloseTo(90 / 4, 1);
 		expect(layout.avatar).toBe(AVATAR_SIZES[0]);
+	});
+
+	it('draws each avatar in the middle of its share of the edge that shows', () => {
+		// The add button's fan with two places to add to: the disk's edge runs
+		// from the screen's right edge round to the nav, and each avatar sits
+		// in the middle of its half of it, not at the ends, which left half of
+		// each one's sector under the nav.
+		const bounds = shell(390, 784);
+		const centre = { x: 344, y: 738 };
+		const layout = layoutFan({ centre, bounds, count: 2 });
+		expect(layout.step).toBeCloseTo((layout.arc.end - layout.arc.start) / 2, 6);
+		for (const [index, point] of layout.points.entries()) {
+			const angle = (Math.atan2(point.y - centre.y, point.x - centre.x) * 180) / Math.PI;
+			const middle = layout.angles[index] ?? 0;
+			expect(((angle - middle + 540) % 360) - 180).toBeCloseTo(0, 6);
+		}
+		// The two sectors meet in the middle of what shows.
+		expect((layout.angles[0] ?? 0) - layout.step / 2).toBeCloseTo(
+			(layout.angles[1] ?? 0) + layout.step / 2,
+			6
+		);
+	});
+
+	/** How far each avatar is from the middle of its sector, in degrees. */
+	const offMiddle = (layout: FanLayout) =>
+		layout.points.map((point, index) => {
+			const angle =
+				(Math.atan2(point.y - layout.centre.y, point.x - layout.centre.x) * 180) / Math.PI;
+			return ((angle - (layout.angles[index] ?? 0) + 540) % 360) - 180;
+		});
+
+	it('centres every avatar where that costs no avatar size, on a phone and wider', () => {
+		for (const [width, height, centre, count] of [
+			[390, 774, 390, 5],
+			[390, 774, 390, 7],
+			[768, 954, 768, 9],
+			[1920, 1010, 1272, 9]
+		] as const) {
+			const layout = layoutFan({
+				centre: { x: centre, y: 0 },
+				bounds: shell(width, height),
+				count
+			});
+			for (const off of offMiddle(layout)) {
+				expect(off, `${width}×${height}, ${count}`).toBeCloseTo(0, 6);
+			}
+		}
+		// And the add button's, at the bottom right.
+		const fab = layoutFan({ centre: { x: 344, y: 738 }, bounds: shell(390, 784), count: 7 });
+		for (const off of offMiddle(fab)) {
+			expect(off).toBeCloseTo(0, 6);
+		}
+	});
+
+	it('moves only a crowded fan’s end avatars inward, a little, rather than shrink every avatar', () => {
+		// Six partners round a phone's corner: centred only with the smallest
+		// avatars, under a comfortable tap.
+		const bounds = shell(390, 774);
+		const layout = layoutFan({ centre: { x: 390, y: 0 }, bounds, count: 9 });
+		expect(layout.avatar).toBeGreaterThan(AVATAR_SIZES.at(-1) ?? 36);
+		const off = offMiddle(layout);
+		// The middle ones in the middle; the ends inward, towards the middle.
+		for (const value of off.slice(1, -1)) {
+			expect(value).toBeCloseTo(0, 6);
+		}
+		expect(Math.abs(off[0] ?? 0)).toBeGreaterThan(0);
+		expect(Math.abs(off[0] ?? 0)).toBeLessThan(layout.step / 2);
+		expect(outside(layout, bounds)).toEqual([]);
+		expect(collisions(layout)).toEqual([]);
+		// The sectors stay an even share of the quarter, wherever the avatars are.
+		expect(Math.max(...unevenness(layout))).toBe(0);
+	});
+
+	it('round its own trigger, keeps the disk only as big as its avatars need', () => {
+		// The add button: a 60px button, nothing in the fan but avatars.
+		const bounds = shell(390, 784);
+		const centre = { x: 344, y: 738 };
+		const tight = layoutFan({ centre, bounds, count: 2, clear: 30 });
+		const loose = layoutFan({ centre, bounds, count: 2 });
+		expect(tight.disk).toBeLessThan(loose.disk);
+		expect(tight.radius).toBeLessThan(MIN_RADIUS);
+		// Still room between them, and clear of the button, lit.
+		expect(tight.room).toBeGreaterThanOrEqual(ROOM_TARGET);
+		for (const point of tight.points) {
+			const reach = tight.avatar / 2 + (tight.avatar * (HOVER_SCALE - 1)) / 2;
+			expect(Math.hypot(point.x - centre.x, point.y - centre.y) - reach).toBeGreaterThanOrEqual(30);
+		}
+	});
+
+	it('round its own trigger, lays out again as the window changes: rows, sizes and the disk', () => {
+		// Many places to add to, in windows from a phone to a desktop:
+		// wherever it lands, a fan that fits, clear of the button, every avatar on the
+		// screen and none on another; and it staggers where it must.
+		const staggered = new Set<boolean>();
+		for (const [width, height] of [
+			[390, 520],
+			[390, 784],
+			[768, 954],
+			[1280, 740],
+			[1920, 1010]
+		] as const) {
+			const bounds = shell(width, height);
+			const centre = { x: width - 46, y: height - 46 };
+			const layout = layoutFan({ centre, bounds, count: 9, clear: 30 });
+			const where = `${width}×${height}`;
+			expect(layout.fits, where).toBe(true);
+			expect(collisions(layout), where).toEqual([]);
+			expect(outside(layout, bounds), where).toEqual([]);
+			for (const point of layout.points) {
+				expect(Math.hypot(point.x - centre.x, point.y - centre.y)).toBeGreaterThan(30);
+			}
+			staggered.add(layout.stagger > 0);
+		}
+		expect([...staggered].sort()).toEqual([false, true]);
+	});
+
+	it('never takes a disk so big that most of its edge is off the screen', () => {
+		const layout = layoutFan({ centre: { x: 390, y: 0 }, bounds: shell(390, 774), count: 9 });
+		expect(layout.arc.end - layout.arc.start).toBeGreaterThanOrEqual(90 * RIM_SHARE);
 	});
 
 	it('uses the whole half of the ring that shows round a control away from the corner', () => {
@@ -443,7 +567,10 @@ describe('where the hint goes', () => {
 		const steps = places
 			.slice(1)
 			.map((place, index) => Math.abs(place.x - (places[index]?.x ?? 0)));
-		expect(Math.max(...steps)).toBeLessThan(40);
+		// Each option now sits in the middle of its share of the edge, which
+		// moves a little more as the share changes than an option pinned to
+		// the arc's end did.
+		expect(Math.max(...steps)).toBeLessThan(48);
 	});
 
 	it('moves down when the top row is taken', () => {
@@ -457,6 +584,24 @@ describe('where the hint goes', () => {
 });
 
 describe('optionAt', () => {
+	it('picks nothing under the bottom nav: every sector is on the part of the disk that shows', () => {
+		// The add button's fan, whose disk runs on under the nav (left undimmed,
+		// taking its own taps). Every point under the nav and inside the disk.
+		for (const count of [2, 3, 5, 9]) {
+			const bounds = shell(390, 784);
+			const layout = layoutFan({ centre: { x: 344, y: 738 }, bounds, count, clear: 30 });
+			for (let x = 0; x <= 390; x += 4) {
+				for (let y = 785; y <= 844; y += 4) {
+					expect(optionAt(layout, { x, y }), `${count}: (${x}, ${y})`).toBeNull();
+				}
+			}
+			// While the visible part of each sector, beside its avatar, picks it.
+			for (const [index, point] of layout.points.entries()) {
+				expect(optionAt(layout, point)).toBe(index);
+			}
+		}
+	});
+
 	/** A hand-made fan: options every 30° from 180 (left) to 90 (down), on a 300 ring. */
 	const quarter: FanLayout = {
 		centre: { x: 400, y: 0 },
@@ -769,14 +914,17 @@ describe('wedgeSpan', () => {
 		expect(wedgeSpan(layout, 2)).toEqual({ from: 0, to: layout.step });
 	});
 
-	it('is the half on the screen for one at an end, out past its avatar', () => {
+	it('is the whole wedge for one at an end too: every sector is a share of what shows', () => {
 		const first = wedgeSpan(layout, 0);
-		expect(first.from).toBe(0);
-		expect(first.to).toBeGreaterThan(layout.step / 2);
-		expect(first.to).toBeLessThan(layout.step);
+		expect(first.from).toBeCloseTo(0, 6);
+		expect(first.to).toBeCloseTo(layout.step, 6);
 		const last = wedgeSpan(layout, 4);
-		expect(last.from).toBeGreaterThan(0);
-		expect(last.from).toBeLessThan(layout.step / 2);
-		expect(last.to).toBe(layout.step);
+		expect(last.from).toBeCloseTo(0, 6);
+		expect(last.to).toBeCloseTo(layout.step, 6);
+	});
+
+	it('is the part on what shows for a sector that runs past it', () => {
+		const past = { ...layout, angles: [layout.arc.end] };
+		expect(wedgeSpan(past, 0)).toEqual({ from: 0, to: layout.step / 2 });
 	});
 });

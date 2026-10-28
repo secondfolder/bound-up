@@ -76,6 +76,7 @@
 		letGo,
 		place,
 		hintFrom = 'top',
+		litLead = null,
 		dimNav = true,
 		onpick,
 		trigger
@@ -93,11 +94,19 @@
 		letGo: (option: FanOption) => string;
 		/**
 		 * Where the disk is centred, and where home is for a trigger that flies
-		 * (its avatar's centre), from the anchor's box and the app shell's.
+		 * (its avatar's centre), from the anchor's box and the app shell's; and
+		 * for a fan round its own trigger, the radius to keep clear (`clear`),
+		 * so the disk is only as big as its avatars need.
 		 */
-		place: (anchor: DOMRect, shell: Box) => { centre: Point; home: Point };
+		place: (anchor: DOMRect, shell: Box) => { centre: Point; home: Point; clear?: number };
 		/** Where the hint starts looking for room: the top of the page, or just above the disk. */
 		hintFrom?: HintFrom;
+		/**
+		 * Over a lit option's name in the hint, small, saying what picking it
+		 * does: "New task for", over "Jun". None for the switcher, whose
+		 * names say it themselves.
+		 */
+		litLead?: string | null;
 		/** Whether the dim covers the bottom nav too, or stops above it and leaves it as it is. */
 		dimNav?: boolean;
 		onpick: (key: string) => void;
@@ -111,9 +120,10 @@
 
 	/**
 	 * The hint's box: at most three lines of help, or two of a lit option's
-	 * name at its much larger size, wrapping within this width.
+	 * name at its much larger size, wrapping within this width; a line taller
+	 * with a lead over the name (`litLead`).
 	 */
-	const HINT = { width: 150, height: 60 };
+	const HINT = $derived({ width: 150, height: litLead ? 78 : 60 });
 
 	const keys = $derived(options.map((option) => option.key));
 
@@ -133,11 +143,25 @@
 	 * trigger sits in the page. Kept after closing, so the options leaving
 	 * still know where they are going back to.
 	 */
-	let measured = $state<{ centre: Point; bounds: Box; shell: Box; home: Point } | null>(null);
+	let measured = $state<{
+		centre: Point;
+		bounds: Box;
+		shell: Box;
+		home: Point;
+		clear?: number;
+	} | null>(null);
 
+	// Laid out again whenever `measured` changes, on a resize included: the
+	// avatars' size, the ring, how many rows it staggers into and the disk all
+	// follow the room there is, and the options move to their new places.
 	const layout = $derived(
 		measured
-			? layoutFan({ centre: measured.centre, bounds: measured.bounds, count: keys.length })
+			? layoutFan({
+					centre: measured.centre,
+					bounds: measured.bounds,
+					count: keys.length,
+					clear: measured.clear ?? null
+				})
 			: null
 	);
 	const hintAt = $derived(
@@ -353,10 +377,19 @@
 	/**
 	 * The option whose sector of the disk the finger is in (`optionAt`): the
 	 * wedge drawn under it is that sector. Nothing within a fingertip of where
-	 * the press began, so a wobble on the trigger picks nothing.
+	 * the press began, so a wobble on the trigger picks nothing, and nothing
+	 * off the part of the disk that can be seen.
 	 */
 	function slotAt(x: number, y: number): string | null {
-		if (!layout) {
+		if (!(layout && measured)) {
+			return null;
+		}
+		// Only where the disk can be seen: its sectors run on under the bottom
+		// nav (which the add button's fan leaves undimmed, and takes its own
+		// taps), and a pointer there lit the option above it, and a click
+		// picked it, rather than reaching the nav.
+		const { bounds } = measured;
+		if (x < bounds.left || x > bounds.right || y < bounds.top || y > bounds.bottom) {
 			return null;
 		}
 		const still = press ? { x: press.x, y: press.y } : null;
@@ -816,6 +849,7 @@
 			<p
 				class="hint"
 				class:right={hintAt.side === 'right'}
+				class:above={hintFrom === 'disk'}
 				class:naming={litName !== null}
 				bind:this={hintElement}
 				aria-hidden="true"
@@ -826,8 +860,12 @@
 				style:width="{HINT.width}px"
 				style:height="{HINT.height}px"
 			>
-				<span class="hint-centred">{litName ?? helpText}</span>
-				<span class="hint-right">{litName ?? helpText}</span>
+				{#each ['hint-centred', 'hint-right'] as copy (copy)}
+					<span class={copy}>
+						{#if litName !== null && litLead}<span class="lead">{litLead}</span>{/if}
+						<span class="text">{litName ?? helpText}</span>
+					</span>
+				{/each}
 			</p>
 		{/if}
 		<fieldset class="slots" {onfocusin} aria-label={label} bind:this={group} style:--lit-scale={HOVER_SCALE}>
@@ -966,14 +1004,29 @@
 		transition: transform 320ms cubic-bezier(0.25, 0.8, 0.25, 1);
 
 		/* The two alignments, stacked in one cell, one showing at a time. */
-		span {
+		.hint-centred,
+		.hint-right {
 			grid-area: 1 / 1;
+			display: flex;
+			flex-direction: column;
+			transition: opacity 320ms ease;
+		}
+
+		.text {
 			overflow: hidden;
 			display: -webkit-box;
 			-webkit-box-orient: vertical;
 			-webkit-line-clamp: 3;
 			line-clamp: 3;
-			transition: opacity 320ms ease;
+		}
+
+		/* Over a lit name: what picking it does, in the help's own size and
+		   colour, so the name stays what is read. */
+		.lead {
+			font-size: var(--wa-font-size-2xs);
+			line-height: 1.4;
+			font-weight: normal;
+			color: var(--wa-color-text-quiet);
 		}
 
 		.hint-centred {
@@ -989,7 +1042,7 @@
 			font-weight: 800;
 			color: var(--wa-color-text-normal);
 
-			span {
+			.text {
 				-webkit-line-clamp: 2;
 				line-clamp: 2;
 			}
@@ -1015,6 +1068,16 @@
 				opacity: 1;
 				pointer-events: auto;
 				user-select: text;
+			}
+		}
+
+		/* Above the disk, the text sits at the bottom of the hint's box, next
+		   to the disk however many lines it runs to, rather than a line of
+		   help floating a line or two clear of it. */
+		&.above {
+			.hint-centred,
+			.hint-right {
+				justify-content: flex-end;
 			}
 		}
 	}
@@ -1117,7 +1180,8 @@
 		.wedge,
 		.slot-avatar,
 		.hint,
-		.hint span {
+		.hint-centred,
+		.hint-right {
 			transition: none;
 		}
 	}

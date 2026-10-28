@@ -153,6 +153,7 @@
 
 	<AddButton
 		label="Add a reward"
+		lead="New reward for"
 		{targets}
 		spaces={data.contextSpaces}
 		you={data.user?.name ?? ''}
