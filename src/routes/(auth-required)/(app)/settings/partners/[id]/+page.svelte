@@ -6,6 +6,7 @@
 	import { inviteFragment } from '$lib/crypto/invite';
 	import { enhance } from '$lib/enhance';
 	import { initialsFor } from '$lib/initials';
+	import { inviteUrl } from '$lib/invite-url';
 	import { openedNames, partnerName, viewerNames } from '$lib/partner-names.svelte';
 	import { inviterInviteKey, sealInvite } from '$lib/partner-sealing';
 	import type { ViewerNames } from '$lib/partnership';
@@ -32,23 +33,24 @@
 	});
 
 	/**
-	 * The link with its key. The server sends the inviter the link without one
-	 * — it never has the key — and the key comes back from the inviter's own
-	 * wrap of it. An invite from before names were sealed has no key, and so no
-	 * working link until a new one is made.
+	 * The link with its key. The server sends the inviter only the link's path
+	 * — it never has the key, and is not sure of the origin (`invite-url.ts`) —
+	 * and the key comes back from the inviter's own wrap of it. An invite from
+	 * before names were sealed has no key, and so no working link until a new
+	 * one is made.
 	 */
 	let inviteLink = $state<string | null>(null);
 	const keyWrap = $derived(partnership.names.invite?.keyWrap ?? null);
 	$effect(() => {
-		const base = data.inviteUrl;
+		const path = data.invitePath;
 		const wrap = keyWrap;
 		const { id } = partnership;
-		if (!(base && wrap)) {
+		if (!(path && wrap)) {
 			inviteLink = null;
 			return;
 		}
 		void inviterInviteKey(id, wrap).then((key) => {
-			inviteLink = key ? `${base}${inviteFragment(key)}` : null;
+			inviteLink = key ? `${inviteUrl(location.origin, path)}${inviteFragment(key)}` : null;
 		});
 	});
 
@@ -119,7 +121,7 @@
 			<div class="pending">
 				<h2>Waiting for them to accept</h2>
 
-				{#if data.inviteUrl && inviteLink}
+				{#if data.invitePath && inviteLink}
 					<p>Send them this link. It stops working once they accept it.</p>
 					<!-- readonly rather than disabled so the value can still be selected
 				     and copied by hand when the Clipboard API is unavailable. -->
@@ -144,9 +146,9 @@
 					{#if shareStatus}<p class="status">{shareStatus}</p>{/if}
 				{:else if data.inviteExpired}
 					<p class="invalid">This invite link has expired.</p>
-				{:else if data.inviteUrl && !keyWrap}
+				{:else if data.invitePath && !keyWrap}
 					<p>This link is from an older version of Bound Up. Create a new link to send them.</p>
-				{:else if data.inviteUrl}
+				{:else if data.invitePath}
 					<p class="hint">…</p>
 				{:else}
 					<p>Only the person who created this invite can see the link.</p>
@@ -171,8 +173,8 @@
 								formData.set(name, value);
 							}
 							return async ({ result, update }) => {
-								if (result.type === 'success' && typeof result.data?.url === 'string') {
-									await share(`${result.data.url}${inviteFragment(sealed.key)}`);
+								if (result.type === 'success' && typeof result.data?.path === 'string') {
+									await share(`${inviteUrl(location.origin, result.data.path)}${inviteFragment(sealed.key)}`);
 								} else if (result.type === 'failure') {
 									rotateError = String(result.data?.rotateError ?? 'Could not renew the link.');
 								} else if (result.type === 'error') {

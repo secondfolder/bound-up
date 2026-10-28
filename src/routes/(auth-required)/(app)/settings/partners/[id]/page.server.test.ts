@@ -63,7 +63,7 @@ describe('load', () => {
 		const data = await runLoad(load(at(invite.id, ada)));
 
 		expect(data.partnership.status).toBe('pending');
-		expect(data.inviteUrl).toBe(`https://app.test/invite/${invite.inviteToken}`);
+		expect(data.invitePath).toBe(`/invite/${invite.inviteToken}`);
 		expect(data.inviteExpired).toBe(false);
 	});
 
@@ -72,14 +72,14 @@ describe('load', () => {
 		await expireInvite(db, invite.id);
 
 		const data = await runLoad(load(at(invite.id, ada)));
-		expect(data.inviteUrl).toBeNull();
+		expect(data.invitePath).toBeNull();
 		expect(data.inviteExpired).toBe(true);
 	});
 
 	it('never puts a token in the page data of an accepted link', async () => {
 		const { id } = await createTestPartnership(db, ada, jun);
 		const data = await runLoad(load(at(id, ada)));
-		expect(data.inviteUrl).toBeNull();
+		expect(data.invitePath).toBeNull();
 		expect(JSON.stringify(data)).not.toMatch(/invite\//);
 	});
 
@@ -256,8 +256,8 @@ describe('the rotate action', () => {
 		const post = resealed();
 		const result = await run('rotate', at(invite.id, ada, post));
 
-		expect(result.url).toMatch(/^https:\/\/app\.test\/invite\//);
-		expect(result.url).not.toContain(invite.inviteToken);
+		expect(result.path).toMatch(/^\/invite\//);
+		expect(result.path).not.toContain(invite.inviteToken);
 		expect(await findPendingInviteByToken(db, invite.inviteToken)).toBeNull();
 		expect((await readPartnershipRow(db, invite.id)).inviteCiphertext).toBe(post.inviteCiphertext);
 	});

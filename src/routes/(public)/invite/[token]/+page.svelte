@@ -34,6 +34,13 @@
 	 * the wrong one.
 	 */
 	let opened = $state<{ invite: PartnershipInvite; key: Uint8Array<ArrayBuffer> } | null>();
+	/**
+	 * The same link over https, when this page was opened over plain http on a
+	 * host that is not localhost. The browser has no `crypto.subtle` there, so
+	 * the invite cannot be opened however complete the link is — and saying the
+	 * link was cut off sent people back for a new one that failed the same way.
+	 */
+	let secureHref = $state<string | null>(null);
 	const sealedInvite = $derived(data.invite);
 	const inviteId = $derived(data.invite?.partnershipId ?? null);
 	$effect(() => {
@@ -44,6 +51,14 @@
 			opened = null;
 			return;
 		}
+		if (!globalThis.isSecureContext) {
+			const secure = new URL(globalThis.location.href);
+			secure.protocol = 'https:';
+			secureHref = secure.toString();
+			opened = null;
+			return;
+		}
+		secureHref = null;
 		opened = undefined;
 		void openInviteLink(invite, globalThis.location.hash)
 			.catch(() => null)
@@ -57,6 +72,9 @@
 	const title = $derived.by(() => {
 		if (data.state === 'invalid') {
 			return "This link doesn't work";
+		}
+		if (secureHref) {
+			return "This link can't be opened over http";
 		}
 		if (opened === null) {
 			return 'This link is incomplete';
@@ -106,13 +124,21 @@
 			<p>
 				{#if data.state === 'invalid'}
 					It may have expired, already been used, or been cancelled. Ask them to send a new one.
+				{:else if secureHref}
+					It was opened over an insecure connection (http), and your browser won't open invites
+					there. Open the same link over https instead.
 				{:else}
 					Part of it seems to have been cut off. Ask them to send it again.
 				{/if}
 			</p>
 			<!-- A way on rather than a dead end: someone who followed a dead invite
 			     most likely still wants in. -->
-			<wa-button href={resolve('/')} variant="brand" appearance="accent">Go to Bound Up</wa-button>
+			{#if secureHref}
+				<!-- An absolute URL on another scheme, so not one `resolve()` can make. -->
+				<wa-button href={secureHref} variant="brand" appearance="accent">Open over https</wa-button>
+			{:else}
+				<wa-button href={resolve('/')} variant="brand" appearance="accent">Go to Bound Up</wa-button>
+			{/if}
 			{#if !page.data.user}
 				<a class="secondary" href={resolve('/(public)/login')}>Log in</a>
 			{/if}

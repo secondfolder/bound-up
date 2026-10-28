@@ -1,7 +1,7 @@
 import { error, fail as kitFail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
-import { inviteUrl } from '$lib/invite-url';
+import { invitePath } from '$lib/invite-url';
 import { controlFromAnswer } from '$lib/partnership';
 import {
 	formFields,
@@ -12,7 +12,7 @@ import { createInvite } from '$lib/server/partnerships';
 import type { Actions, PageServerLoad } from './$types';
 
 /** What the action hands back so the page can open the share sheet. */
-export type InviteCreated = { partnershipId: string; url: string };
+export type InviteCreated = { partnershipId: string; path: string };
 
 export const load: PageServerLoad = async ({ locals }) => {
 	return {
@@ -37,7 +37,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 export const actions: Actions = {
 	// Form actions run BEFORE layout loads, so the (auth-required) group guard
 	// has not run yet — the session check here is not redundant.
-	default: async ({ locals, request, url }) => {
+	default: async ({ locals, request }) => {
 		if (!locals.user) {
 			error(401, 'Not signed in');
 		}
@@ -68,12 +68,13 @@ export const actions: Actions = {
 		// Deliberately NOT a redirect. `navigator.share()` needs transient user
 		// activation, and a 303 plus a fresh page load loses it — returning the
 		// link to the submitting page keeps the share attempt inside the click
-		// that caused it. The page navigates itself afterwards, and adds the
-		// invite key to the link first: the server never has it.
+		// that caused it. The page navigates itself afterwards, and makes the
+		// link absolute on its own origin and adds the invite key first: the server
+		// never has the key, and its idea of the origin can be wrong (`invite-url.ts`).
 		return {
 			created: {
 				partnershipId: invite.id,
-				url: inviteUrl(url.origin, invite.inviteToken)
+				path: invitePath(invite.inviteToken)
 			} satisfies InviteCreated
 		};
 	}

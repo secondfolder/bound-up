@@ -1,7 +1,7 @@
 import { error, fail as kitFail, redirect } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
-import { inviteUrl } from '$lib/invite-url';
+import { invitePath } from '$lib/invite-url';
 import { controlAnswerFor, controlFromAnswer, isInviteUsable } from '$lib/partnership';
 import {
 	formFields,
@@ -21,7 +21,7 @@ import {
 } from '$lib/server/partnerships';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals, params, url }) => {
+export const load: PageServerLoad = async ({ locals, params }) => {
 	if (!locals.user) {
 		error(401, 'Not signed in');
 	}
@@ -63,9 +63,9 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		// token is the whole authorisation to join, so it must not travel in the
 		// page data of anyone who cannot already use it. Without its key: the
 		// page adds the fragment from the inviter's own wrap of it.
-		inviteUrl:
+		invitePath:
 			usable && partnership.role === 'inviter' && partnership.inviteToken
-				? inviteUrl(url.origin, partnership.inviteToken)
+				? invitePath(partnership.inviteToken)
 				: null,
 		inviteExpired: partnership.status === 'pending' && !usable,
 		partnerEditForm: await superValidate(
@@ -170,7 +170,7 @@ export const actions: Actions = {
 	 * Returns the URL instead of redirecting so the page can put it straight
 	 * into the share sheet while the click's user activation is still live.
 	 */
-	rotate: async ({ locals, params, request, url }) => {
+	rotate: async ({ locals, params, request }) => {
 		if (!locals.user) {
 			error(401, 'Not signed in');
 		}
@@ -189,7 +189,7 @@ export const actions: Actions = {
 			return kitFail(400, { rotateError: 'That invite can no longer be renewed.' });
 		}
 
-		return { url: inviteUrl(url.origin, rotated.inviteToken) };
+		return { path: invitePath(rotated.inviteToken) };
 	},
 
 	/**

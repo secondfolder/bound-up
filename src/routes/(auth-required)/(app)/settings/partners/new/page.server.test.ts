@@ -80,7 +80,7 @@ describe('the create action', () => {
 
 		// The id the browser chose, since the invite was sealed to it.
 		expect(created.partnershipId).toBe(post.id);
-		expect(created.url).toMatch(/^https:\/\/app\.test\/invite\/[A-Za-z0-9_-]+$/);
+		expect(created.path).toMatch(/^\/invite\/[A-Za-z0-9_-]+$/);
 
 		const row = await readPartnershipRow(db, created.partnershipId);
 		expect(row.status).toBe('pending');
@@ -101,18 +101,22 @@ describe('the create action', () => {
 	it('the link in the message actually resolves to the stored token', async () => {
 		const created = createdFrom(await submit(sealedPost()));
 		const row = await readPartnershipRow(db, created.partnershipId);
-		expect(created.url).toContain(encodeURIComponent(defined(row.inviteToken, 'the invite token')));
+		expect(created.path).toContain(
+			encodeURIComponent(defined(row.inviteToken, 'the invite token'))
+		);
 		// The invite key is added by the page, in the fragment: the server never has it.
-		expect(created.url).not.toContain('#');
+		expect(created.path).not.toContain('#');
 	});
 
-	it('builds the link on the request origin, not a hard-coded host', async () => {
+	it('sends only the path: the page puts it on its own origin', async () => {
+		// Behind the dev tunnel the request said http:// while the page was on
+		// https://, and a link built from it opened where crypto.subtle is missing.
 		const result = await runAction(
 			actions,
 			'default',
 			fakeEvent({ db, user: ada, formData: sealedPost(), origin: 'http://localhost:5173' })
 		);
-		expect(createdFrom(result).url).toMatch(/^http:\/\/localhost:5173\/invite\//);
+		expect(createdFrom(result).path).toMatch(/^\/invite\//);
 	});
 
 	it('"me" stores control against the inviter role', async () => {

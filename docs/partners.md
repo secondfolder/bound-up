@@ -260,7 +260,14 @@ explicitly decided to share on partner surfaces.
   link the inviter had already sent.
 - **Carries its key in the fragment.** `#k=…` opens the names; see "Names are
   sealed" above. A link with its fragment cut off shows "This link is
-  incomplete" and nothing else.
+  incomplete" and nothing else. One opened over plain http (on a host other
+  than localhost) cannot be opened however complete it is, because the browser
+  has no `crypto.subtle` there, so it says so and offers the same link over
+  https instead.
+- **Built in the inviter's browser.** The server sends only the path
+  (`invitePath`), and the page puts it on its own `location.origin`. The
+  request's origin is not always the page's: behind the dev tunnel, which ends
+  TLS, the server saw `http://` while the inviter was on `https://`.
 - **Only ever sent to the inviter**, and only while it is live. The token is
   never included in the page data of anyone who could not already use it.
 - **Its preview names nobody.** A chat app that unfurls the link fetches it

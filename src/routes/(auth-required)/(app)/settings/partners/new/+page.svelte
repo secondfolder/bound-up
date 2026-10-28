@@ -5,6 +5,7 @@
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import PartnerFields from '$lib/components/PartnerFields.svelte';
 	import { inviteFragment } from '$lib/crypto/invite';
+	import { inviteUrl } from '$lib/invite-url';
 	import { sealInvite } from '$lib/partner-sealing';
 	import { storedNamesFrom } from '$lib/partnership';
 	import { partnerInviteFormSchema } from '$lib/schemas/partnerForm';
@@ -75,7 +76,7 @@
 			}
 			// The key goes in the fragment, which no server ever sees: the link
 			// opens the names, and the server's copy of the invite does not.
-			const link = `${created.url}${inviteFragment(pending.key)}`;
+			const link = `${inviteUrl(location.origin, created.path)}${inviteFragment(pending.key)}`;
 
 			// Started, deliberately NOT awaited. The share sheet has to open inside
 			// the click's transient user activation, but it stays open until the
