@@ -453,7 +453,10 @@ What differs from the switcher's fan:
   text, so its ring starts just outside the button (`clear`, half the
   button's measured size, in place of the switcher's 140px `MIN_RADIUS`) and
   grows only until the avatars have room: two places to add to make a disk
-  of about 120px on a phone, where the switcher's ring would make it 180.
+  of about 130px on a phone, where the switcher's ring would make it 180. A
+  lit avatar keeps as much space off the button as off the disk's edge
+  (`DISK_MARGIN`, 12px), so the avatars sit in the middle of the band of
+  disk round the button rather than crowding it.
   More places, a smaller window, or one resized smaller make it bigger, and
   may stagger it into two rows; it is laid out again on every resize, so the
   avatars move to their new places and the disk follows.

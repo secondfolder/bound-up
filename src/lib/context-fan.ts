@@ -75,10 +75,10 @@ export const MIN_RADIUS = 140;
 /**
  * The tightest ring for avatars of `avatar`: `MIN_RADIUS`, or with a `clear`
  * radius round the centre (the trigger itself), just far enough out that a
- * lit avatar keeps `OPTION_GAP` off it.
+ * lit avatar is as far off it as it is off the disk's edge (`DISK_MARGIN`).
  */
 export function minRadiusFor(avatar: number, clear: number | null): number {
-	return clear === null ? MIN_RADIUS : clear + avatar / 2 + hoverShift(avatar) + OPTION_GAP;
+	return clear === null ? MIN_RADIUS : clear + avatar / 2 + hoverShift(avatar) + DISK_MARGIN;
 }
 const RADIUS_STEP = 4;
 /**
@@ -293,9 +293,17 @@ export function roomBetween(points: readonly Point[], avatar: number): number {
  */
 type Fit = { room: number; arc: Arc; angles: number[]; placed: number[] };
 
+/**
+ * The clear space between a lit avatar and the disk's edge, and between a
+ * lit avatar and the trigger a fan is round (`clear`): the same both ways,
+ * so the avatars sit in the middle of the band of disk around the trigger
+ * rather than crowding it.
+ */
+export const DISK_MARGIN = 12;
+
 /** The disk's radius for a fan whose (outer) avatars of `avatar` are on the ring of `radius`. */
 function diskRadius(radius: number, avatar: number): number {
-	return radius + avatar / 2 + hoverShift(avatar) + 12;
+	return radius + avatar / 2 + hoverShift(avatar) + DISK_MARGIN;
 }
 
 /** The radius of the `index`th option: every other one is `stagger` further in. */

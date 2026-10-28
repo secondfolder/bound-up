@@ -7,6 +7,7 @@ import {
 	CLOSE_MS,
 	cssEasing,
 	DEAD_ZONE,
+	DISK_MARGIN,
 	diskScale,
 	EDGE_MARGIN,
 	FAN_CSS_EASING,
@@ -353,9 +354,13 @@ describe('layoutFan', () => {
 		expect(tight.radius).toBeLessThan(MIN_RADIUS);
 		// Still room between them, and clear of the button, lit.
 		expect(tight.room).toBeGreaterThanOrEqual(ROOM_TARGET);
+		// At least as far off the button as off the disk's edge, lit.
+		const reach = tight.avatar / 2 + (tight.avatar * (HOVER_SCALE - 1)) / 2;
+		const offEdge = tight.disk - tight.radius - reach;
+		expect(offEdge).toBeCloseTo(DISK_MARGIN, 6);
 		for (const point of tight.points) {
-			const reach = tight.avatar / 2 + (tight.avatar * (HOVER_SCALE - 1)) / 2;
-			expect(Math.hypot(point.x - centre.x, point.y - centre.y) - reach).toBeGreaterThanOrEqual(30);
+			const offButton = Math.hypot(point.x - centre.x, point.y - centre.y) - reach - 30;
+			expect(offButton).toBeGreaterThanOrEqual(offEdge - 1e-6);
 		}
 	});
 
