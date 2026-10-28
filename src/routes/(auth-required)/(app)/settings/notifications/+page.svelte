@@ -15,7 +15,6 @@
 		backLabel="Back to settings"
 		backText="Settings"
 		title="Notifications"
-		description="Hear about new messages without opening the app."
 	/>
 
 	<div class="content">

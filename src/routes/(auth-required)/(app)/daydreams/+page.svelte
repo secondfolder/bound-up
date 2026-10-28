@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import DaydreamDisclosure from '$lib/components/DaydreamDisclosure.svelte';
+	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import { daydreamTitle } from '$lib/daydream';
 	import type { DaydreamSetupContent } from '$lib/sealed-kinds/daydreams';
 	import { openedDaydreamSetup, openedPart, shownText } from '$lib/sealed-views.svelte';
@@ -27,46 +28,54 @@
 	}
 </script>
 
+<!-- Daydreams are a Playroom tool, so the way back is to the Playroom, as
+     the kink list's is: the Playroom's tile is the way in. -->
 <div class="page">
-	<h1>Daydreams</h1>
-	<p class="intro">Stories you make up and play: with characters, or told to you.</p>
+	<NestedPageHeader
+		backHref={resolve('/(auth-required)/(app)/playroom')}
+		backLabel="Back to the Playroom"
+		backText="Playroom"
+		title="Daydreams"
+	/>
 
-	{#if !data.available}
-		<wa-callout variant="neutral">
-			Daydreams aren't set up on this server yet. Whoever runs it can turn them on.
-		</wa-callout>
-	{:else if !data.accepted}
-		<DaydreamDisclosure action={`${resolve('/(auth-required)/(app)/daydreams')}?/acceptDisclosure`} />
-	{:else}
-		<wa-button class="new" href={resolve('/(auth-required)/(app)/daydreams/new')} variant="brand">
-			<wa-icon slot="start" name="plus" variant="solid"></wa-icon>
-			New daydream
-		</wa-button>
-		<nav class="libraries" aria-label="Your library">
-			<a href={resolve('/(auth-required)/(app)/daydreams/characters')}>Your characters</a>
-			<a href={resolve('/(auth-required)/(app)/daydreams/ideas')}>Your ideas</a>
-		</nav>
+	<div class="content">
+		{#if !data.available}
+			<wa-callout variant="neutral">
+				Daydreams aren't set up on this server yet. Whoever runs it can turn them on.
+			</wa-callout>
+		{:else if !data.accepted}
+			<DaydreamDisclosure action={`${resolve('/(auth-required)/(app)/daydreams')}?/acceptDisclosure`} />
+		{:else}
+			<wa-button class="new" href={resolve('/(auth-required)/(app)/daydreams/new')} variant="brand">
+				<wa-icon slot="start" name="plus" variant="solid"></wa-icon>
+				New daydream
+			</wa-button>
+			<nav class="libraries" aria-label="Your library">
+				<a href={resolve('/(auth-required)/(app)/daydreams/characters')}>Your characters</a>
+				<a href={resolve('/(auth-required)/(app)/daydreams/ideas')}>Your ideas</a>
+			</nav>
 
-		{#if data.daydreams.length > 0}
-			<ul class="daydreams">
-				{#each data.daydreams as daydream (daydream.id)}
-					{const setup = $derived(openedDaydreamSetup(daydream.setup))}
-					<li>
-						<a href={resolve('/(auth-required)/(app)/daydreams/[id]', { id: daydream.id })}>
-							<span class="title">{shownText(openedPart(setup, daydreamTitle))}</span>
-							<!-- The separator's spaces as a string: written as text at the end of
-							     the block, Svelte trimmed the one after it ("with Mara ·played"). -->
-							<span class="detail">
-								{#if setup}{withWhom(setup)}{' · '}{/if}{daydream.lastTurnAt
-									? `played ${dateFormat.format(daydream.lastTurnAt)}`
-									: 'not started yet'}
-							</span>
-						</a>
-					</li>
-				{/each}
-			</ul>
+			{#if data.daydreams.length > 0}
+				<ul class="daydreams">
+					{#each data.daydreams as daydream (daydream.id)}
+						{const setup = $derived(openedDaydreamSetup(daydream.setup))}
+						<li>
+							<a href={resolve('/(auth-required)/(app)/daydreams/[id]', { id: daydream.id })}>
+								<span class="title">{shownText(openedPart(setup, daydreamTitle))}</span>
+								<!-- The separator's spaces as a string: written as text at the end of
+								     the block, Svelte trimmed the one after it ("with Mara ·played"). -->
+								<span class="detail">
+									{#if setup}{withWhom(setup)}{' · '}{/if}{daydream.lastTurnAt
+										? `played ${dateFormat.format(daydream.lastTurnAt)}`
+										: 'not started yet'}
+								</span>
+							</a>
+						</li>
+					{/each}
+				</ul>
+			{/if}
 		{/if}
-	{/if}
+	</div>
 </div>
 
 <style>
@@ -75,18 +84,13 @@
 	.page {
 		max-width: var(--page-width);
 		margin-inline: auto;
-		padding: var(--wa-space-m) var(--page-gutter);
+		padding-block-end: var(--wa-space-l);
+	}
 
-		h1 {
-			text-align: center;
-			margin-block-end: 0.25em;
-		}
-
-		.intro {
-			text-align: center;
-			color: var(--wa-color-text-quiet);
-			margin-block-start: 0;
-		}
+	/* NestedPageHeader insets itself by the gutter; what is under it takes the
+	   same edge (docs/theme.md, "Page layout"). */
+	.content {
+		padding-inline: var(--page-gutter);
 
 		> wa-callout,
 		> :global(.disclosure) {

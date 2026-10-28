@@ -238,11 +238,13 @@ test.describe('daydreams', () => {
 			page.locator('ol.turns').getByText(`Mara heard: "${said}" (take 2)`)
 		).toBeVisible();
 
-		// Listed, and on the home screen's card.
-		await page.goto('/daydreams');
+		// Listed, reached from the Playroom's tile, with the way back to it.
+		await page.goto('/playroom');
+		await waitForHydration(page);
+		await page.getByRole('link', { name: /^Daydreams/ }).click();
+		await page.waitForURL('**/daydreams');
 		await expect(page.getByRole('link', { name: /The After hours story/ })).toBeVisible();
-		await page.goto('/today');
-		await expect(page.getByText('The After hours story')).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Back to the Playroom' })).toBeVisible();
 	});
 
 	test('directions, suggestions and stepping out of the story', async ({ page }) => {
@@ -1178,7 +1180,9 @@ test.describe('daydreams', () => {
 	test('an account without the feature has no way in', async ({ page }) => {
 		const who = account('Outsider');
 		await newAccount(page, who);
-		await expect(page.getByRole('link', { name: 'Daydreams' })).toHaveCount(0);
+		await page.goto('/playroom');
+		await expect(page.getByRole('heading', { level: 1, name: 'Playroom' })).toBeVisible();
+		await expect(page.getByRole('link', { name: /^Daydreams/ })).toHaveCount(0);
 		const response = await page.goto('/daydreams');
 		expect(response?.status()).toBe(403);
 	});

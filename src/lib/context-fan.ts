@@ -1,9 +1,10 @@
 /**
- * The context switcher's fan as geometry: where its disk is centred, which
+ * The context fan as geometry (the switcher's, and the add button's in
+ * Everyone): where its disk is centred, which
  * part of the ring round that centre can be seen, and where each option goes
  * on that part so that every one is the same angle from its neighbours and no
  * avatar runs into another or off the screen. Pure and alias-free, so it
- * is unit-tested without a browser; `ContextSwitcher` measures the screen and
+ * is unit-tested without a browser; `ContextSelectorFan` measures the screen and
  * draws what this returns. See docs/contexts.md, "The fan".
  *
  * Angles are degrees on the screen: 0 points right, and they grow clockwise
@@ -473,6 +474,14 @@ export const HINT_SLIDE = 0.5;
 /** Which way the hint sits: against the right edge, or centred over the disk. */
 export type HintSide = 'right' | 'centre';
 
+/**
+ * Where the hint starts looking for room: the top of the page, for a fan
+ * opened from the header (the switcher), or just above the disk, for one
+ * opened from the bottom of the screen (the add button), whose disk is far
+ * from the top and whose hint read as unrelated up there.
+ */
+export type HintFrom = 'top' | 'disk';
+
 /** How far past the shell's right edge the disk reaches, as a share of its radius; 0 when it does not. */
 export function rightCut(layout: FanLayout, bounds: Box): number {
 	return Math.max(0, layout.centre.x + layout.disk - bounds.right) / layout.disk;
@@ -491,12 +500,33 @@ export function hintSide(layout: FanLayout, bounds: Box): HintSide {
  * for the current one included) it moves aside, by up to `HINT_SLIDE` of
  * its width, nearest first; failing that down, a few pixels at a time,
  * until clear: below the top row rather than over it.
+ * From `disk`, it starts just above the disk's top (or the top of the page,
+ * if that is lower) and moves down the same way; failing that, it tries again
+ * from the top of the page.
  * Null only when nothing clear is found on the page at all.
  */
 export function hintPlacement(
 	layout: FanLayout,
 	bounds: Box,
-	size: { width: number; height: number }
+	size: { width: number; height: number },
+	from: HintFrom = 'top'
+): { x: number; y: number; side: HintSide } | null {
+	const top = bounds.top + HINT_INSET;
+	if (from === 'disk') {
+		const above = layout.centre.y - layout.disk - HINT_INSET - size.height;
+		const found = placeHint(layout, bounds, size, Math.max(top, above));
+		if (found) {
+			return found;
+		}
+	}
+	return placeHint(layout, bounds, size, top);
+}
+
+function placeHint(
+	layout: FanLayout,
+	bounds: Box,
+	size: { width: number; height: number },
+	start: number
 ): { x: number; y: number; side: HintSide } | null {
 	const side = hintSide(layout, bounds);
 	const width = Math.min(size.width, bounds.right - bounds.left - 2 * HINT_INSET);
@@ -511,7 +541,7 @@ export function hintPlacement(
 	const lowest = bounds.left + HINT_INSET;
 	const highest = bounds.right - HINT_INSET - width;
 	const slide = width * HINT_SLIDE;
-	for (let y = bounds.top + HINT_INSET; y + size.height <= bounds.bottom - HINT_INSET; y += 4) {
+	for (let y = start; y + size.height <= bounds.bottom - HINT_INSET; y += 4) {
 		// Aside a little, nearest first, before ever down: an option clipping
 		// a corner (Add partner, as a resize brings the disk's edge in) used
 		// to drop the hint below the whole fan and back again.

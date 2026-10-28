@@ -1,14 +1,15 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import CreditBalances from '$lib/components/CreditBalances.svelte';
+	import AddButton from '$lib/components/AddButton.svelte';
+	import CreditsControl from '$lib/components/CreditsControl.svelte';
 	import ContextSwitcher from '$lib/components/context/ContextSwitcher.svelte';
 	import ItemsTabs from '$lib/components/ItemsTabs.svelte';
-	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
-	import QuickAddLink from '$lib/components/QuickAddLink.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
 	import RewardWallet from '$lib/components/RewardWallet.svelte';
-	import { balancePills, itemTargets, partnerIn, shownSpaces } from '$lib/item-pages.svelte';
+	import { creditGroups, itemTargets, partnerIn, shownSpaces } from '$lib/item-pages.svelte';
 	import type { RewardEntry } from '$lib/reward-list';
 	import { sealScopeForSpace } from '$lib/sealed-forms';
 	import type { RewardView, RewardWalletView } from '$lib/types';
@@ -22,11 +23,22 @@
 	 */
 	const form = $derived(page.form as ActionData | null | undefined);
 	const historyHref = resolve('/(auth-required)/(app)/rewards/history');
-	const addHref = resolve('/(auth-required)/(app)/rewards/add');
 
 	const spaces = $derived(shownSpaces(data.list.spaces, data.contextSpaces));
 	const several = $derived(spaces.length > 1);
-	const canAdd = $derived(itemTargets(data.list.spaces, data.contextSpaces).length > 0);
+	/** Where the viewer may add a reward to, from here: the add button's choices. */
+	const targets = $derived(
+		itemTargets(data.list.spaces, data.contextSpaces).map((target) => target.spaceId)
+	);
+
+	/**
+	 * Opens the add sheet for the space picked (or the only one), handed over
+	 * in history state rather than the URL (`PageState.addFor`), so the sheet
+	 * skips "For whom?". The sheet posts it; nothing reads the context.
+	 */
+	function add(spaceId: string) {
+		void goto(resolve('/(auth-required)/(app)/rewards/add'), { state: { addFor: spaceId } });
+	}
 
 	function entry(reward: RewardView, wallet: RewardWalletView): RewardEntry {
 		const space = spaces.find((candidate) => candidate.id === reward.spaceId);
@@ -78,51 +90,32 @@
 	const yours = $derived(wallets.filter((shown) => shown.wallet.mine));
 	const theirs = $derived(wallets.filter((shown) => !shown.wallet.mine));
 
-	const balances = $derived(
-		balancePills(
+	const credits = $derived(
+		creditGroups(
 			data.list.wallets.map(({ rewards: _, ...balance }) => balance),
 			data.contextSpaces,
-			data.partners,
+			data.user?.name ?? '',
 			{ editable: true }
 		)
 	);
-
-	const description = $derived.by(() => {
-		if (several) {
-			return 'What your credits can buy, and what you have set aside for your partners.';
-		}
-		return theirs.length > 0
-			? 'What you have each set aside for the other.'
-			: 'What your credits can buy.';
-	});
 </script>
 
 <section class="page">
-	<NestedPageHeader
-		backHref={resolve('/(auth-required)/(app)/today')}
-		backLabel="Back to Today"
-		backText="Today"
-		title="Rewards"
-		{description}
-	>
-		{#snippet actions()}
-			<CreditBalances {balances} />
-			<wa-button appearance="plain" pill href={historyHref}>
-				<wa-icon name="clock-rotate-left" variant="solid" label="Claim history"></wa-icon>
-			</wa-button>
-		{/snippet}
+	<PageHeader title="Tasks & Rewards">
 		{#snippet corner()}
 			<ContextSwitcher spaces={data.contextSpaces} context={data.context} you={data.user?.name ?? ''} />
 		{/snippet}
-	</NestedPageHeader>
+		{#snippet toolbar()}
+			<ItemsTabs current="rewards" />
+			<!-- Set from its sheet, where the viewer may: they used to be edited
+			     in place, in a row of pills that wrapped onto three lines. -->
+			<CreditsControl groups={credits} everyone={several} />
+		{/snippet}
+	</PageHeader>
 
 	<div class="content">
-		<ItemsTabs current="rewards" />
-
 		{#if form?.message}<p class="status">{form.message}</p>{/if}
 		{#if form?.error}<p class="invalid">{form.error}</p>{/if}
-
-		{#if canAdd}<QuickAddLink href={addHref} label="Add a reward" />{/if}
 
 		{#each yours as shown (shown.key)}
 			<RewardWallet
@@ -148,13 +141,32 @@
 				/>
 			{/each}
 		{/if}
+
+		<!-- At the end of the list, where looking back belongs, as the tasks
+		     page's "Completed tasks" is. -->
+		<a class="history" href={historyHref}>
+			<wa-icon name="clock-rotate-left" variant="solid"></wa-icon>
+			Claimed rewards
+			<wa-icon name="chevron-right" variant="solid"></wa-icon>
+		</a>
 	</div>
+
+	<AddButton
+		label="Add a reward"
+		{targets}
+		spaces={data.contextSpaces}
+		you={data.user?.name ?? ''}
+		onadd={add}
+	/>
+
 
 	{@render children()}
 </section>
 
 <style>
+	/* Fills <main>, so the add button, its last child, sticks to the bottom. */
 	.page {
+		flex: 1 1 auto;
 		max-width: var(--page-width);
 		margin: 0 auto;
 		display: flex;
@@ -184,5 +196,20 @@
 
 	.invalid {
 		color: var(--wa-color-text-danger);
+	}
+
+	.history {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		align-self: flex-start;
+		min-block-size: 2.75rem;
+		color: var(--wa-color-brand-on-quiet);
+		font-weight: var(--wa-font-weight-semibold, 600);
+		text-decoration: none;
+
+		wa-icon:last-child {
+			font-size: 0.75em;
+		}
 	}
 </style>

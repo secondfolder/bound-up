@@ -99,7 +99,6 @@ function me(): PageData {
 			tasks: noTasks,
 			rewards: noRewards(SOLO),
 			notebook: [],
-			daydreams: null,
 			latestIq: null,
 			guides: null
 		}

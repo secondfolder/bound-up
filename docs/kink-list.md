@@ -335,9 +335,14 @@ failed save.
 ([`KinkListHome`](../src/lib/components/kink-list/KinkListHome.svelte)), dense
 enough to fill in without a click per category:
 
-- a way back to the Playroom (a partner's view goes back to your own list),
-  drawn as every page's back link is, a chevron and the parent's name
-  ([`KinkListCrumbs`](../src/lib/components/kink-list/KinkListCrumbs.svelte));
+- a way back to the Playroom (a partner's view goes back to your own list,
+  switching to Me on the way), drawn as every page's back link is, a chevron
+  and the parent's name
+  ([`KinkListCrumbs`](../src/lib/components/kink-list/KinkListCrumbs.svelte)),
+  with the context switcher at the end of its line, signed in: Me and
+  Everyone are your own list and a partner is your list for them, which your
+  own list's load sends a switch on to
+  ([contexts.md](contexts.md#the-kink-list));
   the sub-pages (quick fill, import and export, history, a partner's compare
   and differences) use the same, all saying "Kink list" for your own list
 - Quick fill, Share (a dialog that makes a link), Import or export, and

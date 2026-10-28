@@ -133,7 +133,8 @@ characters or a narrator, whose passages are written by a hosted language
 model (see
 [daydreams.md](daydreams.md)). Every load, action and endpoint under
 `/daydreams` and `/api/daydreams` calls `requireFeature` itself, and the
-Today load reads the Daydreams card only for an account that holds it.
+Playroom lists Daydreams only for an account that holds it, from the app
+shell's `features` (display only).
 
 It is a grant rather than on for everyone for two reasons that are not about
 testing: every reply is paid for on the server's OpenRouter key, and using it

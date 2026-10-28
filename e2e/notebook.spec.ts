@@ -10,6 +10,7 @@ import {
 	newSide,
 	type Side,
 	showContext,
+	startAdding,
 	switchTo,
 	typeRichText,
 	waitForHydration
@@ -27,13 +28,20 @@ import {
 const surface = (page: Page) =>
 	page.locator('.richtext-editor .surface[contenteditable="true"]').first();
 
-/** Starts an entry from a notebook list and waits until it can be written in. */
+/**
+ * Starts an entry from a notebook list in one space's context, with its add
+ * button, and waits until it can be written in. A journal entry asks for its
+ * date first, in a dialog; a note starts at once.
+ */
 async function startEntry(page: Page, kind: 'journal' | 'note'): Promise<string> {
 	await waitForHydration(page);
 	if (kind === 'note') {
 		await page.getByRole('tab', { name: 'Notes' }).click();
 	}
-	await clickWaButton(page, kind === 'journal' ? 'New journal entry' : 'New note');
+	await startAdding(page, kind === 'journal' ? 'New journal entry' : 'New note');
+	if (kind === 'journal') {
+		await clickWaButton(page, 'Start entry');
+	}
 	await page.waitForURL(/\/notebook\/[0-9a-f-]{36}$/);
 	await expect(page.getByText('Saved')).toBeVisible();
 	return page.url();
@@ -347,7 +355,9 @@ test.describe('contexts', () => {
 		}
 	});
 
-	test('a new entry in Everyone asks whose it is first', async ({ browser }) => {
+	test('a new entry in Everyone asks whose it is first, with the add button’s fan', async ({
+		browser
+	}) => {
 		const { ada, bo } = await sharedNotebook(browser);
 		try {
 			await showContext(ada.page, 'all');
@@ -356,25 +366,33 @@ test.describe('contexts', () => {
 			await expect(control(ada.page)).toHaveAccessibleName(/^Showing Everyone/);
 			await ada.page.getByRole('tab', { name: 'Notes' }).click();
 
-			await clickWaButton(ada.page, 'New note');
-			await expect(ada.page.getByText('Choose who it’s for')).toBeVisible();
+			// Nothing is started until it is picked.
+			await ada.page.getByRole('button', { name: 'New note: choose whose it’s for' }).click();
+			await expect(ada.page.locator('[data-fan-option]')).toHaveCount(2);
 			await expect(ada.page).toHaveURL(/\/notebook$/);
 
-			await ada.page.locator('wa-select[name="spaceId"]').click();
-			await ada.page.getByRole('option', { name: 'Bo' }).click();
-			await clickWaButton(ada.page, 'New note');
+			await ada.page.getByRole('button', { name: 'New note for Bo', exact: true }).click();
 			await ada.page.waitForURL(/\/notebook\/[0-9a-f-]{36}$/);
 			await expect(ada.page.locator('header .corner')).toContainText('Bo');
 			const id = ada.page.url().split('/').at(-1) ?? '';
 			const { rows } = await sql('SELECT partnership_id FROM notebook_entries WHERE id = ?', [id]);
 			expect(rows[0]?.partnership_id).toBeTruthy();
 
-			// Remembered on this device as the next one's default.
+			// A journal entry asks for its date too, for the one picked.
 			await ada.page.goto('/notebook');
-			await expect(ada.page.locator('wa-select[name="spaceId"]')).toHaveJSProperty(
-				'value',
-				String(rows[0]?.partnership_id)
-			);
+			await waitForHydration(ada.page);
+			await ada.page.getByRole('tab', { name: 'Journal' }).click();
+			await startAdding(ada.page, 'New journal entry', 'me');
+			const dialog = ada.page.locator('wa-dialog');
+			await expect(dialog.locator('wa-input[name="entryDate"]')).toBeVisible();
+			await clickWaButton(ada.page, 'Start entry');
+			await ada.page.waitForURL(/\/notebook\/[0-9a-f-]{36}$/);
+			const journalId = ada.page.url().split('/').at(-1) ?? '';
+			const journal = await sql('SELECT partnership_id, kind FROM notebook_entries WHERE id = ?', [
+				journalId
+			]);
+			expect(journal.rows[0]?.partnership_id).toBeNull();
+			expect(journal.rows[0]?.kind).toBe('journal');
 		} finally {
 			await ada.close();
 			await bo.close();

@@ -24,7 +24,7 @@ vi.mock('$lib/navigation', () => ({ invalidate, invalidateAll: vi.fn() }));
 
 const { default: ContextSwitcher } = await import('./ContextSwitcher.svelte');
 const { HELD_ATTRIBUTE, holdWhileSwitching } = await import('$lib/context-client.svelte');
-const { CLOSE_MS, OPTION_MS } = await import('$lib/context-fan');
+const { CLOSE_MS, OPTION_MS, optionTiming } = await import('$lib/context-fan');
 
 const SOLO = '11111111-1111-4111-8111-111111111111';
 const JUN = '22222222-2222-4222-8222-222222222222';
@@ -609,14 +609,22 @@ describe('the fan', () => {
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
-	it('shows its hint last on opening and takes it away first on closing', async () => {
+	it('fades its hint in midway through opening, and takes it away first on closing', async () => {
 		const { container } = renderSwitcher();
 		await userEvent.click(trigger());
+		const opened = performance.now();
 		await new Promise((done) => requestAnimationFrame(() => done(null)));
 		const hint = defined(container.querySelector<HTMLElement>('.hint'), 'the hint');
-		// The options are on their way; the hint waits for them.
+		// The options are setting out; the hint is not there yet.
 		expect(container.querySelector('[data-fan-option]')).not.toBeNull();
 		expect(Number(getComputedStyle(hint).opacity)).toBeLessThan(0.1);
+		// Read while the last option is still on its way in: the hint is
+		// already there, rather than waiting until they have all landed.
+		const last = optionTiming(3, true);
+		while (performance.now() - opened < last.delay + last.duration * 0.85) {
+			await new Promise((done) => requestAnimationFrame(done));
+		}
+		expect(Number(getComputedStyle(hint).opacity)).toBeGreaterThan(0.9);
 		await fanSettled();
 		expect(Number(getComputedStyle(hint).opacity)).toBe(1);
 

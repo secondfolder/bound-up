@@ -97,7 +97,15 @@ declare global {
 			contextSpaces: () => Promise<ContextSpace[]>;
 		}
 		// interface PageData {}
-		// interface PageState {}
+		interface PageState {
+			/**
+			 * The space an add sheet (`/tasks/add`, `/rewards/add`) was opened
+			 * for, by the add button's fan in Everyone. History state rather
+			 * than a query string, so the URL stays the route's own; gone after
+			 * a reload, when the sheet asks "For whom?" instead.
+			 */
+			addFor?: string;
+		}
 		interface Platform {
 			// Only `env` and `ctx.waitUntil` are declared: nothing in this app
 			// uses caches / cf. `AnyD1Database` comes from drizzle rather than

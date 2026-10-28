@@ -1,3 +1,5 @@
+import type { FeatureKey } from '../features';
+
 /**
  * What lives in the Playroom: kink toys, games and lists that are not
  * sessions or tasks. The /playroom index lists these, in this order.
@@ -5,7 +7,8 @@
  * Alias-free and data only. A tool is either a standalone page outside the
  * app shell, which can be shared and used without an account (the IQ test),
  * or a page in the app shell with a public twin of its own for anyone
- * signed out (the kink list) — see docs/playroom.md.
+ * signed out (the kink list), or a page in the app shell behind a feature
+ * (Daydreams) — see docs/playroom.md.
  */
 export type PlayroomTool = {
 	id: string;
@@ -14,7 +17,15 @@ export type PlayroomTool = {
 	/** A Font Awesome name, as `wa-icon` takes it. */
 	icon: string;
 	/** The tool's route id, for `resolve()`. */
-	route: '/(standalone)/playroom/iq-test/[[id]]' | '/(auth-required)/(app)/playroom/kink-list';
+	route:
+		| '/(standalone)/playroom/iq-test/[[id]]'
+		| '/(auth-required)/(app)/playroom/kink-list'
+		| '/(auth-required)/(app)/daydreams';
+	/**
+	 * Listed only for an account that holds this feature. Display only: the
+	 * tool's own loads and actions call `requireFeature` themselves.
+	 */
+	feature?: FeatureKey;
 };
 
 export const PLAYROOM_TOOLS: readonly PlayroomTool[] = [
@@ -33,5 +44,18 @@ export const PLAYROOM_TOOLS: readonly PlayroomTool[] = [
 		blurb: "Do you know what you're talking about or are you just a dumb little slut?",
 		icon: 'brain',
 		route: '/(standalone)/playroom/iq-test/[[id]]'
+	},
+	{
+		id: 'daydreams',
+		name: 'Daydreams',
+		blurb: 'Make up a story and play it: with characters, or told to you.',
+		icon: 'cloud-moon',
+		route: '/(auth-required)/(app)/daydreams',
+		feature: 'daydreams'
 	}
 ];
+
+/** The tools an account with `features` is shown, in order. */
+export function playroomToolsFor(features: readonly FeatureKey[]): PlayroomTool[] {
+	return PLAYROOM_TOOLS.filter((tool) => !tool.feature || features.includes(tool.feature));
+}

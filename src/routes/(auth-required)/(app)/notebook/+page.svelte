@@ -15,11 +15,6 @@
 		})
 	);
 
-	const header = {
-		backHref: resolve('/(auth-required)/(app)/today'),
-		backLabel: 'Back to Today',
-		backText: 'Today'
-	};
 	const entryHref = (entryId: string) =>
 		resolve('/(auth-required)/(app)/notebook/[entryId]', { entryId });
 </script>
@@ -31,9 +26,10 @@
 	room={data.room}
 	today={data.today}
 	viewerId={data.viewerId}
+	you={data.user?.name ?? ''}
 	spaces={shown}
+	contextSpaces={data.contextSpaces}
 	dependency={data.dependency}
-	{header}
 	{entryHref}
 >
 	{#snippet corner()}

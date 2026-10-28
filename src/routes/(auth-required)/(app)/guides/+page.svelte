@@ -1,23 +1,17 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import GuidesList from '$lib/components/GuidesList.svelte';
-	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
 
 	let { data } = $props();
 	let { guides } = $derived(data);
 </script>
 
-<!-- The same header as every other page reached from Today, with its way back: this
-     was the one that had none, a centred title alone over the wash. -->
+<!-- The header of the app's top-level pages: reached from Today's card, but
+     no "‹ Today" back link, which the bottom nav already is (as on Tasks &
+     Rewards, the notebook and messages). -->
 <section class="page">
-	<NestedPageHeader
-		backHref={resolve('/(auth-required)/(app)/today')}
-		backLabel="Back to Today"
-		backText="Today"
-		title="Guides"
-		description="Step-by-step guides to work through at your own pace."
-	/>
+	<PageHeader title="Guides" />
 
 	<div class="content">
 		{#if guides.length > 0}

@@ -13,7 +13,6 @@
 		backLabel="Back to admin"
 		backText="Admin"
 		title="Accounts"
-		description="Find an account to give it features or admin access."
 	/>
 
 	<div class="content">

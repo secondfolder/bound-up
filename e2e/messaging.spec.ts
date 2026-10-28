@@ -334,7 +334,10 @@ test.describe('the board', () => {
 				.getByRole('link', { name: /^Unread message/ });
 			await sticker.hover();
 			const control = jun.page.waitForRequest(/\/today\/__data\.json/);
-			await jun.page.getByRole('link', { name: 'Back to Today' }).hover();
+			await jun.page
+				.getByRole('navigation', { name: 'Primary' })
+				.getByRole('link', { name: 'Today', exact: true })
+				.hover();
 			await control;
 			expect(threadData).toEqual([]);
 

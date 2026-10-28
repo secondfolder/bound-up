@@ -21,7 +21,6 @@
 		backLabel="Back to settings"
 		backText="Settings"
 		title="Admin"
-		description="How this server runs, and who can do what on it."
 	/>
 
 	<div class="content">

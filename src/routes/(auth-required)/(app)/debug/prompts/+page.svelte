@@ -29,7 +29,6 @@
 		backLabel="Back to debug tools"
 		backText="Debug tools"
 		title="Daydream prompts"
-		description="Every prompt the daydream models are sent, and the paragraphs they are made of. Words a user would write are shown as ⟦placeholders⟧."
 	/>
 
 	<div class="content">
@@ -38,7 +37,11 @@
 				<wa-option value={builder.id}>{builder.label}</wa-option>
 			{/each}
 		</wa-select>
-		<p class="description">{data.builder.description}</p>
+		<!-- The placeholder key beside the prompt it is needed to read, rather
+		     than as a page subtitle (pages carry none). -->
+		<p class="description">
+			{data.builder.description} Words a user would write are shown as ⟦placeholders⟧.
+		</p>
 
 		{#key data.builder.id}
 			<PromptReview catalogue={data.catalogue} starters={data.starters} initial={page.url.searchParams} />

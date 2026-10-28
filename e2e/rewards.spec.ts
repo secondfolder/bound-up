@@ -3,11 +3,15 @@ import { test } from './fixtures';
 import {
 	account,
 	clickWaButton,
+	closeCredits,
 	createInvite,
+	creditsRow,
 	fillRichText,
 	newAccount,
 	newSide,
+	openCredits,
 	settle,
+	startAdding,
 	typeRichText,
 	waitForHydration,
 	waitForSheetClosed
@@ -113,15 +117,18 @@ test.describe('rewards', () => {
 			await route.continue();
 		});
 
-		await page.getByRole('button', { name: 'Edit your reward credits' }).click();
-		await page.getByLabel('Set your reward credits').fill('4');
-		await page.getByRole('button', { name: 'Save your reward credits' }).click();
-		await page.getByRole('link', { name: 'Add a reward' }).click();
+		const credits = await openCredits(page);
+		await credits.getByRole('button', { name: 'Edit your reward credits' }).click();
+		await credits.getByLabel('Set your reward credits').fill('4');
+		await credits.getByRole('button', { name: 'Save your reward credits' }).click();
+		// Straight off the sheet and onto adding, while the save answers.
+		await closeCredits(page);
+		await startAdding(page, 'Add a reward');
 
 		await expect(page).toHaveURL(/\/rewards\/add$/);
 		await expect(page.locator('.add-form')).toBeVisible();
 		// And the refresh still happened: the list under the sheet has the new balance.
-		await expect(page.locator('.balances li').filter({ hasText: 'Yours' })).toContainText('4');
+		await expect(page.locator('.credits-chip')).toContainText('You 4');
 	});
 
 	test('a user can manage and claim self rewards from Today', async ({ browser }) => {
@@ -130,17 +137,18 @@ test.describe('rewards', () => {
 		try {
 			await newAccount(ada.page, ada.who);
 			await ada.page.waitForURL('**/today');
-			await ada.page.getByRole('link', { name: 'Rewards' }).click();
+			await ada.page.getByRole('link', { name: 'Rewards', exact: true }).click();
 			await ada.page.waitForURL(/\/rewards$/);
 
-			await ada.page.getByRole('button', { name: 'Edit your reward credits' }).click();
-			await ada.page.getByLabel('Set your reward credits').fill('4');
-			await ada.page.getByRole('button', { name: 'Save your reward credits' }).click();
-			await expect(ada.page.locator('.balances li').filter({ hasText: 'Yours' })).toContainText(
-				'4'
-			);
+			const credits = await openCredits(ada.page);
+			await credits.getByRole('button', { name: 'Edit your reward credits' }).click();
+			await credits.getByLabel('Set your reward credits').fill('4');
+			await credits.getByRole('button', { name: 'Save your reward credits' }).click();
+			await expect(creditsRow(credits, 'Me')).toContainText(/You\s*4/);
+			await closeCredits(ada.page);
+			await expect(ada.page.locator('.credits-chip')).toContainText('You 4');
 
-			await ada.page.getByRole('link', { name: 'Add a reward' }).click();
+			await startAdding(ada.page, 'Add a reward');
 			await ada.page.waitForURL(/\/rewards\/add$/);
 			await waitForHydration(ada.page);
 			await ada.page.locator('.add-form wa-input[name="title"] input').first().fill('Long bath');
@@ -155,11 +163,9 @@ test.describe('rewards', () => {
 			await within.getByRole('button', { name: /^Long bath/ }).click();
 			await expect(ada.page.locator('wa-dialog')).toContainText('2 credits left');
 			await clickWaButton(ada.page, /^Claim · 2 credits$/);
-			await expect(ada.page.locator('.balances li').filter({ hasText: 'Yours' })).toContainText(
-				'2'
-			);
+			await expect(ada.page.locator('.credits-chip')).toContainText('You 2');
 
-			await ada.page.getByRole('link', { name: 'Claim history' }).click();
+			await ada.page.getByRole('link', { name: 'Claimed rewards' }).click();
 			await ada.page.waitForURL(/\/rewards\/history$/);
 			await expect(ada.page.locator('wa-dialog').getByText('Long bath')).toBeVisible();
 			await expect(ada.page.getByRole('heading', { name: 'Reward history' })).toBeVisible();
@@ -177,7 +183,7 @@ test.describe('rewards', () => {
 		try {
 			await newAccount(ada.page, ada.who);
 			await ada.page.waitForURL('**/today');
-			await ada.page.getByRole('link', { name: 'Rewards' }).click();
+			await ada.page.getByRole('link', { name: 'Rewards', exact: true }).click();
 			await ada.page.waitForURL(/\/rewards$/);
 			const link = await createInvite(ada.page, {
 				partnerName: 'Jun',
@@ -194,13 +200,16 @@ test.describe('rewards', () => {
 
 			// After hydration, so the card sets the partnership's context.
 			await waitForHydration(jun.page);
-			await jun.page.getByRole('link', { name: 'Rewards' }).click();
+			await jun.page.getByRole('link', { name: 'Rewards', exact: true }).click();
 			await jun.page.waitForURL(/\/rewards$/);
-			await jun.page.getByRole('button', { name: "Edit Ada's reward credits" }).click();
-			await jun.page.getByLabel("Set Ada's reward credits").fill('4');
-			await jun.page.getByRole('button', { name: "Save Ada's reward credits" }).click();
+			const credits = await openCredits(jun.page);
+			await credits.getByRole('button', { name: "Edit Ada's reward credits" }).click();
+			await credits.getByLabel("Set Ada's reward credits").fill('4');
+			await credits.getByRole('button', { name: "Save Ada's reward credits" }).click();
+			await expect(creditsRow(credits, 'Ada')).toContainText(/Ada\s*4/);
+			await closeCredits(jun.page);
 
-			await jun.page.getByRole('link', { name: 'Add a reward' }).click();
+			await startAdding(jun.page, 'Add a reward');
 			await jun.page.waitForURL(/\/rewards\/add$/);
 			await waitForHydration(jun.page);
 			await jun.page.locator('.add-form wa-input[name="title"] input').fill('Tea service');
@@ -216,16 +225,21 @@ test.describe('rewards', () => {
 			// the one Jun keeps for her, never one merged list.
 			await ada.page.goto('/rewards');
 			await expect(ada.page.getByRole('heading', { name: 'From Jun' })).toBeVisible();
-			const balance = ada.page.locator('.balances li').filter({ hasText: 'With Jun' });
-			await expect(balance).toContainText('4');
+			// In Everyone her balances are in the credits sheet, a row per space.
+			const adas = await openCredits(ada.page);
+			await expect(creditsRow(adas, 'Jun')).toContainText(/You\s*4/);
+			await closeCredits(ada.page);
 			const teaService = ada.page.getByRole('button', { name: /^Tea service/ });
 			await waitForHydration(ada.page);
 			await teaService.click();
 			await clickWaButton(ada.page, /^Claim · 2 credits$/);
-			await expect(balance).toContainText(/With Jun\s*2\b/);
+			await expect(ada.page.locator('wa-dialog')).toHaveCount(0);
+			const after = await openCredits(ada.page);
+			await expect(creditsRow(after, 'Jun')).toContainText(/You\s*2\b/);
+			await closeCredits(ada.page);
 
 			// The history follows the context too, and says who claimed it.
-			await ada.page.getByRole('link', { name: 'Claim history' }).click();
+			await ada.page.getByRole('link', { name: 'Claimed rewards' }).click();
 			await ada.page.waitForURL(/\/rewards\/history$/);
 			await expect(ada.page.getByText('Claimed by you')).toBeVisible();
 		} finally {

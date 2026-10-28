@@ -7,7 +7,7 @@
 	import { catalog, categories, childrenOf, type KinkItem } from '$lib/kink-list/catalog';
 	import { kinkListContext, setKinkListSearch } from '$lib/kink-list/context';
 	import KinkCategory from './KinkCategory.svelte';
-	import KinkListCrumbs from './KinkListCrumbs.svelte';
+	import KinkListCrumbs, { type KinkListBack } from './KinkListCrumbs.svelte';
 	import LevelKey from './LevelKey.svelte';
 	import ListFilters from './ListFilters.svelte';
 	import SaveStatus from './SaveStatus.svelte';
@@ -30,12 +30,15 @@
 		intro,
 		title = 'Kink list',
 		minimal = false,
-		back
+		back,
+		corner
 	}: {
 		intro?: Snippet;
 		title?: string;
 		/** The way up from the list, where there is one: the Playroom, or your own list. */
-		back?: { href: string; text: string; label: string };
+		back?: KinkListBack;
+		/** At the end of the way back's line: the context switcher, signed in. */
+		corner?: Snippet;
 		/** A partner's view: the list, without quick fill, sharing a link, or import. */
 		minimal?: boolean;
 	} = $props();
@@ -155,7 +158,7 @@
 </script>
 
 <div class="home kink-list-home">
-	{#if back}<KinkListCrumbs {...back} />{/if}
+	{#if back}<KinkListCrumbs {...back}>{@render corner?.()}</KinkListCrumbs>{/if}
 	<header>
 		<h1>{title}</h1>
 		<SaveStatus />

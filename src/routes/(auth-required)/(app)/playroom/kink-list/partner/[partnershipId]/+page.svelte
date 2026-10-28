@@ -1,6 +1,10 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import ContextSwitcher from '$lib/components/context/ContextSwitcher.svelte';
+	import KinkListCrumbs, { type KinkListBack } from '$lib/components/kink-list/KinkListCrumbs.svelte';
 	import KinkListHome from '$lib/components/kink-list/KinkListHome.svelte';
+	import { inContext } from '$lib/context-client.svelte';
 	import { answeredCount } from '$lib/kink-list/answers';
 	import { kinkListContext } from '$lib/kink-list/context';
 	import { differences } from '$lib/kink-list/partner';
@@ -35,6 +39,28 @@
 		})
 	);
 
+	/**
+	 * Back to your own list, switching to Me on the way: your own list
+	 * follows the context, and with it still on this partner it would send
+	 * you straight back here.
+	 */
+	const back = $derived<KinkListBack>({
+		href: resolve('/(auth-required)/(app)/playroom/kink-list'),
+		text: 'Kink list',
+		label: 'Back to your own kink list',
+		attach: inContext({ kind: 'space', spaceId: data.soloSpaceId })
+	});
+
+	/**
+	 * This page is this partnership's whatever the context says, as an item
+	 * page is (docs/contexts.md, "Items carry their own space"): the switcher
+	 * shows it, and picking anything else goes to your own list, which sends
+	 * a partner on to their view and shows Me and Everyone itself.
+	 */
+	function switched() {
+		void goto(resolve('/(auth-required)/(app)/playroom/kink-list'));
+	}
+
 	let busy = $state(false);
 
 	async function share() {
@@ -57,6 +83,19 @@
 <svelte:head>
 	<title>Kink list for {name} · Bound Up</title>
 </svelte:head>
+
+{#snippet switcher()}
+	<ContextSwitcher
+		spaces={data.contextSpaces}
+		context={{ kind: 'space', spaceId: data.partnershipId }}
+		you={data.user?.name ?? ''}
+		onswitch={switched}
+	/>
+{/snippet}
+
+{#if !store.shared}
+	<KinkListCrumbs {...back}>{@render switcher()}</KinkListCrumbs>
+{/if}
 
 {#if !(store.shared || hasOwnList)}
 	<div class="intro">
@@ -98,11 +137,8 @@
 	<KinkListHome
 		title="Your list for {name}"
 		minimal
-		back={{
-			href: resolve('/(auth-required)/(app)/playroom/kink-list'),
-			text: 'Kink list',
-			label: 'Back to your own kink list'
-		}}
+		{back}
+		corner={switcher}
 	>
 		{#snippet intro()}
 			<nav class="partner-links" aria-label="For {name}">

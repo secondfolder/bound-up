@@ -23,7 +23,6 @@ import {
 	deleteLibraryItem,
 	deleteMark,
 	getDaydream,
-	getDaydreamsWidget,
 	getLibrary,
 	hasAcceptedDisclosure,
 	type LibraryKind,
@@ -289,15 +288,6 @@ describe('reading', () => {
 		// and an unplayed one by when it was made — which is now, after both.
 		expect(ids.indexOf(newer.id)).toBeLessThan(ids.indexOf(older.id));
 		expect(ids).toContain(fresh.id);
-	});
-
-	it('previews the top of the list on the widget, with the full count', async () => {
-		for (let index = 0; index < 4; index += 1) {
-			await createTestDaydream(db, ada.id);
-		}
-		const widget = await getDaydreamsWidget(db, ada.id, 3);
-		expect(widget.daydreams).toHaveLength(3);
-		expect(widget.total).toBe(4);
 	});
 
 	it('loads the whole tree’s shape, and the branch being read with its content', async () => {

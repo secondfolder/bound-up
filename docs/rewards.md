@@ -87,8 +87,9 @@ All under `src/routes/(auth-required)/(app)/rewards/`:
 The page follows the context exactly as the tasks page does
 ([tasks.md](tasks.md#route-surface)): the layout's load depends on
 `app:context` and on `rewards:<spaceId>` per space shown
-(`rewardsDependency`), the context switcher is in the header's corner, and a
-Tasks | Rewards pair of links (`ItemsTabs`) sits at the top. An edit sheet
+(`rewardsDependency`), and it has the same header: titled "Tasks & Rewards",
+the context switcher at the end of the title's line, and the Tasks | Rewards
+links (`ItemsTabs`) and the credits on the line under it. An edit sheet
 takes its space from the reward, so it opens whatever the context is. The old
 `/home/rewards` and `/partner/[id]/rewards` routes are gone, with no
 redirects. Today's Rewards card leads here in Today's own context.
@@ -99,9 +100,11 @@ redirects. Today's Rewards card leads here in Today's own context.
 add sheet posts `spaceId` and a sealed record to `createReward`; the edit sheet
 posts a sealed record to `updateReward`.
 
-**Adding** asks "For whom?" (`ForWhom`) when the context shows more than one
-space the viewer may set rewards in, remembered on the device under
-`bound-up:rewards-for-whom`, as the tasks page's add sheet does.
+**Adding** is the round add button (`AddButton`), as on the tasks page
+([tasks.md](tasks.md#route-surface)): straight to the add sheet with one space
+the viewer may set rewards in, a fan of their avatars with more, and "For
+whom?" (`ForWhom`, remembered under `bound-up:rewards-for-whom`) only when
+the sheet is opened by its URL with nothing picked.
 
 ### The wallet
 
@@ -131,13 +134,14 @@ untitled, since the page already says what it is. A merged list, as the tasks
 page has, would hide which balance a cost comes out of, so rewards are never
 merged across wallets.
 
-The balances themselves are the tasks page's row of pills (`CreditBalances`,
-from `balancePills`): the viewer's own ("Yours", or "With Jun" beside others
-in Everyone) and each partner's they manage, with their picture. Any the
-viewer may set (`canSetBalance`) is editable in place, posting to
-`?/setCredits`. Adding a reward is the dashed "Add a reward" row
-(`QuickAddLink`); claim history is the clock icon beside the page title,
-always there.
+The balances themselves are the tasks page's credits control
+(`CreditsControl`, from `creditGroups`): a chip with one space's one or two
+balances, or in Everyone the coins and an arrow, opening a sheet with a row
+per space ([tasks.md](tasks.md#the-checklist)). On this page the sheet is
+where any the viewer may set (`canSetBalance`) are set, posting to
+`?/setCredits`; they used to be edited in place in a row of pills, which on a
+phone wrapped onto three lines. Claim history is the "Claimed rewards" link
+at the end of the list, always there.
 
 The row of a reward whose detail is open stays lit behind it. Each reward is
 an `ItemRow` (the same row a task is; see

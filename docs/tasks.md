@@ -305,16 +305,21 @@ The add, edit and history pages are sheets over the list with URLs of their
 own (`RouteSheet`; see [docs/dialogs.md](dialogs.md#sheets-with-their-own-url)):
 the list is the route's `+layout.svelte`, and a reload on `/tasks/add` shows
 the list with the add form open over it. The forms themselves are
-`TaskEditorBody`. History is reached by the clock icon beside the page title:
-a line per completion under the day it happened, with the completion message
-it gave.
+`TaskEditorBody`. History is reached by the "Completed tasks" link at the end
+of the list (it used to be a clock icon in the header, which on a phone
+wrapped onto a line of its own): a line per completion under the day it
+happened, with the completion message it gave.
 
 **The list follows the context.** The layout's load reads the context's
 spaces (`contextSpaceIds`), depends on `app:context` and on
 `tasks:<spaceId>` for each (`tasksDependency`, which the home and partner
-cards share), and the context switcher sits in the header's corner. At the top
-of the page a Tasks | Rewards pair of links (`ItemsTabs`) moves between the two
-pages, which read as one place since tasks are what pay for rewards. An edit
+cards share), and the context switcher sits at the end of the header's title
+line. Both pages are titled "Tasks & Rewards" (the nav keeps "Tasks"), and
+on the header's second line a Tasks | Rewards pair of links (`ItemsTabs`)
+moves between them, since tasks are what pay for rewards; the credits are at
+that line's end. The header is `PageHeader`, with no back link: the page is
+one of the bottom nav's places, not one under Today
+([theme.md](theme.md#page-layout)). An edit
 sheet takes its space from the task, so a link to one opens whatever the
 context is ([contexts.md](contexts.md#items-carry-their-own-space)). The old
 `/home/tasks` and `/partner/[id]/tasks` routes are gone, with no redirects.
@@ -332,12 +337,18 @@ context, which another tab can change:
 | `/tasks/add` | `spaceId` and a sealed record | `createTask`                              |
 | `/tasks/[taskId]` | a sealed record          | `updateTask`                              |
 
-**Adding** asks "For whom?" (`ForWhom`) first when the context shows more than
-one space the viewer may set tasks in — in practice Everyone — listing Me and
-each partner they manage with. The choice is remembered on the device
-(`localStorage`, `bound-up:tasks-for-whom`) and posted as `spaceId`; the
-server checks the viewer manages that space and picks the assignee itself.
-Where there is only one such space the question is not asked.
+**Adding** is the round add button at the bottom right (`AddButton`), shown
+when the context has somewhere the viewer may set a task (`itemTargets`).
+With one such space it opens the add sheet for it; with more — in practice
+Everyone — it fans out their avatars, as the context switcher does
+(`ContextSelectorFan`, [contexts.md](contexts.md#the-add-buttons-fan)), and
+opens the sheet for the one picked. The space goes to the sheet in history
+state (`page.state.addFor`), not the URL, which lint keeps to `resolve()`'s
+own. The sheet posts it as `spaceId`; the server checks the viewer manages
+that space and picks the assignee itself. Opened any other way with more
+than one such space — a reload, a pasted link — the sheet asks "For whom?"
+(`ForWhom`) first, remembering the choice on the device (`localStorage`,
+`bound-up:tasks-for-whom`).
 
 ### The checklist
 
@@ -382,16 +393,17 @@ which is built on `Intl.DateTimeFormat#formatToParts` and
 `Intl.RelativeTimeFormat`, so a 24-hour locale keeps its own form and "today"
 and "tomorrow" are in the reader's language.
 
-Above the list are the balances the tasks pay into (`CreditBalances`, a row
-of `CreditPill`s labelled by a coins icon at its start, built by
-`balancePills` in `src/lib/item-pages.svelte.ts`), kept apart rather than
-added up because they are spent on different rewards: the viewer's own where
-they complete tasks ("Yours", or "With Jun" beside other spaces' in
-Everyone), and each partner's they set tasks for, with their picture. They are
-read-only here; they are set on the rewards page.
-
-Adding a task is a dashed "Add a task" row (`QuickAddLink`) over the lists,
-shown when the context has somewhere the viewer may set one.
+The balances the tasks pay into are the credits control at the end of the
+header's second line (`CreditsControl`, from `creditGroups` in
+`src/lib/item-pages.svelte.ts`), kept apart rather than added up because they
+are spent on different rewards. A space has the viewer's own balance where
+they complete tasks, a partner's where the viewer sets them tasks, or both
+where control is shared. In one context the control is a chip with that
+space's one or two ("You 6", "Jun 2"); in Everyone it is only the coins and
+an arrow, since a row of every partnership's two balances grew past two
+lines on a phone with two partners. Either opens a sheet with a row per
+space. They are read-only here; they are set from the same sheet on the
+rewards page.
 
 Tapping a task opens its detail (`TaskDetailDialog`), and the row stays lit
 behind it so it is plain which one is open. The detail has the description,

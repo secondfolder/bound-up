@@ -21,10 +21,12 @@
 		backLabel="Back to the daydream"
 		backText="Daydream"
 		title="Change the setup"
-		description="Changes apply from the next passage. What has already happened stays as it is."
 	/>
 
 	<div class="content">
+		<!-- What saving does to a story already under way: said before the form,
+		     since pages carry no subtitle to say it in. -->
+		<p class="note">Changes apply from the next passage. What has already happened stays as it is.</p>
 		<!-- Mounted only once the setup is open, so the form starts from it rather
 		     than from empty fields that fill in a moment later. -->
 		{#if setup}
@@ -84,7 +86,12 @@
 		border-block-start: 1px solid var(--wa-color-surface-border);
 	}
 
-	.placeholder {
+	.placeholder,
+	.note {
 		color: var(--wa-color-text-quiet);
+	}
+
+	.note {
+		margin-block-start: 0;
 	}
 </style>

@@ -783,3 +783,46 @@ export async function grantFeature(email: string, feature: string): Promise<void
 export async function switchOnDebugCookie(page: Page): Promise<void> {
 	await page.context().addCookies([{ name: 'debug', value: '1', url: new URL(page.url()).origin }]);
 }
+
+/**
+ * Starts adding from a list page's add button (`AddButton`): in one context
+ * the button itself, named `label` ("Add a task"); in Everyone, where it
+ * asks whose with a fan, the button and then the avatar for `forWhom` ("me",
+ * or a partner's name). Waits for hydration first: before it the button does
+ * nothing.
+ */
+export async function startAdding(page: Page, label: string, forWhom?: string): Promise<void> {
+	await waitForHydration(page);
+	if (forWhom === undefined) {
+		await page.getByRole('button', { name: label, exact: true }).click();
+		return;
+	}
+	await page.getByRole('button', { name: `${label}: choose whose it’s for` }).click();
+	await page.getByRole('button', { name: `${label} for ${forWhom}`, exact: true }).click();
+}
+
+/**
+ * Opens the tasks and rewards pages' credits sheet (`CreditsControl`) and
+ * returns it: a row per space (`creditsRow`), where the rewards page also
+ * sets them.
+ */
+export async function openCredits(page: Page): Promise<Locator> {
+	await waitForHydration(page);
+	await page.locator('.credits-chip').click();
+	const sheet = page.locator('wa-dialog').filter({ has: page.locator('.groups') });
+	await expect(sheet.locator('.groups')).toBeVisible();
+	return sheet;
+}
+
+/** The credits sheet's row for a space: "Me", or the partner's name. */
+export function creditsRow(sheet: Locator, space: string): Locator {
+	return sheet
+		.locator('.groups li')
+		.filter({ has: sheet.page().locator('.name', { hasText: space }) });
+}
+
+/** Closes the credits sheet, and waits for it to go. */
+export async function closeCredits(page: Page): Promise<void> {
+	await page.keyboard.press('Escape');
+	await expect(page.locator('.groups')).toHaveCount(0);
+}

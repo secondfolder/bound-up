@@ -3,7 +3,6 @@
 	import { page } from '$app/state';
 	import ContextAvatar from '$lib/components/context/ContextAvatar.svelte';
 	import ContextSwitcher from '$lib/components/context/ContextSwitcher.svelte';
-	import DaydreamsWidget from '$lib/components/DaydreamsWidget.svelte';
 	import GuidesWidget from '$lib/components/GuidesWidget.svelte';
 	import NotebookWidget from '$lib/components/notebook/NotebookWidget.svelte';
 	import PartnerMessagesWidget from '$lib/components/PartnerMessagesWidget.svelte';
@@ -28,7 +27,6 @@
 	const rewardsHref = resolve('/(auth-required)/(app)/rewards');
 	const playroomHref = resolve('/(auth-required)/(app)/playroom');
 	const guidesHref = resolve('/(auth-required)/(app)/guides');
-	const daydreamsHref = resolve('/(auth-required)/(app)/daydreams');
 
 	/** The context every card here previews: the lists they lead to open in it. */
 	const shownContext = $derived<AppContext>(
@@ -100,10 +98,6 @@
 			{#if today.guides}
 				<GuidesWidget guides={today.guides} href={guidesHref} />
 			{/if}
-			<!-- Likewise only for an account that holds the daydreams feature. -->
-			{#if today.daydreams}
-				<DaydreamsWidget daydreams={today.daydreams} href={daydreamsHref} />
-			{/if}
 			<!-- Both cover every space the viewer is in, so they open their lists
 			     in Everyone, which is where this page already is. -->
 			<TasksWidget tasks={today.tasks} href={tasksHref} opensIn={shownContext} />
@@ -118,9 +112,6 @@
 			<TasksWidget tasks={today.tasks} href={tasksHref} opensIn={shownContext} />
 			<RewardsWidget rewards={today.rewards} href={rewardsHref} opensIn={shownContext} />
 			<NotebookWidget items={today.notebook} spaceId={today.spaceId} />
-			{#if today.daydreams}
-				<DaydreamsWidget daydreams={today.daydreams} href={daydreamsHref} />
-			{/if}
 			<PlayroomWidget latestIq={today.latestIq} href={playroomHref} />
 			{#if today.guides}
 				<GuidesWidget guides={today.guides} href={guidesHref} />

@@ -30,7 +30,8 @@
 			icon: 'house',
 			href: resolve('/(auth-required)/(app)/today'),
 			// Guides, daydreams and the Playroom have no tab of their own: they
-			// are reached from Today's cards, so Today stays lit inside them
+			// are reached from Today's cards (daydreams through the Playroom's
+			// tile), so Today stays lit inside them
 			// rather than the nav showing no tab at all.
 			prefixes: [`${app}/today`, `${app}/guides`, `${app}/daydreams`, `${app}/playroom`]
 		},

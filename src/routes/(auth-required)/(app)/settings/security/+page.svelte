@@ -168,7 +168,6 @@
 		backLabel="Back to settings"
 		backText="Settings"
 		title="Security"
-		description="Your passkeys, your password, and this device."
 	/>
 
 	<div class="content">

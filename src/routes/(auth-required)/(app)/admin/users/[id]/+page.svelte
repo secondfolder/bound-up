@@ -27,10 +27,12 @@
 		backLabel="Back to accounts"
 		backText="Accounts"
 		title={data.account.name}
-		description={data.account.email}
 	/>
 
 	<div class="content">
+		<!-- The address is what tells two accounts with the same name apart, so
+		     it stays on the page, just not as a subtitle (pages carry none). -->
+		<p class="email">{data.account.email}</p>
 		<div class="panel">
 			<h2>Features</h2>
 			<!-- One form for the list: each row's button carries its feature as the
@@ -139,6 +141,12 @@
 			flex-direction: column;
 			gap: 1rem;
 			padding: var(--wa-space-l) var(--page-gutter);
+		}
+
+		.email {
+			margin: 0;
+			color: var(--wa-color-text-quiet);
+			overflow-wrap: anywhere;
 		}
 
 		.panel {

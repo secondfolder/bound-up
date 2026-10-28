@@ -296,6 +296,26 @@ describe('layoutFan', () => {
 		expect(Math.max(...unevenness(crowded))).toBe(0);
 	});
 
+	it('fans out from a button at the bottom right: clear of the button, apart, and on screen', () => {
+		// The add button's fan on a phone: seven spaces, which staggers.
+		const bounds = shell(390, 784);
+		const centre = { x: 344, y: 738 };
+		const layout = layoutFan({ centre, bounds, count: 7 });
+		expect(layout.fits).toBe(true);
+		expect(collisions(layout)).toEqual([]);
+		for (const point of layout.points) {
+			// Never over the 60px button itself.
+			expect(Math.hypot(point.x - centre.x, point.y - centre.y)).toBeGreaterThan(
+				30 + layout.avatar / 2
+			);
+		}
+		for (const box of boxes(layout)) {
+			expect(box.left).toBeGreaterThanOrEqual(0);
+			expect(box.right).toBeLessThanOrEqual(390);
+			expect(box.bottom).toBeLessThanOrEqual(784);
+		}
+	});
+
 	it('lays out again for a resized window: more of the ring, more of it used', () => {
 		const narrow = layoutFan({ centre: { x: 700, y: 0 }, bounds: shell(768, 954), count: 6 });
 		const wide = layoutFan({ centre: { x: 700, y: 0 }, bounds: shell(1400, 954), count: 6 });
@@ -348,6 +368,29 @@ describe('where the hint goes', () => {
 		expect(at?.side).toBe('centre');
 		expect((at?.x ?? 0) + hint.width / 2).toBe(1272);
 		expect(at?.y).toBe(HINT_INSET);
+	});
+
+	it('for a fan from the bottom of the screen, sits just above its disk rather than at the top', () => {
+		// The add button's: centred on a 60px button 16px in from a phone's
+		// right edge, over a list whose nav starts at 784.
+		const bounds = shell(390, 784);
+		const layout = layoutFan({ centre: { x: 344, y: 738 }, bounds, count: 7 });
+		const at = hintPlacement(layout, bounds, hint, 'disk');
+		expect(at).not.toBeNull();
+		const above = layout.centre.y - layout.disk - HINT_INSET - hint.height;
+		expect(at?.y).toBeGreaterThanOrEqual(above);
+		expect(at?.y).toBeLessThan(layout.centre.y);
+		expect(at?.side).toBe('right');
+		// And clear of every option, as from the top.
+		const box = {
+			left: at?.x ?? 0,
+			top: at?.y ?? 0,
+			right: (at?.x ?? 0) + hint.width,
+			bottom: (at?.y ?? 0) + hint.height
+		};
+		expect(boxes(layout).filter((option) => boxesOverlap(box, option))).toEqual([]);
+		// From the top, the same fan's hint is at the top of the page.
+		expect(hintPlacement(layout, bounds, hint)?.y).toBe(HINT_INSET);
 	});
 
 	it('stays inside the shell however near its edge the disk is centred', () => {

@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { PLAYROOM_TOOLS, type PlayroomTool } from '$lib/playroom/tools';
+	import { page } from '$app/state';
+	import { type PlayroomTool, playroomToolsFor } from '$lib/playroom/tools';
+
+	// The app shell's features decide what is listed and nothing more: a
+	// tool behind one checks for it in its own loads (docs/features-and-admin.md).
+	const tools = $derived(playroomToolsFor(page.data.features ?? []));
 
 	// `resolve()` takes one route at a time, with that route's own params.
 	function href(tool: PlayroomTool): string {
@@ -12,10 +17,9 @@
 
 <div class="page">
 	<h1>Playroom</h1>
-	<p class="intro">Toys and games to play with, alone or with someone else.</p>
 
 	<ul class="tools">
-		{#each PLAYROOM_TOOLS as tool (tool.id)}
+		{#each tools as tool (tool.id)}
 			<li>
 				<!--
 					A plain link rather than a wa-card with an onclick: the whole card is
@@ -41,13 +45,7 @@
 
 		h1 {
 			text-align: center;
-			margin-block-end: 0.25em;
-		}
-
-		.intro {
-			text-align: center;
-			color: var(--wa-color-text-quiet);
-			margin-block-start: 0;
+			margin-block-end: 0;
 		}
 	}
 

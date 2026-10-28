@@ -187,21 +187,12 @@ describe('in Everyone', () => {
 		]);
 	});
 
-	describe('the daydreams card', () => {
-		it('is absent for an account without the daydreams feature', async () => {
-			await createTestDaydream(db, ada.id);
-			expect((await shown('all', at(ada))).today.daydreams).toBeNull();
-		});
-
-		it("previews the account's own daydreams, and counts them all", async () => {
-			for (let index = 0; index < 4; index += 1) {
-				await createTestDaydream(db, ada.id);
-			}
-			await createTestDaydream(db, jun.id);
-			const data = await shown('all', at(ada, [], ['daydreams']));
-			expect(data.today.daydreams?.daydreams).toHaveLength(3);
-			expect(data.today.daydreams?.total).toBe(4);
-		});
+	it('has no daydreams card, even for an account with the feature', async () => {
+		// Daydreams are a Playroom tool (docs/playroom.md), so Today reads none
+		// of them: D1 charges for rows read by a card that is not there.
+		await createTestDaydream(db, ada.id);
+		const data = await shown('all', at(ada, [], ['daydreams']));
+		expect(data.today).not.toHaveProperty('daydreams');
 	});
 
 	describe('the guides card', () => {
@@ -287,18 +278,17 @@ describe('in Me', () => {
 		expect(serialised).not.toContain(junsTask.id);
 	});
 
-	it('carries daydreams, guides and the Playroom as the account allows', async () => {
+	it('carries guides and the Playroom as the account allows, and no daydreams', async () => {
 		const solo = await testSoloSpace(db, ada.id);
 		await createTestDaydream(db, ada.id);
 		await db.insert(guides).values({ title: 'A guide' });
 
 		const without = await shown('solo', at(ada, [], [], solo));
-		expect(without.today.daydreams).toBeNull();
 		expect(without.today.guides).toBeNull();
 		expect(without.today.latestIq).toBeNull();
 
 		const withBoth = await shown('solo', at(ada, [], ['daydreams', 'guides'], solo));
-		expect(withBoth.today.daydreams?.total).toBe(1);
+		expect(withBoth.today).not.toHaveProperty('daydreams');
 		expect(withBoth.today.guides?.total).toBe(1);
 	});
 });

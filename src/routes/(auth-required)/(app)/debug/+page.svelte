@@ -15,7 +15,6 @@
 		backLabel="Back to settings"
 		backText="Settings"
 		title="Debug tools"
-		description="For working out how the app behaves, not for using it."
 	/>
 
 	<ul>

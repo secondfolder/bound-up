@@ -20,7 +20,6 @@ import type {
 	DaydreamListItemView,
 	DaydreamMarkView,
 	DaydreamSetupExchangeView,
-	DaydreamsWidgetView,
 	DaydreamTreeNodeView,
 	DaydreamTurnView,
 	DaydreamView
@@ -184,24 +183,6 @@ export async function listDaydreams(db: Db, userId: string): Promise<DaydreamLis
 		.where(eq(daydreams.ownerId, userId))
 		.orderBy(...newestFirst());
 	return rows.map(toListItem);
-}
-
-/** Today's card: the top of the same list, limited in SQL, and how many there are in all. */
-export async function getDaydreamsWidget(
-	db: Db,
-	userId: string,
-	limit: number
-): Promise<DaydreamsWidgetView> {
-	const [rows, total] = await Promise.all([
-		db
-			.select(listColumns)
-			.from(daydreams)
-			.where(eq(daydreams.ownerId, userId))
-			.orderBy(...newestFirst())
-			.limit(limit),
-		db.$count(daydreams, eq(daydreams.ownerId, userId))
-	]);
-	return { daydreams: rows.map(toListItem), total };
 }
 
 /** Whether `daydreamId` is one of the user's. */

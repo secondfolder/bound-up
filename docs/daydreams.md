@@ -960,6 +960,13 @@ Lines kept on purpose:
 
 ## The flow
 
+Daydreams are a Playroom tool ([playroom.md](playroom.md)): the Playroom
+lists them, for an account with the `daydreams` feature only, and
+`/daydreams` has its way back to the Playroom. Today has no Daydreams card
+of its own; the Playroom's card on Today is the way there. They used to have
+one, which gave a single toy a place beside tasks and rewards when every
+other toy is reached through the Playroom.
+
 1. **Disclosure.** `/daydreams` shows `DaydreamDisclosure.svelte` until the
    user presses "I understand". Acceptance is a row in `daydream_preferences`;
    the reply and suggest endpoints refuse (409) until it exists.
@@ -976,7 +983,7 @@ Lines kept on purpose:
 ## Naming
 
 A daydream's `title` is empty until it has a name. Everywhere one is shown
-— the list, the story's heading, Today's card — goes through
+— the list, the story's heading — goes through
 `daydreamTitle`, which falls back to the idea's title, so an unnamed
 daydream is never blank.
 

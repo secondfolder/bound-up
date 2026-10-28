@@ -19,7 +19,6 @@ One shell, one component per destination.
 ```
 SectionWidget            the card: wa-card, header, optional header link, body
 ├─ GuidesWidget          first few guide titles — only with the guides feature
-├─ DaydreamsWidget       the most recently played daydreams — only with that feature
 ├─ TasksWidget           tasks ready to complete now
 ├─ RewardsWidget         credit balance + rewards claimable now
 ├─ PartnerMessagesWidget unread / total threads for one partnership
@@ -33,9 +32,9 @@ Guides, Tasks and Rewards all want, so that list exists once.
 
 | Context        | Cards                                                                                                     |
 | -------------- | --------------------------------------------------------------------------------------------------------- |
-| Everyone       | Messages (conditional), Guides (conditional), Daydreams (conditional), Tasks, Rewards, Notebook, Playroom |
-| Me             | Tasks, Rewards, Notebook, Daydreams (conditional), Playroom, Guides (conditional)                          |
-| A partnership  | its header, then Messages, Tasks, Rewards, Notebook, Kink lists (header only)                             |
+| Everyone       | Messages (conditional), Guides (conditional), Tasks, Rewards, Notebook, Playroom |
+| Me             | Tasks, Rewards, Notebook, Playroom, Guides (conditional)                          |
+| A partnership  | its header, then Messages, Tasks, Rewards, Notebook, Kink lists (header only)     |
 
 The load (`(app)/today/+page.server.ts`) depends on `app:context` and returns
 `today`, a union on `kind` (`all`, `solo`, `shared`), so each context's data
@@ -50,14 +49,15 @@ The Guides card shows **only to an account that holds the `guides` feature**
 `features` from the app shell layout and skips the guides query entirely
 otherwise — D1 charges for rows read by a card nobody sees — returning
 `guides: null`. That layout list only decides what is shown; `/guides`
-refuses an account without the feature by itself. The Daydreams card works
-the same way with the `daydreams` feature, returning `daydreams: null`
-without it; its titles are sealed, so `WidgetItems` opens them in the browser
-like a task's.
+refuses an account without the feature by itself.
+
+There is no Daydreams card. Daydreams are a Playroom tool
+([playroom.md](playroom.md)), reached through the Playroom's card like the
+kink list and the IQ test, so Today's load reads no daydreams at all.
 
 The page's title row is an `h1` "Today" with the context switcher at its
-end, inset like `NestedPageHeader` but with no back link: this is where back
-goes. In a partnership's context a **header** sits above the cards: the
+end, inset like the other headers and, like `PageHeader` on the bottom
+nav's other places, with no back link: this is where back goes. In a partnership's context a **header** sits above the cards: the
 partner's avatar in the colour the viewer gave them (`ContextAvatar`, the same
 initials and colour as the switcher), their name through `partnerName()` and
 "*your name*'s *their role*" through `viewerNames()` (sealed, "…" until the
@@ -176,7 +176,6 @@ What counts as "something to say" is per widget:
 | Tasks              | something is ready, or a waiting/hidden count exists |
 | Rewards            | a non-zero balance or a claimable row                |
 | Guides             | there is at least one guide                          |
-| Daydreams          | there is at least one daydream                       |
 | Messages (partner) | there is at least one thread                         |
 | Playroom           | an IQ test result has been saved to the account      |
 | Notebook           | there is at least one entry the viewer may see       |
@@ -240,7 +239,6 @@ only what the preview shows:
 | `TasksWidgetView`           | `getTasksWidget`, over the card's space ids           | `server/tasks.ts`     |
 | `RewardsWidgetView`         | `getRewardsWidget`, over the card's space ids         | `server/rewards.ts`   |
 | `GuidesWidgetView`          | `loadGuidesCard`, only with the guides feature        | the Today load        |
-| `DaydreamsWidgetView`       | `getDaydreamsWidget`, only with the daydreams feature | `server/daydreams.ts` |
 | `PartnerMessagesWidgetView` | `getPartnerMessagesWidget`                            | `server/messaging.ts` |
 | `IqTestResultView`          | `latestIqTestResult` (one row)                        | `server/iq-test.ts`   |
 | `WidgetItemView[]` (notebook) | `getHomeNotebookWidget`, `getPartnershipNotebookWidget`; hidden entries left out on the server | `server/notebook.ts` |

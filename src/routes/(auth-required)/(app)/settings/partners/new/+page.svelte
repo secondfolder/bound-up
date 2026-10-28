@@ -101,12 +101,17 @@
 		backLabel="Back to partners"
 		backText="Partners"
 		title="Add a partner"
-		description="Answer these, then you will get a link to send them. Nothing is shared until they accept it."
 	/>
 
 	<div class="content">
 		<form method="POST" use:superform.enhance>
 			<PartnerFields {superform} />
+
+			<!-- Beside the button it is about, not under the title: what pressing
+			     it does, and the reassurance that it shares nothing yet. -->
+			<p class="note">
+				Creating it gives you a link to send them. Nothing is shared until they accept it.
+			</p>
 
 			<!-- `disabled={$submitting}`, never `disabled={$submitting || undefined}`:
 		     once Web Awesome upgrades the element Svelte assigns to the `disabled`
@@ -145,6 +150,11 @@
 
 			.invalid {
 				color: var(--wa-color-text-danger);
+			}
+
+			.note {
+				margin: 0;
+				color: var(--wa-color-text-quiet);
 			}
 
 			.actions {

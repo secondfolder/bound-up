@@ -1,21 +1,18 @@
 <script lang="ts">
-	import { onMount, type Snippet } from 'svelte';
-	import { defaults } from 'sveltekit-superforms';
-	import { zod4Client } from 'sveltekit-superforms/adapters';
-	import { z } from 'zod';
+	import { onMount, type Snippet, tick } from 'svelte';
 	import { navigating } from '$app/state';
+	import AddButton from '$lib/components/AddButton.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
-	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
-	import SelectField from '$lib/components/SelectField.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
+	import ResponsiveDialog from '$lib/components/ResponsiveDialog.svelte';
 	import Tab from '$lib/components/tabs/Tab.svelte';
 	import TabGroup from '$lib/components/tabs/TabGroup.svelte';
 	import TabPanel from '$lib/components/tabs/TabPanel.svelte';
-	import { SOLO_NAME, shownSpace } from '$lib/context-client.svelte';
+	import { shownSpace } from '$lib/context-client.svelte';
 	import { invalidate } from '$lib/navigation';
 	import { groupByMonth, NOTEBOOK_LIST_TOPIC, type NotebookKind } from '$lib/notebook';
 	import { type RoomKey, watchRoom } from '$lib/realtime/live';
 	import type { SealScope } from '$lib/sealed-forms';
-	import { superForm } from '$lib/superform';
 	import type { ContextSpaceView, NotebookEntryView } from '$lib/types';
 	import NewEntryForm, { type NewEntryTarget } from './NewEntryForm.svelte';
 	import NotebookEntryRow from './NotebookEntryRow.svelte';
@@ -39,9 +36,10 @@
 		room,
 		today,
 		viewerId,
+		you,
 		spaces,
+		contextSpaces,
 		dependency,
-		header,
 		entryHref,
 		corner
 	}: {
@@ -55,17 +53,26 @@
 		room: RoomKey;
 		today: string;
 		viewerId: string;
+		/** The viewer's own name, for their avatar on the add button's fan. */
+		you: string;
 		/** The spaces the list shows, in the switcher's order. */
 		spaces: readonly ContextSpaceView[];
+		/** Every space the switcher knows, for the add button's avatars. */
+		contextSpaces: readonly ContextSpaceView[];
 		/** The load's `depends` key, refreshed when the list changes elsewhere. */
 		dependency: string;
-		header: { backHref: string; backLabel: string; backText: string };
 		entryHref: (entryId: string) => string;
 		/** At the end of the header's top line: the context switcher. */
 		corner?: Snippet;
 	} = $props();
 
 	const tabStorageKey = 'bound-up:notebook-tab';
+
+	const ADD_LABEL: Record<NotebookKind, string> = {
+		journal: 'New journal entry',
+		note: 'New note',
+		scene: 'New scene'
+	};
 
 	// Every visit starts on the journal and moves to the remembered tab once
 	// mounted, rather than reading storage while the state initialises: the
@@ -93,9 +100,8 @@
 	}
 
 	const spaceById = $derived(new Map(spaces.map((space) => [space.id, space])));
-	/** Several spaces at once: each row says whose it is, and a new entry asks. */
+	/** Several spaces at once: each row says whose it is, and the add button asks whose a new one is. */
 	const several = $derived(spaces.length > 1);
-	const only = $derived(spaces.length === 1 ? spaces[0] : undefined);
 
 	function sealScopeOf(space: ContextSpaceView): SealScope {
 		return space.kind === 'solo'
@@ -109,78 +115,36 @@
 		return space && space.kind === 'shared' ? shownSpace(space).name : null;
 	}
 
-	const description = $derived.by(() => {
-		if (several) {
-			return 'Your own journal and notes, and the ones you share, together.';
-		}
-		if (only?.kind === 'shared') {
-			const { name } = shownSpace(only);
-			return `A journal and notes you and ${name} share, and can write in together.`;
-		}
-		return 'Your own journal and notes, for nobody but you.';
-	});
-
-	// ── who a new entry is for, when the list shows several spaces ─────────
-
-	const targetStorageKey = 'bound-up:notebook-for-whom';
-	const targetSchema = z.object({ spaceId: z.string().min(1, 'Choose who it’s for') });
-
-	function rememberedTarget(): string {
-		try {
-			return globalThis.localStorage?.getItem(targetStorageKey) ?? '';
-		} catch {
-			return '';
-		}
-	}
-
-	// svelte-ignore state_referenced_locally
-	// Captured once, as every superform is: the stores are the live connection.
-	// Never posted: it is the field behind "For whom?", which each new-entry
-	// form reads when it starts an entry.
-	const targetForm = superForm(
-		defaults({ spaceId: rememberedTarget() }, zod4Client(targetSchema), {
-			id: 'notebook-for-whom'
-		}),
-		{ SPA: true, resetForm: false, validators: zod4Client(targetSchema) }
-	);
-	const { form: targetValues } = targetForm;
-
-	const targetOptions = $derived(
-		spaces.map((space) => ({
-			value: space.id,
-			label: space.kind === 'solo' ? `${SOLO_NAME}, just for you` : shownSpace(space).name
-		}))
-	);
-
-	// The last one used is remembered on this device, as the default next time.
-	const chosenTarget = $derived($targetValues.spaceId);
-	$effect(() => {
-		if (!chosenTarget) {
-			return;
-		}
-		try {
-			globalThis.localStorage?.setItem(targetStorageKey, chosenTarget);
-		} catch {
-			// Only a default for next time.
-		}
-	});
+	// ── starting an entry ────────────────────────────────────────────────────
 
 	/**
-	 * The space a new entry goes to: the one shown, or with several shown,
-	 * the one chosen under "For whom?", which must be chosen first. Named in
-	 * the form, never read from the context on the server (docs/contexts.md).
+	 * Where the next entry goes: the space the add button was pressed for,
+	 * the only one shown or the one picked from its fan in Everyone. Named
+	 * in the form, never read from the context on the server
+	 * (docs/contexts.md, "Writes name their space").
 	 */
-	async function target(): Promise<NewEntryTarget | null> {
-		if (only) {
-			return { spaceId: only.id, sealScope: sealScopeOf(only) };
+	let addFor = $state<ContextSpaceView | null>(null);
+	/** A journal entry asks for its date first, in a dialog. */
+	let askingDate = $state(false);
+	let creating = $state(false);
+	const bareForms: Partial<Record<'note' | 'scene', NewEntryForm>> = $state({});
+
+	function target(): Promise<NewEntryTarget | null> {
+		return Promise.resolve(addFor ? { spaceId: addFor.id, sealScope: sealScopeOf(addFor) } : null);
+	}
+
+	async function add(spaceId: string) {
+		addFor = spaceById.get(spaceId) ?? null;
+		if (!addFor) {
+			return;
 		}
-		const chosen = spaceById.get($targetValues.spaceId);
-		if (!chosen) {
-			$targetValues.spaceId = '';
-			await targetForm.validateForm({ update: true });
-			return null;
+		if (tab === 'journal') {
+			askingDate = true;
+			return;
 		}
-		return { spaceId: chosen.id, sealScope: sealScopeOf(chosen) };
+		// After the render that hands the form its target.
+		await tick();
+		bareForms[tab]?.submit();
 	}
 
 	// ── live ─────────────────────────────────────────────────────────────────
@@ -285,29 +249,9 @@
 
 
 <section class="page">
-	<NestedPageHeader
-		backHref={header.backHref}
-		backLabel={header.backLabel}
-		backText={header.backText}
-		title="Notebook"
-		{description}
-		{corner}
-	/>
+	<PageHeader title="Notebook" {corner} />
 
 	<div class="content">
-		{#if several}
-			<!-- Asked before an entry is started, because the list shows more
-			     than one place it could go. Remembered on this device. -->
-			<div class="for-whom">
-				<SelectField
-					superform={targetForm}
-					field="spaceId"
-					title="For whom?"
-					options={targetOptions}
-					placeholder="Choose who new entries are for"
-				/>
-			</div>
-		{/if}
 		<TabGroup label="Notebook" bind:active={tab} ontabshow={rememberTab}>
 			{#snippet nav()}
 				<Tab panel="journal">Journal</Tab>
@@ -317,10 +261,9 @@
 
 			<TabPanel name="journal">
 				<div class="panel">
-					<NewEntryForm kind="journal" {today} {target} />
 					{#if journal.length === 0}
 						<EmptyState icon="feather" title="No journal entries yet">
-							Dated entries about how things are going. Start one for today above.
+							Dated entries about how things are going. Start one with the + button.
 						</EmptyState>
 					{:else}
 						{#each journalMonths as group (group.month)}
@@ -333,10 +276,19 @@
 
 			<TabPanel name="note">
 				<div class="panel">
-					<NewEntryForm kind="note" {today} {target} />
+					<NewEntryForm
+						bind:this={bareForms.note}
+						kind="note"
+						{today}
+						{target}
+						bare
+						onbusy={(busy) => {
+							creating = busy;
+						}}
+					/>
 					{#if notes.length === 0}
 						<EmptyState icon="note-sticky" title="No notes yet">
-							Anything that doesn’t fit anywhere else. Start one above.
+							Anything that doesn’t fit anywhere else. Start one with the + button.
 						</EmptyState>
 					{:else}
 						{@render rows(notes)}
@@ -346,10 +298,19 @@
 
 			<TabPanel name="scene">
 				<div class="panel">
-					<NewEntryForm kind="scene" {today} {target} />
+					<NewEntryForm
+						bind:this={bareForms.scene}
+						kind="scene"
+						{today}
+						{target}
+						bare
+						onbusy={(busy) => {
+							creating = busy;
+						}}
+					/>
 					{#if scenes.length === 0}
 						<EmptyState icon="masks-theater" title="No scenes yet">
-							Plan a scene: as loosely or as carefully as you like. Start one above.
+							Plan a scene: as loosely or as carefully as you like. Start one with the + button.
 						</EmptyState>
 					{:else}
 						{@render rows(scenes)}
@@ -358,10 +319,42 @@
 			</TabPanel>
 		</TabGroup>
 	</div>
+
+	<AddButton
+		label={ADD_LABEL[tab]}
+		targets={spaces.map((space) => space.id)}
+		spaces={contextSpaces}
+		{you}
+		busy={creating}
+		onadd={(spaceId) => void add(spaceId)}
+	/>
 </section>
 
+{#if askingDate && addFor}
+	<!-- A journal entry's date cannot be changed once it is started, so it is
+	     asked here, today unless changed; a note or a scene asks for nothing
+	     and starts at once. -->
+	<ResponsiveDialog
+		label={addFor.kind === 'shared' ? `New journal entry with ${shownSpace(addFor).name}` : 'New journal entry'}
+		onclose={() => {
+			askingDate = false;
+		}}
+	>
+		<NewEntryForm
+			kind="journal"
+			{today}
+			{target}
+			onbusy={(busy) => {
+				creating = busy;
+			}}
+		/>
+	</ResponsiveDialog>
+{/if}
+
 <style>
+	/* Fills <main>, so the add button, its last child, sticks to the bottom. */
 	.page {
+		flex: 1 1 auto;
 		max-width: var(--page-width);
 		margin: 0 auto;
 		display: flex;
@@ -371,10 +364,6 @@
 
 	.content {
 		padding: 0 var(--page-gutter) var(--wa-space-l);
-	}
-
-	.for-whom {
-		max-inline-size: 20rem;
 	}
 
 	.panel {

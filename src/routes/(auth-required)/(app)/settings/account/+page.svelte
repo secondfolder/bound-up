@@ -57,7 +57,6 @@
 		backLabel="Back to settings"
 		backText="Settings"
 		title="Account"
-		description="Update the name and timezone used on this account, and review the sign-in details attached to it."
 	/>
 
 	<div class="content">

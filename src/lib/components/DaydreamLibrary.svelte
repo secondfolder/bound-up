@@ -90,7 +90,6 @@
 		backLabel="Back to daydreams"
 		backText="Daydreams"
 		title={kind === 'characters' ? 'Your characters' : 'Your ideas'}
-		description={'Ready to pick for any daydream. A daydream keeps its own copy, and offers to update it when you change one here.'}
 	/>
 
 	<div class="content">
@@ -132,6 +131,12 @@
 					</li>
 				{/each}
 			</ul>
+			<!-- Under the list rather than under the title: it is what editing
+			     one of these does, and pages carry no description (the header's
+			     subtitle is for a page that opts in). -->
+			<p class="note">
+				A daydream keeps its own copy of each, and offers to update it when you change one here.
+			</p>
 		{/if}
 	</div>
 </section>
@@ -214,8 +219,14 @@
 		}
 	}
 
-	.empty {
+	.empty,
+	.note {
 		color: var(--wa-color-text-quiet);
+	}
+
+	.note {
+		margin: 0;
+		font-size: 0.875rem;
 	}
 
 	.invalid {

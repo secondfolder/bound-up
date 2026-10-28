@@ -1420,6 +1420,8 @@ test.describe('IQ test', () => {
 		await page.getByRole('link', { name: 'Playroom' }).click();
 		await page.waitForURL('**/playroom');
 		await expect(page.getByRole('heading', { level: 1, name: 'Playroom' })).toBeVisible();
+		// Daydreams are listed only for an account with that feature.
+		await expect(page.getByRole('link', { name: /Daydreams/ })).toHaveCount(0);
 
 		await page.getByRole('link', { name: /IQ test/ }).click();
 		await page.waitForURL('**/playroom/iq-test');

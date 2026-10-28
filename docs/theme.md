@@ -63,8 +63,9 @@ theme without being unlayered, where it would also beat every component's own
   a fixed size one long word ("Notifications") overflowed a 360px phone. The
   landing page's hero and the home screen's title are the only bigger ones.
 - **`--wa-color-text-quiet` is 85% lightness**, not the 80% it started at,
-  so it holds 4.5:1 on the brightest part of the wash, top left, where every
-  page's description line sits (it measured 4.0:1 there).
+  so it holds 4.5:1 on the brightest part of the wash, top left, where a
+  page's description line would sit (it measured 4.0:1 there). No page has
+  one by default now, but quiet text is still drawn there.
 - **Placeholders and select carets are warm.** Web Awesome's placeholder is a
   cool grey and its native select caret a lavender SVG blended into what is
   behind it; both were the only cold colours on a page. The placeholder is the
@@ -90,10 +91,21 @@ widths, and every page's content sits one gutter in from that column's edge.
   the same `max-width` came out different widths, a page changed width with
   its data, and an unwrappable title pushed the old partner page off a phone. The
   app layout gives every root `inline-size: 100%`, so `max-width` is the width.
-- **The header and the content share the gutter.** `NestedPageHeader` is
-  inset by `--page-gutter` as a margin, so its divider is exactly as wide as
-  the content below and the back link, the title and the cards start at one
-  edge. A page's content pads its sides with the same token.
+- **Two headers.** A page the bottom nav goes to (Tasks & Rewards, the
+  notebook, messages, and the guides reached from Today) has `PageHeader`: its
+  title with the context switcher at the end of the same line, and optionally
+  a second line for its segmented control and anything at that line's end (the
+  credits). No back link: those pages are siblings of Today in the nav, not
+  pages under it, and "‹ Today" cost a whole line to say otherwise. A page
+  under one of them has `NestedPageHeader`, with its back link.
+- **No description by default.** Both headers take an optional `description`,
+  a quiet line under the title, but no page passes one: what they said is in
+  the page's body or its empty state where it is needed at all. Keep it for a
+  page that turns out to need one.
+- **The header and the content share the gutter.** Both headers are inset by
+  `--page-gutter` as a margin, so the divider is exactly as wide as the
+  content below and the back link, the title and the cards start at one edge.
+  A page's content pads its sides with the same token.
 - **A list's indent is its padding, not its items' margin.** Web Awesome gives
   every `li` a start margin, which a bullet-less list that zeroed its own
   padding still inherited, so every such list sat 18px in from its heading.
@@ -330,15 +342,20 @@ shows them, built from two generic components:
   something else already names the rows (a heading). Callers leave out an empty
   group.
 
-Around them: `CreditBalances`, the balances a page's items pay into, as a row
-of `CreditPill`s labelled by a coins icon at its start, a partner's marked with
-their picture and any the viewer may set editable in place; `ItemsTabs`, the
-Tasks | Rewards pair of links at the top of both pages, a segmented control of
-links with `aria-current`, since each is a page with its own URL and sheets;
+Around them: `CreditsControl`, the balances a page's items pay into, a chip
+with one space's one or two or in Everyone just the coins and an arrow,
+opening a sheet with a row per space where any the viewer may set are set;
+`ItemsTabs`, the Tasks | Rewards pair of links on both pages' header, a
+segmented control of links with `aria-current`, since each is a page with its
+own URL and sheets;
 and `WhoseTime`, "Jun's time" with a tooltip giving the zone and both
 people's time, for any time that belongs to someone else's clock. Times a list shows are informal — "9am", "Tomorrow 6:30pm" —
-through `src/lib/informal-time.ts`. Adding to a list is a dashed row at its
-top (`QuickAddLink`, "Add a task").
+through `src/lib/informal-time.ts`. Adding to a list is the round add button
+at the bottom right (`AddButton`), sticky over the list as the last child of
+a page root that fills `<main>`, as Messages' "Write something" is; with more
+than one place to add to it fans out their avatars
+([contexts.md](contexts.md#the-add-buttons-fan)). The list's history, where
+it has one, is a link at the list's end ("Completed tasks").
 
 Tabs, and any choice of a few drawn as buttons, are the segmented pill
 (`TabGroup`, `RadioButtonGroup`): the options in one pill on

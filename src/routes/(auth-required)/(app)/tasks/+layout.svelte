@@ -1,15 +1,16 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import CreditBalances from '$lib/components/CreditBalances.svelte';
+	import AddButton from '$lib/components/AddButton.svelte';
+	import CreditsControl from '$lib/components/CreditsControl.svelte';
 	import ContextSwitcher from '$lib/components/context/ContextSwitcher.svelte';
 	import ItemsTabs from '$lib/components/ItemsTabs.svelte';
-	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
-	import QuickAddLink from '$lib/components/QuickAddLink.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
 	import TaskChecklist from '$lib/components/TaskChecklist.svelte';
 	import { shownSpace } from '$lib/context-client.svelte';
-	import { balancePills, itemTargets, partnerIn, shownSpaces } from '$lib/item-pages.svelte';
+	import { creditGroups, itemTargets, partnerIn, shownSpaces } from '$lib/item-pages.svelte';
 	import { sealScopeForSpace } from '$lib/sealed-forms';
 	import type { TaskEntry } from '$lib/task-list';
 	import type { TaskView } from '$lib/types';
@@ -23,14 +24,24 @@
 	 */
 	const form = $derived(page.form as ActionData | null | undefined);
 	const historyHref = resolve('/(auth-required)/(app)/tasks/history');
-	const addHref = resolve('/(auth-required)/(app)/tasks/add');
 
 	/** The spaces the list shows, as the switcher knows them: one, or several in Everyone. */
 	const spaces = $derived(shownSpaces(data.list.spaces, data.contextSpaces));
 	const several = $derived(spaces.length > 1);
 	const only = $derived(spaces.length === 1 ? spaces[0] : undefined);
-	/** Somewhere the viewer may add a task to, from here. */
-	const canAdd = $derived(itemTargets(data.list.spaces, data.contextSpaces).length > 0);
+	/** Where the viewer may add a task to, from here: the add button's choices. */
+	const targets = $derived(
+		itemTargets(data.list.spaces, data.contextSpaces).map((target) => target.spaceId)
+	);
+
+	/**
+	 * Opens the add sheet for the space picked (or the only one), handed over
+	 * in history state rather than the URL (`PageState.addFor`), so the sheet
+	 * skips "For whom?". The sheet posts it; nothing reads the context.
+	 */
+	function add(spaceId: string) {
+		void goto(resolve('/(auth-required)/(app)/tasks/add'), { state: { addFor: spaceId } });
+	}
 
 	function entry(task: TaskView, mode: 'to-do' | 'set'): TaskEntry {
 		const space = spaces.find((candidate) => candidate.id === task.spaceId) ?? null;
@@ -56,19 +67,9 @@
 	/** The partner a one-space list is about, for "Tasks set for Jun" and "Jun's time". */
 	const partnerShown = $derived(only?.kind === 'shared' ? shownSpace(only).name : null);
 
-	const balances = $derived(
-		balancePills(data.list.balances, data.contextSpaces, data.partners, { editable: false })
+	const credits = $derived(
+		creditGroups(data.list.balances, data.contextSpaces, data.user?.name ?? '', { editable: false })
 	);
-
-	const description = $derived.by(() => {
-		if (several) {
-			return 'Your own tasks, and the ones you and your partners set each other.';
-		}
-		if (partnerShown) {
-			return `Tasks you and ${partnerShown} set each other.`;
-		}
-		return 'Your own tasks, for nobody but you.';
-	});
 
 	/** The completion just made, which the list offers to undo in the task's place. */
 	const completion = $derived(
@@ -79,32 +80,20 @@
 </script>
 
 <section class="page">
-	<NestedPageHeader
-		backHref={resolve('/(auth-required)/(app)/today')}
-		backLabel="Back to Today"
-		backText="Today"
-		title="Tasks"
-		{description}
-	>
-		{#snippet actions()}
-			<CreditBalances {balances} />
-			<wa-button appearance="plain" pill href={historyHref}>
-				<wa-icon name="clock-rotate-left" variant="solid" label="Completion history"></wa-icon>
-			</wa-button>
-		{/snippet}
+	<PageHeader title="Tasks & Rewards">
 		{#snippet corner()}
 			<ContextSwitcher spaces={data.contextSpaces} context={data.context} you={data.user?.name ?? ''} />
 		{/snippet}
-	</NestedPageHeader>
+		{#snippet toolbar()}
+			<ItemsTabs current="tasks" />
+			<CreditsControl groups={credits} everyone={several} />
+		{/snippet}
+	</PageHeader>
 
 	<div class="content">
-		<ItemsTabs current="tasks" />
-
 		<!-- No success message: a completion says so in the task's own line,
 		     and an undone one by the task coming back. Refusals, here. -->
 		{#if form?.error}<p class="invalid">{form.error}</p>{/if}
-
-		{#if canAdd}<QuickAddLink href={addHref} label="Add a task" />{/if}
 
 		<section class="list" aria-labelledby="to-do">
 			<h2 id="to-do">To do</h2>
@@ -115,7 +104,7 @@
 				{completion}
 				emptyMessage={partnerShown
 					? `${partnerShown} has not set you any tasks yet.`
-					: 'Nothing to do yet. Add a task of your own, or wait for a partner to set you one.'}
+					: 'Nothing to do yet. Add a task of your own with the + button, or wait for a partner to set you one.'}
 			/>
 		</section>
 
@@ -132,13 +121,32 @@
 				/>
 			</section>
 		{/if}
+
+		<!-- At the end of the list, where looking back belongs: it used to be
+		     a clock icon in the header, which on a phone wrapped onto a line of
+		     its own under the balances. -->
+		<a class="history" href={historyHref}>
+			<wa-icon name="clock-rotate-left" variant="solid"></wa-icon>
+			Completed tasks
+			<wa-icon name="chevron-right" variant="solid"></wa-icon>
+		</a>
 	</div>
+
+	<AddButton
+		label="Add a task"
+		{targets}
+		spaces={data.contextSpaces}
+		you={data.user?.name ?? ''}
+		onadd={add}
+	/>
 
 	{@render children()}
 </section>
 
 <style>
+	/* Fills <main>, so the add button, its last child, sticks to the bottom. */
 	.page {
+		flex: 1 1 auto;
 		max-width: var(--page-width);
 		margin: 0 auto;
 		display: flex;
@@ -167,5 +175,20 @@
 	.invalid {
 		margin: 0;
 		color: var(--wa-color-text-danger);
+	}
+
+	.history {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		align-self: flex-start;
+		min-block-size: 2.75rem;
+		color: var(--wa-color-brand-on-quiet);
+		font-weight: var(--wa-font-weight-semibold, 600);
+		text-decoration: none;
+
+		wa-icon:last-child {
+			font-size: 0.75em;
+		}
 	}
 </style>

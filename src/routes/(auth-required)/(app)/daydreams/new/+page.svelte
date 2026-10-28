@@ -336,9 +336,6 @@
 		backLabel="Back to daydreams"
 		backText="Daydreams"
 		title="New daydream"
-		description={stage.kind === 'start'
-			? 'Say what you feel like, or pick one to start from. You can change any of it.'
-			: 'Change anything you like, then start. You can change it later too.'}
 	/>
 
 	<div class="content">

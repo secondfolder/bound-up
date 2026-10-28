@@ -258,10 +258,12 @@
 		backLabel="Back to admin"
 		backText="Admin"
 		title="Server settings"
-		description="What this server needs to send email, generate text and images. Saved for the whole server, not just for you."
 	/>
 
 	<div class="content">
+		<!-- What saving here affects, which a page that looks like every other
+		     settings page would not otherwise say. -->
+		<p class="scope">Saved for the whole server, not just for you.</p>
 		<!-- Sticky inside the scrolling <main>, so it stays in reach all the
 		     way down. In-page links, which need no `resolve()`. -->
 		<nav class="jump" aria-label="Sections">
@@ -771,6 +773,11 @@
 			gap: 1rem;
 			padding: var(--wa-space-l) var(--page-gutter);
 		}
+	}
+
+	.scope {
+		margin: 0;
+		color: var(--wa-color-text-quiet);
 	}
 
 	.jump {

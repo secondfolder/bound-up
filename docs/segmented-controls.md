@@ -91,9 +91,9 @@ options of different widths.
 ### Across a navigation
 
 `/tasks` and `/rewards` each render `ItemsTabs` in their own layout. A shared
-layout would keep one pill alive across the navigation, but each page's
-`NestedPageHeader`, with its own title, actions and history link, sits above
-the pill, so the pill cannot be lifted out without the header.
+layout would keep one pill alive across the navigation, but the pill sits in
+each page's `PageHeader`, on the line under its title beside that page's own
+credits, so it cannot be lifted out without the header.
 
 Instead, a group given a **`continuity` key** remembers which option it
 showed (`segmented/continuity.ts`):

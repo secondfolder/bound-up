@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
+import { defined } from '$lib/testing/defined';
 import { testPartnershipTaskView, testSelfTaskView } from '$lib/testing/item-views';
 import { testNamesSource, testPartnerView } from '$lib/testing/names';
 import { waSettled } from '$lib/testing/web-awesome';
@@ -90,10 +91,21 @@ describe('/tasks', () => {
 		expect(container.querySelector('h2#to-do')).toHaveTextContent('To do');
 		expect(container.querySelector('h2#set-for-others')).toBeNull();
 		expect(container.querySelector('.chip')).toBeNull();
-		expect(container.querySelector('.balances')).toHaveTextContent('Yours 3');
+		// One space: its balance is in the chip itself.
+		expect(container.querySelector('.credits-chip')).toHaveTextContent('You 3');
 		expect(
 			container.querySelector('nav[aria-label="Tasks and rewards"] [aria-current="page"]')
 		).toHaveTextContent('Tasks');
+		expect(container.querySelector('h1')).toHaveTextContent('Tasks & Rewards');
+		// No back link: the page is one of the bottom nav's.
+		expect(container.querySelector('a[aria-label="Back to Today"]')).toBeNull();
+		// One place a task can go, so the add button adds there, with no fan.
+		const add = container.querySelector('.add-button button');
+		expect(add).toHaveAccessibleName('Add a task');
+		expect(add).not.toHaveAttribute('aria-expanded');
+		expect(container.querySelector('a[href$="/tasks/history"]')).toHaveTextContent(
+			'Completed tasks'
+		);
 	});
 
 	it('shows both lists in Everyone, each row saying whose space it is in', async () => {
@@ -111,10 +123,27 @@ describe('/tasks', () => {
 		expect(container.querySelector('h2#set-for-others')).toHaveTextContent('Set for others');
 		const chips = [...container.querySelectorAll('.chip')].map((chip) => chip.textContent?.trim());
 		expect(chips).toEqual(['Me', 'Jun', 'Jun']);
-		// Kept apart, never added up: her own, hers with Jun, and Jun's.
-		expect(container.querySelector('.balances')).toHaveTextContent(/Yours 3.*With Jun 1.*Jun 5/);
 		// Only the ones set for her can be ticked.
 		expect(container.querySelectorAll('button.tick')).toHaveLength(2);
+		// Several spaces: the chip is only the coins and an arrow, and every
+		// balance is in its sheet, a row per space, kept apart, never added up.
+		const credits = defined(
+			container.querySelector<HTMLElement>('.credits-chip'),
+			'the credits chip'
+		);
+		expect(credits).toHaveAccessibleName('Credits');
+		expect(credits.textContent?.trim()).toBe('');
+		credits.click();
+		await vi.waitFor(() =>
+			expect(container.ownerDocument.querySelectorAll('.groups li')).toHaveLength(2)
+		);
+		const rows = [...container.ownerDocument.querySelectorAll('.groups li')].map((row) =>
+			row.textContent?.replace(/\s+/g, ' ').trim()
+		);
+		expect(rows[0]).toMatch(/Me You 3$/);
+		expect(rows[1]).toMatch(/Jun You 1 Jun 5$/);
+		// Two places a task can go: the add button asks whose, with a fan.
+		expect(container.querySelector('.add-button button')).toHaveAttribute('aria-expanded', 'false');
 	});
 
 	it('offers no way to add where the viewer sets nothing', async () => {
@@ -125,6 +154,6 @@ describe('/tasks', () => {
 			balances: []
 		});
 		await waSettled(container);
-		expect(container.querySelector('a.quick-add')).toBeNull();
+		expect(container.querySelector('.add-button')).toBeNull();
 	});
 });

@@ -19,7 +19,12 @@
 	import { superForm } from '$lib/superform';
 
 	/**
-	 * Starts a journal entry or a note, and opens it.
+	 * Starts a journal entry, a note or a scene, and opens it.
+	 *
+	 * Started from the notebook's add button: `bare`, with nothing showing
+	 * but a problem, for a note or a scene, which ask for nothing, so the
+	 * button submits it (`submit`); with its date field and button, in a
+	 * dialog, for a journal entry, whose date cannot be changed afterwards.
 	 *
 	 * It names the space it goes to in a `spaceId` field, which the server
 	 * checks membership of: never the current context, which another tab can
@@ -36,20 +41,35 @@
 		kind,
 		today,
 		target,
-		action = '?/create'
+		action = '?/create',
+		bare = false,
+		onbusy
 	}: {
 		kind: NotebookKind;
 		today: string;
 		target: () => Promise<NewEntryTarget | null>;
 		action?: string;
+		/** No date field and no button: submitted by the add button instead (`submit`). */
+		bare?: boolean;
+		/** Told when it starts and stops creating, so the add button waits. */
+		onbusy?: (busy: boolean) => void;
 	} = $props();
+
+	let formElement: HTMLFormElement | undefined = $state();
+
+	/** Starts one, as its own button would: through the enhanced submit, so it is sealed first. */
+	export function submit() {
+		formElement?.requestSubmit();
+	}
 
 	const schema = z.object({
 		entryDate: z.string().regex(ENTRY_DATE_PATTERN, 'Please choose a date')
 	});
 
 	const KIND_BUTTON: Record<NotebookKind, { icon: string; label: string }> = {
-		journal: { icon: 'feather', label: 'New journal entry' },
+		// Only the journal's is shown, in the add button's dialog, so it does not
+		// share the add button's own name behind it.
+		journal: { icon: 'feather', label: 'Start entry' },
 		note: { icon: 'note-sticky', label: 'New note' },
 		scene: { icon: 'masks-theater', label: 'New scene' }
 	};
@@ -127,16 +147,22 @@
 		}
 	);
 	const { enhance, submitting } = superform;
+
+	$effect(() => {
+		onbusy?.($submitting);
+	});
 </script>
 
-<form method="POST" {action} use:enhance class="new-entry">
-	{#if kind === 'journal'}
-		<InputField {superform} field="entryDate" type="date" title="Date" />
+<form method="POST" {action} use:enhance class="new-entry" bind:this={formElement}>
+	{#if !bare}
+		{#if kind === 'journal'}
+			<InputField {superform} field="entryDate" type="date" title="Date" />
+		{/if}
+		<wa-button type="submit" variant="brand" appearance="accent" disabled={$submitting}>
+			<wa-icon slot="start" name={KIND_BUTTON[kind].icon}></wa-icon>
+			{KIND_BUTTON[kind].label}
+		</wa-button>
 	{/if}
-	<wa-button type="submit" variant="brand" appearance="accent" disabled={$submitting}>
-		<wa-icon slot="start" name={KIND_BUTTON[kind].icon}></wa-icon>
-		{KIND_BUTTON[kind].label}
-	</wa-button>
 	{#if problem}<p class="invalid" role="alert">{problem}</p>{/if}
 </form>
 

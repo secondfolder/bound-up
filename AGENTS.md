@@ -35,7 +35,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/lib/types.ts`            | Types both server and components need. Alias-free so the schema can import it                |
 | `src/lib/components/`         | Presentational Svelte components                                                             |
 | `src/lib/partnership.ts`      | The partners domain rules. Alias-free. See [docs/partners.md](docs/partners.md)              |
-| `src/lib/context.ts`, `src/lib/space-colours.ts`, `src/lib/components/context/` | The current context (whose things a list shows) and each space's colour: the pure halves (alias-free), the switcher. See [docs/contexts.md](docs/contexts.md) |
+| `src/lib/context.ts`, `src/lib/space-colours.ts`, `src/lib/components/context/` | The current context (whose things a list shows) and each space's colour: the pure halves (alias-free), the switcher and the fan it shares with the add button. See [docs/contexts.md](docs/contexts.md) |
 | `src/lib/spaces.ts`, `src/lib/server/spaces.ts` | Spaces: a solo one per account, a shared one per partnership (same id), members and `can_manage`, deleting a space with everything in it. `spaces.ts` is pure and alias-free. See [docs/spaces.md](docs/spaces.md) |
 | `src/lib/tasks.ts`, `src/lib/rewards.ts`, `src/lib/server/tasks.ts`, `src/lib/server/rewards.ts`, `(app)/tasks/`, `(app)/rewards/` | Tasks and rewards, one table each keyed by space: the rules in members (pure, alias-free, over `spaces.ts`), the one server code path, and the two pages that follow the context. See [docs/tasks.md](docs/tasks.md), [docs/rewards.md](docs/rewards.md) |
 | `src/lib/features.ts`         | Feature registry. Alias-free. See [docs/features-and-admin.md](docs/features-and-admin.md)   |
@@ -762,13 +762,30 @@ hydration. Route ids are identical on both sides.
 **A page's width and gutter are tokens, never a number of its own.** A page
 root takes `max-width: var(--page-width-narrow | --page-width |
 --page-width-wide)` and pads its content's sides with `--page-gutter`, the same
-token `NestedPageHeader` is inset by, so the back link, title, divider and
+token the page headers are inset by, so the back link, title, divider and
 content share one edge. There used to be seven column widths and two gutters,
 and moving between sibling pages made the column jump. The app layout makes
 every page root fill `<main>`; do not undo that with a root of `width: auto`.
 A bullet-less list zeroes its own `padding` and is flush: `theme.css` moves Web
 Awesome's list indent off the `li` and onto the list. See
 [docs/theme.md](docs/theme.md#page-layout).
+
+**A page the bottom nav goes to has `PageHeader`; a page under one has
+`NestedPageHeader`.** `PageHeader` is the title with the context switcher at
+the end of its line and an optional second line (a segmented control, the
+credits), and no back link: those pages are Today's siblings, and "‹ Today"
+was a whole line saying otherwise. **No page has a description by default**:
+both headers keep the prop for one that turns out to need it, and what one
+used to say goes in the body or the empty state. See
+[docs/theme.md](docs/theme.md#page-layout).
+
+**A list page adds with `AddButton`, never a row or button of its own.** It
+is round, at the bottom right, sticky as the page root's last child (the
+root is a flex column filling `<main>`), and given the spaces the viewer may
+add to: with one it adds there, with several it asks whose with the context
+fan, with none it is not drawn. **The fan is `ContextSelectorFan`**, shared
+with the context switcher; a new place to choose a context from builds on it
+rather than drawing another. See [docs/contexts.md](docs/contexts.md#the-add-buttons-fan).
 
 **Two links on one page must not share an accessible name.** Duplicate names
 going to different places are a real problem for anyone navigating by link

@@ -18,7 +18,6 @@
 		backLabel="Back to settings"
 		backText="Settings"
 		title="Partners"
-		description="Link with a partner, review pending invites, and choose who controls each relationship's labels."
 	/>
 
 	<div class="content">

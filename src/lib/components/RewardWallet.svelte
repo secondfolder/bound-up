@@ -27,7 +27,7 @@
 		title?: string | null;
 		/**
 		 * What the wallet holds, which decides what is within reach. Shown in the
-		 * page's row of balances (`CreditBalances`), not here.
+		 * page's credits (`CreditsControl`, in its header), not here.
 		 */
 		balance: number;
 		entries: RewardEntry[];
@@ -93,8 +93,8 @@
 </script>
 
 <section class={['wallet', className]}>
-	<!-- The balance itself is a pill in the page's row of them
-	     (`CreditBalances`), with the tasks pages' design. -->
+	<!-- The balance itself is in the page's credits (`CreditsControl`), as
+	     on the tasks page. -->
 	{#if title}<h2>{title}</h2>{/if}
 
 	{#if entries.length === 0}

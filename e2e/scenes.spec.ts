@@ -11,6 +11,7 @@ import {
 	newSide,
 	type Side,
 	settle,
+	startAdding,
 	switchTo,
 	typeRichText,
 	waitForHydration
@@ -35,7 +36,7 @@ const prompt = (page: Page, id: string) => column(page).locator(`[data-prompt="$
 async function startScene(page: Page): Promise<string> {
 	await waitForHydration(page);
 	await page.getByRole('tab', { name: 'Scenes' }).click();
-	await clickWaButton(page, 'New scene');
+	await startAdding(page, 'New scene');
 	await page.waitForURL(/\/notebook\/[0-9a-f-]{36}$/);
 	await expect(page.getByText('Saved')).toBeVisible();
 	return page.url();

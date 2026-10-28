@@ -1,3 +1,21 @@
+<script lang="ts" module>
+	import type { Attachment } from 'svelte/attachments';
+
+	export type KinkListBack = {
+		href: string;
+		text: string;
+		label: string;
+		/**
+		 * On the link: `inContext` from a partner's view, whose way back is to
+		 * a page that follows the context (your own list goes on to a
+		 * partner's view while the context is that partner, so it is left in
+		 * Me). Handed in rather than imported here, so the public list, which
+		 * has no context, does not load the switcher's client.
+		 */
+		attach?: Attachment<HTMLAnchorElement>;
+	};
+</script>
+
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 
@@ -14,16 +32,11 @@
 	 * text is the parent's title, and two links named only that could collide
 	 * in a link list.
 	 */
-	let {
-		href,
-		text,
-		label,
-		children
-	}: { href: string; text: string; label: string; children?: Snippet } = $props();
+	let { href, text, label, attach, children }: KinkListBack & { children?: Snippet } = $props();
 </script>
 
 <nav class="crumbs">
-	<a {href} aria-label={label}>
+	<a {href} aria-label={label} {@attach attach}>
 		<wa-icon name="chevron-left" variant="solid"></wa-icon>
 		<span>{text}</span>
 	</a>

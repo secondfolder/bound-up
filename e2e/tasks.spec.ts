@@ -5,14 +5,18 @@ import { sql } from './db';
 import { test } from './fixtures';
 import {
 	clickWaButton,
+	closeCredits,
 	contextOf,
 	createInvite,
+	creditsRow,
 	fillRichText,
 	linkAccounts,
 	newAccount,
 	newAccounts,
 	newSide,
+	openCredits,
 	showContext,
+	startAdding,
 	typeRichText,
 	waitForHydration,
 	waitForSheetClosed
@@ -73,7 +77,7 @@ test.describe('tasks', () => {
 			await ada.page.getByRole('main').getByRole('link', { name: 'Tasks', exact: true }).click();
 			await ada.page.waitForURL(/\/tasks$/);
 
-			await ada.page.getByRole('link', { name: 'Add a task' }).click();
+			await startAdding(ada.page, 'Add a task');
 			await ada.page.waitForURL(/\/tasks\/add$/);
 			await waitForHydration(ada.page);
 			await ada.page.locator('wa-input[name="title"] input').fill('Long shower');
@@ -133,9 +137,7 @@ test.describe('tasks', () => {
 			await expect(undoLine).toBeVisible();
 
 			await ada.page.goto('/rewards');
-			await expect(ada.page.locator('.balances li').filter({ hasText: 'Yours' })).toContainText(
-				'2'
-			);
+			await expect(ada.page.locator('.credits-chip')).toContainText('You 2');
 		} finally {
 			await ada.close();
 		}
@@ -329,7 +331,7 @@ test.describe('tasks', () => {
 			await waitForHydration(jun.page);
 			await jun.page.getByRole('main').getByRole('link', { name: 'Tasks', exact: true }).click();
 			await jun.page.waitForURL(/\/tasks$/);
-			await jun.page.getByRole('link', { name: 'Add a task' }).click();
+			await startAdding(jun.page, 'Add a task');
 			await jun.page.waitForURL(/\/tasks\/add$/);
 			await waitForHydration(jun.page);
 			await jun.page.locator('wa-input[name="title"] input').fill('Make tea');
@@ -381,7 +383,7 @@ test.describe('tasks', () => {
 			await ada.page.waitForURL(/\/tasks$/);
 			await ada.page.locator('wa-details.collapsed').filter({ hasText: 'Inactive' }).click();
 			await expect(ada.page.getByRole('button', { name: /^Make tea/ })).toBeVisible();
-			await ada.page.getByRole('link', { name: 'Completion history' }).click();
+			await ada.page.getByRole('link', { name: 'Completed tasks' }).click();
 			await ada.page.waitForURL(/\/tasks\/history$/);
 			await expect(ada.page.getByText('Completed by you')).toBeVisible();
 
@@ -394,9 +396,7 @@ test.describe('tasks', () => {
 			// to the rewards shows them in the same context.
 			await ada.page.getByRole('link', { name: 'Rewards', exact: true }).click();
 			await ada.page.waitForURL(/\/rewards$/);
-			await expect(ada.page.locator('.balances li').filter({ hasText: 'Yours' })).toContainText(
-				'3'
-			);
+			await expect(ada.page.locator('.credits-chip')).toContainText('You 3');
 		} finally {
 			await ada.close();
 			await jun.close();
@@ -420,15 +420,16 @@ test.describe('tasks in every context', () => {
 		await expect(control(page)).toHaveAttribute('aria-expanded', 'false');
 	}
 
-	/** Adds a task from the add sheet, choosing whom for when it asks. */
+	/**
+	 * Adds a task with the add button, picking whom it is for from its fan
+	 * where it asks (Everyone): "me", or a partner's name.
+	 */
 	async function addTask(page: Page, title: string, forWhom: string | null) {
-		await page.getByRole('link', { name: 'Add a task' }).click();
+		await startAdding(page, 'Add a task', forWhom ?? undefined);
 		await page.waitForURL(/\/tasks\/add$/);
 		await waitForHydration(page);
-		if (forWhom) {
-			await page.locator('wa-select[name="spaceId"]').click();
-			await page.getByRole('option', { name: forWhom }).click();
-		}
+		// Picked on the fan, so the sheet does not ask again.
+		await expect(page.locator('wa-select[name="spaceId"]')).toHaveCount(0);
 		await page.locator('wa-input[name="title"] input').fill(title);
 		await page.locator('wa-input[name="creditsAwarded"] input').fill('4');
 		await clickWaButton(page, 'Add task');
@@ -450,15 +451,23 @@ test.describe('tasks in every context', () => {
 			await waitForHydration(ada.page);
 			await expect(control(ada.page)).toHaveAccessibleName(/^Showing Everyone/);
 
-			// In Everyone a new task asks whose it is before the form appears.
-			await ada.page.getByRole('link', { name: 'Add a task' }).click();
-			await ada.page.waitForURL(/\/tasks\/add$/);
+			// In Everyone the add button asks whose a new task is, with a fan
+			// of the places it can go and nothing else.
+			await ada.page.getByRole('button', { name: 'Add a task: choose whose it’s for' }).click();
+			await expect(ada.page.locator('[data-fan-option]')).toHaveCount(2);
+			await expect(ada.page.getByRole('button', { name: 'Add a task for me' })).toBeVisible();
+			await expect(ada.page.getByRole('button', { name: 'Add a task for Jun' })).toBeVisible();
+			await ada.page.keyboard.press('Escape');
+			await expect(ada.page.locator('[data-fan-option]')).toHaveCount(0);
+			// Opened by its URL, with nothing picked, the sheet asks instead,
+			// before the form appears.
+			await ada.page.goto('/tasks/add');
 			await expect(ada.page.locator('wa-select[name="spaceId"]')).toBeVisible();
 			await expect(ada.page.locator('.task-form')).toHaveCount(0);
 			await ada.page.goto('/tasks');
 			await waitForHydration(ada.page);
 
-			await addTask(ada.page, `Mine ${tag}`, 'Me, just for you');
+			await addTask(ada.page, `Mine ${tag}`, 'me');
 			await addTask(ada.page, `For Jun ${tag}`, 'Jun');
 			// Where it went is what the form chose, not the context.
 			const { rows } = await sql(
@@ -525,13 +534,15 @@ test.describe('tasks in every context', () => {
 			// Two balances, kept apart: his own stays at nothing, and the four
 			// are his with Ada.
 			await jun.page.goto('/rewards');
-			const pills = jun.page.locator('.balances li');
-			await expect(pills.filter({ hasText: 'With Ada' })).toContainText('4');
-			await expect(pills.filter({ hasText: 'Yours' })).toContainText('0');
+			const juns = await openCredits(jun.page);
+			await expect(creditsRow(juns, 'Ada')).toContainText(/You\s*4/);
+			await expect(creditsRow(juns, 'Me')).toContainText(/You\s*0/);
+			await closeCredits(jun.page);
 
-			// Ada, who set it, sees Jun's balance where she keeps his rewards.
+			// Ada, who set it, sees Jun's balance where she keeps his rewards:
+			// in their partnership's context, in the chip itself.
 			await ada.page.goto('/rewards');
-			await expect(ada.page.locator('.balances li').filter({ hasText: 'Jun' })).toContainText('4');
+			await expect(ada.page.locator('.credits-chip')).toContainText('Jun 4');
 		} finally {
 			await ada.close();
 			await jun.close();

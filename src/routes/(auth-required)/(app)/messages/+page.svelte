@@ -5,8 +5,8 @@
 	import { page } from '$app/state';
 	import ContextSwitcher from '$lib/components/context/ContextSwitcher.svelte';
 	import ForWhom from '$lib/components/ForWhom.svelte';
-	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import NewMessageDialog from '$lib/components/NewMessageDialog.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
 	import PartnerKeyNotice from '$lib/components/PartnerKeyNotice.svelte';
 	import RestoreRequests from '$lib/components/RestoreRequests.svelte';
 	import StickerBoard from '$lib/components/StickerBoard.svelte';
@@ -331,15 +331,6 @@
 		return null;
 	}
 
-	const description = $derived.by(() => {
-		if (data.view === 'me' || partnerSpaces.length === 0) {
-			return null;
-		}
-		if (several) {
-			return 'Every partner’s threads, newest first.';
-		}
-		return only ? `Between you and ${nameOf(only.id)}.` : null;
-	});
 	const pageTitle = $derived(
 		only && !several && data.context.kind === 'space' ? `${nameOf(only.id)} — messages` : 'Messages'
 	);
@@ -348,17 +339,11 @@
 <svelte:head><title>{pageTitle}</title></svelte:head>
 
 <section class="page">
-	<NestedPageHeader
-		backHref={resolve('/(auth-required)/(app)/today')}
-		backLabel="Back to Today"
-		backText="Today"
-		title="Messages"
-		{description}
-	>
+	<PageHeader title="Messages">
 		{#snippet corner()}
 			<ContextSwitcher spaces={data.contextSpaces} context={data.context} you={data.user?.name ?? ''} />
 		{/snippet}
-	</NestedPageHeader>
+	</PageHeader>
 
 	{#if partnerSpaces.length === 0}
 		<!-- Nobody to write to. Everyone and Me are the same thing without a

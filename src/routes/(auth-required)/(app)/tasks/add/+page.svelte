@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import ForWhom from '$lib/components/ForWhom.svelte';
 	import RouteSheet from '$lib/components/RouteSheet.svelte';
 	import TaskEditorBody from '$lib/components/TaskEditorBody.svelte';
@@ -15,7 +16,15 @@
 	/** Where it could go: each space the list shows that the viewer sets tasks in. */
 	const targets = $derived(itemTargets(data.list.spaces, data.contextSpaces));
 	let chosen = $state<ItemTarget | null>(null);
-	const target = $derived(targets.length === 1 ? (targets[0] ?? null) : chosen);
+	/**
+	 * The space the add button's fan picked, handed over in history state
+	 * (`PageState.addFor`). Read once: an `invalidate()` resets `page.state`,
+	 * and the choice must not vanish under a form being filled in. None after
+	 * a reload or from a pasted link, when "For whom?" asks instead.
+	 */
+	const handedOver = page.state.addFor;
+	const picked = $derived(targets.find((candidate) => candidate.spaceId === handedOver) ?? null);
+	const target = $derived(targets.length === 1 ? (targets[0] ?? null) : (picked ?? chosen));
 	const forName = $derived(target ? partnerIn(target.spaceId, data.contextSpaces) : null);
 
 	/** Opened by its URL, with no list behind it in history: go to the list in its place. */
@@ -30,7 +39,7 @@
 
 <!-- A sheet over the list, which is this route's parent layout (`RouteSheet`). -->
 <RouteSheet bind:this={sheet} label={forName ? `Add a task for ${forName}` : 'Add a task'} {listHref} {leave}>
-	{#if targets.length > 1}
+	{#if targets.length > 1 && !picked}
 		<!-- Asked first, because the list shows more than one place it could go.
 		     Remembered on this device. -->
 		<ForWhom

@@ -1,7 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { CONTEXT_DEPENDENCY } from '$lib/context';
 import { hasFeature } from '$lib/features';
-import { getDaydreamsWidget } from '$lib/server/daydreams';
 import type { Db } from '$lib/server/db';
 import { guides } from '$lib/server/db/schema';
 import { latestIqTestResult } from '$lib/server/iq-test';
@@ -15,9 +14,6 @@ import type { PageServerLoad } from './$types';
 
 /** Rows the guides card previews before it falls back to "and N more". */
 const GUIDES_PREVIEW_LIMIT = 3;
-
-/** Likewise for the Daydreams card. */
-const DAYDREAMS_PREVIEW_LIMIT = 3;
 
 /**
  * Today: the signed-in app's front page, which follows the context
@@ -48,13 +44,8 @@ export const load: PageServerLoad = async ({ locals, parent, depends }) => {
 
 	// Only for an account that holds the feature: D1 charges for rows read by
 	// a card nobody sees. This decides what is shown, which is all the
-	// layout's `features` may be used for; /guides and /daydreams check for
-	// themselves.
+	// layout's `features` may be used for; /guides checks for itself.
 	const guidesCard = () => (hasFeature(features, 'guides') ? loadGuidesCard(locals.db) : null);
-	const daydreamsCard = () =>
-		hasFeature(features, 'daydreams')
-			? getDaydreamsWidget(locals.db, user.id, DAYDREAMS_PREVIEW_LIMIT)
-			: null;
 
 	const space =
 		context.kind === 'space'
@@ -104,11 +95,10 @@ export const load: PageServerLoad = async ({ locals, parent, depends }) => {
 		const id = space.spaceId;
 		depends('notebook:self', tasksDependency(id), rewardsDependency(id));
 		const noNames = new Map<string, never>();
-		const [tasks, rewards, notebook, daydreams, latestIq, guidesView] = await Promise.all([
+		const [tasks, rewards, notebook, latestIq, guidesView] = await Promise.all([
 			getTasksWidget(locals.db, user.id, [id], noNames),
 			getRewardsWidget(locals.db, user.id, [id], noNames),
 			getHomeNotebookWidget(locals.db, user.id),
-			daydreamsCard(),
 			// One row, for the Playroom card's "Last IQ test" line.
 			latestIqTestResult(locals.db, user.id),
 			guidesCard()
@@ -121,7 +111,6 @@ export const load: PageServerLoad = async ({ locals, parent, depends }) => {
 				tasks,
 				rewards,
 				notebook,
-				daydreams,
 				latestIq,
 				guides: guidesView
 			}
@@ -136,10 +125,9 @@ export const load: PageServerLoad = async ({ locals, parent, depends }) => {
 	for (const spaceId of spaceIds) {
 		depends(tasksDependency(spaceId), rewardsDependency(spaceId));
 	}
-	const [unread, guidesView, daydreams, tasks, rewards, latestIq, notebook] = await Promise.all([
+	const [unread, guidesView, tasks, rewards, latestIq, notebook] = await Promise.all([
 		listUnreadCounts(locals.db, user.id, partners),
 		guidesCard(),
-		daydreamsCard(),
 		getTasksWidget(locals.db, user.id, spaceIds, names),
 		getRewardsWidget(locals.db, user.id, spaceIds, names),
 		latestIqTestResult(locals.db, user.id),
@@ -154,7 +142,6 @@ export const load: PageServerLoad = async ({ locals, parent, depends }) => {
 			soloSpaceId: spaces.find((candidate) => candidate.kind === 'solo')?.spaceId ?? null,
 			unread,
 			guides: guidesView,
-			daydreams,
 			tasks,
 			rewards,
 			latestIq,

@@ -15,8 +15,9 @@ messages (`/messages`, [messaging.md](messaging.md#the-board-in-each-context))
 follow the context. Those are the bottom nav's places too, beside Settings:
 `AppNav` has exactly five tabs — Today, Tasks (rewards are a tab inside it),
 Notebook, Messages, Settings — and no tab per partner, since whose things a
-page shows is the switcher's job. Playroom, Daydreams and the guides are
-reached from Today's cards, and light the Today tab.
+page shows is the switcher's job. The Playroom and the guides are reached
+from Today's cards, Daydreams from the Playroom, and all three light the
+Today tab.
 
 ## Where it lives: one cookie
 
@@ -65,8 +66,9 @@ does the same across two real tabs. A new message thread posts to
 for, which stays fixed while the dialog is open however the board under it
 reloads; `e2e/messages-contexts.spec.ts` switches in a second tab under an
 open dialog. Adding a task or a reward posts `spaceId`
-the same way, chosen under "For whom?" (`ForWhom`) when the context shows more
-than one space it could go to; completing, undoing, claiming and editing name
+the same way, picked from the add button's fan when the context shows more
+than one space it could go to ([below](#the-add-buttons-fan)), or under "For
+whom?" (`ForWhom`) on an add sheet opened by its URL; completing, undoing, claiming and editing name
 the task, completion or reward, which carries its own space; setting credits
 names the space and the member.
 
@@ -121,9 +123,16 @@ one-tap switch, and never switches by itself. Messages in Me is the first:
 ## The switcher
 
 `src/lib/components/context/ContextSwitcher.svelte`, built on
-`context-client.svelte.ts` (names, avatars, switching).
+`context-client.svelte.ts` (names, avatars, switching) and on
+`ContextSelectorFan.svelte`, the fan itself, which the add button shares
+([below](#the-add-buttons-fan)). The fan draws the disk, the options, the
+wedge and the hint, and handles the press, the slide, the keyboard and the
+clicks round it; the switcher is the pill (its own avatar, standing in on the
+ring) and what a pick does. Everything below about the fan is true of both,
+except where it says the pill.
 
-**A page opts in** by rendering it, in `NestedPageHeader`'s `corner` snippet,
+**A page opts in** by rendering it, in its header's `corner` snippet
+(`PageHeader` for the bottom nav's places, `NestedPageHeader` under them),
 with `data.contextSpaces`, `data.context` and the viewer's name, and by its
 load depending on `app:context`. Settings never shows it. **With no linked
 partner it offers just Me and "Add partner"**: there is no Everyone
@@ -178,8 +187,9 @@ option's name is shown where the hint is (see "The hint" below). Under
   waited for the last option or left the rest outside it; and at the
   opening's 440ms the ease-in left the options and the disk barely moving
   while the pill was already home.
-- **The hint** fades in last, once the options have mostly landed, and out
-  first on closing.
+- **The hint** fades in halfway through opening, its fade centred on the
+  fan's middle, and out first on closing. It used to wait until the options
+  had all but landed, which left the first thing a newcomer needs until last.
 
 A **selection wedge** is the selected option's sector of the disk in its
 colour (the accent for "Add partner"), solid and opaque round the avatar and
@@ -266,7 +276,7 @@ selects its words, and the click that ends a selection picks nothing.
 ### The fan's layout
 
 The geometry is a pure module, `src/lib/context-fan.ts`, unit-tested in
-`context-fan.test.ts`; the switcher measures and draws what it returns, and
+`context-fan.test.ts`; `ContextSelectorFan` measures and draws what it returns, and
 `e2e/context-switcher-layout.spec.ts` measures the result on real pages.
 
 - **Where the disk is centred**: a fixed offset up and right of the pill's
@@ -397,6 +407,47 @@ the component, not the window) and tabbing out both close it; the dim behind
 the fan is not focusable. Under `prefers-reduced-motion` nothing moves: the CSS
 transitions are off and the fan's transitions and the pick's pause are zero.
 
+## The add button's fan
+
+The list pages' add button (`src/lib/components/AddButton.svelte`; tasks,
+rewards and the notebook) asks, in a context with more than one space
+something can be added to (Everyone), whose a new item is, with the same fan:
+an avatar per such space, in the switcher's order, and nothing for Everyone
+or "Add partner", which are not places. Picking one hands its space to the
+page, which posts it as `spaceId` (writes name their space, as ever). With
+one such space the button adds there at once and has no fan; with none there
+is no button.
+
+What differs from the switcher's fan:
+
+- **No option is showing now**, so nothing is selected on opening: no wedge,
+  and the hint gives what to do until an option is lit. The focus that
+  opening moves onto the first option lights nothing; only a choice does.
+- **The button stays where it is**, rather than flying onto the ring, and
+  turns its + into a × to say a tap closes it. The disk is centred on it.
+- **The hint starts just above the disk** (`hintPlacement`'s `disk`), not at
+  the top of the page, which on a phone is most of the screen away from a
+  fan at the bottom.
+- **The nav is left as it is** (`dimNav` off): the dim stops above it, and it
+  takes its own taps, which close the fan on the way.
+
+Its options are named for what picking does ("Add a task for Jun", "New note
+for me") and the button for what it asks ("Add a task: choose whose it’s
+for"), with `aria-expanded`.
+
+## The kink list
+
+The signed-in kink list follows the switcher too, though its pages differ by
+context rather than filtering one list: Me and Everyone are your own list
+(`/playroom/kink-list`), and a partnership is your list for that partner
+(`/playroom/kink-list/partner/[id]`). Your own list's load depends on the
+context and sends a partnership on to its partner view (a 307), so switching
+there lands on it. A partner view is its partnership's whatever the context
+says, as an item page is, and picking anything else in its switcher goes to
+your own list (`onswitch`), which sends a partner on again. Its way back to
+your own list switches to Me on the way (`inContext`), or it would send you
+straight back.
+
 ## Colours
 
 Each partnership shows in a colour **each member chooses for themselves**:
@@ -493,7 +544,8 @@ that does not redirect, so it is the one refresh this does not cover.
 | `src/lib/context-client.svelte.ts` | Names and avatars for the browser, `switchContext`, `storeContext` and `followInContext` |
 | `src/lib/context-fan.ts` | The fan's geometry and motion: the centre, the visible arc, even spacing, room between avatars, staggering, which sector a point is in, the hint's place, the wedge's shading and fill (Everyone's spectrum), the shared timing and easing. Pure, alias-free |
 | `src/lib/navigation.ts`, `src/lib/enhance.ts` | Refreshes and `use:enhance` that wait for a navigation under way rather than dropping it |
-| `src/lib/components/context/` | `ContextSwitcher`, `ContextAvatar`, `SpaceChip`, `SpaceColourForm` |
+| `src/lib/components/context/` | `ContextSelectorFan` (the fan), `ContextSwitcher` (the pill), `ContextAvatar`, `SpaceChip`, `SpaceColourForm` |
+| `src/lib/components/AddButton.svelte` | The list pages' add button, and its fan in Everyone |
 | `src/routes/api/context/+server.ts` | Switching |
 | `drizzle/0050_add_space_member_colour.sql` | `space_members.colour`, a plain `ADD COLUMN` |
 | `drizzle/0054_map_space_colours_to_signature_hues.sql` | Moves the old palette's stored names to the signature hues |

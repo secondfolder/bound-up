@@ -258,11 +258,17 @@ switcher at the top right:
   an Everyone list watches the viewer's own room alone, however many
   partnerships it shows ([realtime.md](realtime.md#everyone-one-stream-not-one-per-space)).
   An entry's edits and cursors stay in its own space's room.
-- **Starting an entry names its space.** In one space it is that space; in
-  Everyone a **"For whom?"** choice (Me, or each partner) must be made first,
-  and the last one used is remembered on the device (`localStorage`). Either
-  way the form posts `spaceId`, and `createEntryAction` checks membership of
-  it: it never reads the context, which another tab can change under this one.
+- **Starting an entry names its space.** An entry is started from the round
+  add button at the bottom right (`AddButton`), for the kind of the tab that
+  is open. In one space it is that space; in Everyone the button fans out an
+  avatar for each space shown, as the context switcher does
+  ([contexts.md](contexts.md#the-add-buttons-fan)), and the one picked is the
+  space. A note or a scene starts at once (`NewEntryForm` with `bare`, which
+  the button submits); a journal entry asks for its date first, in a dialog,
+  today unless changed, because its date cannot be changed once it is
+  started. Either way the form posts `spaceId`, and `createEntryAction`
+  checks membership of it: it never reads the context, which another tab can
+  change under this one.
 - **An entry is its own space's.** `/notebook/[entryId]` takes its space from
   the entry, so one opened while the context says someone else shows as
   whoever's it is (a chip at the top right), with the actions its partnership

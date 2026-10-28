@@ -642,12 +642,6 @@ export type DaydreamListItemView = {
 	createdAt: Date;
 };
 
-/** What Today's Daydreams card previews: the most recently played, and how many there are. */
-export type DaydreamsWidgetView = {
-	daydreams: DaydreamListItemView[];
-	total: number;
-};
-
 /**
  * One turn's place in a daydream's tree: everything the server knows about it
  * but its content. The whole tree comes with the page, so the branch map and

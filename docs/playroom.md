@@ -1,37 +1,47 @@
 # The Playroom
 
 The Playroom holds small kink toys, games and lists that are not sessions or
-tasks. It has two tools so far:
+tasks. It has three tools so far:
 
 - **The kink list**, with its own doc: [kink-list.md](kink-list.md).
 - **The IQ test**, described below: a dumbification test built to give a sub
   a low score and a dom a flattering one.
+- **Daydreams**, with their own doc: [daydreams.md](daydreams.md). Listed only
+  for an account that holds the `daydreams` feature.
 
 The roadmap's toy collection and the like are planned for it.
 
 ## The container
 
 - **Registry.** [`src/lib/playroom/tools.ts`](../src/lib/playroom/tools.ts)
-  lists the tools: a name, a blurb, an icon and a route id. It is alias-free
-  and holds data only.
+  lists the tools: a name, a blurb, an icon, a route id and, for a tool behind
+  one, a feature. It is alias-free and holds data only; `playroomToolsFor`
+  picks the tools an account's features allow.
 - **Index.** [`/playroom`](<../src/routes/(auth-required)/(app)/playroom/+page.svelte>)
   is a page in the signed-in app shell that lists the registry, as tiles side
   by side where there is room and one to a row on a phone. It has no load
-  function and no feature flag. The kink list links back to it.
+  function and no feature flag of its own. It reads the app shell's
+  `page.data.features` to leave out a tool the account does not hold
+  (Daydreams), which decides what is shown and nothing more: the tool's own
+  loads and actions call `requireFeature` themselves
+  ([features-and-admin.md](features-and-admin.md)). The kink list and
+  `/daydreams` link back to it.
 - **Today card.** [`PlayroomWidget`](../src/lib/components/PlayroomWidget.svelte)
   is the Playroom's card on Today, in Everyone and Me. Its body is the last
   IQ result, read by `latestIqTestResult` in Today's load.
 - **No nav tab.** The bottom bar's five places are Today, Tasks, Notebook,
   Messages and Settings; the Playroom is reached from Today's card, and lights
-  the Today tab while it is open.
+  the Today tab while it, or any tool in it, is open.
 - **Two kinds of tool.** Adding one means a registry entry plus its routes.
   - **A standalone tool** (the IQ test) lives on its own page outside the app
     shell (see below), under `(standalone)/playroom/`, so it can be shared as
     a link and used without an account. It doesn't look like Bound Up.
-  - **An app tool** (the kink list) lives in the app shell under
-    `(app)/playroom/`, and looks like the rest of the app. The kink list also
-    has a public twin under `(public)/kink-list/`, for anyone signed out
-    ([kink-list.md](kink-list.md#without-an-account)).
+  - **An app tool** (the kink list, Daydreams) lives in the app shell, and
+    looks like the rest of the app. The kink list is under `(app)/playroom/`,
+    and has a public twin under `(public)/kink-list/`, for anyone signed out
+    ([kink-list.md](kink-list.md#without-an-account)). Daydreams keep their
+    own `/daydreams` routes, which predate their move into the Playroom, and
+    need an account and a feature.
 
 ## The standalone shell
 
