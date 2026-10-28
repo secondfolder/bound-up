@@ -3,7 +3,7 @@
 
 	/**
 	 * A context's avatar: a partner's initials in the colour you gave them,
-	 * you as the person glyph in amber, Everyone as a pie with a slice per
+	 * you as the person glyph in your own blue, Everyone as a pie with a slice per
 	 * person, or the dashed "add" disc. See docs/contexts.md.
 	 *
 	 * Decoration only: whatever holds it names it (the switcher's buttons, a

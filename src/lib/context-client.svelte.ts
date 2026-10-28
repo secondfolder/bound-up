@@ -37,7 +37,7 @@ export type ContextShown = {
 	people: AvatarPerson[];
 };
 
-/** How a space is shown: "Me" in amber, or the partner's name in the viewer's colour for them. */
+/** How a space is shown: "Me" in your own blue, or the partner's name in the viewer's colour for them. */
 export function shownSpace(space: ContextSpaceView): {
 	name: string;
 	colour: string;

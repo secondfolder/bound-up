@@ -33,7 +33,7 @@ const solo: ContextSpaceView = { id: SOLO, kind: 'solo', colour: 'me', names: nu
 const jun: ContextSpaceView = {
 	id: JUN,
 	kind: 'shared',
-	colour: 'violet',
+	colour: 'purple',
 	names: testNamesSource(JUN, { partnerName: 'Jun' })
 };
 
@@ -493,7 +493,7 @@ describe('the fan', () => {
 		const wedge = defined(container.querySelector<HTMLElement>('.wedge'), 'the wedge');
 		const everyone = wedge.style.background;
 		const you = everyone.indexOf('var(--space-colour-me)');
-		const partner = everyone.indexOf('var(--space-colour-violet)');
+		const partner = everyone.indexOf('var(--space-colour-purple)');
 		expect(you).toBeGreaterThan(-1);
 		expect(partner).toBeGreaterThan(you);
 		// Washed towards the cream, not the colours themselves.
@@ -502,7 +502,7 @@ describe('the fan', () => {
 		// Lit on Jun instead, the wedge is Jun's colour alone.
 		screen.getByRole('button', { name: 'Show Jun' }).focus();
 		await vi.waitFor(() => expect(wedge).toHaveAttribute('data-fan-wedge', JUN));
-		expect(wedge.style.background).toContain('var(--space-colour-violet)');
+		expect(wedge.style.background).toContain('var(--space-colour-purple)');
 		expect(wedge.style.background).not.toContain('var(--space-colour-me)');
 	});
 

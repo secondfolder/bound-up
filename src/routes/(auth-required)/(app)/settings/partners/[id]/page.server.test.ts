@@ -372,7 +372,7 @@ describe('the disconnect action', () => {
 describe('colour', () => {
 	it('starts on the colour the switcher shows, and offers none for a pending invite', async () => {
 		const { id } = await createTestPartnership(db, ada, jun);
-		expect((await runLoad(load(at(id, ada)))).colourForm?.data.colour).toBe('teal');
+		expect((await runLoad(load(at(id, ada)))).colourForm?.data.colour).toBe('green');
 		const invite = await createTestInvite(db, ada);
 		expect((await runLoad(load(at(invite.id, ada)))).colourForm).toBeNull();
 	});
@@ -381,7 +381,7 @@ describe('colour', () => {
 		const { id } = await createTestPartnership(db, ada, jun);
 		await run('colour', at(id, ada, { colour: 'pink' }) as never);
 		expect((await runLoad(load(at(id, ada)))).colourForm?.data.colour).toBe('pink');
-		expect((await runLoad(load(at(id, jun)))).colourForm?.data.colour).toBe('teal');
+		expect((await runLoad(load(at(id, jun)))).colourForm?.data.colour).toBe('green');
 	});
 
 	it('refuses a colour that is not on the list', async () => {

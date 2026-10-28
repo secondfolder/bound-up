@@ -353,12 +353,15 @@ An item's detail is a `ResponsiveDialog`
 Who a thing belongs to is a colour wherever spaces meet: the context switcher
 and the chip on each row of an Everyone list ([contexts.md](contexts.md)).
 
-- `--space-colour-me` is your own space, always the accent amber.
-- `--space-colour-teal`, `-violet`, `-blue`, `-pink`, `-green` and `-lime` are
-  the partner colours each viewer chooses from (`SPACE_COLOURS` in
-  `space-colours.ts`). They are light and saturated enough to stand apart from
-  the amber and from each other on the dark surfaces, at lightnesses that keep
-  the same dark ink legible on every one.
+- `--space-colour-me` is your own space, always blue. It is its own token,
+  not the accent: the amber means "act here", not "yours".
+- `--space-colour-green`, `-pink`, `-purple`, `-teal`, `-red` and `-yellow`
+  are the partner colours each viewer chooses from (`SPACE_COLOURS` in
+  `space-colours.ts`), in that order of preference. They are the "signature
+  hues": each one basic colour name at its own most characteristic lightness,
+  with no orange or brown beside the amber and rust, and the same dark ink
+  legible on every one. Why these and why in this order is in
+  [contexts.md](contexts.md#colours).
 - `--space-colour-ink` (the brand's on-loud rust) is what is drawn on them:
   initials, the person glyph.
 - `--space-colour-gap` (the lowered surface) parts the slices of the

@@ -1,3 +1,4 @@
+import { and, eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CONTEXT_COOKIE } from '../context';
 import { createTestDb, type TestDb } from '../testing/db';
@@ -15,6 +16,7 @@ import {
 	listContextSpaces,
 	setSpaceColour
 } from './context';
+import { spaceMembers } from './db/schema/app';
 import { soloSpaceFor } from './spaces';
 
 let harness: TestDb;
@@ -108,10 +110,10 @@ describe('space colours', () => {
 		expect(await setSpaceColour(harness.db, partnershipId, cy.id, 'pink')).toBe(false);
 	});
 
-	it('show the chosen colour, or a default, and Me in the accent', async () => {
+	it('show the chosen colour, or a default, and Me in your own', async () => {
 		const first = (await createTestPartnership(harness.db, ada, bo)).id;
 		const second = (await createTestPartnership(harness.db, ada, cy)).id;
-		await setSpaceColour(harness.db, second, ada.id, 'teal');
+		await setSpaceColour(harness.db, second, ada.id, 'green');
 		const names = { partnershipId: '', role: 'inviter' } as never;
 		const views = contextSpaceViews(await listContextSpaces(harness.db, ada.id), [
 			{ id: first, names },
@@ -119,9 +121,24 @@ describe('space colours', () => {
 		]);
 		expect(views.map((view) => [view.kind, view.colour])).toEqual([
 			['solo', 'me'],
-			// Teal is taken by the choice, so the default skips it.
-			['shared', 'violet'],
-			['shared', 'teal']
+			// Green is taken by the choice, so the default skips it.
+			['shared', 'pink'],
+			['shared', 'green']
 		]);
+	});
+
+	it('read a stored name that is not on the list as not chosen', async () => {
+		const partnershipId = (await createTestPartnership(harness.db, ada, bo)).id;
+		// An older palette's name, written past the type as a stale row would be.
+		await harness.db
+			.update(spaceMembers)
+			.set({ colour: 'lime' as never })
+			.where(and(eq(spaceMembers.spaceId, partnershipId), eq(spaceMembers.userId, ada.id)));
+		expect(await getSpaceColour(harness.db, partnershipId, ada.id)).toBeNull();
+		const names = { partnershipId: '', role: 'inviter' } as never;
+		const views = contextSpaceViews(await listContextSpaces(harness.db, ada.id), [
+			{ id: partnershipId, names }
+		]);
+		expect(views.map((view) => view.colour)).toEqual(['me', 'green']);
 	});
 });

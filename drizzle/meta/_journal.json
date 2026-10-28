@@ -379,6 +379,13 @@
       "when": 1793103449121,
       "tag": "0053_drop_scoped_tasks_rewards",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "6",
+      "when": 1793175527707,
+      "tag": "0054_map_space_colours_to_signature_hues",
+      "breakpoints": true
     }
   ]
 }

@@ -43,7 +43,7 @@ const spaces: ContextSpaceView[] = [
 	{
 		id: JUN,
 		kind: 'shared',
-		colour: 'violet',
+		colour: 'purple',
 		names: testNamesSource(JUN, {
 			partnerName: 'Jun',
 			yourName: 'Ada',

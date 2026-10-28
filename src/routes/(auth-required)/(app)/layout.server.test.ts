@@ -110,7 +110,7 @@ test('offers the switcher the viewer’s own space and each linked partnership, 
 		{
 			id,
 			kind: 'shared',
-			colour: 'teal',
+			colour: 'green',
 			names: expect.objectContaining({ partnershipId: id })
 		}
 	]);

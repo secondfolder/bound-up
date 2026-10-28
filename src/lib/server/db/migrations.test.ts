@@ -645,3 +645,48 @@ test('tasks and rewards are copied into their spaces, every row, before the old 
 	);
 	expect(left).toEqual([]);
 });
+
+test('each stored space colour moves to its nearest signature hue, and none is lost', async () => {
+	client = createClient({ url: ':memory:' });
+	const [before, after] = await migrationsSplitAt('0054_map_space_colours_to_signature_hues.sql');
+	for (const sql of before) {
+		await client.executeMultiple(sql);
+	}
+
+	// One shared space, a member per old colour and one who never chose.
+	// Their solo spaces come from the trigger and keep a null colour.
+	const old = ['teal', 'violet', 'blue', 'pink', 'green', 'lime', null];
+	await client.execute("INSERT INTO spaces (id, kind) VALUES ('s', 'shared')");
+	for (const [index, colour] of old.entries()) {
+		await client.execute({
+			sql: 'INSERT INTO user (id, name, email, created_at, updated_at) VALUES (?, ?, ?, 1, 1)',
+			args: [`u${index}`, `U${index}`, `u${index}@example.test`]
+		});
+		await client.execute({
+			sql: "INSERT INTO space_members (id, space_id, user_id, can_manage, colour) VALUES (?, 's', ?, 1, ?)",
+			args: [`m${index}`, `u${index}`, colour]
+		});
+	}
+
+	for (const sql of after) {
+		await client.executeMultiple(sql);
+	}
+
+	const rows = await client.execute(
+		"select user_id, colour from space_members where space_id = 's' order by user_id"
+	);
+	expect(rows.rows.map((row) => [row.user_id, row.colour])).toEqual([
+		['u0', 'teal'],
+		['u1', 'purple'],
+		// Blue is your own space's now, so a partner who was blue is purple.
+		['u2', 'purple'],
+		['u3', 'pink'],
+		['u4', 'green'],
+		['u5', 'yellow'],
+		['u6', null]
+	]);
+	const solo = await client.execute(
+		"select count(*) as n from space_members where space_id != 's' and colour is not null"
+	);
+	expect(solo.rows[0]?.n).toBe(0);
+});

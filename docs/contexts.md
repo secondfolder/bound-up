@@ -131,11 +131,11 @@ partner it is not rendered at all**: Everyone would just be Me.
 **The control** is a pill whose left end is the context's avatar at the
 control's full height (40px), then the name and a caret.
 
-- **Me** is the person glyph in amber.
+- **Me** is the person glyph in your own blue.
 - **A partner** is their initials in the colour you gave them. Names come from
   `partnerName()` (AGENTS.md invariant 12), so they read "…" until the vaults
   open, during SSR included.
-- **Everyone** is the **avatar pie**: a slice per person, you first in amber
+- **Everyone** is the **avatar pie**: a slice per person, you first in blue
   then each partner in their colour, parted by thin lines of the darkest
   surface. Each slice carries the person's initials at 36px and over; smaller,
   it is colour only. The pie is SVG: slices with no gaps, and each divider a
@@ -388,12 +388,38 @@ transitions are off and the fan's transitions and the pick's pause are zero.
 
 Each partnership shows in a colour **each member chooses for themselves**:
 `space_members.colour`, the viewer's own row, never seen by the others. It is
-one of a closed list (`SPACE_COLOURS` in `src/lib/space-colours.ts`: teal,
-violet, blue, pink, green, lime), each a `--space-colour-<name>` token in
-`theme.css` ([theme.md](theme.md#space-colours)), and stored in the clear, so a
-list rather than a free value keeps it from carrying anything else. Your own
-space is always the accent amber (`--space-colour-me`), so it is not on the
-list.
+one of a closed list (`SPACE_COLOURS` in `src/lib/space-colours.ts`), each a
+`--space-colour-<name>` token in `theme.css`
+([theme.md](theme.md#space-colours)), and stored in the clear, so a list
+rather than a free value keeps it from carrying anything else.
+
+The palette is the **signature hues**, each an OKLCH colour at its own most
+characteristic lightness rather than all at one:
+
+| Who | Name | OKLCH | sRGB |
+| --- | --- | --- | --- |
+| You (your own space) | Blue | `oklch(68% 0.16 252)` | `#439bf7` |
+| Partner colour 1 | Green | `oklch(78% 0.17 145)` | `#68d36f` |
+| 2 | Pink | `oklch(78% 0.15 355)` | `#ff8dbc` |
+| 3 | Purple | `oklch(66% 0.17 300)` | `#a376e9` |
+| 4 | Teal | `oklch(80% 0.12 190)` | `#47d6cf` |
+| 5 | Red | `oklch(66% 0.19 25)` | `#f05653` |
+| 6 | Yellow | `oklch(90% 0.16 102)` | `#f4e151` |
+
+- **Each is one basic colour name**, so a single colour seen alone — one
+  chip, one avatar — says whose it is, rather than needing its neighbours to
+  tell "teal" from "the other teal".
+- **Your own space is always blue** (`--space-colour-me`), so blue is not on
+  the list. It is not the app's amber accent any more: the accent is for
+  buttons, links and what is lit, and no longer also means "you".
+- **No orange or brown**: the amber accent (`--accent-color`) and the rust
+  surfaces own them, so a partner in either would read as part of the app.
+- **The order is priority**, most pleasing first, because a default takes the
+  first free colour and most people only ever see the first few. Yellow and
+  red are last: yellow neighbours the amber, and red is the app's error
+  colour.
+- **Dark ink stays legible on every one** (`--space-colour-ink`, 5:1 or
+  better; purple and red are the closest).
 
 - **Unset is a default, not a write**: `resolveSpaceColours` gives each
   partnership without a choice the next colour nobody chose, in the order the
@@ -401,6 +427,13 @@ list.
 - **Chosen** at Settings → Partners → a partner → Colour (the `colour` action,
   `SpaceColourForm`), which re-checks that the viewer is in a linked
   partnership and writes only their own row.
+- **A stored name not on the list reads as not chosen** (`storedSpaceColour`),
+  so it gets a default rather than drawing nothing or throwing.
+- **The palette has changed once.** It was teal, violet, blue, pink, green and
+  lime, with your own space in the accent amber. `0054` moved every stored
+  choice to the nearest new hue: violet and blue to purple (blue is your own
+  now, so a partner who was blue is purple), lime to yellow, and teal, pink and
+  green as they were.
 
 ## Everyone is live
 
@@ -442,7 +475,7 @@ that does not redirect, so it is the one refresh this does not cover.
 | Path | What |
 | --- | --- |
 | `src/lib/context.ts` | The pure half: `AppContext`, the cookie's name and format, parsing, `spacesInContext`. Alias-free |
-| `src/lib/space-colours.ts` | The palette, its labels, `resolveSpaceColours`. Alias-free: the schema imports `SpaceColour` |
+| `src/lib/space-colours.ts` | The palette, its labels, `resolveSpaceColours`, `storedSpaceColour`. Alias-free: the schema imports `SpaceColour` |
 | `src/lib/server/context.ts` | `listContextSpaces`, the per-request resolver, the cookie, `setSpaceColour`, `contextSpaceViews`, `contextSpaceIds` |
 | `src/lib/context-client.svelte.ts` | Names and avatars for the browser, `switchContext`, `storeContext` and `followInContext` |
 | `src/lib/context-fan.ts` | The fan's geometry and motion: the centre, the visible arc, even spacing, name widths, staggering, which sector a point is in, the hint's place, the wedge's shading and fill (Everyone's spectrum), the shared timing and easing. Pure, alias-free |
@@ -450,6 +483,7 @@ that does not redirect, so it is the one refresh this does not cover.
 | `src/lib/components/context/` | `ContextSwitcher`, `ContextAvatar`, `SpaceChip`, `SpaceColourForm` |
 | `src/routes/api/context/+server.ts` | Switching |
 | `drizzle/0050_add_space_member_colour.sql` | `space_members.colour`, a plain `ADD COLUMN` |
+| `drizzle/0054_map_space_colours_to_signature_hues.sql` | Moves the old palette's stored names to the signature hues |
 
 ## Not built yet
 

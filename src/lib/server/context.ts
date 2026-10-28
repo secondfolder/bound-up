@@ -9,7 +9,7 @@ import {
 	validContext
 } from '../context';
 import type { PartnerNamesSource } from '../partnership';
-import { resolveSpaceColours, type SpaceColour } from '../space-colours';
+import { resolveSpaceColours, type SpaceColour, storedSpaceColour } from '../space-colours';
 import type { SpaceKind } from '../spaces';
 import type { ContextSpaceView } from '../types';
 import type { Db } from './db';
@@ -143,7 +143,8 @@ export async function getSpaceColour(
 		.from(spaceMembers)
 		.where(and(eq(spaceMembers.spaceId, spaceId), eq(spaceMembers.userId, userId)))
 		.limit(1);
-	return row?.colour ?? null;
+	// Not on the list (an older palette's name) reads as not chosen.
+	return storedSpaceColour(row?.colour);
 }
 
 /**
