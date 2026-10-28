@@ -4,16 +4,29 @@
 	import { resolve } from '$app/paths';
 	import { type AppContext, serialiseContext } from '$lib/context';
 	import { type ContextShown, shownContexts, switchContext } from '$lib/context-client.svelte';
+	import {
+		type Box,
+		fanCentre,
+		hintPlacement,
+		LABEL_GAP,
+		LABEL_GOOD,
+		LABEL_HEIGHT,
+		layoutFan,
+		optionAt,
+		type Point
+	} from '$lib/context-fan';
 	import type { ContextSpaceView } from '$lib/types';
 	import ContextAvatar from './ContextAvatar.svelte';
 
 	/**
 	 * The context switcher: a pill at the top right of a page whose list
 	 * follows the context, showing whose things are shown. Tapping it fans
-	 * every context out on a quarter-circle round the screen's top-right
-	 * corner, and the pill becomes its own avatar on that arc; holding it, or
-	 * pressing and sliding, opens the same fan, and letting go over an avatar
-	 * picks it. See docs/contexts.md.
+	 * every context out round a disk centred a little above and right of the
+	 * pill (on a phone, the screen's top-right corner), spread evenly over all
+	 * of the ring that can be seen, and the pill becomes its own avatar on
+	 * that ring; holding it, or pressing and sliding, opens the same fan, and
+	 * letting go over an avatar picks it. The layout is `$lib/context-fan`'s.
+	 * See docs/contexts.md.
 	 *
 	 * A page opts in by rendering this (in `NestedPageHeader`'s `corner`) and
 	 * by its load depending on the context. Nothing here decides where a write
@@ -30,24 +43,27 @@
 		you: string;
 	} = $props();
 
-	// ── geometry ──────────────────────────────────────────────────────────────
+	// ── sizes and timings ─────────────────────────────────────────────────────
 
 	/** The pill's height, and so its avatar's size. */
 	const CONTROL = 40;
-	/** The avatars on the arc. */
-	const SLOT = 56;
 	const GAP = 8;
 	const PAD_END = 12;
 	const BORDER = 1;
-	/** The arc's sweep, and how far in from the top and side edges it starts. */
-	const SWEEP = 70;
-	const START = 10;
-	/** Close enough to an avatar's centre, while sliding, to be over it. */
-	const HIT = 38;
+	/** How much larger the avatar under a sliding finger is drawn. */
+	const HOVER_SCALE = 1.14;
+	/** How near where a press began the finger still counts as on the pill, not the fan. */
+	const PRESS_QUIET = 24;
 	/** How long a press is held before it opens the fan to slide in. */
 	const HOLD_MS = 280;
 	/** How long a picked avatar stays on the arc before the pill flies home. */
 	const PICK_MS = 240;
+	/** How long the options take to spring out: each starts 35ms after the one before. */
+	const OPTION_MS = 440;
+	const OPTION_STAGGER_MS = 35;
+
+	/** The hint's box: three short lines. */
+	const HINT = { width: 120, height: 46 };
 
 	const contexts = $derived(shownContexts(spaces, you));
 	/**
@@ -63,49 +79,42 @@
 		contexts.find((shown) => shown.key === currentKey) ?? (contexts[0] as ContextShown)
 	);
 
-	/** Every slot on the arc, in order: the contexts, then "Add partner". */
+	/** Every option on the ring, in order: the contexts, then "Add partner". */
 	const slotKeys = $derived([...contexts.map((shown) => shown.key), 'add']);
-	/**
-	 * The arc's radius: 200px, or wider with more partners than fit, so the
-	 * avatars never crowd. 66px of arc per gap is an avatar and its label.
-	 */
-	const radius = $derived(
-		Math.max(200, (66 * Math.max(slotKeys.length - 1, 1)) / ((SWEEP * Math.PI) / 180))
-	);
-	/** The fan's own quarter-disc reaches past the avatars' labels. */
-	const fanRadius = $derived(radius + 86);
-	const step = $derived(SWEEP / Math.max(slotKeys.length - 1, 1));
-	/** "Add partner" is the last slot. */
+	/** "Add partner" is the last. */
 	const addIndex = $derived(contexts.length);
-
-	/** A slot's centre, from the screen's top-right corner: left of it and down. */
-	function slotOffset(index: number): { dx: number; dy: number; deg: number } {
-		const deg = START + index * step;
-		const angle = (deg * Math.PI) / 180;
-		return { dx: radius * Math.cos(angle), dy: radius * Math.sin(angle), deg };
-	}
-
-	const addOffset = $derived(slotOffset(addIndex));
 
 	// ── state ─────────────────────────────────────────────────────────────────
 
 	let open = $state(false);
 	/** Opened by holding or sliding, and the finger is still down. */
 	let sliding = $state(false);
-	/** The slot under the finger while sliding. */
+	/** The option under the finger while sliding. */
 	let hover = $state<string | null>(null);
 	let labelWidth = $state(0);
+
 	/**
-	 * The screen's top-right corner (the app shell's), and the pill's avatar's
-	 * centre when home, both in viewport pixels: measured when the fan opens,
-	 * since the fan is drawn against the shell and the pill sits in the page.
+	 * What the fan is laid out from, in viewport pixels: the disk's centre,
+	 * what can be seen of the app shell above its bottom nav, and the pill's
+	 * avatar's centre when home. Measured on opening and again on a resize or
+	 * a scroll, since the fan is drawn against the shell and the pill sits in
+	 * the page. Kept after closing, so the options leaving still know where
+	 * they are going back to.
 	 */
-	let corner = $state({ right: 0, top: 0 });
-	let home = $state({ x: 0, y: 0 });
+	let measured = $state<{ centre: Point; bounds: Box; home: Point } | null>(null);
+
+	const layout = $derived(
+		measured
+			? layoutFan({ centre: measured.centre, bounds: measured.bounds, count: slotKeys.length })
+			: null
+	);
+	const hintAt = $derived(layout && measured ? hintPlacement(layout, measured.bounds, HINT) : null);
 
 	let root: HTMLElement | undefined = $state();
 	let anchor: HTMLElement | undefined = $state();
 	let trigger: HTMLButtonElement | undefined = $state();
+	let group: HTMLElement | undefined = $state();
+	let backdrop: HTMLElement | undefined = $state();
 	const slotButtons: (HTMLElement | undefined)[] = $state([]);
 
 	/** The label's width: folded into the avatar while open, measured otherwise (auto until it is). */
@@ -126,18 +135,32 @@
 	}
 
 	function measure() {
-		const shell = root?.closest('[data-app-shell]')?.getBoundingClientRect();
-		corner = shell
-			? { right: shell.right, top: shell.top }
-			: { right: document.documentElement.clientWidth, top: 0 };
+		const shellElement = root?.closest('[data-app-shell]');
+		const rect = shellElement?.getBoundingClientRect();
+		const shell: Box = rect
+			? { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }
+			: {
+					left: 0,
+					top: 0,
+					right: document.documentElement.clientWidth,
+					bottom: document.documentElement.clientHeight
+				};
+		// Options under the bottom nav could be neither read nor tapped.
+		const nav = shellElement?.querySelector(':scope > nav')?.getBoundingClientRect();
+		const bounds = nav ? { ...shell, bottom: Math.min(shell.bottom, nav.top) } : shell;
 		const box = anchor?.getBoundingClientRect();
-		if (box) {
-			home = { x: box.left + CONTROL / 2, y: box.top + CONTROL / 2 };
+		if (!box) {
+			return;
 		}
+		measured = {
+			centre: fanCentre({ right: box.right, middle: box.top + box.height / 2 }, shell),
+			bounds,
+			home: { x: box.left + CONTROL / 2, y: box.top + CONTROL / 2 }
+		};
 	}
 
 	// The pill's width follows the name, which moves the anchor's left edge
-	// (it sits at the end of its row): measured again so a pill on the arc
+	// (it sits at the end of its row): measured again so a pill on the ring
 	// flies back to where home now is.
 	$effect(() => {
 		void closedWidth;
@@ -146,33 +169,48 @@
 		}
 	});
 
-	/** Where the pill is while the fan is open: on its own slot, as big as the others. */
+	/** Where the pill is while the fan is open: on its own option, as big as the others. */
 	const flight = $derived.by(() => {
-		if (!open) {
+		if (!(open && layout && measured)) {
 			return null;
 		}
-		const index = slotKeys.indexOf(currentKey);
-		const { dx, dy } = slotOffset(Math.max(index, 0));
-		const scale = (hover === currentKey ? 64 : SLOT) / CONTROL;
+		const at = layout.points[Math.max(slotKeys.indexOf(currentKey), 0)];
+		if (!at) {
+			return null;
+		}
+		const size = hover === currentKey ? layout.avatar * HOVER_SCALE : layout.avatar;
 		return {
-			x: corner.right - dx - home.x,
-			y: corner.top + dy - home.y,
-			scale
+			x: at.x - measured.home.x,
+			y: at.y - measured.home.y,
+			scale: size / CONTROL
 		};
 	});
 
-	/** The selection wedge: a slice of the quarter-disc, pointing at the selected slot. */
+	/**
+	 * The selection wedge: the selected option's sector of the disk, as wide
+	 * as the angle between neighbours and centred on it, which is exactly what
+	 * a slide hit-tests (`optionAt`). Drawn once pointing up and
+	 * turned about the disk's centre, so it glides from option to option
+	 * rather than redrawing.
+	 */
 	const wedge = $derived.by(() => {
-		const selected = hover && hover !== 'add' ? hover : currentKey;
-		const index = Math.max(slotKeys.indexOf(selected), 0);
-		const { deg } = slotOffset(index);
-		const shown = contexts.find((candidate) => candidate.key === selected) ?? current;
-		const half = step / 2;
-		// Drawn once pointing at 45° from the top edge, then turned about the
-		// corner, so it glides from slot to slot rather than redrawing.
+		if (!layout) {
+			return null;
+		}
+		// "Add partner" too: letting go there opens it, so it is what is selected.
+		const selected = hover ?? currentKey;
+		const angle = layout.angles[Math.max(slotKeys.indexOf(selected), 0)] ?? 0;
+		// "Add partner" has no space of its own, so no colour: the accent's.
+		const colour =
+			selected === 'add'
+				? 'var(--accent-color)'
+				: (contexts.find((candidate) => candidate.key === selected) ?? current).colour;
+		const width = layout.step;
 		return {
-			rotate: 45 - deg,
-			background: `conic-gradient(at 100% 0%, transparent 0deg ${225 - half}deg, color-mix(in oklab, ${shown.colour} 34%, transparent) ${225 - half}deg ${225 + half}deg, transparent ${225 + half}deg 360deg)`
+			selected,
+			// Up is -90° on the screen.
+			rotate: angle + 90,
+			background: `conic-gradient(from ${(-width / 2).toFixed(2)}deg, color-mix(in oklab, ${colour} 34%, transparent) 0deg ${width.toFixed(2)}deg, transparent ${width.toFixed(2)}deg)`
 		};
 	});
 
@@ -186,6 +224,25 @@
 		const over = contexts.find((shown) => shown.key === hover);
 		return over ? `Let go to show ${over.name}` : 'Slide onto one, then let go';
 	});
+
+	/** Where an option's button goes: its avatar centred on its point, its name under it. */
+	function placeOf(index: number) {
+		const at = layout?.points[index] ?? { x: 0, y: 0 };
+		const avatar = layout?.avatar ?? 56;
+		const width = Math.max(avatar, layout?.label ?? 0);
+		const centre = measured?.centre ?? at;
+		return {
+			left: at.x - width / 2,
+			top: at.y - avatar / 2,
+			width,
+			height: avatar + LABEL_GAP + LABEL_HEIGHT,
+			// From the option back to the disk's centre, for its way in and out.
+			dx: centre.x - at.x,
+			dy: centre.y - at.y
+		};
+	}
+
+	const addPlace = $derived(placeOf(addIndex));
 
 	// ── opening, closing, picking ──────────────────────────────────────────────
 
@@ -204,6 +261,11 @@
 
 	function closeFan(returnFocus = true) {
 		const hadFocus = root?.contains(document.activeElement) ?? false;
+		// The backdrop stays while the options fly back in, and would take a
+		// tap meant for the page, or for the pill, the moment after closing.
+		if (backdrop) {
+			backdrop.style.pointerEvents = 'none';
+		}
 		open = false;
 		sliding = false;
 		hover = null;
@@ -223,7 +285,7 @@
 			return;
 		}
 		// Two steps: the pill first glides to the picked avatar's place on the
-		// arc and becomes it, then flies home and unfolds with the new name.
+		// ring and becomes it, then flies home and unfolds with the new name.
 		pending = key;
 		sliding = false;
 		hover = null;
@@ -246,14 +308,18 @@
 		hold = undefined;
 	}
 
+	/**
+	 * The option whose sector of the disk the finger is in (`optionAt`): the
+	 * wedge drawn under it is that sector. Nothing within a fingertip of where
+	 * the press began, so a wobble on the pill picks nothing.
+	 */
 	function slotAt(x: number, y: number): string | null {
-		for (const [index, key] of slotKeys.entries()) {
-			const { dx, dy } = slotOffset(index);
-			if (Math.hypot(corner.right - dx - x, corner.top + dy - y) < HIT) {
-				return key;
-			}
+		if (!layout) {
+			return null;
 		}
-		return null;
+		const still = press ? { x: press.x, y: press.y } : null;
+		const index = optionAt(layout, { x, y }, { still, quiet: PRESS_QUIET });
+		return index === null ? null : (slotKeys[index] ?? null);
 	}
 
 	function startSliding() {
@@ -363,7 +429,7 @@
 
 	/**
 	 * The page under the open fan does not scroll: the pill is measured
-	 * against it, and would drift off its slot. Non-passive, so it can refuse.
+	 * against it, and would drift off its option. Non-passive, so it can refuse.
 	 */
 	function holdStill(node: HTMLElement) {
 		const stop = (event: Event) => event.preventDefault();
@@ -375,14 +441,51 @@
 		};
 	}
 
+	/**
+	 * A click anywhere but on the pill or an option closes the fan. On the
+	 * document, in the capture phase, rather than only on the backdrop: the
+	 * backdrop covers the shell, but the app-wide notice is drawn above it,
+	 * and a click there must close the fan too. A click the backdrop takes
+	 * goes no further, so nothing under the fan is acted on.
+	 */
 	$effect(() => {
 		if (!open) {
 			return;
 		}
-		// A resize moves the corner out from under the arc.
-		const close = () => closeFan(false);
-		window.addEventListener('resize', close);
-		return () => window.removeEventListener('resize', close);
+		const outside = (event: MouseEvent) => {
+			const { target } = event;
+			if (target instanceof Node && (trigger?.contains(target) || group?.contains(target))) {
+				return;
+			}
+			closeFan();
+		};
+		document.addEventListener('click', outside, true);
+		return () => document.removeEventListener('click', outside, true);
+	});
+
+	/**
+	 * A resize lays the fan out again rather than closing it: the shell, and
+	 * so how much of the ring shows, has changed, and so may where the pill
+	 * is. So may a scroll the page makes by itself. Once a frame at most.
+	 */
+	$effect(() => {
+		if (!open) {
+			return;
+		}
+		let frame = 0;
+		const again = () => {
+			cancelAnimationFrame(frame);
+			frame = requestAnimationFrame(measure);
+		};
+		window.addEventListener('resize', again);
+		window.visualViewport?.addEventListener('resize', again);
+		document.addEventListener('scroll', again, true);
+		return () => {
+			cancelAnimationFrame(frame);
+			window.removeEventListener('resize', again);
+			window.visualViewport?.removeEventListener('resize', again);
+			document.removeEventListener('scroll', again, true);
+		};
 	});
 
 	$effect(() => () => {
@@ -392,23 +495,77 @@
 
 	// ── transitions ───────────────────────────────────────────────────────────
 
-	/** An avatar popping out of the corner to its slot, and back in on closing. */
-	function fromCorner(_node: Element, { dx, dy, delay }: { dx: number; dy: number; delay: number }) {
+	/**
+	 * An option springing out of the disk's centre to its place, and back in
+	 * on closing. The one showing now is the pill itself, flown to its place,
+	 * so only its name comes in, once the pill is nearly there.
+	 *
+	 * `|global` where used: the options are in an `{#each}` inside the
+	 * `{#if open}`, and a local transition plays only when its own block
+	 * comes or goes, so they used to appear and vanish at once while only
+	 * "Add partner", directly in the `{#if}`, sprang.
+	 */
+	function fromCentre(
+		_node: Element,
+		{ dx, dy, delay, isCurrent }: { dx: number; dy: number; delay: number; isCurrent: boolean }
+	) {
+		if (reducedMotion()) {
+			return { duration: 0 };
+		}
+		if (isCurrent) {
+			// Its name fades in as the pill arrives. The wait is inside the
+			// transition, not its `delay`, which Svelte spends showing the
+			// element fully opaque.
+			const wait = 160;
+			const total = wait + 200;
+			return {
+				duration: total,
+				css: (t: number) => `opacity: ${cubicOut(Math.max(0, (t * total - wait) / 200)).toFixed(3)}`
+			};
+		}
 		return {
-			delay: reducedMotion() ? 0 : delay,
-			duration: reducedMotion() ? 0 : 440,
+			delay,
+			duration: OPTION_MS,
 			easing: backOut,
 			css: (t: number) =>
-				`opacity: ${Math.min(1, t * 1.5)}; transform: translate(${(dx * (1 - t)).toFixed(1)}px, ${(-dy * (1 - t)).toFixed(1)}px) scale(${0.2 + 0.8 * t})`
+				`opacity: ${Math.min(1, t * 1.5)}; transform: translate(${(dx * (1 - t)).toFixed(1)}px, ${(dy * (1 - t)).toFixed(1)}px) scale(${0.2 + 0.8 * t})`
 		};
 	}
 
-	/** The quarter-disc unfolding from the corner. */
+	/** The disk unfolding from its centre. */
 	function unfold(_node: Element) {
 		return {
 			duration: reducedMotion() ? 0 : 300,
 			easing: cubicOut,
 			css: (t: number) => `transform: scale(${t})`
+		};
+	}
+
+	/**
+	 * The hint comes last, once the options have mostly landed, so it does
+	 * not compete with them for the eye while they move.
+	 */
+	function hintIn(_node: Element, { count }: { count: number }) {
+		if (reducedMotion()) {
+			return { duration: 0 };
+		}
+		// The wait is part of the transition rather than its `delay`: Svelte
+		// draws an element as it is, fully opaque, through a delay, so the
+		// hint showed at once, vanished, and then faded in.
+		const wait = (count - 1) * OPTION_STAGGER_MS + OPTION_MS * 0.7;
+		const fadeMs = 220;
+		const total = wait + fadeMs;
+		return {
+			duration: total,
+			css: (t: number) => `opacity: ${cubicOut(Math.max(0, (t * total - wait) / fadeMs)).toFixed(3)}`
+		};
+	}
+
+	/** And goes first, gone before the options are back at the centre. */
+	function hintOut(_node: Element) {
+		return {
+			duration: reducedMotion() ? 0 : 100,
+			css: (t: number) => `opacity: ${t}`
 		};
 	}
 
@@ -428,6 +585,11 @@
 	     so the pill can fly home and take focus back. -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div class="switcher" data-context-switcher bind:this={root} {onkeydown} {onfocusout}>
+		<!-- What letting go will do, while sliding, for assistive tech: polite,
+		     and only when it changes (the option under the finger, not every
+		     move). Always rendered, since a live region added with its text
+		     is not announced. -->
+		<span class="wa-visually-hidden" aria-live="polite">{open && sliding ? hint : ''}</span>
 		<span
 			class="anchor"
 			bind:this={anchor}
@@ -445,7 +607,7 @@
 				aria-haspopup="true"
 				aria-label="Showing {current.name}. Choose whose to show"
 				style:transform={flight
-					? `translate(${flight.x.toFixed(1)}px, ${flight.y.toFixed(1)}px) scale(${flight.scale})`
+					? `translate(${flight.x.toFixed(1)}px, ${flight.y.toFixed(1)}px) scale(${flight.scale.toFixed(3)})`
 					: undefined}
 				{onpointerdown}
 				{onpointermove}
@@ -468,77 +630,119 @@
 			</button>
 		</span>
 
-		{#if open}
-			<!-- Out of the tab order: Escape is the keyboard's way to close. -->
-			<button
-				type="button"
-				class="backdrop"
-				tabindex="-1"
-				aria-label="Close"
-				transition:fade
-				onclick={() => closeFan()}
-				{@attach holdStill}
-			></button>
+		{#if open && layout && measured}
+			<!-- A slight dim over the whole shell, nav included, and what takes
+			     a click off the fan. A div rather than the <button> it was: Web
+			     Awesome's native styles give every <button> the form control's
+			     height, which beat `inset: 0`, so it covered a 43px strip along
+			     the top and every click below that went to the page. Closing on
+			     a click is the document listener's job. -->
+			<div class="backdrop" bind:this={backdrop} transition:fade {@attach holdStill}></div>
+			<!-- The disk is clipped to what the options may use, so it never
+			     covers the nav. -->
 			<div
-				class="fan"
+				class="stage"
 				aria-hidden="true"
-				transition:unfold
-				style:top="{corner.top}px"
-				style:left="{corner.right - fanRadius}px"
-				style:--fan="{fanRadius}px"
+				style:left="{measured.bounds.left}px"
+				style:top="{measured.bounds.top}px"
+				style:width="{measured.bounds.right - measured.bounds.left}px"
+				style:height="{measured.bounds.bottom - measured.bounds.top}px"
 			>
 				<div
-					class="wedge"
-					style:rotate="{wedge.rotate.toFixed(2)}deg"
-					style:background={wedge.background}
-				></div>
+					class="disk"
+					data-fan-disk
+					transition:unfold
+					style:left="{measured.centre.x - measured.bounds.left - layout.disk}px"
+					style:top="{measured.centre.y - measured.bounds.top - layout.disk}px"
+					style:--disk="{layout.disk * 2}px"
+				>
+					{#if wedge}
+						<div
+							class="wedge"
+							data-fan-wedge={wedge.selected}
+							style:rotate="{wedge.rotate.toFixed(2)}deg"
+							style:background={wedge.background}
+						></div>
+					{/if}
+				</div>
 			</div>
-			<p
-				class="hint"
-				aria-hidden="true"
-				transition:fade
-				style:top="{corner.top + 72}px"
-				style:left="{corner.right - 136}px"
+			{#if hintAt}
+				<!-- Shown, not read: the live region by the pill says what matters. -->
+				<p
+					class="hint"
+					aria-hidden="true"
+					in:hintIn|global={{ count: slotKeys.length }}
+					out:hintOut|global
+					style:left="{hintAt.x}px"
+					style:top="{hintAt.y}px"
+					style:width="{HINT.width}px"
+					style:height="{HINT.height}px"
+				>
+					{hint}
+				</p>
+			{/if}
+			<fieldset
+				class="slots"
+				aria-label="Whose to show"
+				class:crowded={layout.label < LABEL_GOOD}
+				bind:this={group}
+				style:--avatar="{layout.avatar}px"
+				style:--label="{layout.label}px"
+				style:--label-gap="{LABEL_GAP}px"
+				style:--label-height="{LABEL_HEIGHT}px"
 			>
-				{hint}
-			</p>
-			<fieldset class="slots" aria-label="Whose to show">
 				{#each contexts as shown, index (shown.key)}
-					{const offset = $derived(slotOffset(index))}
+					{const place = $derived(placeOf(index))}
 					{const isCurrent = $derived(shown.key === currentKey)}
 					<button
 						type="button"
 						class="slot"
 						class:hovered={hover === shown.key}
+						data-fan-option
 						bind:this={slotButtons[index]}
 						aria-label="Show {shown.name}"
 						aria-current={isCurrent ? 'true' : undefined}
-						style:left="{corner.right - offset.dx - 44}px"
-						style:top="{corner.top + offset.dy - SLOT / 2}px"
-						transition:fromCorner={{ dx: offset.dx, dy: offset.dy, delay: index * 35 }}
+						style:left="{place.left}px"
+						style:top="{place.top}px"
+						style:width="{place.width}px"
+						style:height="{place.height}px"
+						transition:fromCentre|global={{
+							dx: place.dx,
+							dy: place.dy,
+							delay: index * OPTION_STAGGER_MS,
+							isCurrent
+						}}
 						onclick={() => pick(shown.key)}
 					>
 						<!-- The one showing now is the pill itself, flown here, so its
-						     own avatar stays out of sight underneath. -->
-						<span class="slot-avatar" class:standing-in={isCurrent}>
-							<ContextAvatar kind={shown.kind} size={SLOT} people={shown.people} />
+						     own avatar stays out of sight underneath; its name shows. -->
+						<span class="slot-avatar" class:standing-in={isCurrent} data-fan-avatar>
+							<ContextAvatar kind={shown.kind} size={layout.avatar} people={shown.people} />
 						</span>
-						<span class="slot-name">{shown.name}</span>
+						<span class="slot-name" data-fan-label>{shown.name}</span>
 					</button>
 				{/each}
 				<a
 					class="slot"
 					class:hovered={hover === 'add'}
+					data-fan-option
 					href={resolve('/(auth-required)/(app)/settings/partners/new')}
 					bind:this={slotButtons[addIndex]}
-					style:left="{corner.right - addOffset.dx - 44}px"
-					style:top="{corner.top + addOffset.dy - SLOT / 2}px"
-					transition:fromCorner={{ dx: addOffset.dx, dy: addOffset.dy, delay: addIndex * 35 }}
+					style:left="{addPlace.left}px"
+					style:top="{addPlace.top}px"
+					style:width="{addPlace.width}px"
+					style:height="{addPlace.height}px"
+					transition:fromCentre|global={{
+						dx: addPlace.dx,
+						dy: addPlace.dy,
+						delay: addIndex * OPTION_STAGGER_MS,
+						isCurrent: false
+					}}
 				>
-					<span class="slot-avatar">
-						<ContextAvatar kind="add" size={SLOT} />
+					<span class="slot-avatar" data-fan-avatar>
+						<ContextAvatar kind="add" size={layout.avatar} />
 					</span>
-					<span class="slot-name">Add partner</span>
+					<span class="slot-name" data-fan-label>Add partner</span>
 				</a>
 			</fieldset>
 		{/if}
@@ -630,7 +834,7 @@
 		}
 	}
 
-	/* Open, the pill is only its avatar, ringed, standing in on the arc. */
+	/* Open, the pill is only its avatar, ringed, standing in on the ring. */
 	.control.open {
 		gap: 0;
 		padding: 0;
@@ -648,44 +852,49 @@
 		}
 	}
 
+	/* Very slight, and even over the whole shell: the fan is what stands out. */
 	.backdrop {
 		position: fixed;
 		inset: 0;
 		z-index: 20;
-		border: none;
-		padding: 0;
-		background: var(--wa-color-overlay-modal);
-		cursor: default;
+		background: color-mix(in oklab, var(--wa-color-overlay-modal) 45%, transparent);
 	}
 
-	.fan {
+	.stage {
 		position: fixed;
 		z-index: 21;
-		inline-size: var(--fan);
-		block-size: var(--fan);
-		border-end-start-radius: var(--fan);
-		background: var(--wa-color-surface-default);
-		border-inline-start: 1px solid var(--wa-color-brand-border-quiet);
-		border-block-end: 1px solid var(--wa-color-brand-border-quiet);
-		transform-origin: top right;
 		overflow: hidden;
 		pointer-events: none;
+	}
+
+	.disk {
+		position: absolute;
+		inline-size: var(--disk);
+		block-size: var(--disk);
+		border-radius: 50%;
+		background: var(--wa-color-surface-default);
+		border: 1px solid var(--wa-color-brand-border-quiet);
+		box-sizing: border-box;
+		overflow: hidden;
 	}
 
 	.wedge {
 		position: absolute;
 		inset: 0;
-		border-end-start-radius: var(--fan);
-		transform-origin: 100% 0;
+		border-radius: 50%;
 		transition: rotate 220ms cubic-bezier(0.25, 0.9, 0.3, 1.1);
 	}
 
 	.hint {
 		position: fixed;
 		z-index: 22;
-		inline-size: 118px;
 		margin: 0;
-		text-align: end;
+		overflow: hidden;
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 3;
+		line-clamp: 3;
+		text-align: center;
 		font-size: var(--wa-font-size-2xs);
 		line-height: 1.4;
 		color: var(--wa-color-text-quiet);
@@ -694,6 +903,7 @@
 
 	.slot-avatar {
 		display: flex;
+		flex: none;
 		border-radius: 50%;
 		transition: transform 120ms ease-out;
 
@@ -702,27 +912,46 @@
 		}
 	}
 
+	/* One line, as wide as the layout allows; a longer name ends in "…"
+	   and is still whole in the option's accessible name. */
 	.slot-name {
-		font-size: var(--wa-font-size-2xs);
-		font-weight: var(--wa-font-weight-semibold);
+		box-sizing: border-box;
+		max-inline-size: var(--label);
+		block-size: var(--label-height);
+		overflow: hidden;
+		text-overflow: ellipsis;
 		white-space: nowrap;
+		font-size: var(--wa-font-size-2xs);
+		line-height: var(--label-height);
+		font-weight: var(--wa-font-weight-semibold);
 	}
 
+	/* Sized and placed by the layout. Every property Web Awesome's native
+	   <button> styles set that matters is set here: its height and
+	   `justify-content: center` used to centre an avatar-and-name taller
+	   than the button on the button, which moved every avatar up 18px from
+	   where the pill flew to, and the pill covered its own name. */
 	.slot {
 		position: fixed;
 		z-index: 22;
-		inline-size: 88px;
+		box-sizing: border-box;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 6px;
+		justify-content: flex-start;
+		gap: var(--label-gap);
+		min-inline-size: 0;
+		margin: 0;
 		padding: 0;
 		border: none;
+		border-radius: 0;
 		background: transparent;
 		color: var(--wa-color-text-normal);
 		font: inherit;
 		text-decoration: none;
 		cursor: pointer;
+		/* Grown and shrunk about its avatar's centre, on the way in and out. */
+		transform-origin: 50% calc(var(--avatar) / 2);
 		-webkit-tap-highlight-color: transparent;
 	}
 
@@ -736,9 +965,15 @@
 		}
 	}
 
+	/* A crowded fan (many partners on a phone) has narrow names: a size
+	   smaller keeps "Everyone" and "Add partner" whole in them. */
+	.crowded .slot-name {
+		font-size: calc(var(--wa-font-size-2xs) - 1px);
+	}
+
 	.slot.hovered {
 		.slot-avatar {
-			transform: scale(1.18);
+			transform: scale(1.14);
 			box-shadow:
 				0 0 0 3px var(--wa-color-surface-default),
 				0 0 0 5px var(--accent-color);

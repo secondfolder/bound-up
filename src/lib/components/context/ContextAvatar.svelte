@@ -27,33 +27,62 @@
 	const first = $derived(people[0]);
 
 	/**
-	 * Everyone's pie: each person's colour as a slice, with a thin gap of the
-	 * page's darkest surface between them so neighbouring colours do not
-	 * blur into one. Conic gradients start at the top and go clockwise.
+	 * Everyone's pie, drawn in SVG on a 100-unit square centred on 0,0: a
+	 * slice per person in their colour, from the top clockwise, with a dark
+	 * line along each border between slices.
+	 *
+	 * The lines are drawn on top as constant-width strokes rather than left as
+	 * gaps between slices. This used to be a conic gradient with an angular
+	 * gap of the darkest surface at each border, and an angular gap is a
+	 * wedge: wide at the rim and nothing at the centre. Chrome does not
+	 * anti-alias a conic gradient's hard stops either, so where the wedge got
+	 * narrower than a pixel it broke up and then vanished, and the middle of
+	 * every divider was missing, the slices' bright colours meeting there
+	 * with no line between them: the "white" patch at the centre. Opposite
+	 * borders are drawn as one straight line through the centre, so a
+	 * two-person pie's divider has no joint at all, and anything past the rim
+	 * is clipped by the avatar's circle.
 	 */
 	const pie = $derived.by(() => {
-		const count = Math.max(people.length, 1);
-		const step = 360 / count;
-		const gap = size >= PIE_LABEL_MIN ? 1.6 : 1.2;
-		const stops = ['var(--space-colour-gap) 0deg', `var(--space-colour-gap) ${gap}deg`];
-		people.forEach((person, index) => {
-			const start = index * step;
-			const end = (index + 1) * step;
-			stops.push(
-				`${person.colour} ${start + gap}deg ${end - gap}deg`,
-				`var(--space-colour-gap) ${end - gap}deg ${end + gap}deg`
-			);
-		});
-		return `conic-gradient(${stops.join(', ')})`;
+		const count = people.length;
+		const step = 360 / Math.max(count, 1);
+		// Past the rim, so no edge of a slice or line shows inside the circle.
+		const reach = 60;
+		const at = (degrees: number) => {
+			const angle = ((degrees - 90) * Math.PI) / 180;
+			return `${(reach * Math.cos(angle)).toFixed(3)} ${(reach * Math.sin(angle)).toFixed(3)}`;
+		};
+		const slices = people.map((person, index) => ({
+			key: `${index}`,
+			colour: person.colour,
+			d:
+				count <= 1
+					? `M 0 -${reach} A ${reach} ${reach} 0 1 1 0 ${reach} A ${reach} ${reach} 0 1 1 0 -${reach} Z`
+					: `M 0 0 L ${at(index * step)} A ${reach} ${reach} 0 ${step > 180 ? 1 : 0} 1 ${at((index + 1) * step)} Z`
+		}));
+		// A line from the centre out along each border. Opposite borders (an
+		// even count of people) are one line through the centre instead, so
+		// no joint is drawn there at all.
+		const point = (degrees: number) => {
+			const angle = ((degrees - 90) * Math.PI) / 180;
+			return { x: (reach * Math.cos(angle)).toFixed(3), y: (reach * Math.sin(angle)).toFixed(3) };
+		};
+		const through = count % 2 === 0;
+		const dividers =
+			count <= 1
+				? []
+				: Array.from({ length: through ? count / 2 : count }, (_, index) => {
+						const to = point(index * step);
+						const from = through ? point(index * step + 180) : { x: '0', y: '0' };
+						return { key: `${index}`, x1: from.x, y1: from.y, x2: to.x, y2: to.y };
+					});
+		// About a pixel at 24px, growing slowly: in the square's units.
+		const thickness = Math.max(1, size * 0.036);
+		return { slices, dividers, width: ((thickness * 100) / size).toFixed(3) };
 	});
 
-	/** The disc's fill: the pie, one person's colour, or (for "add") the stylesheet's. */
-	const fill = $derived.by(() => {
-		if (kind === 'all') {
-			return pie;
-		}
-		return kind === 'add' ? undefined : first?.colour;
-	});
+	/** The disc's fill: one person's colour, or (for "add") the stylesheet's. Everyone's is its pie. */
+	const fill = $derived(kind === 'all' || kind === 'add' ? undefined : first?.colour);
 
 	/** Where each slice's initials sit: halfway round its slice, part way out. */
 	const labels = $derived.by(() => {
@@ -90,6 +119,14 @@
 	{:else if kind === 'add'}
 		<wa-icon name="plus" variant="solid" style:font-size="{Math.round(size * 0.46)}px"></wa-icon>
 	{:else}
+		<svg class="pie" viewBox="-50 -50 100 100" aria-hidden="true">
+			{#each pie.slices as slice (slice.key)}
+				<path d={slice.d} style:fill={slice.colour} />
+			{/each}
+			{#each pie.dividers as divider (divider.key)}
+				<line x1={divider.x1} y1={divider.y1} x2={divider.x2} y2={divider.y2} stroke-width={pie.width} />
+			{/each}
+		</svg>
 		{#each labels as label (label.key)}
 			<span
 				class="slice-label"
@@ -117,6 +154,21 @@
 		color: var(--space-colour-ink);
 		font-weight: var(--wa-font-weight-bold);
 		line-height: 1;
+	}
+
+	.pie {
+		position: absolute;
+		inset: 0;
+		inline-size: 100%;
+		block-size: 100%;
+
+		line {
+			stroke: var(--space-colour-gap);
+			/* Square ends: a round end at the centre drew a dot where three or
+			   five lines met. Odd counts' lines still overlap there, so no
+			   gap opens between them. */
+			stroke-linecap: butt;
+		}
 	}
 
 	.add {

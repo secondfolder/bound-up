@@ -136,24 +136,93 @@ control's full height (40px), then the name and a caret.
   `partnerName()` (AGENTS.md invariant 12), so they read "…" until the vaults
   open, during SSR included.
 - **Everyone** is the **avatar pie**: a slice per person, you first in amber
-  then each partner in their colour, parted by thin gaps of the darkest
+  then each partner in their colour, parted by thin lines of the darkest
   surface. Each slice carries the person's initials at 36px and over; smaller,
-  it is colour only.
+  it is colour only. The pie is SVG: slices with no gaps, and each divider a
+  constant-width stroke drawn on top from the centre to the rim (opposite
+  borders, with an even count of people, as one line through the centre).
+  It was a conic gradient with an angular gap at each border, which is a
+  wedge that narrows to nothing at the centre; Chrome does not anti-alias
+  conic hard stops, so the middle of every divider broke up and vanished and
+  the bright slices met there with no line between them, which read as a
+  light patch at the centre.
 
-**Tapping** fans every context out on a quarter-circle round the screen's
-top-right corner — Everyone, Me, each partner, then a dashed "Add partner"
-linking to `/settings/partners/new` — over a dimmed backdrop. The pill morphs
-into its own avatar on the arc: it is pinned by its avatar's left edge (its
-anchor holds the measured closed width), so as the label folds into the avatar
-the avatar never jumps, and it flies straight to its slot, scaled to the
-others' 56px. Closing is the same in reverse. A **selection wedge**, a slice
-of the quarter-disc tinted in the selected context's colour, sits behind the
-selected avatar and turns about the corner to follow the finger while sliding.
+**Tapping** fans every context out round a disk — Everyone, Me, each partner,
+then a dashed "Add partner" linking to `/settings/partners/new` — over a very
+slight dim of the whole app shell, nav included. The pill morphs into its own
+avatar on the ring: it is pinned by its avatar's left edge (its anchor holds
+the measured closed width), so as the label folds into the avatar the avatar
+never jumps, and it flies straight to its place, scaled to the others' size.
+Every other option springs out of the disk's centre with a slight overshoot,
+each 35ms after the one before, and springs back into it on closing; the
+current one's name fades in under it as the pill arrives. The hint inside the
+ring ("Tap one, or next time hold the button and slide") fades in last, once
+the options have mostly landed, and fades out first on closing. Under
+`prefers-reduced-motion` all of it simply appears and goes.
 
-**Holding** the pill (280ms) or **pressing and sliding** opens the same fan;
-letting go over an avatar picks it, and letting go over nothing leaves the fan
-open for tapping. The pill takes pointer capture and `touch-action: none`, so
-a slide is never a scroll.
+A **selection wedge**, the selected option's sector of the disk tinted in its
+colour (the accent's for "Add partner"), turns about the disk's centre to
+follow the finger while sliding.
+
+### The fan's layout
+
+The geometry is a pure module, `src/lib/context-fan.ts`, unit-tested in
+`context-fan.test.ts`; the switcher measures and draws what it returns, and
+`e2e/context-switcher-layout.spec.ts` measures the result on real pages.
+
+- **Where the disk is centred**: a fixed offset up and right of the pill's
+  right end and middle (`fanCentre`), snapped onto the app shell's edge when
+  within 16px of it and never outside it. On a phone, where the pill sits at
+  the end of the header's first line, that is the screen's top-right corner;
+  on a wide screen, where the page column has a maximum width, it is beside
+  the pill, well in from the corner.
+- **What the options use**: the longest unbroken run of the ring that can be
+  seen (`visibleArc`): the angles at which an option, avatar and name, is
+  wholly inside the shell above its bottom nav, 8px in. A quarter of the ring
+  round a corner, a half round the middle of the top edge. The options are
+  spread evenly along all of it, first at one end and "Add partner" at the
+  other, so every pair of neighbours is the same angle apart. The disk is a
+  circle round the centre, clipped to the same area, and the wedge is as wide
+  as that angle.
+- **Sizes**: names are one line, centred under their avatar, cut short with
+  "…" at a computed width (the whole name stays in the option's accessible
+  name). `layoutFan` tries avatars from 56px down to 36px and, for each, rings
+  from 140px out; it takes the largest avatars whose smallest ring gives every
+  name 80px without any name touching another name or another avatar
+  (`labelBudget`), else the largest that give names 64px, else whatever gives
+  them most. A fan one ring cannot give 64px — nine options (six partners) on
+  a phone's quarter circle — **staggers**: every other option a row further
+  in, at the same even angles, so each name has two steps of room. A crowded
+  fan's names are a size smaller.
+- **Resizing** lays the fan out again rather than closing it (a window
+  resize, the visual viewport changing, or a scroll, once a frame at most):
+  the centre, the visible arc, the ring and the sizes are recomputed, and the
+  pill flies to its recomputed place.
+
+**Holding** the pill (280ms) or **pressing and sliding** opens the same fan.
+While sliding, what is under the finger is **the option whose sector of the
+disk it is in** (`optionAt`), not only its avatar: each option owns the slice
+of the disk round it, from the centre to the disk's edge, with its borders
+halfway to its neighbours (and half a step past either end), which is exactly
+the wedge drawn under it, so what lights up is what letting go picks. Off the
+disk, within 48px of its centre, or within 24px of where the press began
+(so a wobble on the pill picks nothing), nothing is. "Add partner" lights up
+like any other option, and letting go there opens it. Letting go over nothing
+leaves the fan open for tapping. The pill takes pointer capture and
+`touch-action: none`, so a slide is never a scroll. The hint says what
+letting go will do, and a polite live region by the pill says the same to
+assistive tech, only when it changes.
+
+**Closing.** A click anywhere but on the pill or an option closes the fan: on
+the page, the nav, the empty part of the disk, or something drawn above the
+dim such as the app-wide notice (a capture-phase listener on the document).
+The dim takes the click, so nothing under it is acted on, and stops taking
+clicks the moment the fan starts closing, so a tap just after is not lost.
+It used to be a `<button>`, which Web Awesome's native styles gave the form
+control's height: it covered a 43px strip along the top, darkened, and every
+click below it went to the page. The option buttons had the same height and
+`justify-content: center`, which moved every avatar 18px up from where the pill
+flew to, so the pill covered the current option's name.
 
 **Picking** a different context glides the pill to the picked avatar's slot,
 then it flies home and unfolds with the new name, while `POST /api/context`
@@ -198,10 +267,10 @@ lives in one place rather than in each page.
 
 **Where it is drawn.** The pill sits in the page header, but the fan is drawn
 against the app shell (`data-app-shell` on the `(app)` layout's shell), whose
-rectangle is measured when the fan opens: the shell is fitted to the visual
-viewport, so its corner is the screen's even with the iOS keyboard open. The
-pill's flight is measured from the same rectangle. The page under an open fan
-does not scroll (it would carry the pill off its slot), and a resize closes it.
+rectangle and nav are measured when the fan opens and on every resize: the
+shell is fitted to the visual viewport, so its edges are the screen's even
+with the iOS keyboard open. The page under an open fan does not scroll (it
+would carry the pill off its place).
 
 **Keyboard and assistive tech.** The trigger is a native `<button>` with
 `aria-expanded` and `aria-haspopup` — a disclosure trigger, which `wa-button`
@@ -210,10 +279,9 @@ the fan (a click with `detail` 0; a pointer's click is already handled by the
 press). Each context is a real button named "Show …", the current one with
 `aria-current`, in a fieldset named "Whose to show". Focus moves onto the
 current one on opening and back to the trigger on closing; Escape (a keydown on
-the component, not the window) and tabbing out both close it; the backdrop is
-a button out of the tab order. Under `prefers-reduced-motion` nothing moves:
-the CSS transitions are off and the fan's transitions and the pick's pause are
-zero.
+the component, not the window) and tabbing out both close it; the dim behind
+the fan is not focusable. Under `prefers-reduced-motion` nothing moves: the CSS
+transitions are off and the fan's transitions and the pick's pause are zero.
 
 ## Colours
 
@@ -276,6 +344,7 @@ that does not redirect, so it is the one refresh this does not cover.
 | `src/lib/space-colours.ts` | The palette, its labels, `resolveSpaceColours`. Alias-free: the schema imports `SpaceColour` |
 | `src/lib/server/context.ts` | `listContextSpaces`, the per-request resolver, the cookie, `setSpaceColour`, `contextSpaceViews`, `contextSpaceIds` |
 | `src/lib/context-client.svelte.ts` | Names and avatars for the browser, `switchContext`, `storeContext` and `followInContext` |
+| `src/lib/context-fan.ts` | The fan's geometry: the centre, the visible arc, even spacing, name widths, staggering, which sector a point is in. Pure, alias-free |
 | `src/lib/navigation.ts`, `src/lib/enhance.ts` | Refreshes and `use:enhance` that wait for a navigation under way rather than dropping it |
 | `src/lib/components/context/` | `ContextSwitcher`, `ContextAvatar`, `SpaceChip`, `SpaceColourForm` |
 | `src/routes/api/context/+server.ts` | Switching |

@@ -65,6 +65,29 @@ function renderSwitcher(
 
 const trigger = () => screen.getByRole('button', { name: /^Showing / });
 
+/**
+ * Once the fan's options have sprung out to their places: they are measured
+ * where they land. Until a few quiet frames, not one await: Svelte spends a
+ * transition's delay on an animation of its own and only then starts the
+ * real one, so the later options' are not there to await at first.
+ */
+async function fanSettled() {
+	await vi.waitFor(() => {
+		if (!document.querySelector('[data-fan-option]')) {
+			throw new Error('The fan has no options yet');
+		}
+	});
+	let quiet = 0;
+	while (quiet < 3) {
+		await new Promise((done) => requestAnimationFrame(done));
+		const moving = document
+			.getAnimations()
+			.filter((animation) => animation.playState !== 'finished');
+		quiet = moving.length === 0 ? quiet + 1 : 0;
+		await Promise.all(moving.map((animation) => animation.finished.catch(() => undefined)));
+	}
+}
+
 describe('the control', () => {
 	it('is not there for someone with no partner: Everyone would just be them', () => {
 		const { container } = renderSwitcher({ kind: 'all' }, [solo]);
@@ -129,13 +152,73 @@ describe('the fan', () => {
 		expect(trigger()).toHaveAttribute('aria-expanded', 'true');
 	});
 
-	it('opens on a tap, and closes on a tap on what is behind it', async () => {
+	it('opens on a tap, and closes on a tap anywhere off it', async () => {
 		renderSwitcher();
 		await userEvent.click(trigger());
 		expect(trigger()).toHaveAttribute('aria-expanded', 'true');
-		// The backdrop, under the fan: a click anywhere off it.
-		screen.getByRole('button', { name: 'Close' }).click();
+		// The page's own corner, far from the fan.
+		document.body.click();
 		await vi.waitFor(() => expect(trigger()).toHaveAttribute('aria-expanded', 'false'));
+	});
+
+	it('closes on a click on something drawn above its backdrop, like the app-wide notice', async () => {
+		const notice = document.createElement('button');
+		notice.textContent = 'Dismiss';
+		notice.style.cssText = 'position: fixed; bottom: 0; left: 0; z-index: 1000';
+		const dismissed = vi.fn();
+		notice.addEventListener('click', dismissed);
+		document.body.append(notice);
+		try {
+			renderSwitcher();
+			await userEvent.click(trigger());
+			await userEvent.click(notice);
+			await vi.waitFor(() => expect(trigger()).toHaveAttribute('aria-expanded', 'false'));
+			// The notice still does what it is for.
+			expect(dismissed).toHaveBeenCalled();
+		} finally {
+			notice.remove();
+		}
+	});
+
+	it('dims the whole screen evenly, not a strip along the top', async () => {
+		const { container } = renderSwitcher();
+		await userEvent.click(trigger());
+		const backdrop = defined(container.querySelector<HTMLElement>('.backdrop'), 'the backdrop');
+		const box = backdrop.getBoundingClientRect();
+		expect(box.width).toBe(document.documentElement.clientWidth);
+		expect(box.height).toBe(window.innerHeight);
+	});
+
+	it('lets taps through to the page as soon as it closes, while the options are still flying back', async () => {
+		const { container } = renderSwitcher();
+		await userEvent.click(trigger());
+		await fanSettled();
+		await userEvent.keyboard('{Escape}');
+		const backdrop = defined(
+			container.querySelector<HTMLElement>('.backdrop'),
+			'the leaving backdrop'
+		);
+		expect(getComputedStyle(backdrop).pointerEvents).toBe('none');
+	});
+
+	it('stays open when the window is resized, and lays itself out again', async () => {
+		renderSwitcher();
+		await userEvent.click(trigger());
+		globalThis.dispatchEvent(new Event('resize'));
+		await new Promise((done) => requestAnimationFrame(() => done(null)));
+		await new Promise((done) => requestAnimationFrame(() => done(null)));
+		expect(trigger()).toHaveAttribute('aria-expanded', 'true');
+		expect(screen.getByRole('button', { name: 'Show Jun' })).toBeInTheDocument();
+	});
+
+	it('shows the name of the one showing now under its place on the ring', async () => {
+		renderSwitcher({ kind: 'space', spaceId: JUN });
+		await userEvent.click(trigger());
+		const current = await vi.waitFor(() => screen.getByRole('button', { name: 'Show Jun' }));
+		await vi.waitFor(() =>
+			expect(current.querySelector('.slot-name')?.textContent?.trim()).toBe('Jun')
+		);
+		await vi.waitFor(() => expect(getComputedStyle(current).opacity).toBe('1'));
 	});
 
 	it('picks a context: tells the server, then refreshes what depends on it', async () => {
@@ -165,6 +248,7 @@ describe('the fan', () => {
 		pointer('pointerdown', at);
 		// Held: the fan opens to slide in, without letting go.
 		await vi.waitFor(() => expect(control).toHaveAttribute('aria-expanded', 'true'));
+		await fanSettled();
 		const target = screen.getByRole('button', { name: 'Show Me' });
 		const avatar = defined(target.querySelector('.slot-avatar'), 'Me’s avatar');
 		const centre = avatar.getBoundingClientRect();
@@ -182,6 +266,78 @@ describe('the fan', () => {
 				expect.objectContaining({ body: JSON.stringify({ context: SOLO }) })
 			)
 		);
+	});
+
+	it('picks by the wedge the finger is in, not only on the avatar', async () => {
+		const { container } = renderSwitcher({ kind: 'all' });
+		const control = trigger();
+		const box = control.getBoundingClientRect();
+		const pointer = (type: string, point: { clientX: number; clientY: number }) =>
+			control.dispatchEvent(
+				new PointerEvent(type, { bubbles: true, button: 0, pointerId: 11, ...point })
+			);
+		pointer('pointerdown', { clientX: box.left + 10, clientY: box.top + 10 });
+		await vi.waitFor(() => expect(control).toHaveAttribute('aria-expanded', 'true'));
+		await fanSettled();
+		const disk = defined(
+			container.querySelector('[data-fan-disk]'),
+			'the disk'
+		).getBoundingClientRect();
+		const centre = { x: disk.left + disk.width / 2, y: disk.top + disk.height / 2 };
+		const target = screen.getByRole('button', { name: 'Show Jun' });
+		const avatar = defined(
+			target.querySelector('.slot-avatar'),
+			'Jun’s avatar'
+		).getBoundingClientRect();
+		const on = { x: avatar.left + avatar.width / 2, y: avatar.top + avatar.height / 2 };
+		// Halfway in from the avatar to the centre: in Jun's wedge, well off the avatar.
+		const inWedge = {
+			clientX: centre.x + (on.x - centre.x) * 0.5,
+			clientY: centre.y + (on.y - centre.y) * 0.5
+		};
+		expect(Math.hypot(inWedge.clientX - on.x, inWedge.clientY - on.y)).toBeGreaterThan(
+			avatar.width
+		);
+		pointer('pointermove', inWedge);
+		await vi.waitFor(() => expect(target).toHaveClass('hovered'));
+		expect(container.querySelector('.wedge')).toHaveAttribute('data-fan-wedge', JUN);
+		pointer('pointerup', inWedge);
+		await vi.waitFor(() =>
+			expect(fetchMock).toHaveBeenCalledWith(
+				'/api/context',
+				expect.objectContaining({ body: JSON.stringify({ context: JUN }) })
+			)
+		);
+	});
+
+	it('highlights Add partner while sliding over it, and opens it on letting go', async () => {
+		const { container } = renderSwitcher({ kind: 'all' });
+		const control = trigger();
+		const box = control.getBoundingClientRect();
+		const pointer = (type: string, point: { clientX: number; clientY: number }) =>
+			control.dispatchEvent(
+				new PointerEvent(type, { bubbles: true, button: 0, pointerId: 9, ...point })
+			);
+		pointer('pointerdown', { clientX: box.left + 10, clientY: box.top + 10 });
+		await vi.waitFor(() => expect(control).toHaveAttribute('aria-expanded', 'true'));
+		await fanSettled();
+		const add = screen.getByRole('link', { name: 'Add partner' });
+		// Followed, but not out of the test's frame.
+		const followed = vi.fn((event: Event) => event.preventDefault());
+		add.addEventListener('click', followed);
+		const avatar = defined(add.querySelector('.slot-avatar'), 'Add partner’s avatar');
+		const centre = avatar.getBoundingClientRect();
+		const over = {
+			clientX: centre.left + centre.width / 2,
+			clientY: centre.top + centre.height / 2
+		};
+		pointer('pointermove', over);
+		await vi.waitFor(() => expect(add).toHaveClass('hovered'));
+		// The wedge turns to it, and the hint says what letting go does.
+		expect(container.querySelector('.wedge')).toHaveAttribute('data-fan-wedge', 'add');
+		expect(container.querySelector('.hint')?.textContent?.trim()).toBe('Let go to add a partner');
+		pointer('pointerup', over);
+		expect(followed).toHaveBeenCalled();
 	});
 
 	it('stays open, for tapping, when a slide is let go over nothing', async () => {
@@ -202,6 +358,47 @@ describe('the fan', () => {
 		await new Promise((done) => setTimeout(done, 50));
 		expect(control).toHaveAttribute('aria-expanded', 'true');
 		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it('shows its hint last on opening and takes it away first on closing', async () => {
+		const { container } = renderSwitcher();
+		await userEvent.click(trigger());
+		await new Promise((done) => requestAnimationFrame(() => done(null)));
+		const hint = defined(container.querySelector<HTMLElement>('.hint'), 'the hint');
+		// The options are on their way; the hint waits for them.
+		expect(container.querySelector('[data-fan-option]')).not.toBeNull();
+		expect(Number(getComputedStyle(hint).opacity)).toBeLessThan(0.1);
+		await fanSettled();
+		expect(Number(getComputedStyle(hint).opacity)).toBe(1);
+
+		await userEvent.keyboard('{Escape}');
+		await new Promise((done) => setTimeout(done, 160));
+		// Faded out, though it stays in the page until the options are back.
+		expect(Number(getComputedStyle(hint).opacity)).toBeLessThan(0.05);
+		// Me's option, still on its way back to the centre.
+		expect(
+			Number(getComputedStyle(screen.getByRole('button', { name: 'Show Me' })).opacity)
+		).toBeGreaterThan(0.2);
+	});
+
+	it('tells assistive tech what letting go will do while sliding, politely', async () => {
+		const { container } = renderSwitcher({ kind: 'all' });
+		const live = defined(container.querySelector('[aria-live="polite"]'), 'the live region');
+		expect(live.textContent).toBe('');
+		const control = trigger();
+		const box = control.getBoundingClientRect();
+		control.dispatchEvent(
+			new PointerEvent('pointerdown', {
+				bubbles: true,
+				button: 0,
+				pointerId: 5,
+				clientX: box.left + 10,
+				clientY: box.top + 10
+			})
+		);
+		await vi.waitFor(() => expect(live.textContent).toBe('Slide onto one, then let go'));
+		control.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerId: 5 }));
+		await vi.waitFor(() => expect(live.textContent).toBe(''));
 	});
 
 	it('does not move when asked for reduced motion: the fan goes at once', async () => {
