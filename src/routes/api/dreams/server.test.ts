@@ -3,7 +3,8 @@ import { type DreamEvent, readEvents } from '$lib/dream/events';
 import type { PassageRequest } from '$lib/dream/requests';
 import { acceptDisclosure } from '$lib/server/daydreams';
 import type { Db } from '$lib/server/db';
-import { saveCheck } from '$lib/server/model-providers/store';
+import { modelProviders } from '$lib/server/db/schema';
+import { saveCheck, setOverride } from '$lib/server/model-providers/store';
 import type { ServerSettingKey } from '$lib/server-settings';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { fakeEvent, runAndCatch } from '$lib/testing/events';
@@ -56,7 +57,7 @@ beforeEach(async () => {
 	env.OPENROUTER_BASE_URL = 'https://models.test/api/v1';
 	upstream = vi.fn(() => Promise.resolve(sse(`${PROSE.slice(0, 20)}`, PROSE.slice(20))));
 	vi.stubGlobal('fetch', upstream);
-	// Only providers with full adult support are used: one has passed.
+	// Routed to the best tier: open/fp8 passed everything, prude/fp4 two levels.
 	const at = new Date();
 	await saveCheck(db, MODEL, { provider: 'prude/fp4', order: 0, levelPassed: 2, at, reason: null });
 	await saveCheck(db, MODEL, { provider: 'open/fp8', order: 1, levelPassed: 4, at, reason: null });
@@ -192,7 +193,7 @@ describe('POST /api/dreams/passage', () => {
 		expect(String(init.body)).not.toContain('sk-or-test');
 	});
 
-	it('sends only to a provider with full adult support, whatever the heat', async () => {
+	it('sends only to the best tier of providers, whatever the heat', async () => {
 		await read(
 			await passage(
 				event(ada, { json: { ...passageBody, setup: { ...passageBody.setup, heat: 'none' } } })
@@ -206,17 +207,31 @@ describe('POST /api/dreams/passage', () => {
 		});
 	});
 
-	it('refuses, asking nobody, when no provider has full adult support', async () => {
+	it('uses the next tier when that is the best there is', async () => {
 		await saveCheck(db, MODEL, {
 			provider: 'open/fp8',
 			order: 1,
-			levelPassed: 3,
+			levelPassed: 1,
 			at: new Date(),
 			reason: null
 		});
+		await read(await passage(event(ada, { json: passageBody })));
+		const [, init] = upstream.mock.calls[0] as [string, RequestInit];
+		expect(JSON.parse(String(init.body)).provider.order).toEqual(['prude/fp4']);
+	});
+
+	it('goes unpinned for a model never checked', async () => {
+		await db.delete(modelProviders);
+		await read(await passage(event(ada, { json: passageBody })));
+		const [, init] = upstream.mock.calls[0] as [string, RequestInit];
+		expect(JSON.parse(String(init.body)).provider).toEqual({ data_collection: 'deny' });
+	});
+
+	it('refuses, asking nobody, when every provider is ruled out', async () => {
+		await setOverride(db, MODEL, 'open/fp8', 'never');
+		await setOverride(db, MODEL, 'prude/fp4', 'never');
 		const result = await runAndCatch(() => passage(event(ada, { json: passageBody })));
 		expect(result).toMatchObject({ type: 'error', status: 503 });
-		expect(JSON.stringify(result)).toContain('Admin → Server settings');
 		expect(upstream).not.toHaveBeenCalled();
 	});
 

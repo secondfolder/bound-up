@@ -312,25 +312,30 @@ updated with facts, a `<more>` expanded, a scene summarised
 
 ## Adult-friendly providers
 
-**Every request goes only to providers with full adult support**: those that
-passed the highest level of the adult-content check (`REQUIRED_LEVEL` in
-`src/lib/dream/routing.ts`, consent-play fantasy), or that the admin always
-allows, whatever the daydream's heat. A story can go anywhere its user takes
-it, and a provider that passed only the milder levels would refuse part way.
-`routeFor` lists those not backing off. With none, the request is refused
-with a 503 that says an admin can check them, and nothing is sent: there is
-no unpinned fallback that could reach a provider that refuses or filters.
+**Every request goes to the best tier of providers there is**
+(`bestProviders` in `src/lib/model-providers.ts`, whatever the daydream's
+heat). Of the story model's providers not ruled out by the admin and not
+backing off, only those that passed the highest level any of them passed:
+all four levels when any provider passed them all, only the level-2 ones when
+level 2 is the best, and every one when none passed any level, since trying
+them beats not trying. A provider the admin always allows is in every tier.
+A story can go anywhere its user takes it, so the most permissive providers
+there are are the ones worth asking.
 
-The relay (`src/lib/server/dream/relay.ts`) pins each attempt to one of them,
-so the outcome can be credited to it (`recordOutcome`), and tries the next
-once after a refusal, a filtered or empty reply, or a failure before any
-words. The small calls go to the first, and a refusal there counts against
-it too.
+A model never checked goes unpinned, under the model as configured. One
+whose providers are all ruled out or backing off is refused with a 503 that
+says to try again shortly, and nothing is sent.
 
-The bench does the same from `local.db`'s checks (`fullAdultProviders` in
-`scripts/dreams-key.ts`), and refuses to run a model none of whose providers
-has passed. Check a model by making it the story model on a dev server and
-pressing *Check adult content*.
+The relay (`src/lib/server/dream/relay.ts`) pins each attempt to one provider
+of the tier, so the outcome can be credited to it (`recordOutcome`), and
+tries the next once after a refusal, a filtered or empty reply, or a failure
+before any words. A refusal backs the provider off, so later requests drop
+to the next tier until it is usable again. The small calls go to the first
+of the tier, and a refusal there counts against it too.
+
+The bench routes the same way from `local.db`'s checks (`bestTierProviders` in
+`scripts/dreams-key.ts`). Check a model by making it the story model on a dev
+server and pressing *Check adult content*.
 
 ## The pages
 

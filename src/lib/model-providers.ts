@@ -17,9 +17,8 @@ export type ProviderOverride = (typeof OVERRIDES)[number];
 
 /**
  * The adult levels a provider is checked at, mildest first. A provider's
- * level is the highest it passed. The daydream engine uses only providers
- * that passed the highest (`REQUIRED_LEVEL` in `dream/routing.ts`). No level
- * involves minors, or ever will.
+ * level is the highest it passed. The daydream engine uses the best tier
+ * there is (`bestProviders`). No level involves minors, or ever will.
  */
 export const ADULT_LEVELS = [
 	{ level: 1, label: 'Suggestive' },
@@ -162,4 +161,31 @@ export function eligibleProviders(
 		.filter((state) => backoffUntil(state.health, now) === null)
 		.sort((a, b) => a.order - b.order)
 		.map((state) => state.provider);
+}
+
+/**
+ * The providers the daydream engine routes to: the best tier there is. Of
+ * those not ruled out and not backing off, only the ones that passed the
+ * highest level any of them passed, so all four levels when any provider
+ * passed them, the second when that is the best, and every one when none
+ * passed any (or none is checked yet), since trying them beats not trying.
+ * An endpoint the admin always allows is in every tier. Cheapest first.
+ */
+export function bestProviders(
+	states: readonly ProviderState[],
+	now: Date
+): { providers: string[]; level: AdultLevel } {
+	const usable = states
+		.filter((state) => state.override !== 'never')
+		.filter((state) => backoffUntil(state.health, now) === null);
+	const level = usable
+		.filter((state) => state.override !== 'always')
+		.reduce<AdultLevel>((best, state) => Math.max(best, state.levelPassed ?? 0) as AdultLevel, 0);
+	return {
+		level,
+		providers: usable
+			.filter((state) => state.override === 'always' || (state.levelPassed ?? 0) === level)
+			.sort((a, b) => a.order - b.order)
+			.map((state) => state.provider)
+	};
 }

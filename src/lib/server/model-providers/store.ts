@@ -1,6 +1,7 @@
 import { and, asc, eq } from 'drizzle-orm';
 import {
 	type AdultLevel,
+	bestProviders,
 	eligibleProviders,
 	HEALTHY,
 	nextHealth,
@@ -145,4 +146,17 @@ export async function recordOutcome(
 /** Where to send a request with content at this level: an ordered provider list, maybe empty. */
 export async function routeFor(db: Db, key: Key, level: AdultLevel, now: Date): Promise<string[]> {
 	return eligibleProviders(await loadProviderStates(db, key), level, now);
+}
+
+/**
+ * The best tier of this model's providers (`bestProviders`), and whether the
+ * model has been checked at all: unchecked, a request goes unpinned.
+ */
+export async function routeToBest(
+	db: Db,
+	key: Key,
+	now: Date
+): Promise<{ checked: boolean; providers: string[]; level: AdultLevel }> {
+	const states = await loadProviderStates(db, key);
+	return { checked: states.length > 0, ...bestProviders(states, now) };
 }

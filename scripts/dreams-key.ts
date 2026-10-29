@@ -5,6 +5,13 @@
  */
 import { join } from 'node:path';
 import { createClient } from '@libsql/client';
+import {
+	type AdultLevel,
+	bestProviders,
+	HEALTHY,
+	type ProviderOverride,
+	type ProviderState
+} from '../src/lib/model-providers.ts';
 
 export const ROOT = new URL('../', import.meta.url).pathname;
 
@@ -33,34 +40,39 @@ export async function apiKey(): Promise<string> {
 }
 
 /**
- * The providers a bench run may use for `model`: only those local.db's
- * adult-content check found to allow everything (the highest level), or that
- * the admin always allows, cheapest first, as the app routes
- * (docs/dreams.md, "Adult-friendly providers"). Throws when there are none,
- * rather than sending anything to a provider that may refuse or filter.
+ * The providers a bench run uses for `model`: the best tier local.db's
+ * adult-content check found (`bestProviders`), as the app routes
+ * (docs/dreams.md, "Adult-friendly providers"). Empty, so unpinned, for a
+ * model never checked there.
  */
-export async function fullAdultProviders(model: string, level: number): Promise<string[]> {
+export async function bestTierProviders(model: string): Promise<string[]> {
 	const listed = model.split('@')[0] ?? model;
 	const db = createClient({ url: `file:${join(ROOT, 'local.db')}` });
-	let providers: string[] = [];
 	try {
 		const result = await db.execute({
-			sql: `select provider from model_providers
-				where model = ? and kind = 'language' and override != 'never'
-				and (override = 'always' or level_passed >= ?)
-				order by list_order, provider`,
-			args: [listed, level]
+			sql: `select provider, level_passed, override, list_order,
+				refusal_backoff_until, error_backoff_until
+				from model_providers where model = ? and kind = 'language'`,
+			args: [listed]
 		});
-		providers = result.rows.map((row) => String(row.provider));
+		const at = (value: unknown) => (value === null ? null : new Date(Number(value)));
+		const states: ProviderState[] = result.rows.map((row) => ({
+			provider: String(row.provider),
+			levelPassed: row.level_passed === null ? null : (Number(row.level_passed) as AdultLevel),
+			checkedAt: null,
+			override: String(row.override) as ProviderOverride,
+			order: Number(row.list_order),
+			health: {
+				...HEALTHY,
+				refusalBackoffUntil: at(row.refusal_backoff_until),
+				errorBackoffUntil: at(row.error_backoff_until)
+			}
+		}));
+		return bestProviders(states, new Date()).providers;
 	} catch {
-		// No local.db, or no table yet: no provider is known to pass.
+		// No local.db, or no table yet: nothing is known, so unpinned.
+		return [];
 	} finally {
 		db.close();
 	}
-	if (providers.length === 0) {
-		throw new Error(
-			`No provider for ${listed} has passed full adult support in local.db. Make it the story model on a dev server and press "Check adult content" under Admin → Server settings → Language models.`
-		);
-	}
-	return providers;
 }

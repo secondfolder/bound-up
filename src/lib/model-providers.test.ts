@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	backoffUntil,
+	bestProviders,
 	classifyReply,
 	eligibleProviders,
 	HEALTHY,
@@ -67,6 +68,43 @@ function state(provider: string, overrides: Partial<ProviderState> = {}): Provid
 		...overrides
 	};
 }
+
+describe('bestProviders', () => {
+	it('uses only the best tier there is: all four levels when any passed them', () => {
+		const states = [
+			state('top-b', { order: 2 }),
+			state('top-a', { order: 1 }),
+			state('mid', { order: 0, levelPassed: 2 })
+		];
+		expect(bestProviders(states, NOW)).toEqual({ level: 4, providers: ['top-a', 'top-b'] });
+	});
+
+	it('drops to the next tier when that is the best, or the best is backing off', () => {
+		const states = [
+			state('top', { health: nextHealth(HEALTHY, 'refused', NOW) }),
+			state('two-a', { levelPassed: 2, order: 1 }),
+			state('two-b', { levelPassed: 2, order: 2 }),
+			state('one', { levelPassed: 1 })
+		];
+		expect(bestProviders(states, NOW)).toEqual({ level: 2, providers: ['two-a', 'two-b'] });
+		// Once its back-off is over, the top tier is back.
+		expect(bestProviders(states, new Date(NOW.getTime() + 11 * 60_000)).providers).toEqual(['top']);
+	});
+
+	it('still tries every provider when none passed any level', () => {
+		const states = [state('a', { levelPassed: 0 }), state('b', { levelPassed: null, order: 1 })];
+		expect(bestProviders(states, NOW)).toEqual({ level: 0, providers: ['a', 'b'] });
+	});
+
+	it('keeps an always-allowed provider in every tier, and never a ruled-out one', () => {
+		const states = [
+			state('top', { override: 'never' }),
+			state('kept', { levelPassed: 0, override: 'always', order: 1 }),
+			state('two', { levelPassed: 2 })
+		];
+		expect(bestProviders(states, NOW)).toEqual({ level: 2, providers: ['two', 'kept'] });
+	});
+});
 
 describe('eligibleProviders', () => {
 	it('routes to providers that passed the level, cheapest first, skipping any backing off', () => {

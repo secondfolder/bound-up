@@ -16,20 +16,19 @@
  * The OpenRouter key comes from OPENROUTER_API_KEY, or else from local.db's
  * server settings (Admin → Server settings), so a dev server's key works as-is.
  * It costs real money: the summary prints what each run spent. It sends only
- * to providers local.db's adult-content check found to allow everything, as
+ * to the best tier of providers local.db's adult-content check found, as
  * the app does.
  */
 import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { REQUIRED_LEVEL } from '../src/lib/dream/routing.ts';
 import { BENCH_BRIEFS, type BenchBrief } from '../src/lib/server/dream/bench/briefs.ts';
 import { isPersona, PERSONAS } from '../src/lib/server/dream/bench/player.ts';
 import { runDocument, summary } from '../src/lib/server/dream/bench/report.ts';
 import { type BenchRun, runBrief } from '../src/lib/server/dream/bench/run.ts';
 import { stream } from '../src/lib/server/dream/openrouter.ts';
-import { apiKey, fullAdultProviders, ROOT } from './dreams-key.ts';
+import { apiKey, bestTierProviders, ROOT } from './dreams-key.ts';
 
 const BASE_URL = process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1';
 
@@ -108,10 +107,10 @@ async function main(): Promise<void> {
 		throw new Error(`Unknown --persona "${persona}". Known: ${Object.keys(PERSONAS).join(', ')}`);
 	}
 	const fingerprintModel = values['fingerprint-model'] ?? models[0] ?? '';
-	// Only providers with full adult support, as the app uses (docs/dreams.md).
+	// The best tier of providers, as the app routes (docs/dreams.md).
 	const routes = new Map<string, string[]>();
 	for (const model of new Set([...models, fingerprintModel])) {
-		routes.set(model, await fullAdultProviders(model, REQUIRED_LEVEL));
+		routes.set(model, await bestTierProviders(model));
 	}
 	const fingerprint = (messages: Parameters<typeof stream>[0]['messages']) =>
 		stream({

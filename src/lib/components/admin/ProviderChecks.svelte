@@ -100,7 +100,7 @@
 	<h3 id="provider-checks-heading">Adult content by provider</h3>
 	<p class="lead">
 		Each provider serving <code>{model}</code> is asked four graded requests, from suggestive to consent-play
-		fantasy, and the new daydream engine sends requests only to providers that passed all four.
+		fantasy, and the new daydream engine sends requests only to the providers that passed the most.
 		A provider that starts refusing is skipped for a while, longer each time.
 	</p>
 	<form method="POST" action="?/checkProviders" use:check.enhance class="check">
