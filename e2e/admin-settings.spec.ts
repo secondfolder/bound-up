@@ -46,8 +46,12 @@ test('an admin sees what is set up, and sends themselves a test email', async ({
 	await expect(email.getByText('Working')).toBeVisible();
 	// A saved credential is never shown, only that there is one and how it ends.
 	const providers = page.getByRole('article', { name: 'Model providers' });
-	await expect(providers.getByText(/Key saved, ending …-key/)).toHaveCount(2);
+	await expect(providers.getByText(/Key saved, ending …-key/)).toHaveCount(3);
 	await expect(page.getByText('e2e-openrouter-key')).toHaveCount(0);
+	// Read aloud: the narrator is the default voice until one is chosen.
+	const voices = page.getByRole('article', { name: 'Voices' });
+	await expect(voices.getByText('Working')).toBeVisible();
+	await expect(voices.getByRole('radio', { name: /Breathy/ })).toBeChecked();
 
 	await clickWaButton(page, 'Send a test email');
 	await expect(email.getByText(`Sent to ${root.email}.`)).toBeVisible();

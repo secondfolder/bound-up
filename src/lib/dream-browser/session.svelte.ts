@@ -186,6 +186,11 @@ export class DreamSession {
 	readonly #userId: string;
 	/** Pages step 1 read and searches it made for the brief on this page, each with how it went. Not stored. */
 	lookups = $state<Lookup[]>([]);
+	/**
+	 * Whether the user is listening to this daydream read aloud, which asks
+	 * passages for delivery cues and sounds. For this page only.
+	 */
+	listening = $state(false);
 	/** Notices for the user, newest last. */
 	notices = $state<DreamNotice[]>([]);
 	readonly #seed: () => number;
@@ -875,7 +880,8 @@ export class DreamSession {
 			summaries: memory.summaries,
 			history: input.pending === null ? [] : memory.history,
 			take: input.take,
-			repeated: repeatedAt(path)
+			repeated: repeatedAt(path),
+			listening: this.listening
 		});
 		body.notThis = input.notThis ?? null;
 		body.steer = input.steer ?? null;

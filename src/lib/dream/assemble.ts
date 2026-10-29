@@ -133,6 +133,12 @@ export function passageRequestFor(
 		history: HistoryEntry[];
 		take: string | null;
 		repeated: string[];
+		/**
+		 * Whether the user is listening: `voice` is on only then, so delivery
+		 * cues and sounds are written for a passage that will be heard
+		 * (docs/dreams.md, "Read aloud").
+		 */
+		listening?: boolean;
 	}
 ): PassageRequest {
 	const { build } = setup;
@@ -140,7 +146,10 @@ export function passageRequestFor(
 		setup: {
 			heat: build.heat,
 			telling: build.telling,
-			capabilities: build.capabilities,
+			capabilities:
+				story.listening && !build.capabilities.includes('voice')
+					? [...build.capabilities, 'voice']
+					: build.capabilities,
 			elements: story.elements,
 			presentation: build.presentation,
 			musts: setup.reading?.musts ?? [],

@@ -266,7 +266,7 @@
 			</header>
 		{:else if kind !== 'texts' && kind !== 'group-chat'}
 			<header class="block-head">
-				<span class="kind">{kindLabel(kind)}</span>
+				<span class="kind" data-unspoken>{kindLabel(kind)}</span>
 				{#if block?.title}<strong>{block.title}</strong>{/if}
 				{#if node.attrs.now}<span class="now">Now: {node.attrs.now}</span>{/if}
 			</header>
@@ -282,7 +282,7 @@
 			<div class="waveform" aria-hidden="true">
 				{#each WAVE as height, index (index)}<span style:height={`${height}%`}></span>{/each}
 			</div>
-			<p class="quiet">Transcript</p>
+			<p class="quiet" data-unspoken>Transcript</p>
 		{/if}
 		{#if LISTED.has(kind) && block?.fields.length === 0 && node.children.every((child) => child.type === 'text')}
 			<ol class="lines">
@@ -343,6 +343,7 @@
 			<!-- A toggle: native, because wa-button forwards no aria-pressed. -->
 			<button
 				type="button"
+				data-unspoken
 				class="remember"
 				aria-pressed={remember}
 				onclick={() => {
@@ -351,9 +352,9 @@
 			>
 				{remember ? '✓ ' : ''}Remember for this daydream
 			</button>
-			<p class="quiet">Or answer in your own words below, or just carry on.</p>
+			<p class="quiet" data-unspoken>Or answer in your own words below, or just carry on.</p>
 		{:else if given}
-			<p class="quiet">You answered: <strong>{given}</strong></p>
+			<p class="quiet" data-unspoken>You answered: <strong>{given}</strong></p>
 		{/if}
 	</section>
 {/snippet}
@@ -374,8 +375,9 @@
 			{/if}
 		{:else if node.name === 'say'}
 			{const who = $derived(node.attrs.who ?? '')}
-			<span class="say" data-shade={speakerShade(who)} data-you={who === 'you'}>
-				<span class="speaker">{who === 'you' ? 'You' : (nameOf.get(who) ?? who)}</span>
+			<!-- `data-who` and `data-how` are for reading aloud: who says it, and how. -->
+			<span class="say" data-shade={speakerShade(who)} data-you={who === 'you'} data-who={who} data-how={node.attrs.how}>
+				<span class="speaker" data-unspoken>{who === 'you' ? 'You' : (nameOf.get(who) ?? who)}</span>
 				{@render tree(node.children)}
 			</span>
 		{:else if BLOCK_TAGS.has(node.name)}
@@ -405,13 +407,13 @@
 			{const changes = $derived(setChanges(node))}
 			<span class="earned">{@render tree(node.children)}</span>
 			{#each Object.entries(changes) as [address, change] (address)}
-				<span class="stat-change">{change} {address.split('.')[1] ?? address}</span>
+				<span class="stat-change" data-unspoken>{change} {address.split('.')[1] ?? address}</span>
 			{/each}
 		{:else if node.name === 'picture'}
 			{const key = $derived(moreKeys.get(node) ?? '')}
 			{const caption = $derived(words(node.children).trim())}
 			{const url = $derived(pictures?.url(key))}
-			<figure class="picture">
+			<figure class="picture" data-unspoken>
 				{#if url}
 					<img src={url} alt={caption || 'A picture from the story'} />
 				{:else if pictures?.making(key) || pictures?.has(key)}
@@ -481,7 +483,10 @@
 				<wa-skeleton class="expanding" effect="sheen"></wa-skeleton>
 			{/if}
 		{:else if TONES.has(node.name)}
-			<span class="tone {node.name}">{@render tree(node.children)}</span>
+			<span class="tone {node.name}" data-tone={node.name} data-how={node.attrs.how}>{@render tree(node.children)}</span>
+		{:else if node.name === 'sound'}
+			<!-- A sound someone makes: shown as an action, read aloud as one. -->
+			<em class="sound" data-who={node.attrs.who}>{words(node.children)}</em>
 		{:else}
 			{@render tree(node.children)}
 		{/if}
@@ -495,7 +500,7 @@
 		{/each}
 	</div>
 	{#if beats.length > 1}
-		<div class="tap-controls">
+		<div class="tap-controls" data-unspoken>
 			<wa-button
 				size="s"
 				appearance="plain"
@@ -664,6 +669,10 @@
 
 	.tone.slow {
 		letter-spacing: 0.04em;
+	}
+
+	.sound {
+		color: var(--wa-color-text-quiet);
 	}
 
 	.roll {

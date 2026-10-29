@@ -79,7 +79,9 @@ export function utterances(runs: readonly SpeechRun[]): Utterance[] {
 	for (const run of runs) {
 		const start = offset;
 		offset += run.text.length;
-		if (current && current.who !== run.who) {
+		// Space between two people's words belongs to neither: it does not
+		// hand the voice back to the narrator.
+		if (current && current.who !== run.who && run.text.trim()) {
 			flush();
 		}
 		if (run.sound) {

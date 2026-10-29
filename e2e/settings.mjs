@@ -42,7 +42,11 @@ export function e2eSettings({ target, outboxDir }) {
 		researchModel: '',
 		runwareApiKey: 'e2e-runware-key',
 		photoModel: JSON.stringify({ provider: 'runware', preset: 'dark-beast' }),
-		illustratedModel: JSON.stringify({ provider: 'runware', preset: 'wai-illustrious' })
+		illustratedModel: JSON.stringify({ provider: 'runware', preset: 'wai-illustrious' }),
+		// Read aloud, against the stub's Fish Audio (`FISH_AUDIO_BASE_URL`).
+		fishAudioApiKey: 'e2e-fish-audio-key',
+		narratorVoice: JSON.stringify({ provider: 'fish', preset: 'breathy' }),
+		voiceDailyCap: ''
 	};
 }
 

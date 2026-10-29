@@ -13,7 +13,14 @@ import { decryptAttachment, encryptAttachment } from '$lib/crypto/messages';
 import { openRecord, sealRecord } from '$lib/crypto/sealed';
 import { vaultById, vaultsSettled } from '$lib/crypto/vaults.svelte';
 import { type DreamEvent, type Ended, readEvents } from '$lib/dream/events';
-import type { BuildRequest, FillRequest, PassageRequest, ReadRequest } from '$lib/dream/requests';
+import type {
+	BuildRequest,
+	FillRequest,
+	PassageRequest,
+	ReadRequest,
+	SpeakRequest
+} from '$lib/dream/requests';
+import type { TimedWord } from '$lib/dream/speech';
 import type {
 	DreamListItemView,
 	DreamPreferencesView,
@@ -375,4 +382,40 @@ export async function openPicture(
 		fileName: 'picture.webp'
 	});
 	return URL.createObjectURL(picture);
+}
+
+/** A clip read aloud: the audio, and its words' timings as the provider placed them. */
+export type SpokenClip = { audio: Blob; words: TimedWord[] };
+
+/**
+ * Reads one utterance aloud (docs/dreams.md, "Read aloud"). The clip comes
+ * in pieces, joined here; each chunk's timings replace the last for it, so
+ * the words are the latest of each, in order.
+ */
+export async function speak(body: SpeakRequest, signal?: AbortSignal): Promise<SpokenClip> {
+	const response = await send('/api/dreams/speak', {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(body),
+		signal
+	});
+	if (!response.body) {
+		throw new DreamRequestError(SERVER_FAILURE, response.status);
+	}
+	const pieces: Uint8Array<ArrayBuffer>[] = [];
+	const timings = new Map<number, TimedWord[]>();
+	let last: DreamEvent | null = null;
+	for await (const event of readEvents(response.body)) {
+		last = event;
+		if (event.type === 'audio') {
+			pieces.push(Uint8Array.from(atob(event.data), (char) => char.charCodeAt(0)));
+		} else if (event.type === 'words') {
+			timings.set(event.seq, event.words);
+		}
+	}
+	if (last?.type !== 'done') {
+		throw new DreamRequestError(last?.type === 'failed' ? last.message : SERVER_FAILURE, 502);
+	}
+	const words = [...timings.entries()].sort(([a], [b]) => a - b).flatMap(([, list]) => list);
+	return { audio: new Blob(pieces, { type: 'audio/mpeg' }), words };
 }

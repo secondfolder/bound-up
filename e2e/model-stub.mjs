@@ -70,8 +70,11 @@
 // ", again", so "More ideas" has something new to add. The one with nobody in charge is a monologue.
 // The night train and the ideas both come with research notes of their own,
 // so a spec can see them kept on the idea, and carried to a picked idea.
+//
+// Fish Audio's speech (`/fish/v1/tts/stream/with-timestamp`) answers any text
+// with 1.2 seconds of silence and a tenth of a second for each of its words.
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { E2E_RESEND_KEY } from './settings.mjs';
@@ -647,7 +650,55 @@ async function email(request, response) {
 	response.end(JSON.stringify({ id: randomUUID() }));
 }
 
+const FISH_KEY = 'e2e-fish-audio-key';
+/** 1.2 seconds of silence, as mp3: something a browser will really play. */
+const SILENCE = readFile(new URL('./silence.mp3', import.meta.url));
+const CUES = /\[[^\]]*\]/g;
+
+/**
+ * Fish Audio's text to speech with timestamps, as it streams it: the clip in
+ * two pieces, then the timings of every word it was given, a tenth of a
+ * second each, cues left out as Fish leaves them out.
+ */
+async function speech(request, response) {
+	if (request.headers.authorization !== `Bearer ${FISH_KEY}`) {
+		response.writeHead(401, { 'content-type': 'application/json' });
+		response.end(JSON.stringify({ status: 401, message: 'Invalid api key' }));
+		return;
+	}
+	let raw = '';
+	for await (const piece of request) {
+		raw += piece;
+	}
+	const { text } = JSON.parse(raw);
+	const words = text.replace(CUES, ' ').split(/\s+/).filter(Boolean);
+	const audio = (await SILENCE).toString('base64');
+	const half = Math.floor(audio.length / 8) * 4;
+	const event = (fields) => `event: message\ndata: ${JSON.stringify(fields)}\n\n`;
+	const base = { content: text, chunk_seq: 0, chunk_audio_offset_sec: 0 };
+	response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
+	response.write(event({ ...base, audio_base64: audio.slice(0, half), alignment: null }));
+	response.end(
+		event({
+			...base,
+			audio_base64: audio.slice(half),
+			alignment: {
+				audio_duration: 1.2,
+				segments: words.map((word, index) => ({
+					text: word,
+					start: index * 0.1,
+					end: (index + 1) * 0.1
+				}))
+			}
+		})
+	);
+}
+
 const server = createServer(async (request, response) => {
+	if (request.method === 'POST' && request.url === '/fish/v1/tts/stream/with-timestamp') {
+		await speech(request, response);
+		return;
+	}
 	if (request.method === 'POST' && request.url === '/resend/emails') {
 		await email(request, response);
 		return;

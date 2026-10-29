@@ -370,6 +370,42 @@ test.describe('daydreams, the new engine', () => {
 		await expect(page.getByRole('heading', { name: 'The Keeper (changed)' })).toBeVisible();
 	});
 
+	test('a passage is read aloud only when asked, with its words lit as they are said', async ({
+		page
+	}) => {
+		const who = await dreamer(page);
+		await grantFeature(who.email, 'dreamVoice');
+		await start(page, 'A quiet evening');
+		await expect(page.getByRole('heading', { name: 'The Keeper' })).toBeVisible();
+		await saved(page);
+
+		// Nothing plays, and there is no player, until it is asked for.
+		const player = page.getByRole('region', { name: 'Reading aloud' });
+		await expect(player).toHaveCount(0);
+		await page.getByRole('button', { name: 'Read aloud' }).click();
+		await expect(player).toContainText('Tap Listen on a passage');
+
+		const spoken = page.waitForRequest((request) => request.url().endsWith('/api/dreams/speak'));
+		await page.locator('li.passage').last().locator('wa-button', { hasText: 'Listen' }).click();
+		const sent = (await spoken).postDataJSON();
+		expect(sent.text.length).toBeGreaterThan(0);
+		expect(sent.voice).toMatch(/^[a-z-]+$/);
+		// The words are lit as the stand-in's timings say they are said, and
+		// the light goes out when the passage has been read.
+		await expect
+			.poll(() => page.evaluate(() => CSS.highlights.has('dream-reading')), { timeout: 10_000 })
+			.toBe(true);
+		await expect(player).toContainText('Tap Listen on a passage', { timeout: 20_000 });
+		expect(await page.evaluate(() => CSS.highlights.has('dream-reading'))).toBe(false);
+
+		// Listening, the next passage is asked for delivery cues and sounds.
+		const next = page.waitForRequest((request) => request.url().endsWith('/api/dreams/passage'));
+		await box(page, 'Your turn').fill('I wait.');
+		await clickWaButton(page, 'Send');
+		expect((await next).postDataJSON().setup.capabilities).toContain('voice');
+		await saved(page);
+	});
+
 	test('is only for an account with the feature', async ({ page }) => {
 		await newAccount(page, account('Nobody'));
 		const response = await page.goto('/dreams');

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DreamPreference, DreamSetup } from '../sealed-kinds/dreams';
-import { recentFrom, wordPreferences } from './assemble';
+import { defined } from '../testing/defined';
+import { passageRequestFor, recentFrom, wordPreferences } from './assemble';
 import { codePick, newSetup, withReading } from './setup-flow';
 
 const pref = (text: string, firmness: DreamPreference['firmness']): DreamPreference => ({
@@ -71,5 +72,16 @@ describe('recentFrom', () => {
 		);
 		expect(recent.directions).toEqual(['Weekly reports.']);
 		expect(recent.names).toEqual(['Ines Varga', 'Ines', 'Varga', 'Hal Brine', 'Hal', 'Brine']);
+	});
+
+	it('asks for delivery cues and sounds only while the user is listening', () => {
+		const setup = built('a brief', 'A direction.', 'Ines Varga');
+		const story = { elements: [], summaries: [], history: [], take: null, repeated: [] };
+		const worded = { limits: [], preferences: [] };
+		const build = defined(setup.build, 'the build');
+		const request = (listening: boolean) =>
+			passageRequestFor({ ...setup, build }, worded, { ...story, listening });
+		expect(request(false).setup.capabilities).not.toContain('voice');
+		expect(request(true).setup.capabilities).toContain('voice');
 	});
 });

@@ -1,12 +1,16 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount, tick } from 'svelte';
+	import type { Attachment } from 'svelte/attachments';
 	import ResponsiveDialog from '$lib/components/ResponsiveDialog.svelte';
 	import { unlockedIdentity } from '$lib/crypto/session.svelte';
 	import { linkableNames } from '$lib/dream/elements';
 	import { fieldKey } from '$lib/dream/fields';
+	import { voiceForSpeaker } from '$lib/dream/voices';
+	import { ReadAloud, SPEEDS } from '$lib/dream-browser/reader.svelte';
 	import type { DreamSession } from '$lib/dream-browser/session.svelte';
 	import { type DraftSession, openDraft } from '$lib/messaging/drafts';
 	import { MAX_INPUT_CHARS, MAX_PASSAGE_CHARS } from '$lib/sealed-kinds/dreams';
+	import type { FishVoicePresetId } from '$lib/server-settings';
 	import DreamCard from './DreamCard.svelte';
 	import DreamMarkup, { type MarkupInputs } from './DreamMarkup.svelte';
 	import DreamNotices from './DreamNotices.svelte';
@@ -18,8 +22,16 @@
 	 * and the user's turn. Retry, Another take and Edit each add a version
 	 * beside the passage rather than replacing it.
 	 */
-	let { session, pictures: picturesOn = false }: { session: DreamSession; pictures?: boolean } =
-		$props();
+	let {
+		session,
+		pictures: picturesOn = false,
+		voice = null
+	}: {
+		session: DreamSession;
+		pictures?: boolean;
+		/** Read aloud, when this server and account have it. */
+		voice?: { narratorPreset: FishVoicePresetId | null } | null;
+	} = $props();
 
 	const pictures = $derived({
 		enabled: picturesOn,
@@ -112,6 +124,94 @@
 		inputsDraft?.save({ text, tagIds: [] });
 	});
 
+	// ── read aloud ───────────────────────────────────────────────────────────
+
+	// svelte-ignore state_referenced_locally
+	// Made once: whether this server reads aloud does not change while the
+	// page is open, and the reader holds the clips already fetched.
+	const reader = voice
+		? new ReadAloud({
+				voiceOf: (who) => voiceForSpeaker(who, session.elements, session.id, voice.narratorPreset),
+				nameOf: (who) => speakerName(who)
+			})
+		: null;
+	onDestroy(() => reader?.dispose());
+
+	function speakerName(who: string | null): string {
+		if (who === 'you') {
+			return 'You';
+		}
+		return session.elements.find((element) => element.id === who)?.name ?? 'Narrator';
+	}
+
+	/** The passage's drawn text, which is what is read. */
+	function passageRoot(turnId: string): HTMLElement | null {
+		return document.querySelector<HTMLElement>(`[data-turn="${CSS.escape(turnId)}"] .markup`);
+	}
+
+	function listen(turnId: string, at?: { x: number; y: number }) {
+		const root = passageRoot(turnId);
+		if (reader && root) {
+			reader.play(turnId, root, at);
+		}
+	}
+
+	function toggleListening() {
+		session.listening = !session.listening;
+		if (!session.listening) {
+			reader?.stop();
+			if (reader) {
+				reader.readNew = false;
+			}
+		}
+	}
+
+	/**
+	 * While a passage is being read, a tap on any sentence of it plays from
+	 * there. Only a pointer's shortcut, like the tap-through's tap: Listen and
+	 * the player are the controls for the keyboard and a screen reader.
+	 */
+	function tapToListen(turnId: string): Attachment<HTMLElement> {
+		return (element) => {
+			const onClick = (event: MouseEvent) => {
+				if (
+					reader?.turnId === turnId &&
+					!(
+						event.target instanceof Element &&
+						event.target.closest('button, a, input, wa-input, wa-button')
+					)
+				) {
+					listen(turnId, { x: event.clientX, y: event.clientY });
+				}
+			};
+			element.addEventListener('click', onClick);
+			return () => element.removeEventListener('click', onClick);
+		};
+	}
+
+	function nextSpeed() {
+		if (reader) {
+			const at = SPEEDS.indexOf(reader.rate as (typeof SPEEDS)[number]);
+			reader.setRate(SPEEDS[(at + 1) % SPEEDS.length] ?? 1);
+		}
+	}
+
+	// "Read new passages": each passage that arrives from here on is read
+	// once it is finished, never one that was already there.
+	let lastHeard: string | null = null;
+	$effect(() => {
+		const latest = session.lastPassage?.id ?? null;
+		const streaming = session.streaming !== null;
+		if (latest === lastHeard || streaming) {
+			return;
+		}
+		const previous = lastHeard;
+		lastHeard = latest;
+		if (previous !== null && latest !== null && reader?.readNew && session.listening) {
+			void tick().then(() => listen(latest));
+		}
+	});
+
 	// ── how it looks ─────────────────────────────────────────────────────────
 
 	const theme = $derived(build?.presentation.theme ?? 'rust');
@@ -174,10 +274,19 @@
 			<div class="title-line">
 				<h2>{build.title}</h2>
 				<!-- A toggle: native, because wa-button forwards no aria-pressed. -->
-				<button type="button" class="view-switch" aria-pressed={view === 'tap'} onclick={switchView}>
-					<wa-icon name="circle-half-stroke" aria-hidden="true"></wa-icon>
-					One beat at a time
-				</button>
+				<span class="switches">
+					{#if reader}
+						<!-- A toggle: native, because wa-button forwards no aria-pressed. -->
+						<button type="button" class="view-switch" aria-pressed={session.listening} onclick={toggleListening}>
+							<wa-icon name="volume-high" aria-hidden="true"></wa-icon>
+							Read aloud
+						</button>
+					{/if}
+					<button type="button" class="view-switch" aria-pressed={view === 'tap'} onclick={switchView}>
+						<wa-icon name="circle-half-stroke" aria-hidden="true"></wa-icon>
+						One beat at a time
+					</button>
+				</span>
 			</div>
 			<wa-details summary="How this daydream was set up">
 				<div class="setup">
@@ -248,7 +357,7 @@
 			{:else}
 				{const versions = $derived(session.versions(entry.id))}
 				{const passage = $derived(entry.turn)}
-				<li class="passage">
+				<li class="passage" data-turn={entry.id} {@attach tapToListen(entry.id)}>
 					<DreamMarkup
 						source={passage.source}
 						turnId={entry.id}
@@ -279,6 +388,12 @@
 						</fieldset>
 					{/if}
 					<div class="passage-actions">
+						{#if reader && session.listening}
+							<wa-button size="s" appearance="plain" onclick={() => listen(entry.id)}>
+								<wa-icon slot="start" name="play" aria-hidden="true"></wa-icon>
+								Listen
+							</wa-button>
+						{/if}
 						{#if versions.ids.length > 1}
 							<span class="versions">
 								<wa-button
@@ -357,6 +472,68 @@
 
 	{#if session.problem}
 		<wa-callout variant="warning">{session.problem}</wa-callout>
+	{/if}
+
+	{#if reader && session.listening}
+		<section class="player" aria-label="Reading aloud">
+			<span class="speaker" aria-live="polite">
+				{#if reader.loading}
+					Getting the voice ready…
+				{:else if reader.turnId}
+					{reader.speaker}
+				{:else}
+					Tap Listen on a passage
+				{/if}
+			</span>
+			<span class="controls">
+				<wa-button size="s" appearance="plain" disabled={reader.turnId === null} onclick={() => reader.back()}>
+					<wa-icon name="backward-step" label="Back a sentence"></wa-icon>
+				</wa-button>
+				{#if reader.playing}
+					<wa-button size="s" appearance="plain" onclick={() => reader.pause()}>
+						<wa-icon name="pause" label="Pause"></wa-icon>
+					</wa-button>
+				{:else}
+					<wa-button
+						size="s"
+						appearance="plain"
+						disabled={reader.turnId === null && session.lastPassage === null}
+						onclick={() => {
+							if (reader.turnId) {
+								reader.resume();
+							} else if (session.lastPassage) {
+								listen(session.lastPassage.id);
+							}
+						}}
+					>
+						<wa-icon name="play" label="Play"></wa-icon>
+					</wa-button>
+				{/if}
+				<wa-button size="s" appearance="plain" onclick={nextSpeed}>
+					<span class="wa-visually-hidden">Speed</span>
+					{reader.rate}×
+				</wa-button>
+			</span>
+			<span class="options">
+				<!-- Toggles: native, because wa-button forwards no aria-pressed. -->
+				<button
+					type="button"
+					class="toggle"
+					aria-pressed={reader.readNew}
+					onclick={() => {
+						reader.readNew = !reader.readNew;
+					}}>{reader.readNew ? '✓ ' : ''}Read new passages</button
+				>
+				<button
+					type="button"
+					class="toggle"
+					aria-pressed={reader.highlight}
+					onclick={() => reader.setHighlight(!reader.highlight)}
+					>{reader.highlight ? '✓ ' : ''}Highlight</button
+				>
+			</span>
+			{#if reader.problem}<p class="problem">{reader.problem}</p>{/if}
+		</section>
 	{/if}
 
 	<div class="compose">
@@ -485,6 +662,12 @@
 		gap: var(--wa-space-s);
 	}
 
+	.switches {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--wa-space-xs);
+	}
+
 	.view-switch {
 		display: inline-flex;
 		align-items: center;
@@ -504,6 +687,67 @@
 
 		&:focus-visible {
 			outline: var(--wa-focus-ring);
+		}
+	}
+
+	/* What is being read, word by word (the reader's CSS highlight). */
+	:global(::highlight(dream-reading)) {
+		background-color: var(--wa-color-brand-fill-quiet);
+		color: inherit;
+	}
+
+	.player {
+		position: sticky;
+		bottom: 0;
+		z-index: 1;
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--wa-space-2xs) var(--wa-space-s);
+		padding: var(--wa-space-xs) var(--wa-space-s);
+		border: 1px solid var(--wa-color-surface-border);
+		border-radius: var(--wa-border-radius-l);
+		background: var(--wa-color-surface-raised);
+
+		.speaker {
+			flex: 1 1 8rem;
+			min-width: 0;
+			font-weight: var(--wa-font-weight-semibold);
+			overflow-wrap: anywhere;
+		}
+
+		.controls,
+		.options {
+			display: flex;
+			align-items: center;
+			gap: var(--wa-space-2xs);
+		}
+
+		.toggle {
+			padding: var(--wa-space-3xs) var(--wa-space-xs);
+			border: 1px solid var(--wa-color-surface-border);
+			border-radius: var(--wa-border-radius-pill);
+			background: transparent;
+			color: inherit;
+			font: inherit;
+			font-size: var(--wa-font-size-xs);
+			cursor: pointer;
+
+			&[aria-pressed='true'] {
+				background: var(--wa-color-brand-fill-quiet);
+			}
+
+			&:focus-visible {
+				outline: var(--wa-focus-ring);
+			}
+		}
+
+		.problem {
+			flex-basis: 100%;
+			margin: 0;
+			color: var(--wa-color-text-quiet);
+			font-size: var(--wa-font-size-s);
 		}
 	}
 

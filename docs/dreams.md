@@ -41,6 +41,7 @@ randomness: the model lists several directions and code picks one.
 | The browser half: requests, sealing, the session | `src/lib/dream-browser/` |
 | The pages and their components | `src/routes/(auth-required)/(app)/dreams/`, `src/lib/components/dreams/` |
 | The simulated player | `src/lib/server/dream/bench/player.ts`, `--persona` |
+| Read aloud: utterances and cues, voices, the reader, Fish Audio | `src/lib/dream/speech.ts`, `voices.ts`, `src/lib/dream-browser/reader.svelte.ts`, `src/lib/server/dream/fish.ts`, `/api/dreams/speak` |
 
 Everything under `src/lib/dream/` is pure and alias-free, and so is everything
 under `src/lib/server/dream/`, so the bench can run it under `tsx` outside
@@ -751,10 +752,106 @@ its pictures by prefix.
 passage a message bubble from the other side) or `monologue` (one voice in
 large, centred lines).
 
+## Read aloud (phase 8)
+
+Any daydream can be listened to, behind a feature of its own,
+`dreamVoice`, because speech costs money per character spoken; a server
+needs a Fish Audio key (Admin → Server settings → Voices,
+[server-settings.md](server-settings.md#voices)).
+
+**Off until asked.** "Read aloud" beside the title turns it on for the page
+(`session.listening`); nothing ever plays on load, because sound in a public
+place is a privacy risk and browsers block it anyway. It adds a Listen button
+to each passage and a player above the input box: who is speaking, back a
+sentence, play and pause, speed (0.75× to 2×, tapping cycles), "Read new
+passages" (each passage that arrives from then on is read once it is
+finished) and "Highlight". While a passage is being read, tapping any
+sentence of it plays from there. Listening also turns the `voice`
+capability on for the passages asked for (`passageRequestFor`), so the story
+model writes delivery cues (`<say how="low, amused">`, `how` on a tone tag)
+and `<sound>`s for them; without listening it never does (see "Tag hygiene").
+
+**What is read is what is drawn** (`passageRuns` in
+`src/lib/dream-browser/reader.svelte.ts`). The reader walks the passage's
+element on the page, so a spoiler is read only once it is open, an expansion
+once it is expanded, a cycling word as it is set, a tap-through passage up to
+the beat shown. Anything marked `data-unspoken` (speaker labels, stat changes,
+a block's kind, the question's hints, pictures) or `aria-hidden`, and every
+button and field, is left out. The markup marks who says what and how:
+`data-who` and `data-how` on speech, `data-tone` on the tone tags, a
+`.sound`. Speaker labels are not read: a line is said in its speaker's
+voice instead.
+
+**Utterances** (`utterances` in `src/lib/dream/speech.ts`): the runs are
+split into a sentence or a few (at a sentence's end once there are about 160
+characters, never past 280), never two speakers in one. A block's edge ends a
+sentence, so a heading is read as one. Cues become Fish's own: free words in
+square brackets, which its S2 models read as directions and do not speak.
+`how` passes straight through, `<whisper>` is `[whispering]`, `<loud>`
+`[shouting]`, `<slow>` `[slowly]` with `[break]` after each sentence, and a
+sound is its words in brackets (`[sighs]`). Square brackets in the text itself
+are dropped, so nothing becomes a cue by accident.
+
+**Voices** (`src/lib/dream/voices.ts`): the narration and the user's own
+lines are in the narrator's voice (a setting); each character is matched by
+code to one of the curated voices (`FISH_VOICE_PRESETS`) from their `voice`
+field, then manner and appearance: never the other gender when the
+description says one (`genderOf`, shared with names), older or younger as
+described, then by how many of the voice's tags the description uses. Among
+the best and anything one short of them, one is chosen by a hash of the
+daydream and the character, so a character keeps their voice, and the same
+description need not sound the same in every daydream. The narrator's own
+preset is left out while there are others. A request names a voice by our id
+(`narrator`, or a preset), never Fish's, so it cannot spend on any voice it
+likes.
+
+**One clip per utterance**, each `POST /api/dreams/speak`, fetched one ahead
+of the one playing so a change of speaker does not wait. The route checks the
+feature, the disclosure and the daily limit (`spendVoice`, counted before the
+request, in UTF-8 bytes as Fish bills; a day is a UTC date), then relays
+Fish's stream (`/v1/tts/stream/with-timestamp`, S2 Pro, mp3) as the engine's
+events: `audio` pieces and `words`, the latest timings for each of Fish's
+chunks. The browser joins the pieces into a clip and keeps it for the page,
+so replaying costs nothing; nothing is stored anywhere, and the server keeps
+only how much was read today (`dream_voice_usage`).
+
+**Highlighting** uses the CSS Custom Highlight API (`::highlight(dream-reading)`),
+which marks a range of the page without changing it. `alignWords` places
+Fish's timed words in the utterance's visible text, each looked for a few
+words on from the last; one it cannot place (a number Fish spelled out) is
+skipped, and the light stays on the word before. Without timings the whole
+utterance is lit. Nothing is guessed at. Auto-scroll keeps the line in view
+and stops once the user scrolls.
+
+**The lock screen** shows "Bound Up" and nothing else (Media Session), with
+play, pause, back and next: it is the most public surface the app has.
+
+**Fish Audio** (`src/lib/server/dream/fish.ts`). Its S2 Pro reads adult text
+as written: measured 2026-10-30 by reading an explicit line in the default
+voice and transcribing the audio with Fish's own speech-to-text, which gave
+it back word for word. Its terms do not address adult content either way.
+Speech is $15 a million bytes, so a 2,000-character passage is about 3¢, and
+the default limit (30,000 a day) about 45¢ an account a day.
+
+**Not done from the plan:**
+
+- Playback starts when a clip is whole, not while it streams (the plan's
+  MediaSource route), and a passage is read once it is finished, not while
+  it is written. Each clip is a sentence or a few, so the wait is a few
+  seconds.
+- Clips are kept for the page only, not cached encrypted on the device.
+- A voice is not changed on a character's card, and the voice field is not
+  written by the build (`voice` is a field the model may use; the matching
+  falls back to manner and appearance).
+- A question's options are not read with it, nor the texts view's messages
+  one at a time; they are read as drawn.
+- No second route through OpenRouter's speech endpoint, and no automated
+  adult-content check for voice providers: the check above was by hand.
+
 ## Not built yet
 
-Read-aloud (phase 8) and the switch-over (phase 9). A block's Done sends
-its fields without the words in the input box. Step 1
+The switch-over (phase 9). A block's Done sends its fields without the words
+in the input box. Step 1
 and the build are still two calls for a spread of 1, and an edit works on the
 source rather than the rendered tree. See the plan. The judge's agreement with your votes
 comes once there are votes to compare.

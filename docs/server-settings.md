@@ -179,12 +179,12 @@ confirm a new account until it is.
 ## Model providers
 
 **Credentials belong to providers, not to models.** A provider —
-OpenRouter, Runware — is a service models run on, and it needs one key: the
+OpenRouter, Runware, Fish Audio — is a service models run on, and it needs one key: the
 account the requests are billed to. `MODEL_PROVIDERS` in `server-settings.ts`
 is the registry: each provider's label, the setting its key is stored under
-(`openrouterApiKey`, `runwareApiKey`), and the hint and placeholder its key
-field shows. `LANGUAGE_PROVIDERS` and `IMAGE_PROVIDERS` say which kinds of
-model each runs — lists rather than a kind per provider, so one that runs both
+(`openrouterApiKey`, `runwareApiKey`, `fishAudioApiKey`), and the hint and
+placeholder its key field shows. `LANGUAGE_PROVIDERS`, `IMAGE_PROVIDERS` and
+`VOICE_PROVIDERS` say which kinds of model each runs — lists rather than a kind per provider, so one that runs both
 is simply in both. Every model setting that chooses a provider uses its key,
 read with `providerCredential`, so a key is set once however many models use
 it.
@@ -312,6 +312,29 @@ a cleared one cleared and the old rows where they were, so a rollback to an
 older build still finds them; this build ignores them, like any key it does
 not know.
 
+## Voices
+
+Read aloud ([dreams.md](dreams.md#read-aloud-phase-8)) speaks through Fish
+Audio, with its key under Model providers. The Voices card holds:
+
+- **The narrator voice** (`narratorVoice`), chosen like a model: a preset by
+  our name (`{"provider":"fish","preset":"breathy"}`), or Custom, any voice in
+  Fish's library by the 32-character id at the end of its page's address
+  (`{"provider":"fish","fishVoiceId":"…"}`). There is no search: Fish's
+  library is browsed on its own site. The presets (`FISH_VOICE_PRESETS`) are
+  public voices chosen from Fish's sensual, seductive and narration tags,
+  never one named after or imitating a real person and never one tagged as a
+  child; each is also a voice characters are matched to. Breathy, the voice
+  the plan was first tried with, is the default.
+- **The daily limit per account** (`voiceDailyCap`), in characters (UTF-8
+  bytes, which is what Fish bills): 30,000 when unset, about 45¢ at Fish's
+  $15 a million.
+
+Without a Fish Audio key there is no reading aloud, and the card says "Not
+set up". The key was first put in `.env` as `FISH_AUDIO_API_KEY` while the
+feature was built; the one-time import below carries it in like the older
+keys, after which it is set here.
+
 ## Adult content by provider
 
 On OpenRouter, a model is served by many providers, as **endpoints**: one per
@@ -395,6 +418,10 @@ once, as `imported`; after that the database owns it and the variable is
 never read for it again. That is what carries an existing deployment across
 without signing everyone out. The admin page notes each old variable still
 set ("ignored; remove it"), which says when it is safe to delete them.
+
+`FISH_AUDIO_API_KEY` is not an old variable but goes the same way: it was
+where the Fish Audio key was put while read-aloud was built, and is imported
+once into `fishAudioApiKey`.
 
 Model variables are translated: `DAYDREAM_MODEL` becomes its preset if it
 matches one's id, else a custom choice; a `RUNWARE_AI_IMAGE_MODEL*` is

@@ -142,6 +142,15 @@ sends what the user writes to a model provider, which nothing else in the app
 does. A server with no OpenRouter key set at Settings → Admin → Server
 settings has no Daydreams whatever is granted; the pages say so.
 
+### Daydreams read aloud
+
+`dreamVoice` lets an account listen to a daydream of the new engine
+(docs/dreams.md, "Read aloud"). Its own feature, beside `dreams`, because
+speech costs money per character spoken on the server's Fish Audio key; each
+account is held to a daily limit set under Voices. `/api/dreams/speak` checks
+it itself, and the story page offers "Read aloud" only to an account that
+holds it, on a server with a key.
+
 ### Debug mode
 
 `debugMode` lets an account switch troubleshooting UI on and off, one device
