@@ -82,11 +82,15 @@ export function historyPassage(source: string, allowed?: ReadonlySet<string>): s
  */
 export function describeTurn(turn: UserTurn): string {
 	const parts: string[] = [];
-	const filled = (turn.choices?.length ?? 0) + (turn.fields?.length ?? 0) > 0;
+	const filled =
+		(turn.choices?.length ?? 0) + (turn.fields?.length ?? 0) + (turn.answers?.length ?? 0) > 0;
 	if (turn.kind === 'words') {
 		parts.push(wrap('user', turn.text));
 	} else if (!filled) {
 		parts.push('The user pressed Continue, without writing anything: carry the story on.');
+	}
+	for (const answer of turn.answers ?? []) {
+		parts.push(`The user answered your question "${answer.id}": ${JSON.stringify(answer.text)}`);
 	}
 	if (turn.choices && turn.choices.length > 0) {
 		parts.push(

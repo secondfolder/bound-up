@@ -11,6 +11,10 @@
 		setValue?: (key: string, value: string) => void;
 		/** Sends what was filled in as the turn: a block's Done button. */
 		done?: () => void;
+		/** Answers the passage's question, remembered for this daydream if asked. */
+		answer?: (question: { id: string; text: string }, answer: string, remember: boolean) => void;
+		/** What was answered, on an earlier passage. */
+		answered?: Readonly<Record<string, string>>;
 	};
 
 	const STILL: MarkupInputs = { live: false, choices: {}, values: {} };
@@ -22,6 +26,7 @@
 		fieldKey,
 		type PassageBlock,
 		type PassageField,
+		passageAsk,
 		passageBlocks,
 		passageCycles
 	} from '$lib/dream/fields';
@@ -103,6 +108,8 @@
 	);
 	const cycleFor = $derived(new Map(passageCycles(nodes).map((cycle) => [cycle.tag, cycle])));
 	const nameOf = $derived(new Map(names.map((entry) => [entry.id, entry.name])));
+	const ask = $derived(passageAsk(nodes));
+	let remember = $state(false);
 
 	let revealed = $state(new Set<MarkupTag>());
 
@@ -266,6 +273,39 @@
 	</section>
 {/snippet}
 
+{#snippet question(asked: NonNullable<typeof ask>)}
+	{const given = $derived(inputs.answered?.[asked.id])}
+	<section class="ask" aria-label="A question">
+		<p class="ask-text">
+			{#if asked.as}<span class="asker">{nameOf.get(asked.as) ?? asked.as}:</span>{/if}
+			{asked.text}
+		</p>
+		{#if live && inputs.answer}
+			<div class="ask-options">
+				{#each asked.options as option (option)}
+					<wa-button size="s" appearance="outlined" onclick={() => inputs.answer?.(asked, option, remember)}
+						>{option}</wa-button
+					>
+				{/each}
+			</div>
+			<!-- A toggle: native, because wa-button forwards no aria-pressed. -->
+			<button
+				type="button"
+				class="remember"
+				aria-pressed={remember}
+				onclick={() => {
+					remember = !remember;
+				}}
+			>
+				{remember ? '✓ ' : ''}Remember for this daydream
+			</button>
+			<p class="quiet">Or answer in your own words below, or just carry on.</p>
+		{:else if given}
+			<p class="quiet">You answered: <strong>{given}</strong></p>
+		{/if}
+	</section>
+{/snippet}
+
 {#snippet tree(list: readonly MarkupNode[])}
 	{#each list as node, index (index)}
 		{#if node.type === 'text'}
@@ -302,7 +342,11 @@
 				{@render tree(node.children)}
 			{/if}
 		{:else if node.name === 'option'}
-			<!-- Options belong to a field, which draws them. -->
+			<!-- Options belong to a field or a question, which draws them. -->
+		{:else if node.name === 'ask'}
+			{#if ask && ask.tag === node}
+				{@render question(ask)}
+			{/if}
 		{:else if node.name === 'cycle'}
 			{const cycle = $derived(cycleFor.get(node))}
 			{#if cycle && cycle.options.length > 0}
@@ -536,6 +580,50 @@
 
 	.tone.slow {
 		letter-spacing: 0.04em;
+	}
+
+	.ask {
+		display: flex;
+		flex-direction: column;
+		gap: var(--wa-space-xs);
+		margin-block: var(--wa-space-s);
+		padding: var(--wa-space-s) var(--wa-space-m);
+		border-left: 3px solid var(--dream-accent, var(--wa-color-brand-on-quiet));
+		white-space: normal;
+
+		p {
+			margin: 0;
+		}
+	}
+
+	.asker {
+		font-weight: var(--wa-font-weight-bold);
+	}
+
+	.ask-options {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--wa-space-2xs);
+	}
+
+	.remember {
+		align-self: flex-start;
+		padding: var(--wa-space-3xs) var(--wa-space-s);
+		border: 1px solid color-mix(in oklab, currentColor 35%, transparent);
+		border-radius: var(--wa-border-radius-pill);
+		background: transparent;
+		color: inherit;
+		font: inherit;
+		font-size: var(--wa-font-size-s);
+		cursor: pointer;
+
+		&[aria-pressed='true'] {
+			background: var(--wa-color-brand-fill-quiet);
+		}
+
+		&:focus-visible {
+			outline: var(--wa-focus-ring);
+		}
 	}
 
 	/* ── blocks ─────────────────────────────────────────────────────────── */

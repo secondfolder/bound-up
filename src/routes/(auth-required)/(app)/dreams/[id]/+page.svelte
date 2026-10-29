@@ -4,8 +4,6 @@
 	import DreamSetupView from '$lib/components/dreams/DreamSetupView.svelte';
 	import DreamStory from '$lib/components/dreams/DreamStory.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
-	import { wordPreferences } from '$lib/dream/assemble';
-	import { cryptoRandom } from '$lib/dream/random';
 	import { readPreferences } from '$lib/dream-browser/api';
 	import { DreamSession } from '$lib/dream-browser/session.svelte';
 	import { reportRequestFailure } from '$lib/request-failure.svelte';
@@ -26,18 +24,12 @@
 		// holds the story from here on.
 		const view = data.dream;
 		readPreferences()
-			.then(async ({ preferences }) => {
+			.then(async ({ revision, preferences }) => {
 				const opened = new DreamSession(view.id, {
-					worded: wordPreferences(preferences.preferences, [])
+					userId: data.userId,
+					general: { revision, preferences: preferences.preferences }
 				});
 				await opened.load(view);
-				if (opened.setup) {
-					opened.worded = wordPreferences(
-						preferences.preferences,
-						opened.setup.preferences,
-						cryptoRandom
-					);
-				}
 				session = opened;
 				if (data.available && (opened.step !== 'ready' || opened.path.length === 0)) {
 					await opened.runSetup();

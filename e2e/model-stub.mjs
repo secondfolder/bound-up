@@ -237,7 +237,15 @@ function dreamReplyFor(messages) {
 				? '<ask id="who" keep="story">Who is in charge?<option>You are</option><option>They are</option></ask>'
 				: '';
 		const pick = user.includes('[pick]') ? '<pick by="user">The brief asks to choose.</pick>' : '';
-		return `${pick}<musts>\n- a quiet evening\n</musts>\n<research needed="no"/>\n<spread n="3">Open, but small.</spread>\n<directions>\n<direction p="0.5">A lesson in a lighthouse.</direction>\n<direction p="0.3">Letters left under a door.</direction>\n<direction p="0.2">A night train with one other passenger.</direction>\n</directions>\n${ask}`;
+		// What step 1 was asked to keep in mind, shown back as a must, so a
+		// spec can see a remembered preference reach the next daydream.
+		const kept = user
+			.split('<preferences>\n')[1]
+			?.split('\n</preferences>')[0]
+			?.split('\n')[0]
+			?.replace(/^- /, '');
+		const keptMust = kept ? `\n- keeping in mind: ${kept}` : '';
+		return `${pick}<musts>\n- a quiet evening${keptMust}\n</musts>\n<research needed="no"/>\n<spread n="3">Open, but small.</spread>\n<directions>\n<direction p="0.5">A lesson in a lighthouse.</direction>\n<direction p="0.3">Letters left under a door.</direction>\n<direction p="0.2">A night train with one other passenger.</direction>\n</directions>\n${ask}`;
 	}
 	if (system.includes('This step builds the daydream')) {
 		const changed = user.includes('<changes>') ? ' (changed)' : '';
@@ -267,6 +275,13 @@ function dreamReplyFor(messages) {
 		const steer = user.split('taking it in this direction: ')[1]?.split('\n')[0];
 		if (steer) {
 			return `Instead: ${steer}\n<after>\n{"next":"n"}\n</after>`;
+		}
+		if (user.includes('[ask]')) {
+			return 'Ottilie studies you. <ask id="pace" as="ottilie" keep="story">Slower, or faster?<option>Slower</option><option>Faster</option></ask>\n<after>\n{"next":"n"}\n{"pref":"Quiet, unhurried scenes","scope":"story","firmness":"leaning"}\n{"telling":"Now told as letters between you."}\n</after>';
+		}
+		const answered = user.split('\n').find((line) => line.startsWith('The user answered'));
+		if (answered) {
+			return `Ottilie nods. ${answered}\n<after>\n{"next":"n"}\n</after>`;
 		}
 		if (user.includes('[contract]')) {
 			return 'Ottilie slides a page across. Use <cycle id="pen" label="the pen">blue ink|red ink</cycle>.\n<block kind="contract" title="Terms">\n<field id="c1" type="initial">You will kneel when I enter.</field>\n<field id="sig" type="sign">Sign here</field>\n</block>\n<after>\n{"next":"She reads it."}\n</after>';

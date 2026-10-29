@@ -153,3 +153,38 @@ export function turnInputs(
 	);
 	return { cycles, fields };
 }
+
+export type PassageAsk = {
+	tag: MarkupTag;
+	id: string;
+	text: string;
+	options: string[];
+	/** The element asking, in character; null when asked plainly. */
+	as: string | null;
+};
+
+/**
+ * The passage's question, if it asked one. At most one counts: any after the
+ * first are dropped (docs/dreams.md, "Questions").
+ */
+export function passageAsk(nodes: readonly MarkupNode[]): PassageAsk | null {
+	const [tag] = findTags(nodes, 'ask');
+	if (!tag) {
+		return null;
+	}
+	const options = findTags(tag.children, 'option')
+		.map((option) => plainText(option.children).trim())
+		.filter(Boolean);
+	const text = plainText(
+		tag.children.filter((child) => !(child.type === 'tag' && child.name === 'option'))
+	).trim();
+	return text
+		? {
+				tag,
+				id: slug(tag.attrs.id ?? '', 'question'),
+				text,
+				options,
+				as: tag.attrs.as?.trim() || null
+			}
+		: null;
+}

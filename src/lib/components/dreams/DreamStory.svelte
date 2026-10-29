@@ -9,6 +9,7 @@
 	import { MAX_INPUT_CHARS, MAX_PASSAGE_CHARS } from '$lib/sealed-kinds/dreams';
 	import DreamCard from './DreamCard.svelte';
 	import DreamMarkup, { type MarkupInputs } from './DreamMarkup.svelte';
+	import DreamNotices from './DreamNotices.svelte';
 	import DreamTextBox from './DreamTextBox.svelte';
 
 	/**
@@ -52,7 +53,9 @@
 				values: session.values,
 				setChoice: (id, value) => session.setChoice(id, value),
 				setValue: (key, value) => session.setValue(key, value),
-				done: () => void session.send('')
+				done: () => void session.send(''),
+				answer: (question, answer, remember) =>
+					void session.answerQuestion(question, answer, remember)
 			};
 		}
 		const after = session.path[index + 1]?.turn;
@@ -64,7 +67,8 @@
 			choices: Object.fromEntries(after.cycles.map((cycle) => [cycle.id, cycle.value])),
 			values: Object.fromEntries(
 				after.fields.map((field) => [fieldKey(field.block, field.name), field.value])
-			)
+			),
+			answered: Object.fromEntries(after.answers.map((answer) => [answer.id, answer.text]))
 		};
 	}
 
@@ -152,6 +156,24 @@
 								<wa-button size="s" appearance="outlined" onclick={() => openCard(element.id)}>{element.name}</wa-button>
 							{/each}
 						</div>
+					{/if}
+					{#if (session.setup?.preferences.length ?? 0) > 0}
+						<section class="this-daydream">
+							<h3>Remembered for this daydream</h3>
+							<ul>
+								{#each session.setup?.preferences ?? [] as preference (preference.id)}
+									<li>
+										<span>{preference.text}</span>
+										<wa-button size="s" appearance="plain" onclick={() => session.makeGeneral(preference.id)}
+											>Make it general</wa-button
+										>
+										<wa-button size="s" appearance="plain" onclick={() => session.forget(preference.id)}
+											>Forget</wa-button
+										>
+									</li>
+								{/each}
+							</ul>
+						</section>
 					{/if}
 				</div>
 			</wa-details>
@@ -277,6 +299,8 @@
 		{/if}
 	</ol>
 
+	<DreamNotices {session} />
+
 	{#if session.problem}
 		<wa-callout variant="warning">{session.problem}</wa-callout>
 	{/if}
@@ -395,6 +419,30 @@
 
 		p {
 			margin: 0;
+		}
+	}
+
+	.this-daydream {
+		h3 {
+			margin: 0 0 var(--wa-space-2xs);
+			font-size: var(--wa-font-size-s);
+		}
+
+		ul {
+			margin: 0;
+			padding: 0;
+			list-style: none;
+		}
+
+		li {
+			display: flex;
+			flex-wrap: wrap;
+			align-items: center;
+			gap: var(--wa-space-2xs);
+
+			span {
+				flex: 1 1 12rem;
+			}
 		}
 	}
 

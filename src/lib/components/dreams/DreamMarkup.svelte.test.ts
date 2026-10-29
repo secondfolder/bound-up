@@ -144,4 +144,22 @@ describe('DreamMarkup', () => {
 		await userEvent.keyboard(' ');
 		expect(setChoice).toHaveBeenCalledWith('w', 'no');
 	});
+
+	it('asks one question, in character, remembering the answer only when asked', async () => {
+		const answer = vi.fn();
+		draw({
+			source:
+				'<ask id="pace" as="ines">Slower?<option>Yes</option><option>No</option></ask><ask id="extra">Ignored?<option>x</option></ask>',
+			inputs: { live: true, choices: {}, values: {}, answer }
+		});
+		expect(screen.getByText('Ms Varga:')).toBeVisible();
+		expect(screen.queryByText('Ignored?')).toBeNull();
+		await userEvent.click(screen.getByRole('button', { name: 'Remember for this daydream' }));
+		await userEvent.click(screen.getByText('No'));
+		expect(answer).toHaveBeenCalledWith(
+			expect.objectContaining({ id: 'pace', text: 'Slower?' }),
+			'No',
+			true
+		);
+	});
 });

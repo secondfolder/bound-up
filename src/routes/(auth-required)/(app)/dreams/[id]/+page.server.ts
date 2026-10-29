@@ -23,5 +23,5 @@ export const load: PageServerLoad = async ({
 	if (!dream) {
 		error(404, 'That daydream is not there any more.');
 	}
-	return { dream, available: readDaydreamConfig(settings, platform) !== null };
+	return { dream, userId: user.id, available: readDaydreamConfig(settings, platform) !== null };
 };

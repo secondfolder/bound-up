@@ -1,10 +1,13 @@
 <script lang="ts">
+	import RadioButton from '$lib/components/segmented/RadioButton.svelte';
+	import RadioButtonGroup from '$lib/components/segmented/RadioButtonGroup.svelte';
 	import { parseBuild } from '$lib/dream/build';
 	import { parseMarkup, plainText } from '$lib/dream/markup';
 	import { parseBriefReading } from '$lib/dream/reading';
 	import type { DreamSession } from '$lib/dream-browser/session.svelte';
 	import { MAX_AMENDMENT_CHARS } from '$lib/sealed-kinds/dreams';
 	import DreamMarkup from './DreamMarkup.svelte';
+	import DreamNotices from './DreamNotices.svelte';
 	import DreamTextBox from './DreamTextBox.svelte';
 
 	/**
@@ -65,6 +68,9 @@
 	});
 
 	let showIdeas = $state(false);
+	/** Saved for this daydream unless the user says otherwise (docs/dreams.md, "Preferences"). */
+	let remember = $state<'story' | 'general' | 'none'>('story');
+	const worded = $derived(session.worded);
 </script>
 
 <div class="setup">
@@ -109,7 +115,7 @@
 			<h2 id="question">{question.text}</h2>
 			<div class="options">
 				{#each question.options as option (option)}
-					<wa-button appearance="outlined" onclick={() => session.answer(option)}>{option}</wa-button>
+					<wa-button appearance="outlined" onclick={() => session.answer(option, remember)}>{option}</wa-button>
 				{/each}
 			</div>
 			<DreamTextBox
@@ -120,10 +126,15 @@
 				submitLabel="Answer"
 				rows={1}
 				onsend={async (text) => {
-					await session.answer(text);
+					await session.answer(text, remember);
 					return session.problem === null;
 				}}
 			/>
+			<RadioButtonGroup label="Remember the answer for" size="s" bind:value={remember}>
+				<RadioButton value="story">This daydream</RadioButton>
+				<RadioButton value="general">Every daydream</RadioButton>
+				<RadioButton value="none">Don't</RadioButton>
+			</RadioButtonGroup>
 		</section>
 	{/if}
 
@@ -200,6 +211,18 @@
 			<wa-button size="s" appearance="outlined" onclick={() => session.runSetup()}>Try again</wa-button>
 		</wa-callout>
 	{/if}
+
+	{#if worded.limits.length + worded.preferences.length > 0}
+		<!-- So nothing steers the story where the user cannot see it. -->
+		<wa-details summary="What I'm keeping in mind">
+			<ul class="kept">
+				{#each worded.limits as limit (limit)}<li>Never: {limit}</li>{/each}
+				{#each worded.preferences as preference (preference)}<li>{preference}</li>{/each}
+			</ul>
+		</wa-details>
+	{/if}
+
+	<DreamNotices {session} />
 
 	<div class="change">
 		<DreamTextBox
@@ -367,6 +390,11 @@
 		padding: var(--wa-space-m);
 		border-radius: var(--wa-border-radius-m);
 		background: var(--wa-color-surface-raised);
+	}
+
+	.kept {
+		margin: 0;
+		padding-left: 1.25em;
 	}
 
 	.change {

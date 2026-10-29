@@ -345,9 +345,8 @@ Playroom's "Daydreams (new)" tile for an account with the feature:
 - The disclosure first, the same one the old engine asks for.
 - **One box**: "What do you feel like?" Start creates the daydream with just
   the brief, sealed, and goes to its page.
-- **Your limits**: the hard ones among the user's preferences, as a simple
-  list, said to be followed as closely as the model can manage, not
-  guaranteed. The full preferences store comes with phase 5.
+- **What I keep in mind**: a link to the preferences page, where limits
+  live (phase 5).
 - The daydreams so far, titled once built, "being set up" before.
 
 `/dreams/[id]` opens the setup and the branch in the browser and hands them to
@@ -588,10 +587,69 @@ three next-step notes are too alike (word overlap of 0.5 or more), or the user
 has pressed Continue four times running, the next passage is steered the same
 way, with code's pick and no chips.
 
+## Asking and remembering (phase 5)
+
+### Preferences
+
+One store, from "I like surprises" to hard limits
+(`src/lib/dream/preferences.ts`). Each has a firmness: **Never** (`hard`, a
+limit: in the core of every prompt, never left out), **By default**
+(followed unless the brief says otherwise) or **Usually** (a taste, left out
+a quarter of the time). General ones are the user's own
+(`dream-preferences`) and may be limited to a kind of brief ("for training
+stories"), which the prompt asks the model to judge; story ones are saved
+with the daydream's setup.
+
+**Where they come from.** Typed on the preferences page; an answer to a
+question with "Remember" on; or a `{"pref": …}` line the model writes in a
+passage's footer when the user says something about what they want.
+
+**Saved for this story when unsure.** A noticed preference, or an answer
+remembered in play, is kept for this daydream only, since one wrongly made
+general would shape every future story unnoticed. At setup the question's
+"Remember the answer for" defaults to this daydream, and can be every
+daydream or neither. Making one general always takes a tap.
+
+**Always shown, always undoable.** A notice above the input
+(`DreamNotices`) says what was remembered and where, with "Make it general"
+and "Undo". It sits in the page rather than floating as a toast, so its
+buttons stay put and it is announced as it arrives. A noticed preference
+the user already has is not saved again. The story's own preferences are
+listed under "How this daydream was set up", each with "Make it general"
+and "Forget".
+
+**The preferences page** (`/dreams/preferences`, "What I keep in mind")
+lists the user's own preferences by firmness, each with where it came from,
+and adds new ones, limits included: the simple limits list from phase 2
+moved here. A story preference that turns up in three daydreams or more is
+suggested as general there (`promotable`), never made so by itself. Saving
+is compare-and-swap; when another device saved first, nothing is merged
+(that would bring back one just removed): the stored ones are shown and the
+user tries again.
+
+**Seeing why.** The setup page lists "What I'm keeping in mind": the limits
+and the preferences in play for this daydream, as the prompts get them.
+
+### Questions in play
+
+With the questions capability a passage may ask one question,
+`<ask id="pace" as="ottilie">…<option>…</option></ask>`, in a character's
+voice (`as`) or plainly; any after the first are dropped (`passageAsk`).
+It shows its options and a "Remember for this daydream" toggle. Tapping an
+option sends it as the turn (`answers` on the input turn), which the model
+reads as `The user answered your question "pace": "Slower"`. Typing anything
+else, or carrying on, counts as an answer too. Earlier passages show what
+was answered.
+
+### Telling notes that change with the story
+
+When the story's shape changes, a passage's footer may propose new telling
+notes (`{"telling": …}`). They are shown in a notice with "Use these" and
+"Keep as it is", and applied only if accepted.
+
 ## Not built yet
 
-Every later phase: preferences and in-play questions (answers, which
-`dream-turn` can already hold), research, stats, dice and rolls, decks,
+Every later phase: research, stats, dice and rolls, decks,
 pictures and the texts and monologue views, read-aloud. A block's Done sends
 its fields without the words in the input box. Step 1
 and the build are still two calls for a spread of 1, and an edit works on the

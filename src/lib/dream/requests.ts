@@ -72,6 +72,10 @@ const turnExtras = {
 	fields: z
 		.array(z.object({ block: slug, name: required(60), value: z.string().max(1000) }))
 		.max(30)
+		.optional(),
+	answers: z
+		.array(z.object({ id: slug, text: required(400) }))
+		.max(2)
 		.optional()
 };
 

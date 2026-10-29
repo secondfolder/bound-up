@@ -29,14 +29,18 @@ export type TurnChoice = { id: string; value: string };
 /** One field of a block as the user left it; an empty value is a skipped field. */
 export type TurnField = { block: string; name: string; value: string };
 
+/** An answer to a question the passage asked (`<ask id>`). */
+export type TurnAnswer = { id: string; text: string };
+
 /**
  * What the user did after a passage, as the prompt describes it: words, or
- * Continue, either with the choices they set and the fields they filled in
- * (docs/dreams.md, "Fields").
+ * Continue, either with the choices they set, the fields they filled in
+ * (docs/dreams.md, "Fields") and the question they answered.
  */
 export type UserTurn = ({ kind: 'continue' } | { kind: 'words'; text: string }) & {
 	choices?: TurnChoice[];
 	fields?: TurnField[];
+	answers?: TurnAnswer[];
 };
 
 export type HistoryEntry = { passage: string; turn: UserTurn };
@@ -61,7 +65,10 @@ export function userTurnOf(input: DreamInputTurn | null): UserTurn {
 	const text = input?.text.trim() ?? '';
 	const extra = {
 		...(input && input.cycles.length > 0 ? { choices: input.cycles } : {}),
-		...(input && input.fields.length > 0 ? { fields: input.fields } : {})
+		...(input && input.fields.length > 0 ? { fields: input.fields } : {}),
+		...(input && input.answers.length > 0
+			? { answers: input.answers.map(({ id, text: answer }) => ({ id, text: answer })) }
+			: {})
 	};
 	return text ? { kind: 'words', text, ...extra } : { kind: 'continue', ...extra };
 }
@@ -293,7 +300,12 @@ export function similarity(a: string, b: string): number {
 }
 
 function isEmptyTurn(turn: DreamInputTurn): boolean {
-	return !turn.text.trim() && turn.cycles.length === 0 && turn.fields.length === 0;
+	return (
+		!turn.text.trim() &&
+		turn.cycles.length === 0 &&
+		turn.fields.length === 0 &&
+		turn.answers.length === 0
+	);
 }
 
 /**
@@ -318,7 +330,8 @@ export function isStuck(path: readonly PathTurn[], pending: UserTurn): boolean {
 	const fresh =
 		pending.kind === 'words' ||
 		(pending.fields?.length ?? 0) > 0 ||
-		(pending.choices?.length ?? 0) > 0;
+		(pending.choices?.length ?? 0) > 0 ||
+		(pending.answers?.length ?? 0) > 0;
 	if (fresh) {
 		return false;
 	}

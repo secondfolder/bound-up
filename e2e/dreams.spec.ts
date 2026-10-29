@@ -61,14 +61,19 @@ test.describe('daydreams, the new engine', () => {
 	test('a brief is read, asks its question, is built and opens, all sealed', async ({ page }) => {
 		await dreamer(page);
 
-		// A limit, kept with the user's preferences.
-		await page.getByText(/^Your limits/).click();
-		await box(page, 'Add a limit').fill('Nothing about feet');
+		// A limit, kept with the user's preferences, and shown as kept in mind.
+		await page.getByRole('link', { name: 'What I keep in mind' }).click();
+		await waitForHydration(page);
+		await box(page, 'Add a preference').fill('Nothing about feet');
 		await clickWaButton(page, 'Add');
-		await expect(page.getByText('Nothing about feet')).toBeVisible();
+		await expect(page.getByRole('region', { name: 'Never' })).toContainText('Nothing about feet');
+		await page.goto('/dreams');
+		await waitForHydration(page);
 
 		const id = await start(page, 'A quiet evening [ask]');
 		await expect(page.getByRole('heading', { name: 'Who is in charge?' })).toBeVisible();
+		await page.getByRole('button', { name: "What I'm keeping in mind" }).click();
+		await expect(page.getByText('Never: Nothing about feet')).toBeVisible();
 		await clickWaButton(page, 'They are');
 
 		await expect(page.getByText('“You came,”').or(page.getByText('"You came,"'))).toBeVisible();
@@ -236,6 +241,58 @@ test.describe('daydreams, the new engine', () => {
 		// What the opening called her still opens her card.
 		await page.locator('ol.turns').getByRole('button', { name: 'Ottilie', exact: true }).click();
 		await expect(card).toBeVisible();
+	});
+
+	test('a question in play, remembered and made general, changes the next daydream', async ({
+		page
+	}) => {
+		await dreamer(page);
+		await start(page, 'A quiet evening');
+		await expect(page.getByRole('heading', { name: 'The Keeper' })).toBeVisible();
+		await saved(page);
+		await box(page, 'Your turn').fill('[ask]');
+		await clickWaButton(page, 'Send');
+		await expect(page.getByText('Slower, or faster?')).toBeVisible();
+		await saved(page);
+
+		// What the model noticed is remembered for this daydream, shown, and undoable.
+		await expect(
+			page.getByText('Remembered for this daydream: Quiet, unhurried scenes')
+		).toBeVisible();
+		await page
+			.getByRole('status')
+			.filter({ hasText: 'Quiet, unhurried scenes' })
+			.getByRole('button', { name: 'Undo' })
+			.click();
+		await expect(page.getByText('Quiet, unhurried scenes')).toHaveCount(0);
+		// New telling notes apply only if accepted.
+		await expect(page.getByText('Now told as letters between you.')).toBeVisible();
+		await clickWaButton(page, 'Keep as it is');
+
+		await page.getByRole('button', { name: 'Remember for this daydream' }).click();
+		await clickWaButton(page, 'Slower');
+		await expect(page.getByText(/^Ottilie nods\./)).toContainText('"pace": "Slower"');
+		await saved(page);
+		await expect(
+			page.getByText('Remembered for this daydream: Slower, or faster? Slower')
+		).toBeVisible();
+		await clickWaButton(page, 'Make it general');
+		await expect(
+			page.getByText('Remembered for every daydream: Slower, or faster? Slower')
+		).toBeVisible();
+
+		// The next daydream keeps it in mind, and says so.
+		await page.goto('/dreams');
+		await waitForHydration(page);
+		await start(page, 'Another evening [ask]');
+		await expect(page.getByRole('heading', { name: 'Who is in charge?' })).toBeVisible();
+		await expect(
+			page.getByText('keeping in mind: By default: Slower, or faster? Slower')
+		).toBeVisible();
+		await page.getByRole('button', { name: "What I'm keeping in mind" }).click();
+		await expect(
+			page.getByText('By default: Slower, or faster? Slower', { exact: true })
+		).toBeVisible();
 	});
 
 	test('a change asked for while it is set up is read in, and shown', async ({ page }) => {

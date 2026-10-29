@@ -12,10 +12,12 @@
 
 import {
 	buildRequestFor,
+	LEANING_DROP,
 	passageRequestFor,
 	readRequestFor,
 	recentFrom,
-	type Worded
+	type Worded,
+	wordPreferences
 } from '$lib/dream/assemble';
 import { parseBuild } from '$lib/dream/build';
 import { parseElements } from '$lib/dream/elements';
@@ -23,6 +25,13 @@ import { turnInputs } from '$lib/dream/fields';
 import { findTag, parseMarkup } from '$lib/dream/markup';
 import { drawNudges } from '$lib/dream/nudges';
 import { pickDirection } from '$lib/dream/pick';
+import {
+	preferenceFromAnswer,
+	preferenceFromFooter,
+	samePreference,
+	withoutPreference,
+	withPreference
+} from '$lib/dream/preferences';
 import { cryptoRandom } from '$lib/dream/random';
 import { parseBriefReading } from '$lib/dream/reading';
 import {
@@ -37,6 +46,7 @@ import {
 import {
 	elementsAt,
 	expansionsAt,
+	footerOf,
 	isStuck,
 	memoryFor,
 	needsFilling,
@@ -51,6 +61,7 @@ import type { DreamTreeNodeView, DreamView } from '$lib/dream/views';
 import type {
 	DreamDetail,
 	DreamPassageTurn,
+	DreamPreference,
 	DreamSetup,
 	DreamSetupBuild,
 	DreamSummary,
@@ -68,8 +79,10 @@ import {
 	openSummary,
 	openTurn,
 	readBranch,
+	readPreferences,
 	type StreamResult,
 	saveDetail,
+	savePreferences,
 	saveSetup,
 	saveSummary,
 	setActiveTurn,
@@ -90,7 +103,31 @@ type Opened<T> = { turnId: string; value: T };
 const RECENT_DREAMS = 20;
 
 /** Seeds for code's draws: random in play, fixed by the simulated player. */
-export type SessionOptions = { seed?: () => number; worded: Worded };
+export type SessionOptions = {
+	/** Seeds for code's draws: random in play, fixed by tests. */
+	seed?: () => number;
+	/** For a "usually" preference's coin: random in play. */
+	random?: () => number;
+	/** Whose preferences these are: the record is sealed to their id. */
+	userId: string;
+	/** The user's own preferences, as stored, and their revision (null before any). */
+	general: { revision: number | null; preferences: DreamPreference[] };
+};
+
+/**
+ * Something the page tells the user about, with what they can do about it
+ * (docs/dreams.md, "Preferences"): a preference just saved, which can be
+ * made general or undone, or new telling notes the story proposes, which
+ * apply only if accepted.
+ */
+type DreamNoticeSaved = {
+	id: string;
+	kind: 'saved';
+	preference: DreamPreference;
+	scope: 'story' | 'general';
+};
+type DreamNoticeTelling = { id: string; kind: 'telling'; text: string };
+export type DreamNotice = DreamNoticeSaved | DreamNoticeTelling;
 
 /** What asked for a passage, from what it is written after. */
 function requestFor(
@@ -138,17 +175,46 @@ export class DreamSession {
 	/** Whether the setup or the story could not be opened on this device. */
 	unreadable = $state(false);
 
-	/** The user's limits and preferences as prompts take them; set again once the setup opens. */
-	worded: Worded;
+	/** The user's own preferences, every daydream's. */
+	general = $state<DreamPreference[]>([]);
+	#generalRevision: number | null;
+	readonly #userId: string;
+	/** Notices for the user, newest last. */
+	notices = $state<DreamNotice[]>([]);
 	readonly #seed: () => number;
+	readonly #random: () => number;
+	/**
+	 * Whether each "usually" preference is in play on this page, decided once,
+	 * so they do not flicker in and out between requests (`LEANING_DROP`).
+	 */
+	readonly #leanings = new Map<string, boolean>();
 	#abort: AbortController | null = null;
 	/** The build a change is to, kept while the page is open (not stored). */
 	#previousBuild: DreamSetupBuild | null = null;
 
 	constructor(id: string, options: SessionOptions) {
 		this.id = id;
-		this.worded = options.worded;
 		this.#seed = options.seed ?? (() => Math.floor(cryptoRandom() * 2 ** 31));
+		this.#random = options.random ?? cryptoRandom;
+		this.#userId = options.userId;
+		this.general = options.general.preferences;
+		this.#generalRevision = options.general.revision;
+	}
+
+	/** The limits and preferences in play, as the prompts take them. */
+	get worded(): Worded {
+		const kept = (entry: DreamPreference) => {
+			if (entry.firmness !== 'leaning') {
+				return true;
+			}
+			let keep = this.#leanings.get(entry.id);
+			if (keep === undefined) {
+				keep = this.#random() >= LEANING_DROP;
+				this.#leanings.set(entry.id, keep);
+			}
+			return keep;
+		};
+		return wordPreferences(this.general.filter(kept), (this.setup?.preferences ?? []).filter(kept));
 	}
 
 	// ── what the page reads ───────────────────────────────────────────────────
@@ -370,15 +436,153 @@ export class DreamSession {
 		}
 	}
 
-	/** Answers step 1's question; it reads the brief again with the answer. */
-	answer(text: string): Promise<void> {
+	/**
+	 * Answers step 1's question; it reads the brief again with the answer.
+	 * Remembered for this daydream (the default) or for every one, or not.
+	 */
+	answer(text: string, remember: 'none' | 'story' | 'general' = 'story'): Promise<void> {
 		const { setup } = this;
-		if (!setup) {
+		const question = setup?.reading?.ask?.text;
+		if (!(setup && question)) {
 			return Promise.resolve();
 		}
-		return this.#attempt(() => this.#saveSetup(withAnswer(setup, text))).then(() =>
-			this.runSetup()
-		);
+		return this.#attempt(async () => {
+			let next = withAnswer(setup, text);
+			if (remember !== 'none') {
+				const preference = preferenceFromAnswer(question, text, this.#random);
+				if (remember === 'story') {
+					next = { ...next, preferences: withPreference(next.preferences, preference) };
+				} else {
+					await this.#saveGeneral(withPreference(this.general, preference));
+				}
+				this.#notify({ kind: 'saved', preference, scope: remember });
+			}
+			await this.#saveSetup(next);
+		}).then(() => this.runSetup());
+	}
+
+	// ── preferences ───────────────────────────────────────────────────────────
+
+	#notify(notice: Omit<DreamNoticeSaved, 'id'> | Omit<DreamNoticeTelling, 'id'>) {
+		this.notices = [...this.notices, { ...notice, id: crypto.randomUUID() } as DreamNotice];
+	}
+
+	dismiss(noticeId: string): void {
+		this.notices = this.notices.filter((notice) => notice.id !== noticeId);
+	}
+
+	/**
+	 * Saves the user's own preferences, compare-and-swap. When another device
+	 * saved first, nothing is merged (a merge would bring back a preference
+	 * just removed): the stored ones are shown, and the user asked to try
+	 * again.
+	 */
+	async #saveGeneral(preferences: DreamPreference[]): Promise<void> {
+		try {
+			this.#generalRevision = await savePreferences(
+				this.#userId,
+				{ preferences },
+				this.#generalRevision
+			);
+			this.general = preferences;
+		} catch (cause) {
+			if (cause instanceof DreamRequestError && cause.status === 409) {
+				const stored = await readPreferences();
+				this.#generalRevision = stored.revision;
+				this.general = stored.preferences.preferences;
+			}
+			throw cause;
+		}
+	}
+
+	/** Keeps a story preference for every daydream instead. */
+	makeGeneral(preferenceId: string): Promise<void> {
+		const { setup } = this;
+		const preference =
+			setup?.preferences.find((entry) => entry.id === preferenceId) ??
+			this.notices
+				.map((notice) => (notice.kind === 'saved' ? notice.preference : null))
+				.find((entry) => entry?.id === preferenceId);
+		if (!(setup && preference)) {
+			return Promise.resolve();
+		}
+		return this.#attempt(async () => {
+			await this.#saveGeneral(withPreference(this.general, preference));
+			await this.#saveSetup({
+				...setup,
+				preferences: withoutPreference(setup.preferences, preferenceId)
+			});
+			this.notices = this.notices.map((notice) =>
+				notice.kind === 'saved' && notice.preference.id === preferenceId
+					? { ...notice, scope: 'general' }
+					: notice
+			);
+		});
+	}
+
+	/** Forgets a preference, from this daydream or every one. */
+	forget(preferenceId: string): Promise<void> {
+		const { setup } = this;
+		return this.#attempt(async () => {
+			if (this.general.some((entry) => entry.id === preferenceId)) {
+				await this.#saveGeneral(withoutPreference(this.general, preferenceId));
+			}
+			if (setup?.preferences.some((entry) => entry.id === preferenceId)) {
+				await this.#saveSetup({
+					...setup,
+					preferences: withoutPreference(setup.preferences, preferenceId)
+				});
+			}
+			this.notices = this.notices.filter(
+				(notice) => !(notice.kind === 'saved' && notice.preference.id === preferenceId)
+			);
+		});
+	}
+
+	/** The story's proposed telling notes, applied only now that the user accepted them. */
+	acceptTelling(noticeId: string): Promise<void> {
+		const notice = this.notices.find((entry) => entry.id === noticeId);
+		const { setup } = this;
+		const build = setup?.build;
+		if (!(notice?.kind === 'telling' && setup && build)) {
+			return Promise.resolve();
+		}
+		const telling = notice.text;
+		return this.#attempt(async () => {
+			await this.#saveSetup({ ...setup, build: { ...build, telling } });
+			this.dismiss(noticeId);
+		});
+	}
+
+	/**
+	 * What a new passage's footer says about the user: a preference the model
+	 * noticed, kept for this story only and shown so it can be made general or
+	 * undone; and new telling notes, shown to be accepted or not.
+	 */
+	async #fromFooter(source: string): Promise<void> {
+		const { setup } = this;
+		if (!setup?.build) {
+			return;
+		}
+		let { preferences } = setup;
+		for (const line of footerOf(source).entries) {
+			if (line.kind === 'pref') {
+				const preference = preferenceFromFooter(line, this.#random);
+				const before = preferences.length;
+				preferences = withPreference(preferences, preference);
+				const known = this.general.some((entry) => samePreference(entry.text, preference.text));
+				if (preferences.length > before && !known) {
+					this.#notify({ kind: 'saved', preference, scope: 'story' });
+				} else {
+					preferences = preferences.slice(0, before);
+				}
+			} else if (line.kind === 'telling' && line.telling !== setup.build.telling) {
+				this.#notify({ kind: 'telling', text: line.telling });
+			}
+		}
+		if (preferences !== setup.preferences) {
+			await this.#saveSetup({ ...setup, preferences });
+		}
 	}
 
 	/** Chooses a direction, stopping a build of another. */
@@ -452,7 +656,10 @@ export class DreamSession {
 	// ── playing ───────────────────────────────────────────────────────────────
 
 	/** The user's turn: what they wrote, or nothing for Continue. */
-	send(text: string): Promise<void> {
+	send(
+		text: string,
+		answers: { id: string; text: string; remember: boolean }[] = []
+	): Promise<void> {
 		const last = this.lastPassage;
 		if (!last) {
 			return Promise.resolve();
@@ -467,9 +674,9 @@ export class DreamSession {
 			let parentId = last.id;
 			let pending: UserTurn = { kind: 'continue' };
 			// A turn is kept when it says something: words, a choice or a field.
-			if (text.trim() || cycles.length > 0 || fields.length > 0) {
+			if (text.trim() || cycles.length > 0 || fields.length > 0 || answers.length > 0) {
 				const id = crypto.randomUUID();
-				const input = { kind: 'input' as const, text, cycles, answers: [], rolls: [], fields };
+				const input = { kind: 'input' as const, text, cycles, answers, rolls: [], fields };
 				await appendTurn(this.id, { id, parentId, role: 'user', content: input });
 				this.#appended({ id, parentId, role: 'user' }, { id, turn: input });
 				parentId = id;
@@ -479,6 +686,28 @@ export class DreamSession {
 			this.values = {};
 			await this.#passage({ parentId, pending, take: null, signal });
 		});
+	}
+
+	/**
+	 * Answers the question the passage asked, as the user's turn. Remembered
+	 * for this daydream at most: an answer given in the story is part of the
+	 * story first, and making it general takes a tap on the notice.
+	 */
+	async answerQuestion(
+		question: { id: string; text: string },
+		answer: string,
+		remember: boolean
+	): Promise<void> {
+		const { setup } = this;
+		if (remember && setup) {
+			const preference = preferenceFromAnswer(question.text, answer, this.#random);
+			const preferences = withPreference(setup.preferences, preference);
+			if (preferences.length > setup.preferences.length) {
+				await this.#attempt(() => this.#saveSetup({ ...setup, preferences }));
+				this.#notify({ kind: 'saved', preference, scope: 'story' });
+			}
+		}
+		await this.send('', [{ id: question.id, text: answer, remember }]);
 	}
 
 	/** Sets a cycling choice in the passage being answered. */
@@ -691,6 +920,9 @@ export class DreamSession {
 			// In the background: nobody waits on these, and a failure costs only
 			// detail, which the next passage's call can still add.
 			void this.#afterPassage(id).catch(() => undefined);
+			if (input.request !== 'edit') {
+				await this.#fromFooter(input.source).catch(() => undefined);
+			}
 		}
 		return id;
 	}
