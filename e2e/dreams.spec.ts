@@ -94,7 +94,7 @@ test.describe('daydreams, the new engine', () => {
 		await page.keyboard.press('Escape');
 
 		// A <more> expands once, in place.
-		await page.getByRole('button', { name: 'a brass key' }).click();
+		await page.getByRole('button', { name: 'Read more: a brass key' }).click();
 		await expect(page.getByText('It is warm from her hand')).toBeVisible();
 	});
 
@@ -132,6 +132,45 @@ test.describe('daydreams, the new engine', () => {
 		await page.getByText('How this daydream was set up').click();
 		await clickWaButton(page, 'The Warden');
 		await expect(page.getByText('Grey coat, ink on his fingers.')).toBeVisible();
+	});
+
+	test('a contract’s fields and a choice arrive as the next turn, and stay as they were sent', async ({
+		page
+	}) => {
+		await dreamer(page);
+		await start(page, 'A quiet evening');
+		await expect(page.getByRole('heading', { name: 'The Keeper' })).toBeVisible();
+		await saved(page);
+
+		await box(page, 'Your turn').fill('[contract]');
+		await clickWaButton(page, 'Send');
+		const contract = page.getByRole('region', { name: 'Terms' });
+		await expect(contract).toBeVisible();
+		await saved(page);
+
+		await page.getByRole('button', { name: 'Change: the pen, now blue ink' }).click();
+		await expect(page.getByRole('button', { name: 'Change: the pen, now red ink' })).toBeVisible();
+		const initial = contract.getByRole('button', { name: 'Initial: You will kneel when I enter.' });
+		await initial.click();
+		await expect(initial).toHaveAttribute('aria-pressed', 'true');
+
+		// Half filled in, and still there after a reload.
+		await page.reload();
+		await waitForHydration(page);
+		await expect(
+			page.getByRole('button', { name: 'Initial: You will kneel when I enter.' })
+		).toHaveAttribute('aria-pressed', 'true');
+
+		await clickWaButton(page, 'Sign and return');
+		await expect(page.getByText(/^Ottilie reads it\./)).toContainText(
+			'c1: "initialled"; sig: skipped'
+		);
+		await expect(page.getByText(/^Ottilie reads it\./)).toContainText('pen = "red ink"');
+		await saved(page);
+		// The contract now shows what was sent, and takes no more.
+		await expect(
+			page.getByRole('button', { name: 'Initial: You will kneel when I enter.' })
+		).toBeDisabled();
 	});
 
 	test('a change asked for while it is set up is read in, and shown', async ({ page }) => {

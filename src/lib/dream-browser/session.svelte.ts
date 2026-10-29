@@ -18,6 +18,7 @@ import {
 } from '$lib/dream/assemble';
 import { parseBuild } from '$lib/dream/build';
 import { parseElements } from '$lib/dream/elements';
+import { turnInputs } from '$lib/dream/fields';
 import { findTag, parseMarkup } from '$lib/dream/markup';
 import { drawNudges } from '$lib/dream/nudges';
 import { cryptoRandom } from '$lib/dream/random';
@@ -114,6 +115,12 @@ export class DreamSession {
 	problem = $state<string | null>(null);
 	/** Cards being filled in and `<more>`s being expanded, by key. */
 	filling = $state<Set<string>>(new Set());
+	/**
+	 * What the user has set in the passage being answered: cycling choices by
+	 * id, and field values by `fieldKey`. Sent with their turn, then cleared.
+	 */
+	choices = $state<Record<string, string>>({});
+	values = $state<Record<string, string>>({});
 	/** Whether the setup or the story could not be opened on this device. */
 	unreadable = $state(false);
 
@@ -360,26 +367,49 @@ export class DreamSession {
 		if (!last) {
 			return Promise.resolve();
 		}
+		const { cycles, fields } = turnInputs(
+			parseMarkup(last.turn.source, { final: true }),
+			this.choices,
+			this.values
+		);
 		return this.#attempt(async (signal) => {
 			let parentId = last.id;
 			let pending: UserTurn = { kind: 'continue' };
-			if (text.trim()) {
+			// A turn is kept when it says something: words, a choice or a field.
+			if (text.trim() || cycles.length > 0 || fields.length > 0) {
 				const id = crypto.randomUUID();
-				const input = {
-					kind: 'input' as const,
-					text,
-					cycles: [],
-					answers: [],
-					rolls: [],
-					fields: []
-				};
+				const input = { kind: 'input' as const, text, cycles, answers: [], rolls: [], fields };
 				await appendTurn(this.id, { id, parentId, role: 'user', content: input });
 				this.#appended({ id, parentId, role: 'user' }, { id, turn: input });
 				parentId = id;
 				pending = userTurnOf(input);
 			}
+			this.choices = {};
+			this.values = {};
 			await this.#passage({ parentId, pending, take: null, signal });
 		});
+	}
+
+	/** Sets a cycling choice in the passage being answered. */
+	setChoice(id: string, value: string): void {
+		this.choices = { ...this.choices, [id]: value };
+	}
+
+	/** Sets a field in the passage being answered (`fieldKey`). */
+	setValue(key: string, value: string): void {
+		this.values = { ...this.values, [key]: value };
+	}
+
+	/** What the user had set and entered, from a draft, if it was for the passage still being answered. */
+	restoreInputs(saved: {
+		turnId: string;
+		choices: Record<string, string>;
+		values: Record<string, string>;
+	}): void {
+		if (saved.turnId === this.lastPassage?.id) {
+			this.choices = saved.choices;
+			this.values = saved.values;
+		}
 	}
 
 	/** Another take: the same events in new words, as a version beside it. */

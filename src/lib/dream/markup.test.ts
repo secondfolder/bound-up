@@ -108,6 +108,33 @@ describe('createMarkupStream', () => {
 		expect(stream.end()).toEqual(parseMarkup(PASSAGE, { final: true }));
 	});
 
+	it('reads a passage of blocks, fields and cycles the same however it is split', () => {
+		const passage = `You read it twice. <cycle id="pen" label="the pen">blue|black</cycle>
+<block kind="contract" title="Terms">
+<field id="c1" type="initial">You will kneel when she enters.</field>
+<field id="c2" type="choice" label="Weekends">Yes<option>Yes</option><option>No</option></field>
+<field id="sig" type="sign">Sign here</field>
+</block>
+<texts><say who="ines">Well?</say><say who="you">Signed.</say></texts>
+<after>
+{"next":"She reads it."}
+</after>`;
+		const whole = parseMarkup(passage, { final: true });
+		for (const size of [1, 2, 3, 5, 8, 13]) {
+			const stream = createMarkupStream();
+			for (const chunk of passage.match(new RegExp(`[\\s\\S]{1,${size}}`, 'g')) ?? []) {
+				stream.push(chunk);
+			}
+			expect(stream.end(), `chunks of ${size}`).toEqual(whole);
+		}
+		for (let at = 0; at <= passage.length; at += 1) {
+			const stream = createMarkupStream();
+			stream.push(passage.slice(0, at));
+			stream.push(passage.slice(at));
+			expect(stream.end(), `split at ${at}`).toEqual(whole);
+		}
+	});
+
 	it('marks a tag still streaming as incomplete', () => {
 		const stream = createMarkupStream();
 		const nodes = stream.push('On the chair. <hidden label="card">Today you will');

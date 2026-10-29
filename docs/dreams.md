@@ -429,11 +429,88 @@ answer, the turn, an edit) keeps an encrypted draft on the device
 (`src/lib/messaging/drafts.ts`, plain-text scopes) until what it holds is
 taken.
 
+## Interactive text (phase 3)
+
+Everything below is drawn by `DreamMarkup`
+(`src/lib/components/dreams/`), from tags the daydream's capabilities
+enabled. Each interactive part is a real button whose name says what it does,
+in reading order, so the keyboard and a screen reader reach all of it:
+
+| Markup | Drawn as | Its name |
+| --- | --- | --- |
+| `<hidden label="the card">…</hidden>` | Blurred until tapped | "Reveal: the card" |
+| `<more>her ring</more>` | Dashed underline; one to three sentences written on tap | "Read more: her ring" |
+| `<cycle id="wear" label="what you wear">a\|b\|c</cycle>` | The first option, in the accent; a tap moves to the next | "Change: what you wear, now a" |
+| `<whisper>`, `<loud>`, `<slow>` | Smaller and quieter, bold, spaced | (text) |
+
+**Passages with interaction.** Only the passage being answered takes input.
+What the user sets there (choices, and fields as below) is kept in the
+session (`choices`, `values`) and in an encrypted draft
+(`dream-inputs`), so half-filled fields survive a reload, and goes with
+their next turn (`turnInputs` in `src/lib/dream/fields.ts`): a choice only
+where it was changed, every field of every block, an untouched field as
+skipped. Earlier passages show what was sent after them, and take no input.
+
+**What the model is told.** The turn reaches the model as the user's words,
+then plain lines (`describeTurn` in `prompts/passage.ts`):
+`The user's choices in the passage: wear = "nothing"` and
+`The user filled in contract-1: c1: "initialled"; sig: skipped`.
+
+**Tag hygiene.** A model imitates its own history: on a 20-passage
+simulated session, a `<sound>` the daydream had not enabled turned up in
+every passage. Passages now go back to the model with any tag their daydream
+did not enable unwrapped to its words (`historyPassage`), and the build no
+longer offers `voice`, which is on only when the user listens.
+
+### The block gallery
+
+`<block kind="…" title="…">`, with `<texts>` and `<letter>` as shorthands
+(`blockKind`). Twelve kinds have their own layout, plus `letter`; every other
+kind is a labelled card in the daydream's theme:
+
+| Kind | Layout |
+| --- | --- |
+| contract | Numbered clauses, a serif face, fields inline, "Sign and return" |
+| rules, schedule | Plain lines as a numbered list; `now="…"` marks the current slot |
+| report | A letterhead with the title and `date` |
+| questionnaire | Fields as a form, "Hand it in" |
+| punch-card | `filled` of `of` stamps |
+| texts, group-chat | Bubbles from `<say who>`, the user's (`who="you"`) on the right; group chat names each sender |
+| email | A From, To, Cc and Subject header from the attributes |
+| voice-note | A waveform and the transcript (read aloud comes with phase 8) |
+| call-response | The leader's lines in bold, a "Say it" button for the user's |
+| lines | The line in a handwriting face, with its counter, "Finish lines" |
+
+**Fields** are one markup for every fill-in block:
+`<field id="c1" type="…">label</field>`, where type is `initial`, `sign`,
+`say` and `check` (toggles, native buttons with `aria-pressed`), `tap-count`
+(`target="20"`, a button that counts, with the count announced), `choice`
+(`<option>`s, as a `RadioButtonGroup`) or `text` (a `wa-input`). Each takes
+its accessible name from its own words ("Initial: You will kneel."). A block
+with fields has a Done button, labelled by its kind, that sends the turn.
+Deck and draw wait for dice in phase 7.
+
+### Views and themes
+
+**Tap-through** shows the passage being answered a beat at a time
+(`splitBeats` in `src/lib/dream/beats.ts`: at `<beat/>` and paragraph breaks,
+never inside a block or a spoiler), with Back and Next buttons and a tap
+anywhere on the passage as a pointer's shortcut. The newest beat fades in,
+unless the device asks for reduced motion. The build suggests the view
+(`presentation.view`); "One beat at a time" switches it, remembered for that
+daydream on the device. Texts and monologue views come with phase 7.
+
+**Themes** are the build's choice from a curated seven (rust, paper, black,
+dusk, clinical, velvet, neon), each a page, ink, accent and face for the
+passages' own area, defined as `--dream-<theme>-*` tokens in
+`src/lib/theme.css`. The app around the story keeps its own palette.
+
 ## Not built yet
 
-Every later phase: interactive text and the block gallery (cycles, answers,
-rolls and fields, which `dream-turn` can already hold), names, preferences,
-research, stats and dice, pictures and the other views, read-aloud. Step 1
+Every later phase: names, preferences and in-play questions (answers, which
+`dream-turn` can already hold), research, stats, dice and rolls, decks,
+pictures and the texts and monologue views, read-aloud. A block's Done sends
+its fields without the words in the input box. Step 1
 and the build are still two calls for a spread of 1, and an edit works on the
 source rather than the rendered tree. Escaping a loop of similar next-step
 notes is not done yet. See the plan. The judge's agreement with your votes

@@ -1,10 +1,14 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import ResponsiveDialog from '$lib/components/ResponsiveDialog.svelte';
+	import { unlockedIdentity } from '$lib/crypto/session.svelte';
 	import { linkableNames } from '$lib/dream/elements';
+	import { fieldKey } from '$lib/dream/fields';
 	import type { DreamSession } from '$lib/dream-browser/session.svelte';
+	import { type DraftSession, openDraft } from '$lib/messaging/drafts';
 	import { MAX_INPUT_CHARS, MAX_PASSAGE_CHARS } from '$lib/sealed-kinds/dreams';
 	import DreamCard from './DreamCard.svelte';
-	import DreamMarkup from './DreamMarkup.svelte';
+	import DreamMarkup, { type MarkupInputs } from './DreamMarkup.svelte';
 	import DreamTextBox from './DreamTextBox.svelte';
 
 	/**
@@ -35,6 +39,84 @@
 		}
 	}
 
+	// ── what the user sets in a passage ─────────────────────────────────────
+
+	const answering = $derived(session.lastPassage?.id ?? null);
+
+	/** The passage being answered takes input; the rest show what was sent after them. */
+	function inputsFor(turnId: string, index: number): MarkupInputs {
+		if (turnId === answering && !session.busy) {
+			return {
+				live: true,
+				choices: session.choices,
+				values: session.values,
+				setChoice: (id, value) => session.setChoice(id, value),
+				setValue: (key, value) => session.setValue(key, value),
+				done: () => void session.send('')
+			};
+		}
+		const after = session.path[index + 1]?.turn;
+		if (after?.kind !== 'input') {
+			return { live: false, choices: {}, values: {} };
+		}
+		return {
+			live: false,
+			choices: Object.fromEntries(after.cycles.map((cycle) => [cycle.id, cycle.value])),
+			values: Object.fromEntries(
+				after.fields.map((field) => [fieldKey(field.block, field.name), field.value])
+			)
+		};
+	}
+
+	// Half-filled fields are kept, encrypted, like anything typed.
+	let inputsDraft: DraftSession | null = null;
+	onMount(() => {
+		void openDraft({ kind: 'dream-inputs', dreamId: session.id }, unlockedIdentity()).then(
+			(draft) => {
+				inputsDraft = draft;
+				try {
+					const saved = draft.initial ? JSON.parse(draft.initial.text) : null;
+					if (saved && typeof saved.turnId === 'string') {
+						session.restoreInputs(saved);
+					}
+				} catch {
+					// A draft that will not read is no draft.
+				}
+			}
+		);
+	});
+	$effect(() => {
+		const set = Object.keys(session.choices).length + Object.keys(session.values).length > 0;
+		const text = set
+			? JSON.stringify({ turnId: answering, choices: session.choices, values: session.values })
+			: '';
+		inputsDraft?.save({ text, tagIds: [] });
+	});
+
+	// ── how it looks ─────────────────────────────────────────────────────────
+
+	const theme = $derived(build?.presentation.theme ?? 'rust');
+	const viewKey = $derived(`bound-up:dream-view:${session.id}`);
+	let chosenView = $state<'scroll' | 'tap' | null>(null);
+	onMount(() => {
+		try {
+			const saved = localStorage.getItem(viewKey);
+			chosenView = saved === 'tap' || saved === 'scroll' ? saved : null;
+		} catch {
+			// Storage refused: the build's suggestion stands.
+		}
+	});
+	const view = $derived(chosenView ?? (build?.presentation.view === 'tap' ? 'tap' : 'scroll'));
+
+	function switchView() {
+		chosenView = view === 'tap' ? 'scroll' : 'tap';
+		try {
+			localStorage.setItem(viewKey, chosenView);
+		} catch {
+			// Remembered for this page only.
+		}
+	}
+
 	const ENDED_NOTES: Record<string, string> = {
 		stopped: 'Stopped before the end.',
 		refused: 'Refused.',
@@ -42,10 +124,24 @@
 	};
 </script>
 
-<div class="story">
+<div
+	class="story"
+	data-theme={theme}
+	style:--dream-page={`var(--dream-${theme}-page)`}
+	style:--dream-ink={`var(--dream-${theme}-ink)`}
+	style:--dream-accent={`var(--dream-${theme}-accent)`}
+	style:--dream-face={`var(--dream-${theme}-face)`}
+>
 	{#if build}
 		<header class="title">
-			<h2>{build.title}</h2>
+			<div class="title-line">
+				<h2>{build.title}</h2>
+				<!-- A toggle: native, because wa-button forwards no aria-pressed. -->
+				<button type="button" class="view-switch" aria-pressed={view === 'tap'} onclick={switchView}>
+					<wa-icon name="circle-half-stroke" aria-hidden="true"></wa-icon>
+					One beat at a time
+				</button>
+			</div>
 			<wa-details summary="How this daydream was set up">
 				<div class="setup">
 					<p><strong>You asked for</strong> “{session.setup?.brief}”</p>
@@ -63,7 +159,7 @@
 	{/if}
 
 	<ol class="turns">
-		{#each session.path as entry (entry.id)}
+		{#each session.path as entry, index (entry.id)}
 			{#if entry.turn === null}
 				<li class="unreadable">This part can't be shown on this device.</li>
 			{:else if entry.turn.kind === 'input'}
@@ -84,6 +180,8 @@
 						{names}
 						{expansions}
 						filling={session.filling}
+						view={entry.id === answering ? view : 'scroll'}
+						inputs={inputsFor(entry.id, index)}
 						onref={openCard}
 						onmore={(key, phrase) => expand(entry.id, key, phrase)}
 					/>
@@ -232,6 +330,36 @@
 		gap: var(--wa-space-m);
 	}
 
+	.title-line {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--wa-space-s);
+	}
+
+	.view-switch {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--wa-space-2xs);
+		padding: var(--wa-space-2xs) var(--wa-space-s);
+		border: 1px solid var(--wa-color-surface-border);
+		border-radius: var(--wa-border-radius-pill);
+		background: transparent;
+		color: inherit;
+		font: inherit;
+		font-size: var(--wa-font-size-s);
+		cursor: pointer;
+
+		&[aria-pressed='true'] {
+			background: var(--wa-color-brand-fill-quiet);
+		}
+
+		&:focus-visible {
+			outline: var(--wa-focus-ring);
+		}
+	}
+
 	.title h2 {
 		margin: 0 0 var(--wa-space-xs);
 	}
@@ -257,9 +385,14 @@
 		gap: var(--wa-space-2xs);
 	}
 
+	/* The daydream's theme is the passages' own: their page, ink and face. */
 	.turns {
+		padding: var(--wa-space-m);
+		border-radius: var(--wa-border-radius-l);
+		background: var(--dream-page);
+		color: var(--dream-ink);
+		font-family: var(--dream-face);
 		margin: 0;
-		padding: 0;
 		list-style: none;
 		display: flex;
 		flex-direction: column;

@@ -240,7 +240,7 @@ function dreamReplyFor(messages) {
 	}
 	if (system.includes('This step builds the daydream')) {
 		const changed = user.includes('<changes>') ? ' (changed)' : '';
-		return `<title>The Keeper${changed}</title>\n<heat level="suggestive"/>\n<telling>\nClose second person, unhurried.\n</telling>\n<presentation view="scroll" theme="dusk">Plain prose.</presentation>\n<capabilities>reveals</capabilities>\n<elements>\n<character id="ottilie" name="Ottilie Brandt" also="Ottilie">\n<manner>Precise, amused.</manner>\n<unspoken shown="no">She has been waiting for you.</unspoken>\n</character>\n</elements>\n<passage>\nThe lamp turns above you. <say who="ottilie">"You came,"</say> Ottilie says, and hands you <more>a brass key</more>.\n<after>\n{"next":"She shows you the stairs."}\n{"new":"character","id":"warden","name":"The Warden","seed":"keeps the logbook"}\n</after>\n</passage>`;
+		return `<title>The Keeper${changed}</title>\n<heat level="suggestive"/>\n<telling>\nClose second person, unhurried.\n</telling>\n<presentation view="scroll" theme="dusk">Plain prose.</presentation>\n<capabilities>reveals, blocks, choices</capabilities>\n<elements>\n<character id="ottilie" name="Ottilie Brandt" also="Ottilie">\n<manner>Precise, amused.</manner>\n<unspoken shown="no">She has been waiting for you.</unspoken>\n</character>\n</elements>\n<passage>\nThe lamp turns above you. <say who="ottilie">"You came,"</say> Ottilie says, and hands you <more>a brass key</more>.\n<after>\n{"next":"She shows you the stairs."}\n{"new":"character","id":"warden","name":"The Warden","seed":"keeps the logbook"}\n</after>\n</passage>`;
 	}
 	if (system.includes("This step keeps the daydream's elements")) {
 		return user.includes('"warden"')
@@ -258,6 +258,17 @@ function dreamReplyFor(messages) {
 		user.includes('Write the next passage now') ||
 		user.includes('Write it again')
 	) {
+		if (user.includes('[contract]')) {
+			return 'Ottilie slides a page across. Use <cycle id="pen" label="the pen">blue ink|red ink</cycle>.\n<block kind="contract" title="Terms">\n<field id="c1" type="initial">You will kneel when I enter.</field>\n<field id="sig" type="sign">Sign here</field>\n</block>\n<after>\n{"next":"She reads it."}\n</after>';
+		}
+		const filled = user
+			.split('\n')
+			.filter(
+				(line) => line.startsWith('The user filled in') || line.startsWith("The user's choices")
+			);
+		if (filled.length > 0) {
+			return `Ottilie reads it. ${filled.join(' ')}\n<after>\n{"next":"n"}\n</after>`;
+		}
 		const said = user.split('<user>\n')[1]?.split('\n</user>')[0] ?? '';
 		const take = user.includes('Write it again') ? 'Again, differently: ' : '';
 		const reply = said
