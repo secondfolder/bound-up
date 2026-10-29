@@ -36,6 +36,8 @@ export type BuildInput = {
 	recentNames: readonly string[];
 	/** Changes the user asked for while it was being set up, oldest first. */
 	amendments?: readonly string[];
+	/** Names drawn by code for the build to choose from (`drawPool`). */
+	namePool?: string;
 	/**
 	 * The build these changes are to, without its passage: rebuilt keeping
 	 * everything the changes do not touch (docs/dreams.md, "The setup page").
@@ -67,7 +69,7 @@ From: ${CAPABILITIES.filter((name) => name !== 'research' && name !== 'voice').j
 
 <elements>
 Anything worth keeping a record of, as tags. The tag is the element's type, and any type is allowed. Known types the app does more with:
-<character id="short-id" name="Their name" also="nicknames, other names">
+<character id="short-id" name="Their name" also="nicknames, other names" name-from="German woman born in the 1970s, uncommon">
   <appearance>what they look like (used for pictures)</appearance>
   <manner>how they behave and speak</manner>
   <background>a little of their history, where it shapes how they act</background>
@@ -79,7 +81,7 @@ Anything worth keeping a record of, as tags. The tag is the element's type, and 
 Fields are free: use the ones above where they fit and invent others.
 Stats, only where the daydream is a progression (a training, a debt, days kept): <stat name="poise" kind="meter|count|list|line" value="20" max="100">what moves it</stat>, inside the element it belongs to.
 Write profiles, not plans: who people are, how they talk, what they want. Never plan events that only happen if something else does. The story is written one passage at a time.
-Names: choose names that suit each person's background and age. Never use any of these, which are overused: ${OVERUSED_NAMES.join(', ')}.
+Names: choose names that suit each person's background and age. Where their background is in the pool of names below, choose from it; otherwise name them yourself. Never use any of these, which are overused: ${OVERUSED_NAMES.join(', ')}. On each character, write name-from="…": a few words on what their name should suit (background, gender, roughly when they were born, how unusual), so another can be drawn for them later.
 </elements>
 
 <passage>
@@ -114,6 +116,9 @@ export function buildMessages(input: BuildInput): ModelMessage[] {
 		parts.push(
 			`Nudges, as suggestions:\n${bulletList(input.nudges.map((nudge) => `${nudge.dimension}: ${nudge.text}`))}`
 		);
+	}
+	if (input.namePool) {
+		parts.push(`A pool of names, drawn at random from real ones by background:\n${input.namePool}`);
 	}
 	if (input.recentNames.length > 0) {
 		parts.push(`Names this user has had recently, to avoid: ${input.recentNames.join(', ')}`);

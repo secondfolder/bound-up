@@ -50,6 +50,16 @@ describe('the setup’s steps', () => {
 		expect(setupStep({ ...setup, build })).toBe('ready');
 	});
 
+	it('tries another idea, leaving out the ones tried, until none is left', () => {
+		const setup = codePick(withReading(newSetup('x'), reading()), 5);
+		const first = setup.chosen?.directionId ?? '';
+		const second = codePick(setup, 6, new Set([first]));
+		expect(second.chosen?.directionId).not.toBe(first);
+		expect(second.build).toBeNull();
+		const none = codePick(setup, 6, new Set(['d1', 'd2']));
+		expect(none).toBe(setup);
+	});
+
 	it('picks the same way from the same seed', () => {
 		const setup = withReading(newSetup('x'), reading());
 		expect(codePick(setup, 99)).toEqual(codePick(setup, 99));

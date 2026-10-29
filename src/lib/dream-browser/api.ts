@@ -13,7 +13,12 @@ import { openRecord, sealRecord } from '$lib/crypto/sealed';
 import { vaultById, vaultsSettled } from '$lib/crypto/vaults.svelte';
 import { type DreamEvent, type Ended, readEvents } from '$lib/dream/events';
 import type { BuildRequest, FillRequest, PassageRequest, ReadRequest } from '$lib/dream/requests';
-import type { DreamPreferencesView, DreamTurnRole, DreamView } from '$lib/dream/views';
+import type {
+	DreamListItemView,
+	DreamPreferencesView,
+	DreamTurnRole,
+	DreamView
+} from '$lib/dream/views';
 import { NETWORK_FAILURE, SERVER_FAILURE, tryFetch } from '$lib/request-failure.svelte';
 import type { SealedKind } from '$lib/sealed';
 import { writableVault } from '$lib/sealed-forms';
@@ -282,4 +287,22 @@ export function fill(body: FillRequest, signal?: AbortSignal): Promise<string> {
 /** Where the story could go next, as `<direction>` tags with likelihoods. */
 export function listDirections(body: PassageRequest, signal?: AbortSignal): Promise<string> {
 	return askWhole('/api/dreams/directions', body, signal);
+}
+
+export async function listDreams(): Promise<DreamListItemView[]> {
+	const response = await send('/api/dreams');
+	return ((await response.json()) as { dreams: DreamListItemView[] }).dreams;
+}
+
+/** Real names drawn for a character's description (`drawNames`). */
+export async function drawNames(
+	description: string,
+	exclude: readonly string[]
+): Promise<{ background: string | null; given: string[]; family: string[] }> {
+	const response = await sendJson('/api/dreams/names', 'POST', { description, exclude });
+	return (await response.json()) as {
+		background: string | null;
+		given: string[];
+		family: string[];
+	};
 }

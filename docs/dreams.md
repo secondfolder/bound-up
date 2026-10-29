@@ -505,13 +505,76 @@ dusk, clinical, velvet, neon), each a page, ink, accent and face for the
 passages' own area, defined as `--dream-<theme>-*` tokens in
 `src/lib/theme.css`. The app around the story keeps its own palette.
 
+## Variety (phase 4)
+
+Every source of randomness is code's, never the model's habits:
+
+- **Nudges**: two or three drawn per step 1 from lists of settings, eras,
+  forms, who holds power and so on (`src/lib/dream/nudges.ts`); the build
+  gets the chosen direction's own draw.
+- **The weighted pick** (`pickDirection`): each direction weighted by its
+  likelihood raised to a power set by the spread, so a wide brief favours
+  the less obvious. "Surprise me" (when the brief asked to choose) is the
+  same pick; "Try another idea" picks again leaving out the ideas tried, and
+  when none is left reads the brief again with them all marked "not these".
+- **Recent directions and names** (`recentFrom` in `src/lib/dream/assemble.ts`):
+  the page opens the user's 20 most recent other daydreams' setups (the
+  server cannot) and sends the directions taken for briefs like this one
+  (word overlap of 0.2 or more), which step 1 is told not to repeat, and
+  every name given, which the build avoids. The plan had a separate
+  `dream-recent` record for this; every setup already holds its brief, its
+  direction and its names, so they are read from there, and a deleted
+  daydream simply drops out.
+- **Leanings left out**: each "usually" preference is left out of a given
+  daydream a quarter of the time (`LEANING_DROP`); limits never are.
+- **Sampling per step** (`src/lib/server/dream/sampling.ts`): hotter where the
+  model lists possibilities (step 1, directions), steadier where it keeps
+  records; the bench uses the same table unless `--temperature` overrides it.
+
+### Names
+
+Models name characters from a tiny set, so code draws real names and the
+model chooses among them (`src/lib/server/dream/names/`):
+
+- **Lists** for twelve broad backgrounds (`lists.ts`), each a few dozen
+  uncommon-but-real first names by gender and family names, hand-compiled to
+  start with; the plan's openly licensed datasets can replace them a
+  background at a time.
+- **The pool**: the build route draws about five names of each gender and
+  four family names per background into the build prompt (`drawPool`),
+  leaving out the overused list and the user's recent names. Every model can
+  use it, so the names tool the plan describes (the model asking with a
+  description, mid-build) waits for phase 6's tool loop.
+- **`name-from`**: the build writes, on each character, what their name
+  should suit ("German woman born in the 1970s, uncommon").
+- **"Another name"** on a card asks `/api/dreams/names` for ten names drawn
+  for that description (`drawNames`: its background and gender, or a broad
+  mix with each pair from one background), leaving out every name in the
+  story. The chosen name is kept from the turn the user is on, and the old
+  one becomes one of its other names, so earlier passages still link to the
+  card.
+
+### Different direction, and escaping a loop
+
+"Different direction" changes what happens, not just the words. The page asks
+`/api/dreams/directions` for where the passage could go instead (the same
+passage prompt, asking for 3 to 5 `<direction p>` lines, the turned-down
+passage marked "not this"), picks one leaning towards the unlikely, and asks
+for the passage with it (`steer`), as a version beside the old one. The other
+directions are offered as chips under it ("Or steer it"); a chip writes the
+passage again taking that direction. Chips last while the page is open.
+
+**Escaping a loop** (`isStuck` in `src/lib/dream/story.ts`): when the last
+three next-step notes are too alike (word overlap of 0.5 or more), or the user
+has pressed Continue four times running, the next passage is steered the same
+way, with code's pick and no chips.
+
 ## Not built yet
 
-Every later phase: names, preferences and in-play questions (answers, which
+Every later phase: preferences and in-play questions (answers, which
 `dream-turn` can already hold), research, stats, dice and rolls, decks,
 pictures and the texts and monologue views, read-aloud. A block's Done sends
 its fields without the words in the input box. Step 1
 and the build are still two calls for a spread of 1, and an edit works on the
-source rather than the rendered tree. Escaping a loop of similar next-step
-notes is not done yet. See the plan. The judge's agreement with your votes
+source rather than the rendered tree. See the plan. The judge's agreement with your votes
 comes once there are votes to compare.

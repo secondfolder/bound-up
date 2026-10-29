@@ -77,16 +77,21 @@ export function withAnswer(setup: DreamSetup, answer: string): DreamSetup {
 /**
  * The direction code picks, leaning towards the less likely (`pickDirection`),
  * with the nudges for the build drawn from the same seed, so a bench run can
- * repeat it exactly.
+ * repeat it exactly. `exclude` leaves out ideas already tried ("Try another
+ * idea"); with none left, nothing changes.
  */
-export function codePick(setup: DreamSetup, seed: number): DreamSetup {
+export function codePick(
+	setup: DreamSetup,
+	seed: number,
+	exclude: ReadonlySet<string> = new Set()
+): DreamSetup {
 	const { reading } = setup;
-	if (!reading || setup.chosen) {
+	if (!reading) {
 		return setup;
 	}
 	const random = seededRandom(seed);
-	const direction = pickDirection(reading.directions, reading.spread.n, random);
-	return direction ? choose(setup, direction.id, 'code', seed, random) : setup;
+	const direction = pickDirection(reading.directions, reading.spread.n, random, exclude);
+	return direction ? choose({ ...setup, build: null }, direction.id, 'code', seed, random) : setup;
 }
 
 /** The user choosing a direction: the build starts again from it. */

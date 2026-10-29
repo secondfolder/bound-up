@@ -312,6 +312,8 @@
 	<DreamCard
 		element={card}
 		filling={session.filling.has(`card:${card.id}`)}
+		ondraw={() => session.namesFor(card.id)}
+		onrename={(name) => session.rename(card.id, name)}
 		onclose={() => {
 			cardId = null;
 		}}

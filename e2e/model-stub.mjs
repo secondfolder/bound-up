@@ -236,11 +236,14 @@ function dreamReplyFor(messages) {
 			user.includes('[ask]') && !user.includes('You asked:')
 				? '<ask id="who" keep="story">Who is in charge?<option>You are</option><option>They are</option></ask>'
 				: '';
-		return `<musts>\n- a quiet evening\n</musts>\n<research needed="no"/>\n<spread n="3">Open, but small.</spread>\n<directions>\n<direction p="0.5">A lesson in a lighthouse.</direction>\n<direction p="0.3">Letters left under a door.</direction>\n<direction p="0.2">A night train with one other passenger.</direction>\n</directions>\n${ask}`;
+		const pick = user.includes('[pick]') ? '<pick by="user">The brief asks to choose.</pick>' : '';
+		return `${pick}<musts>\n- a quiet evening\n</musts>\n<research needed="no"/>\n<spread n="3">Open, but small.</spread>\n<directions>\n<direction p="0.5">A lesson in a lighthouse.</direction>\n<direction p="0.3">Letters left under a door.</direction>\n<direction p="0.2">A night train with one other passenger.</direction>\n</directions>\n${ask}`;
 	}
 	if (system.includes('This step builds the daydream')) {
 		const changed = user.includes('<changes>') ? ' (changed)' : '';
-		return `<title>The Keeper${changed}</title>\n<heat level="suggestive"/>\n<telling>\nClose second person, unhurried.\n</telling>\n<presentation view="scroll" theme="dusk">Plain prose.</presentation>\n<capabilities>reveals, blocks, choices</capabilities>\n<elements>\n<character id="ottilie" name="Ottilie Brandt" also="Ottilie">\n<manner>Precise, amused.</manner>\n<unspoken shown="no">She has been waiting for you.</unspoken>\n</character>\n</elements>\n<passage>\nThe lamp turns above you. <say who="ottilie">"You came,"</say> Ottilie says, and hands you <more>a brass key</more>.\n<after>\n{"next":"She shows you the stairs."}\n{"new":"character","id":"warden","name":"The Warden","seed":"keeps the logbook"}\n</after>\n</passage>`;
+		// Which idea was built, so a spec can see "Try another idea" take another.
+		const idea = user.split('The chosen direction:\n')[1]?.split('\n')[0] ?? '';
+		return `<title>The Keeper${changed}</title>\n<heat level="suggestive"/>\n<telling>\nClose second person, unhurried.\n</telling>\n<presentation view="scroll" theme="dusk">Plain prose.</presentation>\n<capabilities>reveals, blocks, choices</capabilities>\n<elements>\n<character id="ottilie" name="Ottilie Brandt" also="Ottilie">\n<manner>Precise, amused.</manner>\n<unspoken shown="no">She has been waiting for you.</unspoken>\n</character>\n</elements>\n<passage>\nThe lamp turns above you (${idea}). <say who="ottilie">"You came,"</say> Ottilie says, and hands you <more>a brass key</more>.\n<after>\n{"next":"She shows you the stairs."}\n{"new":"character","id":"warden","name":"The Warden","seed":"keeps the logbook"}\n</after>\n</passage>`;
 	}
 	if (system.includes("This step keeps the daydream's elements")) {
 		return user.includes('"warden"')

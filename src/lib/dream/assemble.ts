@@ -12,7 +12,7 @@ import type { DreamElement } from './elements';
 import type { Nudge } from './nudges';
 import type { BuildRequest, PassageRequest, ReadRequest } from './requests';
 import { chosenDirection, serializeBuild } from './setup-flow';
-import type { HistoryEntry } from './story';
+import { type HistoryEntry, similarity } from './story';
 
 export type Worded = { limits: string[]; preferences: string[] };
 
@@ -21,19 +21,27 @@ const FIRMNESS_WORDS: Readonly<Record<Exclude<DreamPreference['firmness'], 'hard
 	leaning: 'Usually'
 };
 
+/** How often a "usually" preference is left out of a daydream (docs/dreams.md, "Preferences"). */
+export const LEANING_DROP = 0.25;
+
 /**
  * The user's preferences as the prompts take them: hard ones as limits,
  * the rest as lines saying how firm they are, this story's last so they win.
+ * Each "usually" one is left out now and then (`random`), so remembered
+ * tastes shape the stories without making every one the same. Hard limits
+ * are never left out.
  */
 export function wordPreferences(
 	general: readonly DreamPreference[],
-	story: readonly DreamPreference[]
+	story: readonly DreamPreference[],
+	random: () => number = () => 1
 ): Worded {
 	const all = [...general, ...story];
 	return {
 		limits: all.filter((entry) => entry.firmness === 'hard').map((entry) => entry.text),
 		preferences: all
 			.filter((entry) => entry.firmness !== 'hard')
+			.filter((entry) => entry.firmness !== 'leaning' || random() >= LEANING_DROP)
 			.map((entry) => {
 				const firmness = entry.firmness === 'hard' ? 'Never' : FIRMNESS_WORDS[entry.firmness];
 				const scope = entry.appliesTo ? ` (for ${entry.appliesTo})` : '';
@@ -42,7 +50,46 @@ export function wordPreferences(
 	};
 }
 
-export function readRequestFor(setup: DreamSetup, worded: Worded, nudges: Nudge[]): ReadRequest {
+/** What this user's recent daydreams went with, so the next one does not repeat it. */
+export type Recent = { directions: string[]; names: string[] };
+
+export const NO_RECENT: Recent = { directions: [], names: [] };
+
+/** Briefs at least this alike count as "briefs like this one" for recent directions. */
+const SIMILAR_BRIEF = 0.2;
+
+/**
+ * Recent directions and names from the user's other daydreams, newest first
+ * (docs/dreams.md, "Variety"): the directions taken for briefs like this
+ * one, which step 1 is told not to repeat, and every name given, which the
+ * build avoids.
+ */
+export function recentFrom(others: readonly DreamSetup[], brief: string): Recent {
+	const directions = others
+		.filter((other) => similarity(other.brief, brief) >= SIMILAR_BRIEF)
+		.map((other) => chosenDirection(other))
+		.filter((direction): direction is string => direction !== null)
+		.slice(0, 8);
+	const names = [
+		...new Set(
+			others.flatMap((other) =>
+				(other.build?.elements ?? []).flatMap((element) =>
+					element.type === 'you' ? [] : [element.name, ...element.name.split(' ')]
+				)
+			)
+		)
+	]
+		.filter((name) => name.length > 1)
+		.slice(0, 40);
+	return { directions, names };
+}
+
+export function readRequestFor(
+	setup: DreamSetup,
+	worded: Worded,
+	nudges: Nudge[],
+	recent: Recent = NO_RECENT
+): ReadRequest {
 	const { reading } = setup;
 	return {
 		brief: setup.brief,
@@ -52,7 +99,7 @@ export function readRequestFor(setup: DreamSetup, worded: Worded, nudges: Nudge[
 				? { question: reading.ask.text, answer: reading.answer }
 				: null,
 		...worded,
-		recentDirections: [],
+		recentDirections: recent.directions,
 		nudges
 	};
 }
@@ -61,7 +108,8 @@ export function readRequestFor(setup: DreamSetup, worded: Worded, nudges: Nudge[
 export function buildRequestFor(
 	setup: DreamSetup,
 	worded: Worded,
-	previous: DreamSetupBuild | null
+	previous: DreamSetupBuild | null,
+	recent: Recent = NO_RECENT
 ): BuildRequest {
 	return {
 		brief: setup.brief,
@@ -71,7 +119,7 @@ export function buildRequestFor(
 		direction: chosenDirection(setup),
 		nudges: setup.chosen?.nudges ?? [],
 		...worded,
-		recentNames: [],
+		recentNames: recent.names,
 		previous: previous ? serializeBuild(previous) : null
 	};
 }

@@ -12,12 +12,34 @@
 	let {
 		element,
 		filling,
+		ondraw,
+		onrename,
 		onclose
 	}: {
 		element: DreamElement;
 		filling: boolean;
+		/** Names drawn for this element's description, or null when none could be. */
+		ondraw?: () => Promise<{ given: string[]; family: string[] } | null>;
+		onrename?: (name: string) => Promise<void>;
 		onclose: () => void;
 	} = $props();
+
+	let drawn = $state<{ given: string[]; family: string[] } | null>(null);
+	let drawing = $state(false);
+	/** A person keeps a family name in the new one when they had one. */
+	const keepsFamily = $derived(element.name.includes(' '));
+
+	async function another() {
+		drawing = true;
+		drawn = (await ondraw?.()) ?? null;
+		drawing = false;
+	}
+
+	function nameFrom(given: string, index: number): string {
+		return keepsFamily
+			? `${given} ${drawn?.family[index % (drawn?.family.length || 1)] ?? ''}`.trim()
+			: given;
+	}
 
 	const shown = $derived(element.fields.filter((field) => field.shown && field.name !== 'seed'));
 	const seed = $derived(element.fields.find((field) => field.name === 'seed')?.text ?? '');
@@ -69,6 +91,28 @@
 				{/if}
 			</section>
 		{/each}
+		{#if ondraw && (element.type === 'character' || element.nameFrom)}
+			<section class="names">
+				{#if drawn}
+					<h3>Another name</h3>
+					<div class="choices">
+						{#each drawn.given as given, index (given)}
+							{const name = $derived(nameFrom(given, index))}
+							<wa-button
+								size="s"
+								appearance="outlined"
+								onclick={async () => {
+									await onrename?.(name);
+									drawn = null;
+								}}>{name}</wa-button
+							>
+						{/each}
+					</div>
+				{:else}
+					<wa-button size="s" appearance="plain" disabled={drawing} onclick={another}>Another name</wa-button>
+				{/if}
+			</section>
+		{/if}
 		{#if hidden.length > 0}
 			<wa-details summary="Behind the scenes">
 				{#each hidden as field (field.name)}
@@ -107,6 +151,12 @@
 	.type,
 	.seed {
 		color: var(--wa-color-text-quiet);
+	}
+
+	.choices {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--wa-space-2xs);
 	}
 
 	.loading {

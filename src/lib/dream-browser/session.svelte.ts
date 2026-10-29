@@ -14,6 +14,7 @@ import {
 	buildRequestFor,
 	passageRequestFor,
 	readRequestFor,
+	recentFrom,
 	type Worded
 } from '$lib/dream/assemble';
 import { parseBuild } from '$lib/dream/build';
@@ -58,8 +59,10 @@ import type {
 import {
 	appendTurn,
 	DreamRequestError,
+	drawNames,
 	fill,
 	listDirections,
+	listDreams,
 	openDetail,
 	openSetup,
 	openSummary,
@@ -82,6 +85,9 @@ export type Streaming = {
 };
 
 type Opened<T> = { turnId: string; value: T };
+
+/** How many of the user's other daydreams are read for recent directions and names. */
+const RECENT_DREAMS = 20;
 
 /** Seeds for code's draws: random in play, fixed by the simulated player. */
 export type SessionOptions = { seed?: () => number; worded: Worded };
@@ -269,7 +275,15 @@ export class DreamSession {
 				if (step === 'read') {
 					await this.#read(setup, signal);
 				} else if (step === 'build' && !setup.chosen) {
-					await this.#saveSetup(codePick(setup, this.#seed()));
+					const picked = codePick(setup, this.#seed());
+					if (picked === setup) {
+						// Nothing to pick from: never loop on it.
+						throw new DreamRequestError(
+							'The brief could not be read just now. Try again, or change it.',
+							502
+						);
+					}
+					await this.#saveSetup(picked);
 				} else if (step === 'build') {
 					await this.#build(setup, signal);
 				} else {
@@ -287,7 +301,10 @@ export class DreamSession {
 		this.streaming = { what: 'read', text: '' };
 		const reply = await streamReply(
 			'read',
-			readRequestFor(setup, this.worded, drawNudges(cryptoRandom)),
+			readRequestFor(setup, this.worded, drawNudges(cryptoRandom), {
+				...(await this.#recent(setup)),
+				directions: [...this.#notThese, ...(await this.#recent(setup)).directions].slice(0, 20)
+			}),
 			{ signal, onText: (text) => this.#streamed(text) }
 		);
 		if (reply.ended !== 'complete' || parseBriefReading(reply.text).directions.length === 0) {
@@ -303,7 +320,7 @@ export class DreamSession {
 		this.streaming = { what: 'build', text: '' };
 		const reply = await streamReply(
 			'build',
-			buildRequestFor(setup, this.worded, this.#previousBuild),
+			buildRequestFor(setup, this.worded, this.#previousBuild, await this.#recent(setup)),
 			{ signal, onText: (text) => this.#streamed(text) }
 		);
 		const { passage, ...build } = parseBuild(reply.text);
@@ -323,6 +340,28 @@ export class DreamSession {
 			model: reply.model,
 			provider: reply.provider
 		});
+	}
+
+	#recentSetups: Promise<DreamSetup[]> | null = null;
+
+	/**
+	 * What the user's other recent daydreams went with (`recentFrom`), opened
+	 * here from their sealed setups: the server cannot read them. Read once
+	 * per page; a failure only means nothing is avoided.
+	 */
+	async #recent(setup: DreamSetup) {
+		this.#recentSetups ??= listDreams()
+			.then((dreams) =>
+				Promise.all(
+					dreams
+						.filter((dream) => dream.id !== this.id)
+						.slice(0, RECENT_DREAMS)
+						.map((dream) => openSetup(dream.setup))
+				)
+			)
+			.then((setups) => setups.filter((other): other is DreamSetup => other !== null))
+			.catch(() => []);
+		return recentFrom(await this.#recentSetups, setup.brief);
 	}
 
 	#streamed(text: string) {
@@ -352,6 +391,49 @@ export class DreamSession {
 		return this.#attempt(() => this.#saveSetup(userPick(setup, directionId, this.#seed()))).then(
 			() => this.runSetup()
 		);
+	}
+
+	/** "Surprise me" when the brief asked to choose: code's pick, as if it had not. */
+	surprise(): Promise<void> {
+		const { setup } = this;
+		if (!setup) {
+			return Promise.resolve();
+		}
+		this.stop();
+		return this.#attempt(() => this.#saveSetup(codePick(setup, this.#seed()))).then(() =>
+			this.runSetup()
+		);
+	}
+
+	/** Ideas already tried on this page, by direction text, for "Try another idea". */
+	#tried = new Set<string>();
+	/** Ideas to mark "not these" when step 1 reads the brief again. */
+	#notThese: string[] = [];
+
+	/**
+	 * "Try another idea": picks again from the ideas not yet tried. When every
+	 * one has been, step 1 reads the brief again with them all marked "not
+	 * these" (docs/dreams.md, "Picking").
+	 */
+	tryAnother(): Promise<void> {
+		const { setup } = this;
+		const reading = setup?.reading;
+		if (!(setup && reading)) {
+			return Promise.resolve();
+		}
+		this.stop();
+		if (setup.chosen) {
+			this.#tried.add(setup.chosen.directionId);
+		}
+		const next = codePick(setup, this.#seed(), this.#tried);
+		if (next !== setup) {
+			return this.#attempt(() => this.#saveSetup(next)).then(() => this.runSetup());
+		}
+		this.#notThese = [...this.#notThese, ...reading.directions.map((direction) => direction.text)];
+		this.#tried = new Set();
+		return this.#attempt(() =>
+			this.#saveSetup({ ...setup, reading: null, chosen: null, build: null })
+		).then(() => this.runSetup());
 	}
 
 	/** "Not quite? Tell it what to change." Stops what is running and goes back as far as it must. */
@@ -731,6 +813,54 @@ export class DreamSession {
 			next.delete(key);
 			this.filling = next;
 		}
+	}
+
+	/**
+	 * Names to choose from for an element's "Another name" (docs/dreams.md,
+	 * "Names"), drawn for its description, leaving out every name in the story.
+	 */
+	async namesFor(elementId: string): Promise<{ given: string[]; family: string[] } | null> {
+		const element = this.elements.find((candidate) => candidate.id === elementId);
+		if (!element) {
+			return null;
+		}
+		const taken = this.elements.flatMap((other) => [
+			other.name,
+			...other.name.split(' '),
+			...other.also
+		]);
+		try {
+			return await drawNames(element.nameFrom ?? `a ${element.type}`, taken);
+		} catch (cause) {
+			this.problem =
+				cause instanceof DreamRequestError ? cause.message : 'No names could be drawn.';
+			return null;
+		}
+	}
+
+	/**
+	 * Renames an element from the turn the user is on. Its old name becomes
+	 * one of its other names, so what earlier passages called it still links
+	 * to its card.
+	 */
+	async rename(elementId: string, name: string): Promise<void> {
+		const element = this.elements.find((candidate) => candidate.id === elementId);
+		const turnId = this.path.at(-1)?.id;
+		if (!(element && turnId) || element.name === name) {
+			return;
+		}
+		const detail: DreamDetail = {
+			kind: 'element',
+			element: {
+				...element,
+				name,
+				also: [element.name, ...element.also.filter((other) => other !== name)].slice(0, 12)
+			}
+		};
+		await this.#attempt(async () => {
+			await saveDetail(this.id, { id: crypto.randomUUID(), turnId, detail });
+			this.details = [...this.details, { turnId, value: detail }];
+		});
 	}
 
 	/** Expanding a `<more>`: written once, kept on its passage. */

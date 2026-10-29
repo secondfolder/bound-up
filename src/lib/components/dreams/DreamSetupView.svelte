@@ -143,6 +143,12 @@
 					{/if}
 				</p>
 			{/if}
+			{#if step === 'pick'}
+				<p class="pick-note">Choose an idea, or let it choose for you.</p>
+				<wa-button size="s" appearance="outlined" onclick={() => session.surprise()}>Surprise me</wa-button>
+			{:else if chosen}
+				<wa-button size="s" appearance="plain" onclick={() => session.tryAnother()}>Try another idea</wa-button>
+			{/if}
 			{#if !chosen || showIdeas}
 				<ul class="directions">
 					{#each setup.reading.directions as direction (direction.id)}
@@ -296,8 +302,15 @@
 		gap: var(--wa-space-xs);
 	}
 
-	.ideas p {
-		margin: 0;
+	.ideas {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--wa-space-xs);
+
+		p {
+			margin: 0;
+		}
 	}
 
 	.link {
@@ -311,6 +324,7 @@
 	}
 
 	.directions {
+		align-self: stretch;
 		margin: var(--wa-space-s) 0 0;
 		padding: 0;
 		list-style: none;

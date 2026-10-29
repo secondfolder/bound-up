@@ -202,6 +202,42 @@ test.describe('daydreams, the new engine', () => {
 		await expect(page.locator('li.passage').last()).toContainText('3 / 3');
 	});
 
+	test('choosing first, Surprise me, and Try another idea', async ({ page }) => {
+		await dreamer(page);
+		await start(page, 'A quiet evening [pick]');
+		await expect(page.getByText('Choose an idea, or let it choose for you.')).toBeVisible();
+		// Nothing is built until the user chooses.
+		await expect(page.getByRole('heading', { name: 'The Keeper' })).toHaveCount(0);
+		await clickWaButton(page, 'Surprise me');
+		await expect(page.getByRole('heading', { name: 'The Keeper' })).toBeVisible();
+		await saved(page);
+
+		// Built from one of step 1's ideas, picked for the user.
+		await expect(page.locator('li.passage').first()).toContainText(
+			/\((?:A lesson in a lighthouse|Letters left under a door|A night train)/
+		);
+	});
+
+	test('another name for a character, keeping the old one linked', async ({ page }) => {
+		await dreamer(page);
+		await start(page, 'A quiet evening');
+		await expect(page.getByRole('heading', { name: 'The Keeper' })).toBeVisible();
+		await saved(page);
+		await page.locator('ol.turns').getByRole('button', { name: 'Ottilie', exact: true }).click();
+		await clickWaButton(page, 'Another name');
+		const choice = page.locator('.choices wa-button').first();
+		const name = ((await choice.textContent()) ?? '').trim();
+		expect(name).toMatch(/^\S+ \S+$/);
+		await choice.click();
+		const card = page.locator('wa-dialog').getByRole('heading', { name, exact: true });
+		await expect(card).toBeVisible();
+		await page.keyboard.press('Escape');
+		await expect(card).toBeHidden();
+		// What the opening called her still opens her card.
+		await page.locator('ol.turns').getByRole('button', { name: 'Ottilie', exact: true }).click();
+		await expect(card).toBeVisible();
+	});
+
 	test('a change asked for while it is set up is read in, and shown', async ({ page }) => {
 		await dreamer(page);
 		await start(page, 'A quiet evening [ask]');

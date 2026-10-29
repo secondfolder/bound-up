@@ -1,5 +1,7 @@
 import { error } from '@sveltejs/kit';
+import { cryptoRandom } from '$lib/dream/random';
 import { buildRequestSchema } from '$lib/dream/requests';
+import { drawPool } from '$lib/server/dream/names/draw';
 import { buildMessages } from '$lib/server/dream/prompts/build';
 import { SAMPLING } from '$lib/server/dream/sampling';
 import { dreamsGuard, streamStory } from '$lib/server/dream-api';
@@ -17,7 +19,11 @@ export const POST: RequestHandler = async (event) => {
 		error(400, 'That could not be sent. Reload and try again.');
 	}
 	return await streamStory(event, userId, {
-		messages: buildMessages(parsed.data),
+		messages: buildMessages({
+			...parsed.data,
+			// Code's randomness: names drawn here, never the model's habits.
+			namePool: drawPool(cryptoRandom, parsed.data.recentNames)
+		}),
 		...SAMPLING.build
 	});
 };

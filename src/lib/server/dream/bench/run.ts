@@ -24,6 +24,7 @@ import {
 	userTurnOf
 } from '../../../dream/story';
 import type { DreamSummary, DreamTurn } from '../../../sealed-kinds/dreams';
+import { drawPool } from '../names/draw';
 import type { Completion } from '../openrouter';
 import { buildMessages } from '../prompts/build';
 import type { ModelMessage } from '../prompts/core';
@@ -167,7 +168,9 @@ async function runSteps(
 			nudges: run.nudges,
 			limits: BENCH_LIMITS,
 			preferences: [],
-			recentNames: []
+			recentNames: [],
+			// Drawn from the run's seed, so prompt versions compare on the same pool.
+			namePool: drawPool(random)
 		})
 	);
 	const build = parseBuild(buildText);

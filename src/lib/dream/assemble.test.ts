@@ -1,0 +1,75 @@
+import { describe, expect, it } from 'vitest';
+import type { DreamPreference, DreamSetup } from '../sealed-kinds/dreams';
+import { recentFrom, wordPreferences } from './assemble';
+import { codePick, newSetup, withReading } from './setup-flow';
+
+const pref = (text: string, firmness: DreamPreference['firmness']): DreamPreference => ({
+	id: text,
+	text,
+	firmness,
+	appliesTo: '',
+	source: 'typed'
+});
+
+describe('wordPreferences', () => {
+	it('makes hard ones limits, and says how firm the rest are', () => {
+		const worded = wordPreferences(
+			[pref('No feet', 'hard'), pref('Older people', 'leaning')],
+			[pref('Slow', 'default')]
+		);
+		expect(worded).toEqual({
+			limits: ['No feet'],
+			preferences: ['Usually: Older people', 'By default: Slow']
+		});
+	});
+
+	it('leaves a leaning out now and then, and a limit never', () => {
+		const worded = wordPreferences(
+			[pref('No feet', 'hard'), pref('Older people', 'leaning')],
+			[],
+			() => 0.1
+		);
+		expect(worded).toEqual({ limits: ['No feet'], preferences: [] });
+	});
+});
+
+describe('recentFrom', () => {
+	const built = (brief: string, direction: string, name: string): DreamSetup => {
+		const read = withReading(newSetup(brief), {
+			musts: [],
+			research: { needed: false, text: '' },
+			spread: { n: 1, reason: '' },
+			directions: [{ id: 'd1', p: 1, text: direction }],
+			pick: { by: 'code', reason: '' },
+			ask: null,
+			rest: []
+		});
+		const picked = codePick(read, 1);
+		return {
+			...picked,
+			build: {
+				title: 't',
+				heat: 'steamy',
+				telling: '',
+				presentation: { view: 'scroll', theme: 'rust', notes: '' },
+				capabilities: [],
+				elements: [
+					{ id: 'a', type: 'character', name, also: [], shown: true, fields: [], stats: [] },
+					{ id: 'you', type: 'you', name: 'You', also: [], shown: true, fields: [], stats: [] }
+				]
+			}
+		};
+	};
+
+	it('avoids directions taken for briefs like this one, and every name given', () => {
+		const recent = recentFrom(
+			[
+				built('a training dynamic with reports', 'Weekly reports.', 'Ines Varga'),
+				built('pirates on a ship', 'A mutiny.', 'Hal Brine')
+			],
+			'a training dynamic'
+		);
+		expect(recent.directions).toEqual(['Weekly reports.']);
+		expect(recent.names).toEqual(['Ines Varga', 'Ines', 'Varga', 'Hal Brine', 'Hal', 'Brine']);
+	});
+});
