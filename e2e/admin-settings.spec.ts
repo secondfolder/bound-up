@@ -55,34 +55,76 @@ test('an admin sees what is set up, and sends themselves a test email', async ({
 	expect(mail.subject).toBe('A test email from your server');
 });
 
-test('an admin finds a story model on OpenRouter and saves it', async ({ page }) => {
-	const root = account('Root');
-	await newAccount(page, root);
-	await becomeAdmin(page, root);
-	await openServerSettings(page);
+// Both save the whole Language models form, story model included, so run
+// side by side each would write over the other's.
+test.describe('saving the language models', () => {
+	test.describe.configure({ mode: 'serial' });
 
-	const daydreams = page.getByRole('article', { name: 'Language models' });
-	// The suite's own model is already a custom one.
-	await expect(daydreams.getByRole('radio', { name: /Custom/ })).toBeChecked();
-	await daydreams.getByRole('searchbox', { name: 'Search OpenRouter' }).fill('storyteller');
-	await daydreams.getByRole('button', { name: /Stub: Storyteller 70B/ }).click();
-	await expect(daydreams.locator('wa-input[name="openrouterModelId"] input')).toHaveValue(
-		'stubvendor/stub-storyteller-70b'
-	);
+	test('an admin finds a story model on OpenRouter and saves it', async ({ page }) => {
+		const root = account('Root');
+		await newAccount(page, root);
+		await becomeAdmin(page, root);
+		await openServerSettings(page);
 
-	try {
-		await clickWaButton(page, 'Save language model settings');
-		await expect(daydreams.getByText('Saved.')).toBeVisible();
-		const { rows } = await sql("select value from server_settings where key = 'storyModel'");
-		expect(JSON.parse(String(rows[0]?.value))).toEqual({
-			provider: 'openrouter',
-			openrouterModelId: 'stubvendor/stub-storyteller-70b'
-		});
-	} finally {
-		await sql("update server_settings set value = ? where key = 'storyModel'", [
-			JSON.stringify({ provider: 'openrouter', openrouterModelId: 'e2e/stub' })
-		]);
-	}
+		const daydreams = page.getByRole('article', { name: 'Language models' });
+		// The suite's own model is already a custom one.
+		await expect(daydreams.getByRole('radio', { name: /Custom/ })).toBeChecked();
+		const story = daydreams.getByRole('group', { name: 'Daydreams story model' });
+		await story.getByRole('searchbox', { name: 'Search OpenRouter' }).fill('storyteller');
+		await story.getByRole('button', { name: /Stub: Storyteller 70B/ }).click();
+		await expect(daydreams.locator('wa-input[name="openrouterModelId"] input')).toHaveValue(
+			'stubvendor/stub-storyteller-70b'
+		);
+
+		try {
+			await clickWaButton(page, 'Save language model settings');
+			await expect(daydreams.getByText('Saved.')).toBeVisible();
+			const { rows } = await sql("select value from server_settings where key = 'storyModel'");
+			expect(JSON.parse(String(rows[0]?.value))).toEqual({
+				provider: 'openrouter',
+				openrouterModelId: 'stubvendor/stub-storyteller-70b'
+			});
+		} finally {
+			await sql("update server_settings set value = ? where key = 'storyModel'", [
+				JSON.stringify({ provider: 'openrouter', openrouterModelId: 'e2e/stub' })
+			]);
+		}
+	});
+
+	test('a story model without tools asks for a research model, and one with tools does not', async ({
+		page
+	}) => {
+		const root = account('Root');
+		await newAccount(page, root);
+		await becomeAdmin(page, root);
+		await openServerSettings(page);
+
+		const language = page.getByRole('article', { name: 'Language models' });
+		// The suite's story model is not listed as calling tools.
+		const research = language.getByRole('group', { name: 'Research model' });
+		await expect(research).toBeVisible();
+		await research.getByRole('searchbox', { name: 'Search OpenRouter' }).fill('researcher');
+		await research.getByRole('button', { name: /Stub: Researcher/ }).click();
+		await expect(language.locator('wa-input[name="researchModelId"] input')).toHaveValue(
+			'stubvendor/stub-researcher'
+		);
+
+		try {
+			await clickWaButton(page, 'Save language model settings');
+			await expect(language.getByText('Saved.')).toBeVisible();
+			const { rows } = await sql("select value from server_settings where key = 'researchModel'");
+			expect(rows[0]?.value).toBe('stubvendor/stub-researcher');
+		} finally {
+			await sql("update server_settings set value = '' where key = 'researchModel'");
+		}
+
+		// A story model that calls tools researches for itself. Not saved.
+		const story = language.getByRole('group', { name: 'Daydreams story model' });
+		await story.getByRole('searchbox', { name: 'Search OpenRouter' }).fill('researcher');
+		await story.getByRole('button', { name: /Stub: Researcher/ }).click();
+		await expect(research).toHaveCount(0);
+		await expect(language.getByText(/The story model calls tools/)).toBeVisible();
+	});
 });
 
 test('a custom picture model found on Runware fills in its base model', async ({ page }) => {

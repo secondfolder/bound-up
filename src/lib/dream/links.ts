@@ -53,3 +53,17 @@ export function isAllowedPage(url: string, hosts: readonly string[]): boolean {
 		return false;
 	}
 }
+
+const ASKS_FOR_RESEARCH =
+	/\b(?:research|look(?:ing)? (?:up|into)|search|find (?:out|real|actual)|real(?:-life| world)? (?:examples?|phrases?|quotes?|wording)|based on (?:real|actual|the)|accurate|authentic)\b/i;
+
+/**
+ * Whether a brief asks for something to be looked up, which is when a
+ * search is offered (docs/dreams.md, "Research"). Every other brief goes
+ * without: a search query can repeat the brief's words to the search
+ * provider, so it is offered only where the brief wants one, and the model
+ * still decides whether to make it.
+ */
+export function asksForResearch(brief: string): boolean {
+	return briefLinks(brief).length > 0 || ASKS_FOR_RESEARCH.test(brief);
+}

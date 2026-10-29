@@ -25,7 +25,9 @@ export type ReadingInput = {
 	nudges: readonly Nudge[];
 	/** Whether the model can open links itself; without, it must not guess at them. */
 	canFetch: boolean;
-	/** Research from a separate step, for a model that cannot fetch. */
+	/** Whether the model may search the web, for a brief that asks for something looked up. */
+	canSearch?: boolean;
+	/** Research from a separate step, for a model that cannot call tools; kept as it is. */
 	research?: string;
 	/** Changes the user asked for while it was being set up, oldest first. */
 	amendments?: readonly string[];
@@ -61,14 +63,28 @@ Optionally, one question, only when its answer would change which direction is r
 <ask id="short-id" keep="story">the question<option>an answer</option><option>another</option></ask>
 keep="general" only for a question about what the user wants from every daydream.`;
 
+/** How a search is to be made: about the subject, never about the user. */
+export const SEARCH_NOTE =
+	'If the brief asks for something to be looked up, search the web for it with the search tool: a few short searches about the subject, never the user’s own words or anything about them.';
+
 function linksNote(input: ReadingInput): string {
 	if (input.research) {
-		return 'The pages the brief links have already been read for you; the research is below. Build on it rather than guessing at anything it does not cover.';
+		return 'The brief has already been researched for you; the research is below and is kept for the daydream as it is. Write <research needed="no"/> rather than repeating it, and build every direction on it.';
 	}
+	const notes: string[] = [];
 	if (input.canFetch) {
-		return 'If the brief links pages, open them with the fetch tool before you answer, and follow links on them that lead to what the user meant.';
+		notes.push(
+			'If the brief links pages, open them with the fetch tool before you answer, and follow links on them that lead to what the user meant.'
+		);
+	} else {
+		notes.push(
+			'You cannot open links. If the brief links pages, say in the research that they could not be read, and do not guess at what they say.'
+		);
 	}
-	return 'You cannot open links. If the brief links pages, say in the research that they could not be read, and do not guess at what they say.';
+	if (input.canSearch) {
+		notes.push(SEARCH_NOTE);
+	}
+	return notes.join(' ');
 }
 
 export function readingMessages(input: ReadingInput): ModelMessage[] {

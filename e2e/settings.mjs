@@ -39,6 +39,7 @@ export function e2eSettings({ target, outboxDir }) {
 		// `RUNWARE_BASE_URL`, which stay test seams in the environment.
 		openrouterApiKey: 'e2e-openrouter-key',
 		storyModel: JSON.stringify({ provider: 'openrouter', openrouterModelId: 'e2e/stub' }),
+		researchModel: '',
 		runwareApiKey: 'e2e-runware-key',
 		photoModel: JSON.stringify({ provider: 'runware', preset: 'dark-beast' }),
 		illustratedModel: JSON.stringify({ provider: 'runware', preset: 'wai-illustrious' })

@@ -297,6 +297,32 @@ describe('actions', () => {
 		});
 	});
 
+	it('saves a research model only if OpenRouter lists it as calling tools', async () => {
+		const save = async (researchModelId: string) =>
+			runAction(
+				actions,
+				'saveLanguageModels',
+				await event(admin, {
+					storyProvider: 'openrouter',
+					storyModel: 'hermes',
+					openrouterModelId: '',
+					researchModelId
+				})
+			);
+		expect(await save('z-ai/glm-5.2')).not.toMatchObject({ status: 400 });
+		expect(await stored('researchModel')).toBe('z-ai/glm-5.2');
+		expect((await runLoad(load(await event(admin)))).languageModelForm.data).toMatchObject({
+			researchModelId: 'z-ai/glm-5.2'
+		});
+
+		const refused = await save('vendor/no-tools');
+		expect(refused).toMatchObject({ status: 400 });
+		expect(await stored('researchModel')).toBe('z-ai/glm-5.2');
+
+		expect(await save('')).not.toMatchObject({ status: 400 });
+		expect(await stored('researchModel')).toBe('');
+	});
+
 	it('saves a custom picture model with its base model, and refuses one without', async () => {
 		const pictures = {
 			photoProvider: 'runware',

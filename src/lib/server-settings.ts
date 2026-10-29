@@ -28,6 +28,7 @@ export const SERVER_SETTING_KEYS = [
 	'openrouterApiKey',
 	'runwareApiKey',
 	'storyModel',
+	'researchModel',
 	'photoModel',
 	'illustratedModel'
 ] as const;
@@ -403,6 +404,17 @@ export function parseStoryModel(raw: string): StoryModelChoice {
 		}
 	}
 	return DEFAULT_STORY_MODEL;
+}
+
+/**
+ * The research model, for a story model that cannot call tools: an OpenRouter
+ * model id, stored as it is, or null when none is set (or the stored value is
+ * not an id). It only ever reads a brief's links and searches for it, and is
+ * checked to call tools when it is saved (docs/dreams.md, "Research").
+ */
+export function parseResearchModel(raw: string): string | null {
+	const id = raw.trim();
+	return OPENROUTER_MODEL_ID.test(id) ? id : null;
 }
 
 /** Whether a choice's model can call tools: only a custom one OpenRouter said could. */

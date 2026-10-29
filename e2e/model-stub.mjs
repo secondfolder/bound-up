@@ -546,6 +546,14 @@ const MODELS = {
 			name: 'Stub: Other',
 			context_length: 8192,
 			pricing: { prompt: '0.000001', completion: '0.000002' }
+		},
+		// One that calls tools, for the research model.
+		{
+			id: 'stubvendor/stub-researcher',
+			name: 'Stub: Researcher',
+			context_length: 65_536,
+			pricing: { prompt: '0.0000003', completion: '0.0000004' },
+			supported_parameters: ['max_tokens', 'tools']
 		}
 	]
 };

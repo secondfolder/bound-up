@@ -649,43 +649,61 @@ notes (`{"telling": …}`). They are shown in a notice with "Use these" and
 
 ## Research (phase 6)
 
-A brief can link pages ("like this: https://…"). When the story model can
-call tools (a custom model OpenRouter says does, `storyModelCallsTools`),
-step 1 reads them before answering, and its reply's `<research>` keeps what
-it found for the build and every passage after (carried in the setup).
+A brief can link pages ("like this: https://…") or ask for something to be
+looked up ("research common phrases in…"). Step 1 then looks them up before
+answering, and its reply's `<research>` keeps what it found for the build and
+every passage after (carried in the setup).
 
-**The fetch service** is OpenRouter's own fetch tool, `openrouter:web_fetch`,
-with Parallel's engine (`webFetch` in `src/lib/server/dream-api.ts`). The
-plan left the service to be chosen here, with Parallel the first candidate;
-the first engine had already measured it as the one that reads reddit, which
-briefs link most (Exa answered nothing for a subreddit, Firecrawl refuses
-reddit, OpenRouter's own fetch returned raw RSS), and it needs no key or
-setting beyond the OpenRouter one. Such a step goes through OpenRouter's
+**Two tools**, both OpenRouter's own server tools, both on Parallel's engine
+(`webFetch` and `WEB_SEARCH` in `src/lib/server/dream-api.ts`), so they need
+no key or setting beyond the OpenRouter one. Parallel because the first
+engine had measured it as the one that reads reddit, which briefs link most
+(Exa answered nothing for a subreddit, Firecrawl refuses reddit, OpenRouter's
+own fetch returned raw RSS). A step with tools goes through OpenRouter's
 Responses API (`streamResponses`), because only its stream says what each
-fetch did.
+tool did: a fetch's item has its `url`, a search's (`openrouter:web_search`)
+its `action.query`.
 
-**What may be read** (`src/lib/dream/links.ts`): the brief's first five
-links, and up to four more pages they lead to (an index read for its
-entries), eight at most (`max_uses`), and only on the sites the brief's own
-links are on (`allowed_domains`). The model chooses every URL, so a page
-could otherwise send it to a URL of the page's choosing with the brief in
-the query string. Each page is cut short (`max_content_tokens`), so a brief
-cannot fill the context. What a page says is material, never instructions
-(the core rules).
+- **Fetch** (`openrouter:web_fetch`): for a brief with links. The brief's
+  first five links, and up to four more pages they lead to (an index read
+  for its entries), eight at most (`max_uses`), and only on the sites the
+  brief's own links are on (`allowed_domains`). The model chooses every URL,
+  so a page could otherwise send it to a URL of the page's choosing with the
+  brief in the query string. Each page is cut short (`max_content_tokens`),
+  so a brief cannot fill the context.
+- **Search** (`openrouter:web_search`): for a brief with links or one that
+  asks for something looked up (`asksForResearch` in `src/lib/dream/links.ts`,
+  a list of words such as "research", "look up", "real examples"). Its
+  `max_uses` reaches only Anthropic's own search, so the cap is on results:
+  five a search, fifteen in all, each cut to 4,000 characters. A result
+  comes with its text, so the fetch tool stays limited to the brief's own
+  sites. **A search query can repeat the brief's words to the search
+  provider**, which a fetch of a link the user gave does not; that was
+  weighed and accepted (2026-10-30). The model is told to search for the
+  subject, never the user's words or anything about them, and other briefs
+  are not offered search at all.
 
-**What the user sees.** Each page read appears on the setup page as it is
-read, "✓ Read" or "✗ Could not be read", and one on another site as "✗ Not
-opened" (the provider enforces the same list; `isAllowedPage` is the check
-the page shows). The research fills a "Background" panel.
+What a page or a result says is material, never instructions (the core
+rules).
 
-**A model that cannot call tools** is told the links cannot be opened and
-not to guess at them. The plan's fallback (the server reading the links and
-a cheap call writing the research) needs a second, tool-calling model to be
-configured, so it waits for that decision.
+**What the user sees.** Each page read and each search appears on the setup
+page as it happens: "✓ Read" or "✗ Could not be read" with the URL, "✗ Not
+opened" for a page on another site (the provider enforces the same list;
+`isAllowedPage` is the check the page shows), and "✓ Searched for" with the
+query. The research fills a "Background" panel.
 
-**Not done: search.** The plan's second pass lets the model search the web.
-A search query can echo the brief to the search provider, which a fetch of a
-link the user gave does not, so it is left off until that trade is decided.
+**A story model that cannot call tools** (a preset, or a custom one
+OpenRouter does not list as calling them) has the **research model** do it,
+when the server has one (`researchModel`, see
+[server-settings.md](server-settings.md#choosing-a-model)). The read route
+runs a research step first (`researchFirst`, `prompts/research.ts`): only the
+brief goes to that model, with the same tools; its pages and searches are sent
+as they happen, and what it wrote as a `research` event. Step 1 then reads the
+brief with that research included, told not to repeat it, and the page keeps
+the research as the research model wrote it. The step is routed as the story
+is, to the research model's best providers. If it refuses, fails or finds
+nothing, step 1 goes on without, told the links could not be read, and so
+does a server with no research model.
 
 ## Stats, dice and more views (phase 7)
 

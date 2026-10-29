@@ -1,12 +1,14 @@
 import { error, isHttpError, json } from '@sveltejs/kit';
+import { type DreamEvent, encodeEvent } from '$lib/dream/events';
 import { classifyReply } from '$lib/model-providers';
 import { splitOpenRouterModelId } from '$lib/model-search';
 import { type DaydreamConfig, readDaydreamConfig } from '$lib/server/daydream/config';
 import { hasAcceptedDisclosure } from '$lib/server/daydreams';
 import { complete, streamResponses } from '$lib/server/dream/openrouter';
 import type { ModelMessage } from '$lib/server/dream/prompts/core';
-import { relay } from '$lib/server/dream/relay';
-import type { Sampling } from '$lib/server/dream/sampling';
+import { researchMessages } from '$lib/server/dream/prompts/research';
+import { relay, toolEvent } from '$lib/server/dream/relay';
+import { SAMPLING, type Sampling } from '$lib/server/dream/sampling';
 import { requireFeature } from '$lib/server/features';
 import { recordOutcome, routeToBest } from '$lib/server/model-providers/store';
 import { rateLimitMessage } from '$lib/server/rate-limit';
@@ -68,6 +70,20 @@ async function admit(
 	);
 }
 
+/** Where a model's requests may go: its best providers, or unpinned when it was never checked. */
+async function providersFor(locals: App.Locals, model: string) {
+	const { listed } = splitOpenRouterModelId(model);
+	const key = { model: listed, kind: 'language' as const };
+	const { checked, providers } = await routeToBest(locals.db, key, new Date());
+	return {
+		listed,
+		checked,
+		providers,
+		record: (provider: string, outcome: Parameters<typeof recordOutcome>[3]) =>
+			recordOutcome(locals.db, key, provider, outcome, new Date())
+	};
+}
+
 /**
  * The providers a request may go to: the best tier there is
  * (`bestProviders`), so only those that passed the highest level any of the
@@ -76,31 +92,29 @@ async function admit(
  * backing off is a 503 saying what to do.
  */
 async function route(locals: App.Locals, config: DaydreamConfig) {
-	const { listed } = splitOpenRouterModelId(config.openrouterModelId);
-	const key = { model: listed, kind: 'language' as const };
-	const { checked, providers } = await routeToBest(locals.db, key, new Date());
-	if (checked && providers.length === 0) {
+	const routing = await providersFor(locals, config.openrouterModelId);
+	if (routing.checked && routing.providers.length === 0) {
 		console.error('[dreams] every provider is ruled out or backing off');
 		error(
 			503,
 			'No provider for the story model can take this right now. Try again in a few minutes; an admin can see why under Admin → Server settings → Language models.'
 		);
 	}
-	return {
-		listed,
-		providers,
-		record: (provider: string, outcome: Parameters<typeof recordOutcome>[3]) =>
-			recordOutcome(locals.db, key, provider, outcome, new Date())
-	};
+	return routing;
 }
+
+/** What a step may look up (docs/dreams.md, "Research"). */
+export type Lookups = {
+	/** Pages it may read, through OpenRouter's fetch tool: only on these sites, at most this many. */
+	fetch: { hosts: string[]; maxPages: number } | null;
+	/** Whether it may search the web, through OpenRouter's search tool. */
+	search: boolean;
+};
 
 export type StoryCall = {
 	messages: ModelMessage[];
-	/**
-	 * Pages the step may read, through OpenRouter's fetch tool: only on these
-	 * sites, and at most this many (docs/dreams.md, "Research").
-	 */
-	fetch?: { hosts: string[]; maxPages: number };
+	/** Tools the step may use; none when absent. */
+	lookups?: Lookups;
 } & Sampling;
 
 /**
@@ -110,7 +124,7 @@ export type StoryCall = {
  * outright, and OpenRouter's own fetch hands back raw RSS. Each page is cut
  * short, so a brief cannot fill the context.
  */
-function webFetch(fetch: NonNullable<StoryCall['fetch']>) {
+function webFetch(fetch: NonNullable<Lookups['fetch']>) {
 	return {
 		type: 'openrouter:web_fetch',
 		parameters: {
@@ -122,11 +136,49 @@ function webFetch(fetch: NonNullable<StoryCall['fetch']>) {
 	} as const;
 }
 
-/** Streams a reply as the engine's events (`$lib/dream/events`). */
+/**
+ * OpenRouter's search tool, on Parallel's engine for the same reason as the
+ * fetch. Its `max_uses` reaches only Anthropic's own search, so the cap is
+ * on results across every search instead, each cut short. A search's
+ * results come with their text, so no fetch beyond the brief's own sites is
+ * needed to read them: the fetch tool stays limited to those.
+ */
+const WEB_SEARCH = {
+	type: 'openrouter:web_search',
+	parameters: {
+		engine: 'parallel',
+		max_results: 5,
+		max_total_results: 15,
+		max_characters: 4000
+	}
+} as const;
+
+function toolsFor(lookups: Lookups): unknown[] {
+	return [
+		...(lookups.fetch ? [webFetch(lookups.fetch)] : []),
+		...(lookups.search ? [WEB_SEARCH] : [])
+	];
+}
+
+/** Whether a step has anything to look up with. */
+export function looksUp(lookups: Lookups): boolean {
+	return lookups.fetch !== null || lookups.search;
+}
+
+type Send = (event: DreamEvent) => void;
+
+/** A step that runs before the reply, sending its own events first, and decides the call. */
+type Before = (send: Send, signal: AbortSignal) => Promise<StoryCall>;
+
+/**
+ * Streams a reply as the engine's events (`$lib/dream/events`). `call` may
+ * instead be a step to run first (the research step), whose events go
+ * before the reply's and which decides what is asked.
+ */
 export async function streamStory(
 	event: { locals: App.Locals; platform: App.Platform | undefined; request: Request },
 	userId: string,
-	call: StoryCall
+	call: StoryCall | Before
 ): Promise<Response> {
 	const config = dreamModel(event.locals, event.platform);
 	const refused = await admit(event.locals, userId, 'story');
@@ -134,32 +186,150 @@ export async function streamStory(
 		return refused;
 	}
 	const routing = await route(event.locals, config);
-	const { fetch: reading } = call;
-	const body = relay({
-		request: {
-			baseUrl: config.baseUrl,
-			apiKey: config.apiKey,
-			messages: call.messages,
-			temperature: call.temperature,
-			minP: call.minP,
-			maxTokens: call.maxTokens,
-			// The user pressing Stop, or leaving, ends the request upstream, so a
-			// reply nobody will read is not paid for to the end.
-			signal: event.request.signal
-		},
-		listedModel: routing.listed,
-		configuredModel: config.openrouterModelId,
-		providers: routing.providers,
-		record: routing.record,
-		...(reading
-			? {
-					hosts: reading.hosts,
-					stream: (request, onText, onFetch) =>
-						streamResponses({ ...request, tools: [webFetch(reading)] }, onText, onFetch)
+	const replyTo = (resolved: StoryCall) => {
+		const { lookups } = resolved;
+		return relay({
+			request: {
+				baseUrl: config.baseUrl,
+				apiKey: config.apiKey,
+				messages: resolved.messages,
+				temperature: resolved.temperature,
+				minP: resolved.minP,
+				maxTokens: resolved.maxTokens,
+				// The user pressing Stop, or leaving, ends the request upstream, so a
+				// reply nobody will read is not paid for to the end.
+				signal: event.request.signal
+			},
+			listedModel: routing.listed,
+			configuredModel: config.openrouterModelId,
+			providers: routing.providers,
+			record: routing.record,
+			...(lookups && looksUp(lookups)
+				? {
+						hosts: lookups.fetch?.hosts ?? [],
+						stream: (request, onText, onTool) =>
+							streamResponses({ ...request, tools: toolsFor(lookups) }, onText, onTool)
+					}
+				: {})
+		});
+	};
+	if (typeof call !== 'function') {
+		return new Response(replyTo(call), { headers: SSE_HEADERS });
+	}
+	return new Response(afterStep(call, replyTo, event.request.signal), { headers: SSE_HEADERS });
+}
+
+/** The events of a step run first, then the reply it decided on. */
+function afterStep(
+	before: Before,
+	replyTo: (call: StoryCall) => ReadableStream<Uint8Array>,
+	signal: AbortSignal
+): ReadableStream<Uint8Array> {
+	const encoder = new TextEncoder();
+	let reply: ReadableStreamDefaultReader<Uint8Array> | null = null;
+	let cancelled = false;
+	return new ReadableStream<Uint8Array>({
+		async start(controller) {
+			const send: Send = (step) => {
+				if (!cancelled) {
+					controller.enqueue(encoder.encode(encodeEvent(step)));
 				}
-			: {})
+			};
+			let resolved: StoryCall;
+			try {
+				resolved = await before(send, signal);
+			} catch {
+				console.error('[dreams] the step before a reply failed');
+				send({
+					type: 'failed',
+					message: 'That could not be done just now. Try again in a moment.'
+				});
+				controller.close();
+				return;
+			}
+			if (cancelled) {
+				return;
+			}
+			reply = replyTo(resolved).getReader();
+			for (;;) {
+				const { done, value } = await reply.read();
+				if (done || cancelled) {
+					break;
+				}
+				controller.enqueue(value);
+			}
+			if (!cancelled) {
+				controller.close();
+			}
+		},
+		cancel() {
+			cancelled = true;
+			reply?.cancel().catch(() => undefined);
+		}
 	});
-	return new Response(body, { headers: SSE_HEADERS });
+}
+
+/**
+ * The research step, for a story model that cannot call tools
+ * (docs/dreams.md, "Research"): the research model reads the brief's links
+ * and searches for it, each page and search sent as it happens, and what it
+ * wrote is sent as `research`. Null when it found nothing, refused, or
+ * failed: the reading then goes on without, told the links could not be
+ * read. Routed as the story model is, to its best providers.
+ */
+export async function researchFirst(
+	locals: App.Locals,
+	config: DaydreamConfig,
+	input: { brief: string; lookups: Lookups },
+	send: Send,
+	signal: AbortSignal
+): Promise<string | null> {
+	if (!config.researchModel) {
+		return null;
+	}
+	const routing = await providersFor(locals, config.researchModel);
+	if (routing.checked && routing.providers.length === 0) {
+		return null;
+	}
+	const [provider] = routing.providers;
+	const { lookups } = input;
+	try {
+		const reply = await streamResponses(
+			{
+				baseUrl: config.baseUrl,
+				apiKey: config.apiKey,
+				model: provider ? routing.listed : config.researchModel,
+				messages: researchMessages({
+					brief: input.brief,
+					canFetch: lookups.fetch !== null,
+					canSearch: lookups.search
+				}),
+				...SAMPLING.research,
+				signal,
+				tools: toolsFor(lookups),
+				...(provider ? { providers: [provider] } : {})
+			},
+			() => undefined,
+			(used) => send(toolEvent(used, lookups.fetch?.hosts ?? []))
+		);
+		const outcome = classifyReply(reply.text, reply.finishReason);
+		if (provider) {
+			await routing.record(provider, outcome).catch(() => undefined);
+		}
+		const text = reply.text.trim();
+		if (outcome !== 'complied' || text === '') {
+			return null;
+		}
+		send({ type: 'research', text });
+		return text;
+	} catch {
+		if (provider && !signal.aborted) {
+			await routing.record(provider, 'error').catch(() => undefined);
+		}
+		// Not the error: an upstream message can quote the request back.
+		console.error('[dreams] the research step failed');
+		return null;
+	}
 }
 
 /**

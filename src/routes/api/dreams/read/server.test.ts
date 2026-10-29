@@ -27,7 +27,10 @@ let upstream: ReturnType<typeof vi.fn>;
 const READING =
 	'<musts>\n- what the post is about\n</musts><spread n="2">x</spread><directions><direction p="0.5">One.</direction></directions>';
 
-function responsesStream(): Response {
+const RESEARCH = 'The post is a list of trance phrases: "deeper now", "let go".';
+
+/** A Responses API stream: a fetch and a search, then the step's answer. */
+function responsesStream(text = READING): Response {
 	const event = (fields: Record<string, unknown>) => `data: ${JSON.stringify(fields)}\n\n`;
 	return new Response(
 		[
@@ -39,7 +42,15 @@ function responsesStream(): Response {
 					status: 'completed'
 				}
 			}),
-			event({ type: 'response.output_text.delta', delta: READING }),
+			event({
+				type: 'response.output_item.done',
+				item: {
+					type: 'openrouter:web_search',
+					status: 'completed',
+					action: { type: 'search', query: 'trance phrases', sources: [] }
+				}
+			}),
+			event({ type: 'response.output_text.delta', delta: text }),
 			event({ type: 'response.completed', response: { status: 'completed' } })
 		].join(''),
 		{ headers: { 'content-type': 'text/event-stream' } }
@@ -68,9 +79,14 @@ beforeEach(async () => {
 	await grantTestDreams(db, ada.id);
 	await acceptDisclosure(db, ada.id);
 	env.OPENROUTER_BASE_URL = 'https://models.test/api/v1';
-	upstream = vi.fn((url: string) =>
-		Promise.resolve(url.endsWith('/responses') ? responsesStream() : chatStream())
-	);
+	upstream = vi.fn((url: string, init: RequestInit) => {
+		if (!url.endsWith('/responses')) {
+			return Promise.resolve(chatStream());
+		}
+		// The research step's answer is its analysis, not a reading.
+		const researching = String(init.body).includes('You research for a writer');
+		return Promise.resolve(responsesStream(researching ? RESEARCH : READING));
+	});
 	vi.stubGlobal('fetch', upstream);
 });
 
@@ -79,14 +95,15 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
-async function read(brief: string, tools: boolean) {
+async function read(brief: string, tools: boolean, researchModel = '') {
 	const settings: Partial<Record<ServerSettingKey, string>> = {
 		openrouterApiKey: 'sk-or-test',
 		storyModel: JSON.stringify({
 			provider: 'openrouter',
 			openrouterModelId: 'test/model',
 			...(tools ? { tools: true } : {})
-		})
+		}),
+		researchModel
 	};
 	const response = await POST(
 		fakeEvent({ db, user: ada, settings: testSettings(settings), json: body(brief) })
@@ -95,8 +112,12 @@ async function read(brief: string, tools: boolean) {
 	for await (const event of readEvents(response.body as ReadableStream<Uint8Array>)) {
 		events.push(event);
 	}
-	const [url, init] = upstream.mock.calls[0] as [string, RequestInit];
-	return { events, url, sent: JSON.parse(String(init.body)) };
+	const calls = upstream.mock.calls.map(([url, init]) => ({
+		url: url as string,
+		sent: JSON.parse(String((init as RequestInit).body))
+	}));
+	const [first] = calls;
+	return { events, calls, url: first?.url, sent: first?.sent };
 }
 
 describe('POST /api/dreams/read', () => {
@@ -112,7 +133,8 @@ describe('POST /api/dreams/read', () => {
 					max_content_tokens: 6000,
 					allowed_domains: ['www.reddit.com']
 				}
-			}
+			},
+			expect.objectContaining({ type: 'openrouter:web_search' })
 		]);
 		expect(sent.provider.data_collection).toBe('deny');
 		expect(events.find((event) => event.type === 'fetch')).toEqual({
@@ -124,8 +146,72 @@ describe('POST /api/dreams/read', () => {
 		expect(events.at(-1)).toMatchObject({ type: 'done', ended: 'complete' });
 	});
 
+	it('offers a search, and says what was searched, for a brief that asks for research', async () => {
+		const { events, url, sent } = await read('Research common trance phrases and use them.', true);
+		expect(url).toBe('https://models.test/api/v1/responses');
+		expect(sent.tools).toEqual([
+			{
+				type: 'openrouter:web_search',
+				parameters: {
+					engine: 'parallel',
+					max_results: 5,
+					max_total_results: 15,
+					max_characters: 4000
+				}
+			}
+		]);
+		expect(sent.input[0].content).toContain('never the user’s own words');
+		expect(events.find((event) => event.type === 'search')).toEqual({
+			type: 'search',
+			query: 'trance phrases',
+			ok: true
+		});
+	});
+
+	it('has the research model research first for a story model without tools', async () => {
+		const { events, calls } = await read(
+			'Like this: https://www.reddit.com/r/x/1.',
+			false,
+			'z-ai/glm-5.2'
+		);
+		const [research, reading] = calls;
+		expect(research?.url).toBe('https://models.test/api/v1/responses');
+		expect(research?.sent.model).toBe('z-ai/glm-5.2');
+		expect(research?.sent.provider.data_collection).toBe('deny');
+		expect(research?.sent.tools.map((tool: { type: string }) => tool.type)).toEqual([
+			'openrouter:web_fetch',
+			'openrouter:web_search'
+		]);
+		// Only the brief goes to the research model.
+		expect(research?.sent.input.at(-1).content).toBe(
+			'<brief>\nLike this: https://www.reddit.com/r/x/1.\n</brief>'
+		);
+		expect(reading?.url).toBe('https://models.test/api/v1/chat/completions');
+		expect(reading?.sent.model).toBe('test/model');
+		expect(reading?.sent.messages[1].content).toContain(RESEARCH);
+		expect(events.map((event) => event.type).slice(0, 3)).toEqual(['fetch', 'search', 'research']);
+		expect(events.find((event) => event.type === 'research')).toEqual({
+			type: 'research',
+			text: RESEARCH
+		});
+		expect(events.at(-1)).toMatchObject({ type: 'done', ended: 'complete' });
+	});
+
+	it('reads on without research when the research step fails', async () => {
+		upstream.mockImplementationOnce(() => Promise.resolve(new Response('no', { status: 500 })));
+		const { events, calls } = await read(
+			'Like this: https://www.reddit.com/r/x/1.',
+			false,
+			'z-ai/glm-5.2'
+		);
+		expect(calls[1]?.sent.messages[0].content).toContain('You cannot open links.');
+		expect(events.some((event) => event.type === 'research')).toBe(false);
+		expect(events.at(-1)).toMatchObject({ type: 'done', ended: 'complete' });
+	});
+
 	it('tells a model that cannot call tools that the links cannot be opened', async () => {
-		const { url, sent } = await read('Like this: https://www.reddit.com/r/x/1.', false);
+		const { url, sent, calls } = await read('Like this: https://www.reddit.com/r/x/1.', false);
+		expect(calls).toHaveLength(1);
 		expect(url).toBe('https://models.test/api/v1/chat/completions');
 		expect(sent.tools).toBeUndefined();
 		expect(sent.messages[0].content).toContain('You cannot open links.');

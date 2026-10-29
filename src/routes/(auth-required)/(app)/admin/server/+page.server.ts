@@ -39,6 +39,7 @@ import {
 	PICTURE_MODEL_SETTING,
 	type PictureModelChoice,
 	parsePictureModel,
+	parseResearchModel,
 	parseStoryModel,
 	providerCredential,
 	SECRET_SETTING_KEYS,
@@ -189,7 +190,8 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 			{
 				storyProvider: story.provider,
 				storyModel: 'preset' in story ? story.preset : 'custom',
-				openrouterModelId: 'openrouterModelId' in story ? story.openrouterModelId : ''
+				openrouterModelId: 'openrouterModelId' in story ? story.openrouterModelId : '',
+				researchModelId: parseResearchModel(settings.researchModel) ?? ''
 			},
 			zod4(languageModelSettingsFormSchema),
 			{ id: LANGUAGE_MODEL_FORM, errors: false }
@@ -356,8 +358,24 @@ export const actions: Actions = {
 			return fail(400, { languageModelForm });
 		}
 		const { data } = languageModelForm;
+		const story = await storyModelChoice(data, platform, request.signal);
+		// A research model that cannot call tools would research nothing:
+		// refused, rather than saved to fail quietly on every brief. Not asked
+		// when the story model calls tools itself, which leaves it unused.
+		if (
+			data.researchModelId !== '' &&
+			!storyModelCallsTools(story) &&
+			!(await callsTools(data.researchModelId, platform, request.signal))
+		) {
+			return setError(
+				languageModelForm,
+				'researchModelId',
+				'OpenRouter doesn’t list this model as calling tools, so it couldn’t read or search anything. Choose one that does.'
+			);
+		}
 		await saveServerSettings(locals.db, {
-			storyModel: JSON.stringify(await storyModelChoice(data, platform, request.signal))
+			storyModel: JSON.stringify(story),
+			researchModel: data.researchModelId
 		});
 		return message(languageModelForm, SAVED);
 	},

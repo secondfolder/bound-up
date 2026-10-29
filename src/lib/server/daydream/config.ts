@@ -3,6 +3,7 @@ import {
 	type LanguageProviderId,
 	openrouterModelIdFor,
 	type ProviderCredentialKey,
+	parseResearchModel,
 	parseStoryModel,
 	providerCredential,
 	type ServerSettings,
@@ -28,11 +29,20 @@ export type DaydreamConfig = {
 	 * OpenRouter's `web_fetch` (docs/daydreams.md, "Links in a brief").
 	 */
 	readsLinks: boolean;
+	/**
+	 * A tool-calling model that researches a brief first, for a story model
+	 * that cannot (docs/dreams.md, "Research"); null when the story model
+	 * reads links itself, or none is set.
+	 */
+	researchModel: string | null;
 	/** OpenRouter's API root. Only the e2e suite points it anywhere else. */
 	baseUrl: string;
 };
 
-export type DaydreamSettings = Pick<ServerSettings, ProviderCredentialKey | 'storyModel'>;
+export type DaydreamSettings = Pick<
+	ServerSettings,
+	ProviderCredentialKey | 'storyModel' | 'researchModel'
+>;
 
 export const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
@@ -69,11 +79,13 @@ export function parseDaydreamConfig(
 	if (!apiKey) {
 		return null;
 	}
+	const readsLinks = storyModelCallsTools(choice);
 	return {
 		provider: choice.provider,
 		apiKey,
 		openrouterModelId: openrouterModelIdFor(choice),
-		readsLinks: storyModelCallsTools(choice),
+		readsLinks,
+		researchModel: readsLinks ? null : parseResearchModel(settings.researchModel),
 		baseUrl
 	};
 }

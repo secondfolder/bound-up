@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { briefLinks, isAllowedPage, pagesToRead, readableHosts } from './links';
+import { asksForResearch, briefLinks, isAllowedPage, pagesToRead, readableHosts } from './links';
 
 describe('links in a brief', () => {
 	const brief =
@@ -20,5 +20,14 @@ describe('links in a brief', () => {
 		expect(isAllowedPage('https://example.org/other', hosts)).toBe(true);
 		expect(isAllowedPage('https://evil.test/?q=brief', hosts)).toBe(false);
 		expect(isAllowedPage('not a url', hosts)).toBe(false);
+	});
+
+	it('offers a search only to a brief that links pages or asks for something looked up', () => {
+		expect(asksForResearch('research common phrases in obedience trance captions')).toBe(true);
+		expect(asksForResearch('use real phrases from hypnosis scripts')).toBe(true);
+		expect(asksForResearch('Look up how a night watch is run, then write it')).toBe(true);
+		expect(asksForResearch(brief)).toBe(true);
+		expect(asksForResearch('a training dynamic')).toBe(false);
+		expect(asksForResearch('make it feel real')).toBe(false);
 	});
 });

@@ -108,7 +108,9 @@ export const languageModelSettingsFormSchema = z
 	.object({
 		storyProvider: z.enum(LANGUAGE_PROVIDERS),
 		storyModel: z.string().max(100),
-		openrouterModelId: z.string().trim().max(200)
+		openrouterModelId: z.string().trim().max(200),
+		/** A tool-calling model to research briefs with, for a story model without tools; '' for none. */
+		researchModelId: z.string().trim().max(200).default('')
 	})
 	.superRefine((data, context) => {
 		requirePresetOf(
@@ -122,6 +124,13 @@ export const languageModelSettingsFormSchema = z
 				code: 'custom',
 				path: ['openrouterModelId'],
 				message: 'An OpenRouter model ID, like vendor/model-name. Search for one above.'
+			});
+		}
+		if (data.researchModelId !== '' && !OPENROUTER_MODEL_ID.test(data.researchModelId)) {
+			context.addIssue({
+				code: 'custom',
+				path: ['researchModelId'],
+				message: 'An OpenRouter model ID, like vendor/model-name, or nothing. Search for one above.'
 			});
 		}
 	});

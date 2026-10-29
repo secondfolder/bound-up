@@ -62,7 +62,9 @@ async function run(providers: string[], script: Script) {
 		restart: () => '|',
 		done: () => '',
 		failed: () => '',
-		fetch: () => ''
+		fetch: () => '',
+		search: () => '',
+		research: () => ''
 	};
 	const text = events
 		.map((event) => pieces[event.type](event))
@@ -139,7 +141,7 @@ describe('relay', () => {
 		expect(request?.providers).toBeUndefined();
 	});
 
-	it('passes on each page a tool read, saying whether the brief allowed it', async () => {
+	it('passes on each page a tool read, saying whether the brief allowed it, and each search', async () => {
 		const events: DreamEvent[] = [];
 		const body = relay({
 			request: { baseUrl: 'https://openrouter.test', apiKey: 'k', messages: [] },
@@ -148,9 +150,10 @@ describe('relay', () => {
 			providers: [],
 			record: () => Promise.resolve(),
 			hosts: ['example.org'],
-			stream: (_request, onText, onFetch) => {
-				onFetch({ url: 'https://example.org/a', ok: true });
-				onFetch({ url: 'https://evil.test/?q=x', ok: true });
+			stream: (_request, onText, onTool) => {
+				onTool({ kind: 'fetch', url: 'https://example.org/a', ok: true });
+				onTool({ kind: 'fetch', url: 'https://evil.test/?q=x', ok: true });
+				onTool({ kind: 'search', query: 'obedience captions', ok: true });
 				onText(PROSE);
 				return Promise.resolve({
 					text: PROSE,
@@ -168,6 +171,9 @@ describe('relay', () => {
 		expect(events.filter((event) => event.type === 'fetch')).toEqual([
 			{ type: 'fetch', url: 'https://example.org/a', ok: true, allowed: true },
 			{ type: 'fetch', url: 'https://evil.test/?q=x', ok: true, allowed: false }
+		]);
+		expect(events.filter((event) => event.type === 'search')).toEqual([
+			{ type: 'search', query: 'obedience captions', ok: true }
 		]);
 	});
 });

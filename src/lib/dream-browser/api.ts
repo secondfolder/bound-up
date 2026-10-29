@@ -219,6 +219,9 @@ export type StreamResult = {
 	provider: string;
 };
 
+/** A page read or a search made for a brief (docs/dreams.md, "Research"). */
+export type Lookup = Extract<DreamEvent, { type: 'fetch' | 'search' }>;
+
 type StreamPaths = { read: ReadRequest; build: BuildRequest; passage: PassageRequest };
 
 /**
@@ -234,8 +237,10 @@ export async function streamReply<Path extends keyof StreamPaths>(
 	options: {
 		signal?: AbortSignal;
 		onText?: (text: string) => void;
-		/** A page read for the brief, as it is read. */
-		onFetch?: (fetched: { url: string; ok: boolean; allowed: boolean }) => void;
+		/** A page read or a search made for the brief, as it happens. */
+		onLookup?: (lookup: Lookup) => void;
+		/** What a separate research step found, kept as the daydream's research. */
+		onResearch?: (text: string) => void;
 	} = {}
 ): Promise<StreamResult> {
 	const response = await send(`/api/dreams/${path}`, {
@@ -255,8 +260,10 @@ export async function streamReply<Path extends keyof StreamPaths>(
 			if (event.type === 'text') {
 				text += event.text;
 				options.onText?.(text);
-			} else if (event.type === 'fetch') {
-				options.onFetch?.(event);
+			} else if (event.type === 'fetch' || event.type === 'search') {
+				options.onLookup?.(event);
+			} else if (event.type === 'research') {
+				options.onResearch?.(event.text);
 			} else if (event.type === 'restart') {
 				text = '';
 				options.onText?.(text);

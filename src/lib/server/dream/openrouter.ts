@@ -189,13 +189,23 @@ function applyChunk(
 	}
 }
 
-/** A page a tool read while the model worked: where, and whether it was read. */
-export type Fetched = { url: string; ok: boolean };
+/**
+ * What a tool did while the model worked: a page it read (where, and whether
+ * it was read), or a web search (what it asked, and whether it answered).
+ */
+export type ToolUse =
+	| { kind: 'fetch'; url: string; ok: boolean }
+	| { kind: 'search'; query: string; ok: boolean };
 
 type ResponsesEvent = {
 	type?: string;
 	delta?: string;
-	item?: { type?: string; url?: string; status?: string };
+	item?: {
+		type?: string;
+		url?: string;
+		status?: string;
+		action?: { type?: string; query?: string };
+	};
 	response?: {
 		status?: string;
 		usage?: { input_tokens?: number; output_tokens?: number; cost?: number };
@@ -207,14 +217,14 @@ type ResponsesEvent = {
 /**
  * A completion through OpenRouter's Responses API, streamed, for a step
  * that uses tools (docs/dreams.md, "Research"): only its stream says what
- * each tool did, which the setup page shows. `onFetch` hears each page a
- * tool read. OpenRouter names some events differently from OpenAI
+ * each tool did, which the setup page shows. `onTool` hears each page a
+ * tool read and each search it made. OpenRouter names some events differently from OpenAI
  * (`response.content_part.delta`, `response.done`), so both are read.
  */
 export async function streamResponses(
 	request: CompletionRequest & { tools: readonly unknown[] },
 	onText: (text: string) => void = () => undefined,
-	onFetch: (fetched: Fetched) => void = () => undefined
+	onTool: (used: ToolUse) => void = () => undefined
 ): Promise<Completion> {
 	const started = Date.now();
 	const response = await fetch(`${request.baseUrl}/responses`, {
@@ -257,12 +267,26 @@ export async function streamResponses(
 		for (const line of lines) {
 			const event = parseChunk(line.trim()) as ResponsesEvent | null;
 			if (event) {
-				applyResponsesEvent(result, event, started, onText, onFetch);
+				applyResponsesEvent(result, event, started, onText, onTool);
 			}
 		}
 	}
 	result.latencyMs = Date.now() - started;
 	return result;
+}
+
+/**
+ * A tool's output item as what it did. A search names its query in
+ * `action` (measured 2026-10-30: `openrouter:web_search`, with
+ * `action.query` and the `sources` it found); anything else is read as a
+ * fetch of its `url`.
+ */
+function toolUse(item: NonNullable<ResponsesEvent['item']>): ToolUse {
+	const ok = item.status === 'completed';
+	if (item.action?.type === 'search' || item.type?.endsWith('web_search')) {
+		return { kind: 'search', query: item.action?.query ?? '', ok };
+	}
+	return { kind: 'fetch', url: item.url ?? item.type ?? '', ok };
 }
 
 /** Output items that are the model itself, rather than a tool at work. */
@@ -273,7 +297,7 @@ function applyResponsesEvent(
 	event: ResponsesEvent,
 	started: number,
 	onText: (text: string) => void,
-	onFetch: (fetched: Fetched) => void
+	onTool: (used: ToolUse) => void
 ): void {
 	const type = event.type ?? '';
 	if (type === 'error' || type === 'response.error' || type === 'response.failed') {
@@ -293,10 +317,7 @@ function applyResponsesEvent(
 		event.item?.type &&
 		!MODEL_ITEMS.has(event.item.type)
 	) {
-		onFetch({
-			url: event.item.url ?? event.item.type,
-			ok: event.item.status === 'completed'
-		});
+		onTool(toolUse(event.item));
 		return;
 	}
 	if (type === 'response.completed' || type === 'response.done' || type === 'response.incomplete') {

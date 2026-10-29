@@ -265,6 +265,17 @@ the model is saved, not on every suggestion; if OpenRouter cannot be reached
 the model is saved without it, and saving it again asks again. The panel
 says which the saved model is. The presets never call tools.
 
+**A story model that cannot call tools can have a research model**
+(`researchModel`, an OpenRouter id stored as it is, `''` for none): a second
+model that reads a brief's links and searches for it first, so the story
+model writes from what it found ([dreams.md](dreams.md#research-phase-6)).
+The field shows only while the story model as picked is not known to call
+tools: a preset never does, and a custom one does when OpenRouter lists it so,
+which the page learns as soon as the picker finds the model. Hidden, it is
+posted as it was, so choosing a story model with tools does not clear it; it
+is simply unused. Saving one that OpenRouter does not list as calling tools
+is refused, since it could research nothing.
+
 Ids are matched loosely enough for what the providers really use: an
 OpenRouter id may have a `:variant` and an `@` suffix with slashes in it, and
 a Runware AIR's version may have letters (`persona:242173@2788849L`).

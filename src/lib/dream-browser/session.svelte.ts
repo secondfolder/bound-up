@@ -73,6 +73,7 @@ import {
 	DreamRequestError,
 	drawNames,
 	fill,
+	type Lookup,
 	listDirections,
 	listDreams,
 	makePicture,
@@ -183,8 +184,8 @@ export class DreamSession {
 	general = $state<DreamPreference[]>([]);
 	#generalRevision: number | null;
 	readonly #userId: string;
-	/** Pages step 1 read for the brief on this page, each with how it went. Not stored. */
-	fetches = $state<{ url: string; ok: boolean; allowed: boolean }[]>([]);
+	/** Pages step 1 read and searches it made for the brief on this page, each with how it went. Not stored. */
+	lookups = $state<Lookup[]>([]);
 	/** Notices for the user, newest last. */
 	notices = $state<DreamNotice[]>([]);
 	readonly #seed: () => number;
@@ -371,7 +372,8 @@ export class DreamSession {
 
 	async #read(setup: DreamSetup, signal: AbortSignal) {
 		this.streaming = { what: 'read', text: '' };
-		this.fetches = [];
+		this.lookups = [];
+		let researched: string | null = null;
 		const reply = await streamReply(
 			'read',
 			readRequestFor(setup, this.worded, drawNudges(cryptoRandom), {
@@ -381,8 +383,11 @@ export class DreamSession {
 			{
 				signal,
 				onText: (text) => this.#streamed(text),
-				onFetch: (fetched) => {
-					this.fetches = [...this.fetches, fetched];
+				onLookup: (lookup) => {
+					this.lookups = [...this.lookups, lookup];
+				},
+				onResearch: (text) => {
+					researched = text;
 				}
 			}
 		);
@@ -392,7 +397,15 @@ export class DreamSession {
 				502
 			);
 		}
-		await this.#saveSetup(withReading(setup, parseBriefReading(reply.text)));
+		const reading = parseBriefReading(reply.text);
+		// A separate research step's findings are kept as written: the reading
+		// was told not to repeat them (docs/dreams.md, "Research").
+		await this.#saveSetup(
+			withReading(
+				setup,
+				researched ? { ...reading, research: { needed: true, text: researched } } : reading
+			)
+		);
 	}
 
 	async #build(setup: DreamSetup, signal: AbortSignal) {

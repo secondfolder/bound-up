@@ -100,19 +100,26 @@
 		<p class="live" aria-live="off">{liveLine}</p>
 	{/if}
 
-	{#if session.fetches.length > 0}
-		<ul class="fetches" aria-label="Pages read for the brief">
-			{#each session.fetches as fetched, index (index)}
-				<li data-ok={fetched.ok && fetched.allowed}>
-					{#if !fetched.allowed}
-						✗ Not opened: not one of the brief's sites
-					{:else if fetched.ok}
-						✓ Read
-					{:else}
-						✗ Could not be read
-					{/if}
-					<span class="url">{fetched.url}</span>
-				</li>
+	{#if session.lookups.length > 0}
+		<ul class="lookups" aria-label="Looked up for the brief">
+			{#each session.lookups as lookup, index (index)}
+				{#if lookup.type === 'search'}
+					<li data-ok={lookup.ok}>
+						{lookup.ok ? '✓ Searched for' : '✗ Could not search for'}
+						<span class="what">“{lookup.query}”</span>
+					</li>
+				{:else}
+					<li data-ok={lookup.ok && lookup.allowed}>
+						{#if !lookup.allowed}
+							✗ Not opened: not one of the brief's sites
+						{:else if lookup.ok}
+							✓ Read
+						{:else}
+							✗ Could not be read
+						{/if}
+						<span class="what">{lookup.url}</span>
+					</li>
+				{/if}
 			{/each}
 		</ul>
 	{/if}
@@ -415,7 +422,7 @@
 		background: var(--wa-color-surface-raised);
 	}
 
-	.fetches {
+	.lookups {
 		margin: 0;
 		padding: 0;
 		list-style: none;
@@ -425,7 +432,7 @@
 			color: var(--wa-color-text-quiet);
 		}
 
-		.url {
+		.what {
 			overflow-wrap: anywhere;
 		}
 	}

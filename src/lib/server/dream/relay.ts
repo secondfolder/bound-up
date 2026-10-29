@@ -24,8 +24,8 @@ import { classifyReply, type ReplyOutcome } from '../../model-providers';
 import {
 	type Completion,
 	type CompletionRequest,
-	type Fetched,
-	stream as openRouterStream
+	stream as openRouterStream,
+	type ToolUse
 } from './openrouter';
 
 export type RelayOptions = {
@@ -44,7 +44,7 @@ export type RelayOptions = {
 	stream?: (
 		request: CompletionRequest,
 		onText: (text: string) => void,
-		onFetch: (fetched: Fetched) => void
+		onTool: (used: ToolUse) => void
 	) => Promise<Completion>;
 	/** The sites a fetch may read from; a page elsewhere is shown as not allowed. */
 	hosts?: readonly string[];
@@ -55,6 +55,13 @@ function endedFor(outcome: ReplyOutcome, finishReason: string | null): Ended {
 		return 'refused';
 	}
 	return finishReason === 'length' ? 'stopped' : 'complete';
+}
+
+/** What a tool did, as the event the setup page shows. */
+export function toolEvent(used: ToolUse, hosts: readonly string[]): DreamEvent {
+	return used.kind === 'search'
+		? { type: 'search', query: used.query, ok: used.ok }
+		: { type: 'fetch', url: used.url, ok: used.ok, allowed: isAllowedPage(used.url, hosts) };
 }
 
 const FAILED_MESSAGE = 'The story could not be written just now. Try again in a moment.';
@@ -98,13 +105,7 @@ export function relay(options: RelayOptions): ReadableStream<Uint8Array> {
 							wrote = true;
 							send({ type: 'text', text });
 						},
-						(fetched) =>
-							send({
-								type: 'fetch',
-								url: fetched.url,
-								ok: fetched.ok,
-								allowed: isAllowedPage(fetched.url, options.hosts ?? [])
-							})
+						(used) => send(toolEvent(used, options.hosts ?? []))
 					);
 				} catch {
 					// Stopped by the user: nobody's fault, and nothing to send.

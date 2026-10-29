@@ -2,7 +2,9 @@
 	import type { Attachment } from 'svelte/attachments';
 	import { resolve } from '$app/paths';
 	import ModelChoice, { type ModelPresetOption } from '$lib/components/admin/ModelChoice.svelte';
+	import ModelDetails from '$lib/components/admin/ModelDetails.svelte';
 	import ModelProviderField from '$lib/components/admin/ModelProviderField.svelte';
+	import ModelSearch from '$lib/components/admin/ModelSearch.svelte';
 	import ProviderChecks from '$lib/components/admin/ProviderChecks.svelte';
 	import ProviderKeyDialog from '$lib/components/admin/ProviderKeyDialog.svelte';
 	import SecretSettingField from '$lib/components/admin/SecretSettingField.svelte';
@@ -117,6 +119,24 @@
 	const imageModelsBroken = $derived(
 		(photoMissing || illustratedMissing) && !imageModelIsTainted($imageModelTainted)
 	);
+
+	/**
+	 * Whether the story model as picked calls tools, which decides whether a
+	 * research model is asked for: none of the presets do; a custom model
+	 * does when OpenRouter lists it so, which `ModelChoice` hears once it has
+	 * found the model, and the saved one is known from the load until then.
+	 */
+	let storyTools = $state<{ id: string; tools: boolean } | null>(null);
+	const storyCallsTools = $derived.by(() => {
+		if ($languageModels.storyModel !== 'custom') {
+			return false;
+		}
+		const id = $languageModels.openrouterModelId.trim();
+		if (storyTools?.id === id) {
+			return storyTools.tools;
+		}
+		return id === data.languageModelForm.data.openrouterModelId && data.storyModelReadsLinks;
+	});
 
 	/**
 	 * The page's sections, for the jump row at the top. The page is long —
@@ -481,6 +501,9 @@
 					onmissing={(missing) => {
 						storyMissing = missing;
 					}}
+					ontools={(tools) => {
+						storyTools = { id: $languageModels.openrouterModelId.trim(), tools };
+					}}
 				>
 					{#snippet providerField()}
 						<ModelProviderField
@@ -495,18 +518,43 @@
 						/>
 					{/snippet}
 				</ModelChoice>
-				<!-- What is stored, not what is picked: OpenRouter is asked whether
-				     the model calls tools when it is saved. Worded without "saved",
-				     which the panel's stored-credential badge is found by. -->
-				<p class="env-note">
-					{#if data.storyModelReadsLinks}
-						The story model calls tools, so it reads the links in a daydream’s brief.
-					{:else}
-						The story model isn’t known to call tools, so links in a daydream’s brief go as text.
-						A custom model reads them if OpenRouter lists it as calling tools; it is checked as
-						it is stored.
-					{/if}
-				</p>
+				<!-- What is picked, as far as it is known: OpenRouter is asked again
+				     whether the model calls tools when it is saved. -->
+				{#if storyCallsTools}
+					<p class="env-note">
+						The story model calls tools, so it reads the links in a daydream’s brief and searches
+						for a brief that asks for research.
+					</p>
+					<!-- Kept as it is while hidden: the form posts its fields, and a
+					     missing one would clear it. -->
+					<input type="hidden" name="researchModelId" value={$languageModels.researchModelId} />
+				{:else}
+					<fieldset class="research">
+						<legend>Research model</legend>
+						<p class="env-note">
+							The story model isn’t known to call tools, so it can’t read the links in a brief
+							or search for one. A model that does can research a brief first, and the story model
+							writes from what it found. Optional: without one, links in a brief go as text.
+						</p>
+						<ModelSearch
+							provider="openrouter"
+							label="Search OpenRouter"
+							onpick={(result) => {
+								$languageModels.researchModelId = result.openrouterModelId;
+							}}
+						/>
+						<InputField
+							superform={languageModelForm}
+							field="researchModelId"
+							title="Research model ID"
+							type="text"
+							autocomplete="off"
+							with-clear
+							hint="Must call tools. Leave empty for none."
+						/>
+						<ModelDetails provider="openrouter" modelId={$languageModels.researchModelId} />
+					</fieldset>
+				{/if}
 				{#if stillInEnv('storyModel').length}
 					{@render envNote(stillInEnv('storyModel'))}
 				{/if}
@@ -1006,6 +1054,22 @@
 
 		wa-icon {
 			margin-top: 0.2rem;
+		}
+	}
+
+	.research {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		margin: 0;
+		padding: 0;
+		border: 0;
+		min-width: 0;
+
+		legend {
+			margin-bottom: 0.5rem;
+			padding: 0;
+			font-weight: var(--wa-font-weight-semibold);
 		}
 	}
 

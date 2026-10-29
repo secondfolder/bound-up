@@ -25,6 +25,7 @@ describe('parseDaydreamConfig', () => {
 			apiKey: 'sk-or-1',
 			openrouterModelId: OPENROUTER_STORY_MODEL_PRESETS[0].openrouterModelId,
 			readsLinks: false,
+			researchModel: null,
 			baseUrl: DEFAULT_OPENROUTER_BASE_URL
 		});
 	});
@@ -50,6 +51,21 @@ describe('parseDaydreamConfig', () => {
 		);
 		expect(readsLinks(JSON.stringify({ openrouterModelId: 'z-ai/glm-5.2' }))).toBe(false);
 		expect(readsLinks(JSON.stringify({ preset: 'hermes' }))).toBe(false);
+	});
+
+	it('researches with the research model only for a story model that cannot call tools', () => {
+		const research = (storyModel: string, researchModel: string) =>
+			parseDaydreamConfig(
+				testSettings({ openrouterApiKey: 'k', storyModel, researchModel }),
+				DEFAULT_OPENROUTER_BASE_URL
+			)?.researchModel;
+		const preset = JSON.stringify({ preset: 'hermes' });
+		expect(research(preset, 'z-ai/glm-5.2')).toBe('z-ai/glm-5.2');
+		expect(research(preset, '')).toBeNull();
+		expect(research(preset, 'not an id')).toBeNull();
+		expect(
+			research(JSON.stringify({ openrouterModelId: 'z-ai/glm-5.2', tools: true }), 'other/model')
+		).toBeNull();
 	});
 });
 

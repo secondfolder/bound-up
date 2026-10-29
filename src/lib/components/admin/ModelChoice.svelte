@@ -48,7 +48,8 @@
 		legend,
 		presets,
 		providerField,
-		onmissing
+		onmissing,
+		ontools
 	}: {
 		superform: SuperForm<T>;
 		choiceField: FormPathLeaves<T>;
@@ -60,6 +61,8 @@
 		providerField?: Snippet;
 		/** Whether the provider says it has no model by the custom id (`ModelDetails`). */
 		onmissing?: (missing: boolean) => void;
+		/** Whether OpenRouter lists the custom model it has found as calling tools. */
+		ontools?: (tools: boolean) => void;
 	} = $props();
 
 	// svelte-ignore state_referenced_locally
@@ -91,6 +94,7 @@
 	function pickOpenRouter(result: OpenRouterModelResult) {
 		pickedOpenRouter = result;
 		$modelId = result.openrouterModelId as typeof $modelId;
+		ontools?.(result.tools);
 	}
 
 	/** The search result last picked, so its details show without asking again. */
@@ -181,6 +185,7 @@
 					provider="openrouter"
 					modelId={String($modelId ?? '')}
 					known={pickedOpenRouter}
+					onfound={(result) => ontools?.(result.tools)}
 					{onmissing}
 				/>
 			{/if}

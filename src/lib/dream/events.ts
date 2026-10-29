@@ -11,6 +11,9 @@
  * - `failed`: it could not be finished; whatever came is kept.
  * - `fetch`: a page was read for the brief (`ok`), or could not be, or was
  *   not one the brief allowed (`allowed`).
+ * - `search`: the web was searched for the brief, with what query.
+ * - `research`: what a separate research step found, for a story model that
+ *   cannot call tools; it is kept as the daydream's research as written.
  *
  * Pure and alias-free.
  */
@@ -22,7 +25,9 @@ export type DreamEvent =
 	| { type: 'restart'; reason: 'refused' | 'failed' }
 	| { type: 'done'; ended: Ended; model: string; provider: string }
 	| { type: 'failed'; message: string }
-	| { type: 'fetch'; url: string; ok: boolean; allowed: boolean };
+	| { type: 'fetch'; url: string; ok: boolean; allowed: boolean }
+	| { type: 'search'; query: string; ok: boolean }
+	| { type: 'research'; text: string };
 
 /** One event as server-sent-event bytes. */
 export function encodeEvent(event: DreamEvent): string {
@@ -45,11 +50,13 @@ function decode(name: string, data: string): DreamEvent | null {
 	const event = { type: name, ...value } as DreamEvent;
 	switch (event.type) {
 		case 'text':
+		case 'research':
 			return typeof event.text === 'string' ? event : null;
 		case 'restart':
 		case 'done':
 		case 'failed':
 		case 'fetch':
+		case 'search':
 			return event;
 		default:
 			return null;
