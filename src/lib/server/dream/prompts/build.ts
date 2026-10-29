@@ -92,7 +92,8 @@ export function buildMessages(input: BuildInput): ModelMessage[] {
 		CORE_RULES,
 		limitsSection(input.limits),
 		INSTRUCTIONS,
-		passageFormat(CAPABILITIES.filter((name) => name !== 'research'))
+		// Not voice: that is on when the user listens, never the build's choice.
+		passageFormat(CAPABILITIES.filter((name) => name !== 'research' && name !== 'voice'))
 	].join('\n\n');
 	const parts = [wrap('brief', input.brief)];
 	if (input.musts.length > 0) {

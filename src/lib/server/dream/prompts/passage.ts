@@ -8,13 +8,13 @@
  */
 
 import type { Build } from '../../../dream/build';
+import { allowedTags } from '../../../dream/capabilities';
 import { serializeElements } from '../../../dream/elements';
 import { nextNote, parseFooter } from '../../../dream/footer';
 import { findTag, parseMarkup, plainText } from '../../../dream/markup';
+import type { UserTurn } from '../../../dream/story';
 import { bulletList, CORE_RULES, limitsSection, type ModelMessage, wrap } from './core';
 import { passageFormat } from './passage-format';
-
-export type UserTurn = { kind: 'continue' } | { kind: 'words'; text: string };
 
 export type PassageInput = {
 	setup: Pick<Build, 'heat' | 'telling' | 'capabilities' | 'elements' | 'presentation'> & {
@@ -45,17 +45,55 @@ export type PassageInput = {
 
 const FOOTER_TAG = /<after>[\s\S]*?(?:<\/after>|$)/;
 
-/** A past passage as it goes back to the model: markup kept, footer cut to its "next" line. */
-export function historyPassage(source: string): string {
-	const body = source.replace(FOOTER_TAG, '').trim();
+const TAG = /<\/?(?<name>[a-z][\w-]*)\b[^>]*>/gi;
+
+/**
+ * A past passage as it goes back to the model: markup kept, footer cut to its
+ * "next" line. With `allowed`, any tag this daydream did not enable is
+ * unwrapped to its words: a model imitates its own history, so one stray
+ * `<sound>` in a passage otherwise turned up in every passage after it (seen
+ * on a 20-passage simulated session).
+ */
+export function historyPassage(source: string, allowed?: ReadonlySet<string>): string {
+	let body = source.replace(FOOTER_TAG, '').trim();
+	if (allowed) {
+		body = body.replace(TAG, (tag, ...rest) => {
+			const groups = rest.at(-1) as { name?: string } | undefined;
+			return allowed.has(groups?.name?.toLowerCase() ?? '') ? tag : '';
+		});
+	}
 	const next = lastNext(source);
 	return next ? `${body}\n<after>\n${JSON.stringify({ next })}\n</after>` : body;
 }
 
-function describeTurn(turn: UserTurn): string {
-	return turn.kind === 'continue'
-		? 'The user pressed Continue, without writing anything: carry the story on.'
-		: wrap('user', turn.text);
+/**
+ * The user's turn as the model reads it. Choices and fields go as plain
+ * structured lines after the words, and a field left empty is reported as
+ * skipped, so the story can use it (docs/dreams.md, "Fields").
+ */
+export function describeTurn(turn: UserTurn): string {
+	const parts: string[] = [];
+	const filled = (turn.choices?.length ?? 0) + (turn.fields?.length ?? 0) > 0;
+	if (turn.kind === 'words') {
+		parts.push(wrap('user', turn.text));
+	} else if (!filled) {
+		parts.push('The user pressed Continue, without writing anything: carry the story on.');
+	}
+	if (turn.choices && turn.choices.length > 0) {
+		parts.push(
+			`The user's choices in the passage: ${turn.choices.map((choice) => `${choice.id} = ${JSON.stringify(choice.value)}`).join('; ')}`
+		);
+	}
+	const blocks = new Map<string, string[]>();
+	for (const field of turn.fields ?? []) {
+		const lines = blocks.get(field.block) ?? [];
+		lines.push(`${field.name}: ${field.value ? JSON.stringify(field.value) : 'skipped'}`);
+		blocks.set(field.block, lines);
+	}
+	for (const [block, lines] of blocks) {
+		parts.push(`The user filled in ${block}: ${lines.join('; ')}`);
+	}
+	return parts.join('\n');
 }
 
 function setupSection(input: PassageInput): string {
@@ -101,7 +139,7 @@ function nowSection(
 	}
 	if (input.take) {
 		parts.push(
-			`This passage was already written for this moment:\n${wrap('take', historyPassage(input.take))}\nWrite it again: the same events, in new words. Do not reuse its sentences or its images.`
+			`This passage was already written for this moment:\n${wrap('take', historyPassage(input.take, allowedTags(input.setup.capabilities)))}\nWrite it again: the same events, in new words. Do not reuse its sentences or its images.`
 		);
 	} else {
 		parts.push('Write the next passage now, ending with its footer.');
@@ -121,6 +159,7 @@ export function passageMessages(input: PassageInput): ModelMessage[] {
 		passageFormat(input.setup.capabilities),
 		setupSection(input)
 	].join('\n\n');
+	const allowed = allowedTags(input.setup.capabilities);
 	const messages: ModelMessage[] = [{ role: 'system', content: system }];
 	if (input.summaries && input.summaries.length > 0) {
 		messages.push({
@@ -129,7 +168,7 @@ export function passageMessages(input: PassageInput): ModelMessage[] {
 		});
 	}
 	for (const [index, entry] of input.history.entries()) {
-		messages.push({ role: 'assistant', content: historyPassage(entry.passage) });
+		messages.push({ role: 'assistant', content: historyPassage(entry.passage, allowed) });
 		// Every turn but the last goes between passages; the last is in "now".
 		if (index < input.history.length - 1) {
 			messages.push({ role: 'user', content: describeTurn(entry.turn) });

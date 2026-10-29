@@ -31,7 +31,7 @@ export const CAPABILITY_TAGS: Readonly<Record<Capability, readonly string[]>> = 
 	reveals: ['hidden', 'more'],
 	choices: ['cycle'],
 	questions: ['ask', 'option'],
-	blocks: ['block', 'texts', 'letter', 'notice', 'diary', 'field', 'option'],
+	blocks: ['block', 'texts', 'letter', 'field', 'option'],
 	tone: ['whisper', 'loud', 'slow'],
 	dice: ['roll', 'on'],
 	pictures: ['picture'],

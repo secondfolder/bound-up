@@ -23,8 +23,21 @@ import { repeatedPhrases } from './repetition';
 /** A turn on the path, opened: null when it could not be. */
 export type PathTurn = { id: string; turn: DreamTurn | null };
 
-/** What the user did after a passage, as the prompt describes it. */
-export type UserTurn = { kind: 'continue' } | { kind: 'words'; text: string };
+/** A cycling choice as the user left it (`<cycle id>`). */
+export type TurnChoice = { id: string; value: string };
+
+/** One field of a block as the user left it; an empty value is a skipped field. */
+export type TurnField = { block: string; name: string; value: string };
+
+/**
+ * What the user did after a passage, as the prompt describes it: words, or
+ * Continue, either with the choices they set and the fields they filled in
+ * (docs/dreams.md, "Fields").
+ */
+export type UserTurn = ({ kind: 'continue' } | { kind: 'words'; text: string }) & {
+	choices?: TurnChoice[];
+	fields?: TurnField[];
+};
 
 export type HistoryEntry = { passage: string; turn: UserTurn };
 
@@ -43,10 +56,14 @@ function isInput(entry: PathTurn | undefined): entry is { id: string; turn: Drea
 	return entry?.turn?.kind === 'input';
 }
 
-/** What the user's turn tells the model. Only words, for now; the rest come with phase 3. */
+/** What the user's turn tells the model: words, choices and fields. Answers and rolls come later. */
 export function userTurnOf(input: DreamInputTurn | null): UserTurn {
 	const text = input?.text.trim() ?? '';
-	return text ? { kind: 'words', text } : { kind: 'continue' };
+	const extra = {
+		...(input && input.cycles.length > 0 ? { choices: input.cycles } : {}),
+		...(input && input.fields.length > 0 ? { fields: input.fields } : {})
+	};
+	return text ? { kind: 'words', text, ...extra } : { kind: 'continue', ...extra };
 }
 
 /**

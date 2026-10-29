@@ -53,7 +53,7 @@ export function elementsMessages(
 ): ModelMessage[] {
 	const parts = [
 		wrap('elements', serializeElements(input.elements)),
-		wrap('passages', input.passages.map(historyPassage).join('\n\n---\n\n'))
+		wrap('passages', input.passages.map((passage) => historyPassage(passage)).join('\n\n---\n\n'))
 	];
 	if (input.focus) {
 		parts.push(CARD_FOCUS(input.focus));
@@ -84,7 +84,10 @@ export function summaryMessages(input: Shared & { passages: readonly string[] })
 		),
 		{
 			role: 'user',
-			content: wrap('scene', input.passages.map(historyPassage).join('\n\n---\n\n'))
+			content: wrap(
+				'scene',
+				input.passages.map((passage) => historyPassage(passage)).join('\n\n---\n\n')
+			)
 		}
 	];
 }

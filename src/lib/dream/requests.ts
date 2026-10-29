@@ -62,9 +62,22 @@ export const buildRequestSchema = z.object({
 
 export type BuildRequest = z.output<typeof buildRequestSchema>;
 
+const SLUG = /^[\w-]{1,40}$/;
+const slug = z.string().regex(SLUG);
+const turnExtras = {
+	choices: z
+		.array(z.object({ id: slug, value: required(200) }))
+		.max(20)
+		.optional(),
+	fields: z
+		.array(z.object({ block: slug, name: required(60), value: z.string().max(1000) }))
+		.max(30)
+		.optional()
+};
+
 const userTurnSchema = z.discriminatedUnion('kind', [
-	z.object({ kind: z.literal('continue') }),
-	z.object({ kind: z.literal('words'), text: required(MAX_INPUT_CHARS) })
+	z.object({ kind: z.literal('continue'), ...turnExtras }),
+	z.object({ kind: z.literal('words'), text: required(MAX_INPUT_CHARS), ...turnExtras })
 ]);
 
 const setupSchema = z.object({
