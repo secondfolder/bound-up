@@ -65,7 +65,12 @@ export async function streamSpeech(
 			reference_id: request.voice,
 			format: 'mp3',
 			mp3_bitrate: 64,
-			latency: 'balanced',
+			// Not `balanced`, which starts in about 0.4 s rather than 2.5 s but
+			// cut the last word of a clip short ("waiting" ended without its
+			// "-ing"), heard 2026-10-30. A `[break]` after the text kept the word
+			// but ended each clip with a sharp breath. The wait is mostly hidden:
+			// each clip is fetched while the one before plays.
+			latency: 'normal',
 			normalize: true
 		}),
 		signal: request.signal

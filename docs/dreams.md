@@ -809,7 +809,8 @@ likes.
 of the one playing so a change of speaker does not wait. The route checks the
 feature, the disclosure and the daily limit (`spendVoice`, counted before the
 request, in UTF-8 bytes as Fish bills; a day is a UTC date), then relays
-Fish's stream (`/v1/tts/stream/with-timestamp`, S2 Pro, mp3) as the engine's
+Fish's stream (`/v1/tts/stream/with-timestamp`, S2 Pro, mp3, at `normal`
+latency: `balanced` starts sooner but cut each clip's last word short) as the engine's
 events: `audio` pieces and `words`, the latest timings for each of Fish's
 chunks. The browser joins the pieces into a clip and keeps it for the page,
 so replaying costs nothing; nothing is stored anywhere, and the server keeps
