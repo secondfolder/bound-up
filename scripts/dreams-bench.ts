@@ -12,16 +12,16 @@
  * server settings (Admin → Server settings), so a dev server's key works as-is.
  * It costs real money: the summary prints what each run spent.
  */
+import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { createClient } from '@libsql/client';
 import { BENCH_BRIEFS, type BenchBrief } from '../src/lib/server/dream/bench/briefs.ts';
 import { runDocument, summary } from '../src/lib/server/dream/bench/report.ts';
 import { type BenchRun, runBrief } from '../src/lib/server/dream/bench/run.ts';
-import { complete } from '../src/lib/server/dream/openrouter.ts';
+import { stream } from '../src/lib/server/dream/openrouter.ts';
+import { apiKey, ROOT } from './dreams-key.ts';
 
-const ROOT = new URL('../', import.meta.url).pathname;
 const BASE_URL = process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1';
 
 const { values } = parseArgs({
@@ -32,32 +32,26 @@ const { values } = parseArgs({
 		passages: { type: 'string', default: '2' },
 		seed: { type: 'string', default: 'bench' },
 		concurrency: { type: 'string', default: '4' },
-		temperature: { type: 'string', default: '1' }
+		temperature: { type: 'string', default: '1' },
+		label: { type: 'string' },
+		'fingerprint-model': { type: 'string' }
 	}
 });
 
-async function apiKey(): Promise<string> {
-	if (process.env.OPENROUTER_API_KEY) {
-		return process.env.OPENROUTER_API_KEY;
-	}
-	const db = createClient({ url: `file:${join(ROOT, 'local.db')}` });
+/**
+ * The prompt version under test: the commit, marked "+dirty" when the engine's
+ * code has uncommitted changes, so two bench folders can be told apart.
+ */
+function defaultLabel(): string {
+	const git = (args: string[]): string =>
+		execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
 	try {
-		const result = await db.execute({
-			sql: 'select value from server_settings where key = ?',
-			args: ['openrouterApiKey']
-		});
-		const value = result.rows[0]?.value;
-		if (typeof value === 'string' && value) {
-			return value;
-		}
+		const commit = git(['rev-parse', '--short', 'HEAD']);
+		const dirty = git(['status', '--porcelain', 'src/lib/dream', 'src/lib/server/dream']);
+		return dirty ? `${commit}+dirty` : commit;
 	} catch {
-		// No local.db, or no settings table yet: fall through to the message below.
-	} finally {
-		db.close();
+		return 'unlabelled';
 	}
-	throw new Error(
-		'No OpenRouter key: set OPENROUTER_API_KEY, or set one in Admin → Server settings on a dev server (local.db).'
-	);
 }
 
 function chosenBriefs(): BenchBrief[] {
@@ -98,6 +92,17 @@ async function main(): Promise<void> {
 	const models = values.models.split(',');
 	const passages = Number.parseInt(values.passages, 10);
 	const temperature = Number.parseFloat(values.temperature);
+	const label = values.label ?? defaultLabel();
+	const fingerprintModel = values['fingerprint-model'] ?? models[0] ?? '';
+	const fingerprint = (messages: Parameters<typeof stream>[0]['messages']) =>
+		stream({
+			baseUrl: BASE_URL,
+			apiKey: key,
+			model: fingerprintModel,
+			messages,
+			temperature: 0,
+			maxTokens: 400
+		});
 	const tasks: (() => Promise<BenchRun>)[] = [];
 	for (const brief of chosenBriefs()) {
 		const runs = values.runs ? Number.parseInt(values.runs, 10) : (brief.runs ?? 3);
@@ -106,11 +111,13 @@ async function main(): Promise<void> {
 				const seed = `${values.seed}-${index + 1}`;
 				tasks.push(async () => {
 					const run = await runBrief(brief, {
+						label,
 						model,
+						fingerprint,
 						seed,
 						passages,
 						complete: (messages) =>
-							complete({
+							stream({
 								baseUrl: BASE_URL,
 								apiKey: key,
 								model,
@@ -128,7 +135,7 @@ async function main(): Promise<void> {
 	process.stdout.write(`Running ${tasks.length} bench runs…\n`);
 	const results = await pool(tasks, Number.parseInt(values.concurrency, 10));
 	const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-	const out = join(ROOT, 'dream-bench', `${stamp}-${values.seed}`);
+	const out = join(ROOT, 'dream-bench', `${stamp}-${label}-${values.seed}`);
 	await mkdir(join(out, 'runs'), { recursive: true });
 	await writeFile(join(out, 'summary.md'), summary(results));
 	await writeFile(join(out, 'runs.json'), JSON.stringify(results, null, '\t'));

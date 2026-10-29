@@ -6,6 +6,7 @@
  * Alias-free, for the bench.
  */
 
+import { FINGERPRINT_FIELDS, type Fingerprint, fingerprintSpread } from './fingerprint';
 import type { BenchRun } from './run';
 
 function percent(part: number, whole: number): string {
@@ -47,6 +48,24 @@ function variety(runs: readonly BenchRun[]): string {
 	].join(' · ');
 }
 
+/** Each fingerprint field's values across the runs, most common first. */
+function fingerprintTable(runs: readonly BenchRun[]): string[] {
+	const fingerprints = runs
+		.map((run) => run.fingerprint)
+		.filter((value): value is Fingerprint => value !== null);
+	if (fingerprints.length < 2) {
+		return [];
+	}
+	const spread = fingerprintSpread(fingerprints);
+	return FINGERPRINT_FIELDS.map((field) => {
+		const values = spread[field];
+		const top = values
+			.slice(0, 4)
+			.map(([value, count]) => (count > 1 ? `${value} ×${count}` : value));
+		return `- **${field}**: ${values.length} different in ${fingerprints.length} runs: ${top.join('; ')}`;
+	});
+}
+
 export function summary(runs: readonly BenchRun[]): string {
 	const groups = new Map<string, BenchRun[]>();
 	for (const run of runs) {
@@ -69,6 +88,13 @@ export function summary(runs: readonly BenchRun[]): string {
 			`| ${key} | ${group.length} | ${errors} | ${percent(passed, checks.length)} | ${variety(group)} |`
 		);
 	}
+	lines.push('', '## Variety by fingerprint', '');
+	for (const [key, group] of groups) {
+		const table = fingerprintTable(group);
+		if (table.length > 0) {
+			lines.push(`### ${key}`, '', ...table, '');
+		}
+	}
 	lines.push('', '## Failed checks', '');
 	for (const run of runs) {
 		const failed = run.checks.filter((check) => !check.ok);
@@ -86,7 +112,7 @@ export function summary(runs: readonly BenchRun[]): string {
 /** One run in full, to read: every prompt as sent and every reply as received. */
 export function runDocument(run: BenchRun): string {
 	const lines = [
-		`# ${run.brief.id} · ${run.model} · ${run.seed}`,
+		`# ${run.brief.id} · ${run.model} · ${run.seed} · ${run.label}`,
 		'',
 		`Brief: ${run.brief.brief}`,
 		`Nudges: ${run.nudges.map((nudge) => `${nudge.dimension}: ${nudge.text}`).join('; ')}`,

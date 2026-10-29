@@ -19,7 +19,7 @@ how it reads) and **elements** (anything worth a record, of any type), and
 offers a **menu of capabilities** it may opt into. Code supplies the
 randomness: the model lists several directions and code picks one.
 
-## What exists now (phase 0)
+## What exists now (phase 0, the tooling)
 
 | Piece | Where |
 | --- | --- |
@@ -30,13 +30,16 @@ randomness: the model lists several directions and code picks one.
 | Repetition, overused names, clichés | `src/lib/dream/repetition.ts` |
 | The prompts | `src/lib/server/dream/prompts/` |
 | A minimal OpenRouter client | `src/lib/server/dream/openrouter.ts` |
-| The bench | `src/lib/server/dream/bench/`, `scripts/dreams-bench.ts` |
+| The bench, its checks and the variety fingerprint | `src/lib/server/dream/bench/`, `scripts/dreams-bench.ts` |
+| The pairwise judge | `bench/judge.ts`, `scripts/dreams-judge.ts` |
+| Blind A/B votes and the leaderboard | `/debug/dreams`, `src/lib/server/dream/ab.ts`, `bench/leaderboard.ts` |
 
 Everything under `src/lib/dream/` is pure and alias-free, and so is everything
 under `src/lib/server/dream/`, so the bench can run it under `tsx` outside
 Vite. Keep it that way: an import of `$lib` or `$env` there breaks the bench.
 
-There is no route, table or UI yet.
+There is no player-facing route, table or UI yet: only the dev-only voting
+page.
 
 ## The markup
 
@@ -119,15 +122,28 @@ prose in plain text):
 The key is `OPENROUTER_API_KEY`, or else the OpenRouter key in `local.db`'s
 server settings. It costs real money, and the summary says how much.
 
+Every run is labelled with the prompt version under test: the commit, marked
+`+dirty` when `src/lib/dream` or `src/lib/server/dream` has uncommitted
+changes, or a name given with `--label`. The judge and the voting page compare
+labels, so bench the old prompts and the new at two commits (or two labels).
+
+The bench streams, so its timings are time to the first words of each step,
+which is what the plan's targets are (`TIME_TARGETS_MS`).
+
+After each run, a cheap model reduces it to a **fingerprint** (`setting`,
+`power`, `form`, `userRole`, `hook`, `opening`), and the summary counts each
+field's distinct values across a brief's runs: "the training brief produced 4
+settings in 20 runs, 11 of them a studio" is variety a person can read. Pass a
+cheap, permissive model with `--fingerprint-model`; it defaults to the first
+writer.
+
 All of code's randomness in a run (nudges, the pick) comes from one seed
 (`--seed` plus the run number and the brief), so two prompt versions can be
 compared on identical draws. Briefs carry what a person would expect of them
 (a spread range, an element range, code-checkable musts), and the checks in
 `bench/checks.ts` flag runs far outside those, along with tags the daydream
 did not enable, missing footers, more than one question, bare stat changes,
-overused names, clichés, repetition, and slow calls. The bench does not
-stream yet, so its timings are whole-call totals rather than time to the
-first words.
+overused names, clichés, repetition, and slow first words.
 
 `runBrief` takes its completion function as an argument, so
 `bench/run.test.ts` runs the whole pipeline against canned replies.
@@ -145,9 +161,46 @@ first words.
   flags. The prompt now says the opening uses only the chosen capabilities'
   markup.
 
+## The judge
+
+```sh
+npm run dreams:judge -- --a dream-bench/<folder-a> --b dream-bench/<folder-b> --model mistralai/mistral-small-3.2-24b-instruct
+```
+
+It pairs runs of the same brief from two folders and asks six questions
+(`JUDGE_QUESTIONS`: the brief, the musts, consistency, writing, markup,
+structure), each in both orders. A verdict counts only when the orders agree,
+which cancels a judge's lean towards whichever it read first, and both runs
+are cut to the same length first, because judges prefer longer answers. It
+writes `dream-bench/judge-<a>-vs-<b>.md` with a table and the reasons.
+Verdicts are cached by content in `dream-bench/.judge-cache.json`, so judging
+again after a change pays only for what changed.
+
+Use a judge from a different family than the writer. Mistral Small reads
+explicit content without refusing and judged two pairs for under a cent;
+mainstream models may refuse it. **The judge only sorts.** Judges track
+individual taste poorly and have been found to reward overwrought prose, so
+your votes decide.
+
+## Voting
+
+`/debug/dreams`, on a dev server, for an account with debug mode: two runs of
+the same brief from two prompt versions, side by side with the sides
+shuffled, and a vote (left, tie or right) with optional tags (samey, off
+brief, too much markup, flat, loved it). Each vote goes to
+`dream-bench/votes.jsonl` as a win for A or B, never a side, and the page
+moves straight on to the next pair. Under it, the **leaderboard**: a
+Bradley–Terry fit over every vote (`bench/leaderboard.ts`), one strength per
+version, with ties as half a win each.
+
+It reads the developer's own dream-bench/, so it exists only on a dev server.
+`src/lib/server/dream/ab.ts` uses Node's file system and is imported only
+behind `dev`, which keeps it out of every build. Passages are shown as plain
+text for now; the renderer comes with the player.
+
 ## Not built yet
 
-The variety map, the pairwise judge and the blind A/B rating page (the rest of
-phase 0), and every later phase: providers and their adult-content checks,
-routes, storage, the live setup page, the views, preferences, research,
-names, read-aloud. See the plan.
+Every later phase: providers and their adult-content checks, routes, storage,
+the live setup page, the views, preferences, research, names, read-aloud. See
+the plan. The judge's agreement with your votes and the simulated player come
+once there are votes to compare and a play loop to play.

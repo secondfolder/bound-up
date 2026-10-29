@@ -27,6 +27,15 @@
 				<wa-icon name="chevron-right" variant="solid"></wa-icon>
 			</a>
 		</li>
+		<li>
+			<a href={resolve('/(auth-required)/(app)/debug/dreams')}>
+				<span class="what">
+					<span>Bench votes</span>
+					<small>Blind A/B votes between two versions of the new daydream engine's prompts, and the leaderboard they make. Dev server only.</small>
+				</span>
+				<wa-icon name="chevron-right" variant="solid"></wa-icon>
+			</a>
+		</li>
 	</ul>
 </section>
 

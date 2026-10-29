@@ -24,12 +24,11 @@ const WHITESPACE = /\s+/;
 export type CheckResult = { id: string; ok: boolean; detail: string };
 
 /**
- * How long each whole call may take before the bench flags it. The bench
- * does not stream yet, so these are totals, and generous: the plan's targets
- * are for the first words appearing (docs/dreams.md, "Evaluation"), which
- * needs a streaming bench to measure.
+ * How long until the first words of each step may take before the bench
+ * flags it: the plan's targets (docs/dreams.md, "Evaluation"). The bench
+ * streams, so this is what a user would wait before seeing anything.
  */
-export const TIME_TARGETS_MS = { reading: 15_000, build: 45_000, passage: 25_000 } as const;
+export const TIME_TARGETS_MS = { reading: 6000, build: 12_000, passage: 3000 } as const;
 
 export type CheckInput = {
 	brief: BenchBrief;
@@ -160,17 +159,17 @@ function timingChecks({ timings }: CheckInput): CheckResult[] {
 	const slowest = Math.max(0, ...timings.passages);
 	return [
 		{
-			id: 'reading total time',
+			id: 'reading: first words',
 			ok: timings.reading <= TIME_TARGETS_MS.reading,
 			detail: `${timings.reading} ms`
 		},
 		{
-			id: 'build total time',
+			id: 'build: first words',
 			ok: timings.build <= TIME_TARGETS_MS.build,
 			detail: `${timings.build} ms`
 		},
 		{
-			id: 'passage total time',
+			id: 'passage: first words',
 			ok: slowest <= TIME_TARGETS_MS.passage,
 			detail: `slowest ${slowest} ms`
 		}

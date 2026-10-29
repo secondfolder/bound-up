@@ -35,7 +35,8 @@
 		"title-font": "uv run --no-project --python 3.13 --with-requirements scripts/title-font/requirements.txt python scripts/title-font/build.py",
 		"prompts:export": "NODE_OPTIONS=--max-old-space-size=8192 tsx scripts/prompts-export.ts",
 		"prompts:review": "NODE_OPTIONS=--max-old-space-size=8192 tsx scripts/prompts-review.ts",
-		"dreams:bench": "tsx scripts/dreams-bench.ts"
+		"dreams:bench": "tsx scripts/dreams-bench.ts",
+		"dreams:judge": "tsx scripts/dreams-judge.ts"
 	},
 	"lint-staged": {
 		"*.{js,mjs,cjs,ts,svelte,css,html,json,jsonc}": [

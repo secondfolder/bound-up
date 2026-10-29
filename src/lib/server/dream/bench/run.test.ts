@@ -40,7 +40,8 @@ function reply(text: string): Completion {
 		provider: 'Stub',
 		finishReason: 'stop',
 		usage: { promptTokens: 10, completionTokens: 10, cost: 0.001 },
-		latencyMs: 5
+		latencyMs: 5,
+		firstTokenMs: 3
 	};
 }
 
@@ -64,7 +65,13 @@ describe('runBrief', () => {
 			throw new Error('the training brief is missing from the bench set');
 		}
 		const { sent, complete } = stub();
-		const run = await runBrief(training, { model: 'stub', seed: 'test', passages: 2, complete });
+		const run = await runBrief(training, {
+			label: 'test',
+			model: 'stub',
+			seed: 'test',
+			passages: 2,
+			complete
+		});
 		expect(run.error).toBeUndefined();
 		expect(sent.map((entry) => entry.step)).toEqual(['reading', 'build', 'passage 2', 'passage 3']);
 		expect(run.picked).toMatch(/Weekly reports|A choir mistress/);
@@ -83,7 +90,13 @@ describe('runBrief', () => {
 			throw new Error('the training brief is missing from the bench set');
 		}
 		const { complete } = stub();
-		const run = await runBrief(training, { model: 'stub', seed: 'test', passages: 1, complete });
+		const run = await runBrief(training, {
+			label: 'test',
+			model: 'stub',
+			seed: 'test',
+			passages: 1,
+			complete
+		});
 		const spread = run.checks.find((check) => check.id === 'spread-fits-brief');
 		expect(spread).toMatchObject({ ok: false });
 		expect(run.checks.find((check) => check.id === 'passage 1: only enabled tags')?.ok).toBe(true);
@@ -94,6 +107,7 @@ describe('runBrief', () => {
 			throw new Error('the training brief is missing from the bench set');
 		}
 		const run = await runBrief(training, {
+			label: 'test',
 			model: 'stub',
 			seed: 'test',
 			passages: 1,
@@ -108,12 +122,14 @@ describe('runBrief', () => {
 			throw new Error('the training brief is missing from the bench set');
 		}
 		const first = await runBrief(training, {
+			label: 'test',
 			model: 'stub',
 			seed: 'same',
 			passages: 0,
 			complete: stub().complete
 		});
 		const second = await runBrief(training, {
+			label: 'test',
 			model: 'stub',
 			seed: 'same',
 			passages: 0,
@@ -121,5 +137,34 @@ describe('runBrief', () => {
 		});
 		expect(second.nudges).toEqual(first.nudges);
 		expect(second.picked).toBe(first.picked);
+	});
+});
+
+describe('the variety fingerprint', () => {
+	it('is taken from a cheap model after the run, and a bad one is dropped', async () => {
+		if (!training) {
+			throw new Error('the training brief is missing from the bench set');
+		}
+		const json =
+			'Here: {"setting": "a restaurant after close", "power": "she teaches, he obeys", "form": "prose", "userRole": "apprentice", "hook": "blind tasting", "opening": "three glasses"}';
+		const run = await runBrief(training, {
+			label: 'test',
+			model: 'stub',
+			seed: 'test',
+			passages: 0,
+			complete: stub().complete,
+			fingerprint: () => Promise.resolve(reply(json))
+		});
+		expect(run.fingerprint?.setting).toBe('a restaurant after close');
+		expect(run.steps.at(-1)?.step).toBe('fingerprint');
+		const bad = await runBrief(training, {
+			label: 'test',
+			model: 'stub',
+			seed: 'test',
+			passages: 0,
+			complete: stub().complete,
+			fingerprint: () => Promise.resolve(reply('not json'))
+		});
+		expect(bad.fingerprint).toBeNull();
 	});
 });

@@ -316,6 +316,9 @@
 				"src/lib/server/media/local.ts",
 				// SMTP and the mail outbox; likewise dead code in the worker bundle.
 				"src/lib/server/mail/local.ts",
+				// The bench-vote page's reader of dream-bench/; imported only behind
+				// `dev`, so likewise dead code in every build.
+				"src/lib/server/dream/ab.ts",
 				"src/lib/testing/**",
 				"**/*.test.ts"
 			],

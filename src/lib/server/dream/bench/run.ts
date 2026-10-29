@@ -23,6 +23,7 @@ import { passageMessages, type UserTurn } from '../prompts/passage';
 import { readingMessages } from '../prompts/reading';
 import type { BenchBrief } from './briefs';
 import { type CheckResult, runChecks } from './checks';
+import { type Fingerprint, fingerprintMessages, parseFingerprint } from './fingerprint';
 
 export type Complete = (messages: readonly ModelMessage[], step: string) => Promise<Completion>;
 
@@ -34,6 +35,8 @@ export type BenchStep = {
 
 export type BenchRun = {
 	brief: BenchBrief;
+	/** The prompt version under test: a git commit, or a name given with --label. */
+	label: string;
 	model: string;
 	seed: string;
 	nudges: Nudge[];
@@ -43,16 +46,20 @@ export type BenchRun = {
 	passages: string[];
 	steps: BenchStep[];
 	checks: CheckResult[];
+	fingerprint: Fingerprint | null;
 	cost: number;
 	error?: string;
 };
 
 export type RunOptions = {
+	label: string;
 	model: string;
 	seed: string;
 	/** Passages after the opening. */
 	passages: number;
 	complete: Complete;
+	/** A cheap model for the variety fingerprint; none skips it. */
+	fingerprint?: Complete;
 };
 
 const BENCH_LIMITS: readonly string[] = [];
@@ -69,6 +76,8 @@ export async function runBrief(brief: BenchBrief, options: RunOptions): Promise<
 	};
 	const run: BenchRun = {
 		brief,
+		label: options.label,
+		fingerprint: null,
 		model: options.model,
 		seed: options.seed,
 		nudges,
@@ -85,9 +94,15 @@ export async function runBrief(brief: BenchBrief, options: RunOptions): Promise<
 	} catch (error) {
 		run.error = error instanceof Error ? error.message : String(error);
 	}
+	if (options.fingerprint && run.build && run.passages[0]) {
+		run.fingerprint = await fingerprintOf(run, options.fingerprint, steps);
+	}
 	run.cost = steps.reduce((sum, step) => sum + (step.completion.usage.cost ?? 0), 0);
+	// Time to the first words where the call was streamed, as the plan's targets are.
 	const latency = (name: string): number[] =>
-		steps.filter((step) => step.step.startsWith(name)).map((step) => step.completion.latencyMs);
+		steps
+			.filter((step) => step.step.startsWith(name))
+			.map((step) => step.completion.firstTokenMs ?? step.completion.latencyMs);
 	run.checks = runChecks({
 		brief,
 		reading: run.reading,
@@ -163,5 +178,22 @@ async function runSteps(
 			})
 		);
 		run.passages.push(text);
+	}
+}
+
+async function fingerprintOf(
+	run: BenchRun,
+	complete: Complete,
+	steps: BenchStep[]
+): Promise<Fingerprint | null> {
+	const buildStep = steps.find((step) => step.step === 'build');
+	const messages = fingerprintMessages(buildStep?.completion.text ?? '', run.passages[0] ?? '');
+	try {
+		const completion = await complete(messages, 'fingerprint');
+		steps.push({ step: 'fingerprint', messages, completion });
+		return parseFingerprint(completion.text);
+	} catch {
+		// A fingerprint is a bonus; the run stands without it.
+		return null;
 	}
 }
