@@ -100,6 +100,29 @@
 		<p class="live" aria-live="off">{liveLine}</p>
 	{/if}
 
+	{#if session.fetches.length > 0}
+		<ul class="fetches" aria-label="Pages read for the brief">
+			{#each session.fetches as fetched, index (index)}
+				<li data-ok={fetched.ok && fetched.allowed}>
+					{#if !fetched.allowed}
+						✗ Not opened: not one of the brief's sites
+					{:else if fetched.ok}
+						✓ Read
+					{:else}
+						✗ Could not be read
+					{/if}
+					<span class="url">{fetched.url}</span>
+				</li>
+			{/each}
+		</ul>
+	{/if}
+
+	{#if reading?.research.needed && reading.research.text}
+		<wa-details summary="Background">
+			<p class="research">{reading.research.text}</p>
+		</wa-details>
+	{/if}
+
 	{#if reading && reading.musts.length > 0}
 		<fieldset class="chips musts">
 			<legend>What it must have</legend>
@@ -390,6 +413,26 @@
 		padding: var(--wa-space-m);
 		border-radius: var(--wa-border-radius-m);
 		background: var(--wa-color-surface-raised);
+	}
+
+	.fetches {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		font-size: var(--wa-font-size-s);
+
+		li[data-ok='false'] {
+			color: var(--wa-color-text-quiet);
+		}
+
+		.url {
+			overflow-wrap: anywhere;
+		}
+	}
+
+	.research {
+		margin: 0;
+		white-space: pre-line;
 	}
 
 	.kept {

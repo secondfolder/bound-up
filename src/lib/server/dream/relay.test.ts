@@ -61,7 +61,8 @@ async function run(providers: string[], script: Script) {
 		text: (event) => (event.type === 'text' ? event.text : ''),
 		restart: () => '|',
 		done: () => '',
-		failed: () => ''
+		failed: () => '',
+		fetch: () => ''
 	};
 	const text = events
 		.map((event) => pieces[event.type](event))
@@ -136,5 +137,37 @@ describe('relay', () => {
 		const [request] = stream.mock.calls[0] ?? [];
 		expect(request?.model).toBe('z-ai/glm-5.2@preset/nsfw');
 		expect(request?.providers).toBeUndefined();
+	});
+
+	it('passes on each page a tool read, saying whether the brief allowed it', async () => {
+		const events: DreamEvent[] = [];
+		const body = relay({
+			request: { baseUrl: 'https://openrouter.test', apiKey: 'k', messages: [] },
+			listedModel: 'm',
+			configuredModel: 'm',
+			providers: [],
+			record: () => Promise.resolve(),
+			hosts: ['example.org'],
+			stream: (_request, onText, onFetch) => {
+				onFetch({ url: 'https://example.org/a', ok: true });
+				onFetch({ url: 'https://evil.test/?q=x', ok: true });
+				onText(PROSE);
+				return Promise.resolve({
+					text: PROSE,
+					provider: 'p',
+					finishReason: 'stop',
+					usage: { promptTokens: 1, completionTokens: 1, cost: 0 },
+					latencyMs: 1,
+					firstTokenMs: 1
+				});
+			}
+		});
+		for await (const event of readEvents(body)) {
+			events.push(event);
+		}
+		expect(events.filter((event) => event.type === 'fetch')).toEqual([
+			{ type: 'fetch', url: 'https://example.org/a', ok: true, allowed: true },
+			{ type: 'fetch', url: 'https://evil.test/?q=x', ok: true, allowed: false }
+		]);
 	});
 });

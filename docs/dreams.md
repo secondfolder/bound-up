@@ -647,9 +647,49 @@ When the story's shape changes, a passage's footer may propose new telling
 notes (`{"telling": …}`). They are shown in a notice with "Use these" and
 "Keep as it is", and applied only if accepted.
 
+## Research (phase 6)
+
+A brief can link pages ("like this: https://…"). When the story model can
+call tools (a custom model OpenRouter says does, `storyModelCallsTools`),
+step 1 reads them before answering, and its reply's `<research>` keeps what
+it found for the build and every passage after (carried in the setup).
+
+**The fetch service** is OpenRouter's own fetch tool, `openrouter:web_fetch`,
+with Parallel's engine (`webFetch` in `src/lib/server/dream-api.ts`). The
+plan left the service to be chosen here, with Parallel the first candidate;
+the first engine had already measured it as the one that reads reddit, which
+briefs link most (Exa answered nothing for a subreddit, Firecrawl refuses
+reddit, OpenRouter's own fetch returned raw RSS), and it needs no key or
+setting beyond the OpenRouter one. Such a step goes through OpenRouter's
+Responses API (`streamResponses`), because only its stream says what each
+fetch did.
+
+**What may be read** (`src/lib/dream/links.ts`): the brief's first five
+links, and up to four more pages they lead to (an index read for its
+entries), eight at most (`max_uses`), and only on the sites the brief's own
+links are on (`allowed_domains`). The model chooses every URL, so a page
+could otherwise send it to a URL of the page's choosing with the brief in
+the query string. Each page is cut short (`max_content_tokens`), so a brief
+cannot fill the context. What a page says is material, never instructions
+(the core rules).
+
+**What the user sees.** Each page read appears on the setup page as it is
+read, "✓ Read" or "✗ Could not be read", and one on another site as "✗ Not
+opened" (the provider enforces the same list; `isAllowedPage` is the check
+the page shows). The research fills a "Background" panel.
+
+**A model that cannot call tools** is told the links cannot be opened and
+not to guess at them. The plan's fallback (the server reading the links and
+a cheap call writing the research) needs a second, tool-calling model to be
+configured, so it waits for that decision.
+
+**Not done: search.** The plan's second pass lets the model search the web.
+A search query can echo the brief to the search provider, which a fetch of a
+link the user gave does not, so it is left off until that trade is decided.
+
 ## Not built yet
 
-Every later phase: research, stats, dice and rolls, decks,
+Every later phase: stats, dice and rolls, decks,
 pictures and the texts and monologue views, read-aloud. A block's Done sends
 its fields without the words in the input box. Step 1
 and the build are still two calls for a spread of 1, and an edit works on the

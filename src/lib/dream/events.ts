@@ -9,6 +9,8 @@
  *   writing it again.
  * - `done`: the reply is finished, and how it ended.
  * - `failed`: it could not be finished; whatever came is kept.
+ * - `fetch`: a page was read for the brief (`ok`), or could not be, or was
+ *   not one the brief allowed (`allowed`).
  *
  * Pure and alias-free.
  */
@@ -19,7 +21,8 @@ export type DreamEvent =
 	| { type: 'text'; text: string }
 	| { type: 'restart'; reason: 'refused' | 'failed' }
 	| { type: 'done'; ended: Ended; model: string; provider: string }
-	| { type: 'failed'; message: string };
+	| { type: 'failed'; message: string }
+	| { type: 'fetch'; url: string; ok: boolean; allowed: boolean };
 
 /** One event as server-sent-event bytes. */
 export function encodeEvent(event: DreamEvent): string {
@@ -46,6 +49,7 @@ function decode(name: string, data: string): DreamEvent | null {
 		case 'restart':
 		case 'done':
 		case 'failed':
+		case 'fetch':
 			return event;
 		default:
 			return null;

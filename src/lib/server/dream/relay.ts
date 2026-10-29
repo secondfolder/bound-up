@@ -19,8 +19,14 @@
  */
 
 import { type DreamEvent, type Ended, encodeEvent } from '../../dream/events';
+import { isAllowedPage } from '../../dream/links';
 import { classifyReply, type ReplyOutcome } from '../../model-providers';
-import { type Completion, type CompletionRequest, stream as openRouterStream } from './openrouter';
+import {
+	type Completion,
+	type CompletionRequest,
+	type Fetched,
+	stream as openRouterStream
+} from './openrouter';
 
 export type RelayOptions = {
 	request: Omit<CompletionRequest, 'providers' | 'model'>;
@@ -34,7 +40,14 @@ export type RelayOptions = {
 	record: (provider: string, outcome: ReplyOutcome) => Promise<void>;
 	/** How many providers to try before giving up. */
 	attempts?: number;
-	stream?: typeof openRouterStream;
+	/** The completion call: Chat Completions by default; a step with tools passes its own. */
+	stream?: (
+		request: CompletionRequest,
+		onText: (text: string) => void,
+		onFetch: (fetched: Fetched) => void
+	) => Promise<Completion>;
+	/** The sites a fetch may read from; a page elsewhere is shown as not allowed. */
+	hosts?: readonly string[];
 };
 
 function endedFor(outcome: ReplyOutcome, finishReason: string | null): Ended {
@@ -84,7 +97,14 @@ export function relay(options: RelayOptions): ReadableStream<Uint8Array> {
 						(text) => {
 							wrote = true;
 							send({ type: 'text', text });
-						}
+						},
+						(fetched) =>
+							send({
+								type: 'fetch',
+								url: fetched.url,
+								ok: fetched.ok,
+								allowed: isAllowedPage(fetched.url, options.hosts ?? [])
+							})
 					);
 				} catch {
 					// Stopped by the user: nobody's fault, and nothing to send.

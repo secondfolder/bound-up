@@ -3,7 +3,7 @@ import { classifyReply } from '$lib/model-providers';
 import { splitOpenRouterModelId } from '$lib/model-search';
 import { type DaydreamConfig, readDaydreamConfig } from '$lib/server/daydream/config';
 import { hasAcceptedDisclosure } from '$lib/server/daydreams';
-import { complete } from '$lib/server/dream/openrouter';
+import { complete, streamResponses } from '$lib/server/dream/openrouter';
 import type { ModelMessage } from '$lib/server/dream/prompts/core';
 import { relay } from '$lib/server/dream/relay';
 import type { Sampling } from '$lib/server/dream/sampling';
@@ -94,7 +94,33 @@ async function route(locals: App.Locals, config: DaydreamConfig) {
 	};
 }
 
-export type StoryCall = { messages: ModelMessage[] } & Sampling;
+export type StoryCall = {
+	messages: ModelMessage[];
+	/**
+	 * Pages the step may read, through OpenRouter's fetch tool: only on these
+	 * sites, and at most this many (docs/dreams.md, "Research").
+	 */
+	fetch?: { hosts: string[]; maxPages: number };
+} & Sampling;
+
+/**
+ * OpenRouter's fetch tool. Parallel's engine because it is the one that
+ * reads reddit, which briefs link most: measured 2026-10-20 for the first
+ * engine, Exa answered nothing for a subreddit, Firecrawl refuses reddit
+ * outright, and OpenRouter's own fetch hands back raw RSS. Each page is cut
+ * short, so a brief cannot fill the context.
+ */
+function webFetch(fetch: NonNullable<StoryCall['fetch']>) {
+	return {
+		type: 'openrouter:web_fetch',
+		parameters: {
+			engine: 'parallel',
+			max_uses: fetch.maxPages,
+			max_content_tokens: 6000,
+			allowed_domains: fetch.hosts
+		}
+	} as const;
+}
 
 /** Streams a reply as the engine's events (`$lib/dream/events`). */
 export async function streamStory(
@@ -108,6 +134,7 @@ export async function streamStory(
 		return refused;
 	}
 	const routing = await route(event.locals, config);
+	const { fetch: reading } = call;
 	const body = relay({
 		request: {
 			baseUrl: config.baseUrl,
@@ -123,7 +150,14 @@ export async function streamStory(
 		listedModel: routing.listed,
 		configuredModel: config.openrouterModelId,
 		providers: routing.providers,
-		record: routing.record
+		record: routing.record,
+		...(reading
+			? {
+					hosts: reading.hosts,
+					stream: (request, onText, onFetch) =>
+						streamResponses({ ...request, tools: [webFetch(reading)] }, onText, onFetch)
+				}
+			: {})
 	});
 	return new Response(body, { headers: SSE_HEADERS });
 }

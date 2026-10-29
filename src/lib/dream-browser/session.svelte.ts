@@ -179,6 +179,8 @@ export class DreamSession {
 	general = $state<DreamPreference[]>([]);
 	#generalRevision: number | null;
 	readonly #userId: string;
+	/** Pages step 1 read for the brief on this page, each with how it went. Not stored. */
+	fetches = $state<{ url: string; ok: boolean; allowed: boolean }[]>([]);
 	/** Notices for the user, newest last. */
 	notices = $state<DreamNotice[]>([]);
 	readonly #seed: () => number;
@@ -365,13 +367,20 @@ export class DreamSession {
 
 	async #read(setup: DreamSetup, signal: AbortSignal) {
 		this.streaming = { what: 'read', text: '' };
+		this.fetches = [];
 		const reply = await streamReply(
 			'read',
 			readRequestFor(setup, this.worded, drawNudges(cryptoRandom), {
 				...(await this.#recent(setup)),
 				directions: [...this.#notThese, ...(await this.#recent(setup)).directions].slice(0, 20)
 			}),
-			{ signal, onText: (text) => this.#streamed(text) }
+			{
+				signal,
+				onText: (text) => this.#streamed(text),
+				onFetch: (fetched) => {
+					this.fetches = [...this.fetches, fetched];
+				}
+			}
 		);
 		if (reply.ended !== 'complete' || parseBriefReading(reply.text).directions.length === 0) {
 			throw new DreamRequestError(

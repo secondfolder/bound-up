@@ -188,3 +188,126 @@ function applyChunk(
 		};
 	}
 }
+
+/** A page a tool read while the model worked: where, and whether it was read. */
+export type Fetched = { url: string; ok: boolean };
+
+type ResponsesEvent = {
+	type?: string;
+	delta?: string;
+	item?: { type?: string; url?: string; status?: string };
+	response?: {
+		status?: string;
+		usage?: { input_tokens?: number; output_tokens?: number; cost?: number };
+		error?: { message?: string };
+	};
+	error?: { message?: string };
+};
+
+/**
+ * A completion through OpenRouter's Responses API, streamed, for a step
+ * that uses tools (docs/dreams.md, "Research"): only its stream says what
+ * each tool did, which the setup page shows. `onFetch` hears each page a
+ * tool read. OpenRouter names some events differently from OpenAI
+ * (`response.content_part.delta`, `response.done`), so both are read.
+ */
+export async function streamResponses(
+	request: CompletionRequest & { tools: readonly unknown[] },
+	onText: (text: string) => void = () => undefined,
+	onFetch: (fetched: Fetched) => void = () => undefined
+): Promise<Completion> {
+	const started = Date.now();
+	const response = await fetch(`${request.baseUrl}/responses`, {
+		method: 'POST',
+		headers: {
+			authorization: `Bearer ${request.apiKey}`,
+			'content-type': 'application/json'
+		},
+		body: JSON.stringify({
+			stream: true,
+			model: request.model,
+			input: request.messages,
+			temperature: request.temperature,
+			max_output_tokens: request.maxTokens,
+			tools: request.tools,
+			provider: {
+				data_collection: 'deny',
+				...(request.providers?.length ? { order: request.providers, allow_fallbacks: false } : {})
+			}
+		}),
+		signal: request.signal
+	});
+	if (!(response.ok && response.body)) {
+		throw new Error(`OpenRouter ${response.status} for ${request.model}`);
+	}
+	const result: Completion = {
+		text: '',
+		provider: null,
+		finishReason: null,
+		usage: { promptTokens: 0, completionTokens: 0, cost: null },
+		latencyMs: 0,
+		firstTokenMs: null
+	};
+	const decoder = new TextDecoder();
+	let buffer = '';
+	for await (const bytes of response.body) {
+		buffer += decoder.decode(bytes, { stream: true });
+		const lines = buffer.split('\n');
+		buffer = lines.pop() ?? '';
+		for (const line of lines) {
+			const event = parseChunk(line.trim()) as ResponsesEvent | null;
+			if (event) {
+				applyResponsesEvent(result, event, started, onText, onFetch);
+			}
+		}
+	}
+	result.latencyMs = Date.now() - started;
+	return result;
+}
+
+/** Output items that are the model itself, rather than a tool at work. */
+const MODEL_ITEMS = new Set(['message', 'reasoning']);
+
+function applyResponsesEvent(
+	result: Completion,
+	event: ResponsesEvent,
+	started: number,
+	onText: (text: string) => void,
+	onFetch: (fetched: Fetched) => void
+): void {
+	const type = event.type ?? '';
+	if (type === 'error' || type === 'response.error' || type === 'response.failed') {
+		throw new Error(
+			`OpenRouter error mid-stream: ${event.error?.message ?? event.response?.error?.message ?? 'unknown'}`
+		);
+	}
+	const isText = type.includes('output_text') || type.includes('content_part');
+	if (type.endsWith('.delta') && isText && event.delta) {
+		result.firstTokenMs ??= Date.now() - started;
+		result.text += event.delta;
+		onText(event.delta);
+		return;
+	}
+	if (
+		type === 'response.output_item.done' &&
+		event.item?.type &&
+		!MODEL_ITEMS.has(event.item.type)
+	) {
+		onFetch({
+			url: event.item.url ?? event.item.type,
+			ok: event.item.status === 'completed'
+		});
+		return;
+	}
+	if (type === 'response.completed' || type === 'response.done' || type === 'response.incomplete') {
+		result.finishReason = type === 'response.incomplete' ? 'length' : 'stop';
+		const usage = event.response?.usage;
+		if (usage) {
+			result.usage = {
+				promptTokens: usage.input_tokens ?? 0,
+				completionTokens: usage.output_tokens ?? 0,
+				cost: usage.cost ?? null
+			};
+		}
+	}
+}

@@ -230,7 +230,12 @@ type StreamPaths = { read: ReadRequest; build: BuildRequest; passage: PassageReq
 export async function streamReply<Path extends keyof StreamPaths>(
 	path: Path,
 	body: StreamPaths[Path],
-	options: { signal?: AbortSignal; onText?: (text: string) => void } = {}
+	options: {
+		signal?: AbortSignal;
+		onText?: (text: string) => void;
+		/** A page read for the brief, as it is read. */
+		onFetch?: (fetched: { url: string; ok: boolean; allowed: boolean }) => void;
+	} = {}
 ): Promise<StreamResult> {
 	const response = await send(`/api/dreams/${path}`, {
 		method: 'POST',
@@ -249,6 +254,8 @@ export async function streamReply<Path extends keyof StreamPaths>(
 			if (event.type === 'text') {
 				text += event.text;
 				options.onText?.(text);
+			} else if (event.type === 'fetch') {
+				options.onFetch?.(event);
 			} else if (event.type === 'restart') {
 				text = '';
 				options.onText?.(text);
