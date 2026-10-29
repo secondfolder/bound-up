@@ -271,3 +271,68 @@ export function repeatedAt(path: readonly PathTurn[], passages = 4): string[] {
 		.map((entry) => proseOf(entry.turn.source));
 	return repeatedPhrases(recent).map((entry) => entry.phrase);
 }
+
+/** Next-step notes this alike are going round in circles. */
+export const LOOP_SIMILARITY = 0.5;
+/** This many Continues in a row, with nothing written, is a story left to drift. */
+export const LOOP_CONTINUES = 4;
+
+const WORD = /[\p{L}\p{N}']{3,}/gu;
+
+function wordsOf(text: string): Set<string> {
+	return new Set(text.toLowerCase().match(WORD) ?? []);
+}
+
+/** How alike two notes are: the share of their words in common (Jaccard). */
+export function similarity(a: string, b: string): number {
+	const left = wordsOf(a);
+	const right = wordsOf(b);
+	const shared = [...left].filter((word) => right.has(word)).length;
+	const all = new Set([...left, ...right]).size;
+	return all === 0 ? 0 : shared / all;
+}
+
+function isEmptyTurn(turn: DreamInputTurn): boolean {
+	return !turn.text.trim() && turn.cycles.length === 0 && turn.fields.length === 0;
+}
+
+/**
+ * Whether the next passage should be steered out of a loop (docs/dreams.md,
+ * "Escaping a loop"): the last three next-step notes are too alike, or the
+ * user has pressed Continue four times running (this one included) without
+ * writing anything.
+ */
+export function isStuck(path: readonly PathTurn[], pending: UserTurn): boolean {
+	const notes = path
+		.filter(isPassage)
+		.slice(-3)
+		.map((entry) => footerOf(entry.turn.source).entries.find((line) => line.kind === 'next'))
+		.map((line) => (line?.kind === 'next' ? line.next : ''));
+	if (
+		notes.length === 3 &&
+		notes.every(Boolean) &&
+		notes.every((note, index) => similarity(note, notes[(index + 1) % 3] ?? '') >= LOOP_SIMILARITY)
+	) {
+		return true;
+	}
+	const fresh =
+		pending.kind === 'words' ||
+		(pending.fields?.length ?? 0) > 0 ||
+		(pending.choices?.length ?? 0) > 0;
+	if (fresh) {
+		return false;
+	}
+	let continues = 1;
+	for (let index = path.length - 1; index > 0; index -= 1) {
+		const turn = path[index]?.turn;
+		const before = path[index - 1]?.turn;
+		if (turn?.kind === 'input' && isEmptyTurn(turn)) {
+			continues += 1;
+		} else if (turn?.kind === 'passage' && before?.kind === 'passage') {
+			continues += 1;
+		} else if (turn?.kind === 'input') {
+			break;
+		}
+	}
+	return continues >= LOOP_CONTINUES;
+}

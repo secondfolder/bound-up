@@ -21,6 +21,7 @@ import { parseElements } from '$lib/dream/elements';
 import { turnInputs } from '$lib/dream/fields';
 import { findTag, parseMarkup } from '$lib/dream/markup';
 import { drawNudges } from '$lib/dream/nudges';
+import { pickDirection } from '$lib/dream/pick';
 import { cryptoRandom } from '$lib/dream/random';
 import { parseBriefReading } from '$lib/dream/reading';
 import {
@@ -35,6 +36,7 @@ import {
 import {
 	elementsAt,
 	expansionsAt,
+	isStuck,
 	memoryFor,
 	needsFilling,
 	type PathTurn,
@@ -57,6 +59,7 @@ import {
 	appendTurn,
 	DreamRequestError,
 	fill,
+	listDirections,
 	openDetail,
 	openSetup,
 	openSummary,
@@ -121,6 +124,11 @@ export class DreamSession {
 	 */
 	choices = $state<Record<string, string>>({});
 	values = $state<Record<string, string>>({});
+	/**
+	 * The directions "Different direction" did not take, as chips under the
+	 * passage it wrote. Kept while the page is open; not stored.
+	 */
+	chips = $state<{ turnId: string; options: string[] } | null>(null);
 	/** Whether the setup or the story could not be opened on this device. */
 	unreadable = $state(false);
 
@@ -372,6 +380,7 @@ export class DreamSession {
 			this.choices,
 			this.values
 		);
+		this.chips = null;
 		return this.#attempt(async (signal) => {
 			let parentId = last.id;
 			let pending: UserTurn = { kind: 'continue' };
@@ -422,7 +431,26 @@ export class DreamSession {
 		return this.#rewrite(turnId, 'next');
 	}
 
-	#rewrite(turnId: string, request: 'take' | 'next'): Promise<void> {
+	/**
+	 * "Different direction" (docs/dreams.md): what happens changes. The model
+	 * lists where the passage could go instead, the turned-down one marked
+	 * "not this"; code picks one leaning towards the unlikely, and the passage
+	 * is written from it as a version beside the old one. The other directions
+	 * are offered as chips under it.
+	 */
+	differentDirection(turnId: string): Promise<void> {
+		return this.#rewrite(turnId, { kind: 'different' });
+	}
+
+	/** A chip under a passage: written again, taking that direction. */
+	steerTo(turnId: string, direction: string): Promise<void> {
+		return this.#rewrite(turnId, { kind: 'steer', direction });
+	}
+
+	#rewrite(
+		turnId: string,
+		how: 'take' | 'next' | { kind: 'different' } | { kind: 'steer'; direction: string }
+	): Promise<void> {
 		const index = this.path.findIndex((entry) => entry.id === turnId);
 		const target = this.path[index];
 		if (target?.turn?.kind !== 'passage') {
@@ -433,13 +461,19 @@ export class DreamSession {
 		const parent = before.at(-1);
 		const pending =
 			parent?.turn?.kind === 'input' ? userTurnOf(parent.turn) : ({ kind: 'continue' } as const);
+		const opening = before.length === 0;
 		return this.#attempt((signal) =>
 			this.#passage({
 				parentId: parent?.id ?? null,
-				pending: before.length > 0 ? pending : null,
-				take: request === 'take' || before.length === 0 ? source : null,
+				pending: opening ? null : pending,
+				// The opening has no turn to answer, so anything but a fresh take
+				// of it is written as one.
+				take: how === 'take' || opening ? source : null,
 				signal,
-				path: before
+				path: before,
+				notThis: typeof how === 'object' && how.kind === 'different' ? source : null,
+				steer: typeof how === 'object' && how.kind === 'steer' ? how.direction : null,
+				different: typeof how === 'object' && how.kind === 'different'
 			})
 		);
 	}
@@ -450,16 +484,16 @@ export class DreamSession {
 		if (index < 0) {
 			return Promise.resolve();
 		}
-		return this.#attempt(() =>
-			this.#keepPassage({
+		return this.#attempt(async () => {
+			await this.#keepPassage({
 				parentId: this.path[index - 1]?.id ?? null,
 				request: 'edit',
 				source,
 				ended: 'complete',
 				model: '',
 				provider: ''
-			})
-		);
+			});
+		});
 	}
 
 	/**
@@ -472,6 +506,10 @@ export class DreamSession {
 		take: string | null;
 		signal: AbortSignal;
 		path?: PathTurn[];
+		notThis?: string | null;
+		steer?: string | null;
+		/** Ask where it could go first, pick, and offer the rest as chips. */
+		different?: boolean;
 	}) {
 		const { setup } = this;
 		if (!setup?.build) {
@@ -492,6 +530,21 @@ export class DreamSession {
 			take: input.take,
 			repeated: repeatedAt(path)
 		});
+		body.notThis = input.notThis ?? null;
+		body.steer = input.steer ?? null;
+		// A loop is steered out of the same way "Different direction" works,
+		// with code's pick and no chips (docs/dreams.md, "Escaping a loop").
+		const steered = [input.take, input.steer, input.different].some(Boolean);
+		const stuck = !steered && input.pending !== null && isStuck(path, input.pending);
+		let others: string[] = [];
+		if (input.different || stuck) {
+			const { directions } = parseBriefReading(await listDirections(body, input.signal));
+			const picked = pickDirection(directions, directions.length, cryptoRandom);
+			if (picked) {
+				body.steer = picked.text;
+				others = directions.filter((entry) => entry.id !== picked.id).map((entry) => entry.text);
+			}
+		}
 		let reply: StreamResult;
 		try {
 			reply = await streamReply('passage', body, {
@@ -507,7 +560,7 @@ export class DreamSession {
 				throw cause;
 			}
 		}
-		await this.#keepPassage({
+		const kept = await this.#keepPassage({
 			parentId: input.parentId,
 			request,
 			source: reply.text,
@@ -515,6 +568,7 @@ export class DreamSession {
 			model: reply.model,
 			provider: reply.provider
 		});
+		this.chips = input.different && others.length > 0 ? { turnId: kept, options: others } : null;
 		if (reply.ended === 'refused' || reply.ended === 'failed') {
 			this.problem =
 				reply.ended === 'refused'
@@ -556,6 +610,7 @@ export class DreamSession {
 			// detail, which the next passage's call can still add.
 			void this.#afterPassage(id).catch(() => undefined);
 		}
+		return id;
 	}
 
 	#appended(node: Pick<DreamTreeNodeView, 'id' | 'parentId' | 'role'>, opened: PathTurn | null) {

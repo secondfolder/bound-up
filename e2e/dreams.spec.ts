@@ -173,6 +173,35 @@ test.describe('daydreams, the new engine', () => {
 		).toBeDisabled();
 	});
 
+	test('a different direction changes what happens, and offers the rest as chips', async ({
+		page
+	}) => {
+		await dreamer(page);
+		await start(page, 'A quiet evening');
+		await expect(page.getByRole('heading', { name: 'The Keeper' })).toBeVisible();
+		await saved(page);
+		await box(page, 'Your turn').fill('I wait');
+		await clickWaButton(page, 'Send');
+		await expect(page.getByText(/and Ottilie smiles/)).toBeVisible();
+		await saved(page);
+
+		await page
+			.locator('li.passage')
+			.last()
+			.getByRole('button', { name: 'Different direction' })
+			.click();
+		await expect(page.getByText(/^Instead: /)).toBeVisible();
+		await saved(page);
+		await expect(page.locator('li.passage').last()).toContainText('2 / 2');
+		const chips = page.getByRole('group', { name: 'Or steer it' });
+		await expect(chips.getByRole('button')).toHaveCount(2);
+		const [chip] = await chips.getByRole('button').allInnerTexts();
+		await chips.getByRole('button').first().click();
+		await expect(page.getByText(`Instead: ${chip?.trim()}`)).toBeVisible();
+		await saved(page);
+		await expect(page.locator('li.passage').last()).toContainText('3 / 3');
+	});
+
 	test('a change asked for while it is set up is read in, and shown', async ({ page }) => {
 		await dreamer(page);
 		await start(page, 'A quiet evening [ask]');

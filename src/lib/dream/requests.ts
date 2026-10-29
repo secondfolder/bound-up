@@ -104,7 +104,11 @@ export const passageRequestSchema = z.object({
 	summaries: strings(MAX_SUMMARY_CHARS, MAX_SUMMARIES),
 	/** A passage to write again in new words, or null for a new one. */
 	take: z.string().max(MAX_PASSAGE_CHARS).nullable(),
-	repeated: strings(80, 12)
+	repeated: strings(80, 12),
+	/** A passage turned down with "Different direction". */
+	notThis: z.string().max(MAX_PASSAGE_CHARS).nullable().optional(),
+	/** The direction code picked for it. */
+	steer: z.string().trim().max(1000).nullable().optional()
 });
 
 export type PassageRequest = z.output<typeof passageRequestSchema>;

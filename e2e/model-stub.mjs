@@ -258,6 +258,13 @@ function dreamReplyFor(messages) {
 		user.includes('Write the next passage now') ||
 		user.includes('Write it again')
 	) {
+		if (user.includes('Do not write the passage yet')) {
+			return '<directions>\n<direction p="0.5">The lighthouse floods.</direction>\n<direction p="0.3">A ship signals from the dark.</direction>\n<direction p="0.2">Ottilie leaves without a word.</direction>\n</directions>';
+		}
+		const steer = user.split('taking it in this direction: ')[1]?.split('\n')[0];
+		if (steer) {
+			return `Instead: ${steer}\n<after>\n{"next":"n"}\n</after>`;
+		}
 		if (user.includes('[contract]')) {
 			return 'Ottilie slides a page across. Use <cycle id="pen" label="the pen">blue ink|red ink</cycle>.\n<block kind="contract" title="Terms">\n<field id="c1" type="initial">You will kneel when I enter.</field>\n<field id="sig" type="sign">Sign here</field>\n</block>\n<after>\n{"next":"She reads it."}\n</after>';
 		}

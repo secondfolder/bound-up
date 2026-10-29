@@ -188,6 +188,20 @@
 					{#if ENDED_NOTES[passage.ended]}
 						<p class="ended">{ENDED_NOTES[passage.ended]}</p>
 					{/if}
+					{#if session.chips?.turnId === entry.id}
+						{const chips = $derived(session.chips)}
+						<fieldset class="chips steer">
+							<legend class="quiet">Or steer it</legend>
+							{#each chips.options as option (option)}
+								<wa-button
+									size="s"
+									appearance="outlined"
+									disabled={session.busy}
+									onclick={() => session.steerTo(entry.id, option)}>{option}</wa-button
+								>
+							{/each}
+						</fieldset>
+					{/if}
 					<div class="passage-actions">
 						{#if versions.ids.length > 1}
 							<span class="versions">
@@ -217,6 +231,14 @@
 						{/if}
 						<wa-button size="s" appearance="plain" disabled={session.busy} onclick={() => session.anotherTake(entry.id)}>
 							Another take
+						</wa-button>
+						<wa-button
+							size="s"
+							appearance="plain"
+							disabled={session.busy}
+							onclick={() => session.differentDirection(entry.id)}
+						>
+							Different direction
 						</wa-button>
 						<wa-button
 							size="s"
@@ -383,6 +405,15 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: var(--wa-space-2xs);
+	}
+
+	.steer {
+		align-items: center;
+		margin-inline: 0;
+		padding: 0;
+		border: 0;
+		margin-top: var(--wa-space-xs);
+		font-family: var(--wa-font-family-body);
 	}
 
 	/* The daydream's theme is the passages' own: their page, ink and face. */

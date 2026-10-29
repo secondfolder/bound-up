@@ -5,12 +5,14 @@ import {
 	elementsAt,
 	expansionsAt,
 	historyFor,
+	isStuck,
 	memoryFor,
 	needsFilling,
 	type PathTurn,
 	proseOf,
 	repeatedAt,
-	sceneToSummarise
+	sceneToSummarise,
+	similarity
 } from './story';
 
 const passage = (id: string, source: string): PathTurn => ({
@@ -202,5 +204,42 @@ describe('repetition', () => {
 		];
 		expect(repeatedAt(path)).toContain('runs a hand through');
 		expect(proseOf('Words.<after>{"next":"x"}</after>')).toBe('Words.');
+	});
+});
+
+describe('escaping a loop', () => {
+	const noted = (id: string, next: string) =>
+		passage(id, `Words.\n<after>\n${JSON.stringify({ next })}\n</after>`);
+
+	it('notices next-step notes going round in circles', () => {
+		const looping = [
+			noted('p1', 'She tests whether you will hold still.'),
+			noted('p2', 'She tests again whether you will hold still.'),
+			noted('p3', 'Again she tests whether you hold still.')
+		];
+		expect(isStuck(looping, { kind: 'words', text: 'ok' })).toBe(true);
+		const moving = [
+			noted('p1', 'She tests whether you will hold still.'),
+			noted('p2', 'The doorbell rings: a guest arrives early.'),
+			noted('p3', 'You are sent to the market alone.')
+		];
+		expect(isStuck(moving, { kind: 'continue' })).toBe(false);
+		expect(similarity('a b', '')).toBe(0);
+	});
+
+	it('notices Continue pressed four times running, and nothing else', () => {
+		const path = [
+			passage('p1', 'One.'),
+			input('u1', 'I sit.'),
+			passage('p2', 'Two.'),
+			passage('p3', 'Three.'),
+			input('u2', ''),
+			passage('p4', 'Four.'),
+			passage('p5', 'Five.')
+		];
+		// p3 after p2, the empty turn, p5 after p4, and this one: four.
+		expect(isStuck(path, { kind: 'continue' })).toBe(true);
+		expect(isStuck(path.slice(0, 6), { kind: 'continue' })).toBe(false);
+		expect(isStuck(path, { kind: 'words', text: 'I stand.' })).toBe(false);
 	});
 });

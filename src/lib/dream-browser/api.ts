@@ -70,10 +70,31 @@ async function seal<T>(kind: SealedKind<T>, recordId: string, payload: T) {
 	return { vaultId: writable.vault.id, ...sealed };
 }
 
+/** How long to wait for the vaults to start opening before reading a record as unopenable. */
+const VAULT_WAIT_MS = 15_000;
+
+/**
+ * The vault a record names, once vaults are worked out. A page's `onMount`
+ * runs before the app shell's, which is what starts opening them, so on a
+ * fresh load `vaultsSettled` can answer before anything has begun; this
+ * waits for the vault to stop being unknown. Seen after a reload, where the
+ * setup read as "can't be shown on this device".
+ */
+async function vaultFor(vaultId: string) {
+	const until = Date.now() + VAULT_WAIT_MS;
+	for (;;) {
+		await vaultsSettled();
+		const vault = vaultById(vaultId);
+		if (vault !== undefined || Date.now() > until) {
+			return vault ?? null;
+		}
+		await new Promise((resolve) => setTimeout(resolve, 50));
+	}
+}
+
 /** Opens a record, or null when it will not open on this device. */
 export async function open<T>(kind: SealedKind<T>, ref: SealedRefView): Promise<T | null> {
-	await vaultsSettled();
-	const vault = vaultById(ref.vaultId);
+	const vault = await vaultFor(ref.vaultId);
 	return vault ? await openRecord(kind, { ...ref, vault }) : null;
 }
 
@@ -243,13 +264,22 @@ export async function streamReply<Path extends keyof StreamPaths>(
 	throw new DreamRequestError(last?.type === 'failed' ? last.message : SERVER_FAILURE, 502);
 }
 
-/** One of the small calls: the model's whole reply. */
-export async function fill(body: FillRequest, signal?: AbortSignal): Promise<string> {
-	const response = await send('/api/dreams/fill', {
+async function askWhole(path: string, body: unknown, signal?: AbortSignal): Promise<string> {
+	const response = await send(path, {
 		method: 'POST',
 		headers: { 'content-type': 'application/json' },
 		body: JSON.stringify(body),
 		signal
 	});
 	return ((await response.json()) as { text: string }).text;
+}
+
+/** One of the small calls: the model's whole reply. */
+export function fill(body: FillRequest, signal?: AbortSignal): Promise<string> {
+	return askWhole('/api/dreams/fill', body, signal);
+}
+
+/** Where the story could go next, as `<direction>` tags with likelihoods. */
+export function listDirections(body: PassageRequest, signal?: AbortSignal): Promise<string> {
+	return askWhole('/api/dreams/directions', body, signal);
 }

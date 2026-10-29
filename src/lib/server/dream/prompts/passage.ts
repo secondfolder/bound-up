@@ -41,6 +41,15 @@ export type PassageInput = {
 	 * take"). It answers the same turn as the one it replaces.
 	 */
 	take?: string | null;
+	/**
+	 * A passage the user turned down with "Different direction": the next one
+	 * answers the same turn with something else happening.
+	 */
+	notThis?: string | null;
+	/** The direction code picked for the passage, which it should take. */
+	steer?: string | null;
+	/** `directions` asks for where the next passage could go, rather than the passage. */
+	mode?: 'passage' | 'directions';
 };
 
 const FOOTER_TAG = /<after>[\s\S]*?(?:<\/after>|$)/;
@@ -122,6 +131,17 @@ function lastNext(passage: string): string | null {
 	return footer ? nextNote(parseFooter(plainText(footer.children))) : null;
 }
 
+/**
+ * Asking where the story could go, for "Different direction" and for
+ * escaping a loop (docs/dreams.md, "Different direction"): the same list and
+ * likelihoods as step 1, so code can pick leaning towards the unlikely.
+ */
+const DIRECTIONS_ASK = `Do not write the passage yet. List 3 to 5 directions the next passage could take, each one line, genuinely different from each other in what happens:
+<directions>
+<direction p="0.30">one line: what happens next</direction>
+</directions>
+p is how likely you would have been to write that one. Include unlikely ones as well as likely ones; the unlikely ones are wanted. Nothing else.`;
+
 function nowSection(
 	input: PassageInput,
 	last: { passage: string; turn: UserTurn } | undefined
@@ -137,9 +157,21 @@ function nowSection(
 			`Phrases already used more than once; do not reuse them: ${input.repeated.map((phrase) => `"${phrase}"`).join(', ')}`
 		);
 	}
-	if (input.take) {
+	const allowed = allowedTags(input.setup.capabilities);
+	if (input.notThis) {
 		parts.push(
-			`This passage was already written for this moment:\n${wrap('take', historyPassage(input.take, allowedTags(input.setup.capabilities)))}\nWrite it again: the same events, in new words. Do not reuse its sentences or its images.`
+			`This passage was written for this moment, and the user wants something else to happen:\n${wrap('not-this', historyPassage(input.notThis, allowed))}\nNot this: what happens must be different, not only the words.`
+		);
+	}
+	if (input.mode === 'directions') {
+		parts.push(DIRECTIONS_ASK);
+	} else if (input.take) {
+		parts.push(
+			`This passage was already written for this moment:\n${wrap('take', historyPassage(input.take, allowed))}\nWrite it again: the same events, in new words. Do not reuse its sentences or its images.`
+		);
+	} else if (input.steer) {
+		parts.push(
+			`Write the next passage now, taking it in this direction: ${input.steer}\nEnd it with its footer.`
 		);
 	} else {
 		parts.push('Write the next passage now, ending with its footer.');
