@@ -11,13 +11,12 @@ import type { RequestHandler } from './$types';
 export const POST: RequestHandler = async (event) => {
 	const userId = await dreamsGuard(event.locals);
 	const parsed = passageRequestSchema.safeParse(await event.request.json().catch(() => null));
-	if (!parsed.success || (parsed.data.history.length === 0 && !parsed.data.take)) {
+	if (!parsed.success) {
 		error(400, 'That could not be sent. Reload and try again.');
 	}
 	const input = parsed.data;
 	return await streamStory(event, userId, {
 		messages: passageMessages(input),
-		heat: input.setup.heat,
 		// Another take a little hotter, so it goes somewhere new in its words.
 		temperature: input.take ? 1 : 0.9,
 		maxTokens: 6000

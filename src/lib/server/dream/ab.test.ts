@@ -32,6 +32,8 @@ function run(label: string, passage: string): BenchRun {
 		picked: null,
 		build: null,
 		passages: [passage],
+		turns: [],
+		summaries: [],
 		steps: [],
 		checks: [],
 		fingerprint: null,

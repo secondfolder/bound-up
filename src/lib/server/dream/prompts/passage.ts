@@ -110,14 +110,11 @@ function nowSection(
 }
 
 /**
- * The messages for the next passage. Throws without an opening passage to
- * follow, unless it is another take of the opening itself.
+ * The messages for the next passage. With no history it writes the opening
+ * (an opening the build wrote but that was never kept), or another take of it.
  */
 export function passageMessages(input: PassageInput): ModelMessage[] {
 	const last = input.history.at(-1);
-	if (!(last || input.take)) {
-		throw new Error('passageMessages needs at least the opening passage in its history.');
-	}
 	const system = [
 		CORE_RULES,
 		limitsSection(input.limits),

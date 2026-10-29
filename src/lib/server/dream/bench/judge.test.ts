@@ -27,6 +27,8 @@ function run(id: string, passages: string[], error?: string): BenchRun {
 		picked: null,
 		build: null,
 		passages,
+		turns: [],
+		summaries: [],
 		steps: [],
 		checks: [],
 		fingerprint: null,

@@ -17,7 +17,6 @@ export const POST: RequestHandler = async (event) => {
 	}
 	return await streamStory(event, userId, {
 		messages: buildMessages(parsed.data),
-		heat: null,
 		temperature: 0.9,
 		// The build and the opening, plus room for a reasoning model to think:
 		// its reasoning counts against this too.

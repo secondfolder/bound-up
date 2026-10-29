@@ -14,4 +14,9 @@ describe('playroomToolsFor', () => {
 			'daydreams'
 		]);
 	});
+
+	it('adds the new engine only for an account that holds its own feature', () => {
+		expect(playroomToolsFor(['daydreams']).map((tool) => tool.id)).not.toContain('dreams');
+		expect(playroomToolsFor(['dreams']).map((tool) => tool.id)).toContain('dreams');
+	});
 });

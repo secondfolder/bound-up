@@ -41,7 +41,19 @@ export type DraftScope =
 	/** The "Write something" dialog — one per partnership, not per open. */
 	| { kind: 'new-thread'; partnershipId: string }
 	/** What the user is writing in a daydream: one per daydream. */
-	| { kind: 'daydream'; daydreamId: string };
+	| { kind: 'daydream'; daydreamId: string }
+	/**
+	 * The new engine's boxes (docs/dreams.md): the story's input and the
+	 * setup's "change it", the answer to its question and an edit of a
+	 * passage, one per daydream or passage each, and a new daydream's brief
+	 * and a new limit, one per account. Plain text, not a rich-text document.
+	 */
+	| { kind: 'dream'; dreamId: string }
+	| { kind: 'dream-change'; dreamId: string }
+	| { kind: 'dream-answer'; dreamId: string }
+	| { kind: 'dream-edit'; turnId: string }
+	| { kind: 'dream-brief' }
+	| { kind: 'dream-limit' };
 
 export type Draft = { text: string; tagIds: string[] };
 
@@ -81,6 +93,15 @@ function scopeId(scope: DraftScope): string {
 			return scope.partnershipId;
 		case 'daydream':
 			return scope.daydreamId;
+		case 'dream':
+		case 'dream-change':
+		case 'dream-answer':
+			return scope.dreamId;
+		case 'dream-edit':
+			return scope.turnId;
+		case 'dream-brief':
+		case 'dream-limit':
+			return 'new';
 		default:
 			return assertNever(scope, 'draft scope');
 	}
@@ -89,6 +110,18 @@ function scopeId(scope: DraftScope): string {
 /** Empty by the same measure the Send button uses: nothing a reader would see. */
 export function isDraftEmpty(text: string): boolean {
 	return text === '' || isRichTextDocumentEmpty(parseStoredRichText(text));
+}
+
+/** The scopes whose text is plain, which `isDraftEmpty` would read as an empty document. */
+function isPlainScope(scope: DraftScope): boolean {
+	return (
+		scope.kind === 'dream' ||
+		scope.kind === 'dream-change' ||
+		scope.kind === 'dream-answer' ||
+		scope.kind === 'dream-edit' ||
+		scope.kind === 'dream-brief' ||
+		scope.kind === 'dream-limit'
+	);
 }
 
 /**
@@ -164,8 +197,9 @@ export async function openDraft(
 		}
 	}
 
+	const plain = isPlainScope(scope);
 	function save(draft: Draft) {
-		if (isDraftEmpty(draft.text)) {
+		if (plain ? draft.text.trim() === '' : isDraftEmpty(draft.text)) {
 			clear();
 			return;
 		}

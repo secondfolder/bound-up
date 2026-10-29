@@ -56,7 +56,13 @@ beforeEach(async () => {
 	env.OPENROUTER_BASE_URL = 'https://models.test/api/v1';
 	upstream = vi.fn(() => Promise.resolve(sse(`${PROSE.slice(0, 20)}`, PROSE.slice(20))));
 	vi.stubGlobal('fetch', upstream);
+	// Only providers with full adult support are used: one has passed.
+	const at = new Date();
+	await saveCheck(db, MODEL, { provider: 'prude/fp4', order: 0, levelPassed: 2, at, reason: null });
+	await saveCheck(db, MODEL, { provider: 'open/fp8', order: 1, levelPassed: 4, at, reason: null });
 });
+
+const MODEL = { model: 'test/model', kind: 'language' as const };
 
 afterEach(() => {
 	harness.close();
@@ -183,16 +189,15 @@ describe('POST /api/dreams/passage', () => {
 		const [, init] = upstream.mock.calls[0] as [string, RequestInit];
 		const sent = JSON.parse(String(init.body));
 		expect(sent.messages[0].content).toContain('Nothing about feet');
-		expect(sent.provider).toEqual({ data_collection: 'deny' });
 		expect(String(init.body)).not.toContain('sk-or-test');
 	});
 
-	it('pins the request to a provider that passed the daydream’s heat', async () => {
-		const key = { model: 'test/model', kind: 'language' as const };
-		const at = new Date();
-		await saveCheck(db, key, { provider: 'prude/fp4', order: 0, levelPassed: 1, at, reason: null });
-		await saveCheck(db, key, { provider: 'open/fp8', order: 1, levelPassed: 4, at, reason: null });
-		await read(await passage(event(ada, { json: passageBody })));
+	it('sends only to a provider with full adult support, whatever the heat', async () => {
+		await read(
+			await passage(
+				event(ada, { json: { ...passageBody, setup: { ...passageBody.setup, heat: 'none' } } })
+			)
+		);
 		const [, init] = upstream.mock.calls[0] as [string, RequestInit];
 		expect(JSON.parse(String(init.body)).provider).toEqual({
 			data_collection: 'deny',
@@ -201,9 +206,25 @@ describe('POST /api/dreams/passage', () => {
 		});
 	});
 
+	it('refuses, asking nobody, when no provider has full adult support', async () => {
+		await saveCheck(db, MODEL, {
+			provider: 'open/fp8',
+			order: 1,
+			levelPassed: 3,
+			at: new Date(),
+			reason: null
+		});
+		const result = await runAndCatch(() => passage(event(ada, { json: passageBody })));
+		expect(result).toMatchObject({ type: 'error', status: 503 });
+		expect(JSON.stringify(result)).toContain('Admin → Server settings');
+		expect(upstream).not.toHaveBeenCalled();
+	});
+
 	it('refuses a malformed request without asking the model', async () => {
 		expect(
-			await runAndCatch(() => passage(event(ada, { json: { ...passageBody, history: [] } })))
+			await runAndCatch(() =>
+				passage(event(ada, { json: { ...passageBody, setup: { heat: 'scorching' } } }))
+			)
 		).toMatchObject({ type: 'error', status: 400 });
 		expect(upstream).not.toHaveBeenCalled();
 	});

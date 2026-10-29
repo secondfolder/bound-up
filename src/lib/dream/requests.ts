@@ -97,7 +97,6 @@ export const passageRequestSchema = z.object({
 export type PassageRequest = z.output<typeof passageRequestSchema>;
 
 const shared = {
-	heat: z.enum(HEAT_LEVELS),
 	telling: z.string().max(MAX_TELLING_CHARS),
 	limits
 };

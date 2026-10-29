@@ -32,6 +32,7 @@ import {
 	daydreamSetupKind,
 	daydreamTurnKind
 } from './sealed-kinds/daydreams';
+import { type DreamSetup, dreamSetupKind } from './sealed-kinds/dreams';
 import { type NotebookEntryHeader, notebookEntryKind } from './sealed-kinds/notebook';
 import { tagKind } from './sealed-kinds/tags';
 import { type RewardContent, rewardKind, type TaskContent, taskKind } from './sealed-kinds/tasks';
@@ -108,6 +109,11 @@ export function openedWidgetTitle(item: WidgetItemView): Opened<string> {
 /** A daydream's setup: its title, voice, characters, idea, limits and dials. Always sealed. */
 export function openedDaydreamSetup(ref: SealedRefView): Opened<DaydreamSetupContent> {
 	return open(daydreamSetupKind, ref);
+}
+
+/** A daydream of the new engine's setup (docs/dreams.md). Always sealed. */
+export function openedDreamSetup(ref: SealedRefView): Opened<DreamSetup> {
+	return open(dreamSetupKind, ref);
 }
 
 /** One turn of a daydream's story. Always sealed. */

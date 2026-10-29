@@ -339,7 +339,10 @@ was not checked on is refused.
 **Routing** (`eligibleProviders`, `routeFor`) gives a request an explicit,
 ordered provider list: endpoints that passed the level the content needs, or
 that the admin set to *Always*, minus any backing off, never one set to
-*Never*, cheapest first as OpenRouter lists them.
+*Never*, cheapest first as OpenRouter lists them. The new daydream engine
+asks for the highest level on every request, so only providers with full
+adult support are used, and with none it refuses rather than sending
+anything ([dreams.md](dreams.md#adult-friendly-providers)).
 
 **Back-off.** Each reply in use can be recorded (`recordOutcome`). A refusal
 skips the endpoint for 10 minutes, then 30, 90, 270 and 810 minutes, and at

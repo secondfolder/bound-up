@@ -3,22 +3,12 @@
  * "Adult-friendly providers"). Pure and alias-free.
  */
 
-import type { AdultLevel } from '../model-providers';
-import type { Heat } from './build';
-
-const BY_HEAT: Readonly<Record<Heat, AdultLevel>> = {
-	none: 0,
-	suggestive: 1,
-	steamy: 2,
-	explicit: 3
-};
+import { ADULT_LEVELS, type AdultLevel } from '../model-providers';
 
 /**
- * A passage's level, from its daydream's heat. Before the heat is known (the
- * reading and the build), a brief could ask for anything, so those ask for
- * the explicit level too: a provider that would refuse the story should not
- * be the one to set it up.
+ * Every request needs full adult support: the highest level checked,
+ * whatever the daydream's heat. A story can go anywhere its user takes it,
+ * and a provider that passed only the milder levels would refuse it part way,
+ * so the engine never sends anything to one.
  */
-export function levelFor(heat: Heat | null): AdultLevel {
-	return heat === null ? BY_HEAT.explicit : BY_HEAT[heat];
-}
+export const REQUIRED_LEVEL = Math.max(...ADULT_LEVELS.map((entry) => entry.level)) as AdultLevel;

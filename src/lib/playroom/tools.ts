@@ -20,7 +20,8 @@ export type PlayroomTool = {
 	route:
 		| '/(standalone)/playroom/iq-test/[[id]]'
 		| '/(auth-required)/(app)/playroom/kink-list'
-		| '/(auth-required)/(app)/daydreams';
+		| '/(auth-required)/(app)/daydreams'
+		| '/(auth-required)/(app)/dreams';
 	/**
 	 * Listed only for an account that holds this feature. Display only: the
 	 * tool's own loads and actions call `requireFeature` themselves.
@@ -52,6 +53,15 @@ export const PLAYROOM_TOOLS: readonly PlayroomTool[] = [
 		icon: 'cloud-moon',
 		route: '/(auth-required)/(app)/daydreams',
 		feature: 'daydreams'
+	},
+	{
+		// The new engine, beside the first until it replaces it (docs/dreams.md).
+		id: 'dreams',
+		name: 'Daydreams (new)',
+		blurb: 'Describe anything, and it becomes a story you play.',
+		icon: 'wand-magic-sparkles',
+		route: '/(auth-required)/(app)/dreams',
+		feature: 'dreams'
 	}
 ];
 

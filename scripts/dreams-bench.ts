@@ -7,20 +7,29 @@
  *
  *   npm run dreams:bench -- --models nousresearch/hermes-4-405b
  *   npm run dreams:bench -- --models a/b,c/d --briefs training,texts --runs 3 --seed tuesday
+ *   npm run dreams:bench -- --models a/b --briefs training --runs 1 --passages 20 --persona eager
+ *
+ * `--persona` has a simulated player take every turn (bench/player.ts):
+ * eager, terse, steers, contrary, continues or explorer. Without it every
+ * turn is Continue.
  *
  * The OpenRouter key comes from OPENROUTER_API_KEY, or else from local.db's
  * server settings (Admin → Server settings), so a dev server's key works as-is.
- * It costs real money: the summary prints what each run spent.
+ * It costs real money: the summary prints what each run spent. It sends only
+ * to providers local.db's adult-content check found to allow everything, as
+ * the app does.
  */
 import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
+import { REQUIRED_LEVEL } from '../src/lib/dream/routing.ts';
 import { BENCH_BRIEFS, type BenchBrief } from '../src/lib/server/dream/bench/briefs.ts';
+import { isPersona, PERSONAS } from '../src/lib/server/dream/bench/player.ts';
 import { runDocument, summary } from '../src/lib/server/dream/bench/report.ts';
 import { type BenchRun, runBrief } from '../src/lib/server/dream/bench/run.ts';
 import { stream } from '../src/lib/server/dream/openrouter.ts';
-import { apiKey, ROOT } from './dreams-key.ts';
+import { apiKey, fullAdultProviders, ROOT } from './dreams-key.ts';
 
 const BASE_URL = process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1';
 
@@ -34,7 +43,8 @@ const { values } = parseArgs({
 		concurrency: { type: 'string', default: '4' },
 		temperature: { type: 'string', default: '1' },
 		label: { type: 'string' },
-		'fingerprint-model': { type: 'string' }
+		'fingerprint-model': { type: 'string' },
+		persona: { type: 'string' }
 	}
 });
 
@@ -93,12 +103,22 @@ async function main(): Promise<void> {
 	const passages = Number.parseInt(values.passages, 10);
 	const temperature = Number.parseFloat(values.temperature);
 	const label = values.label ?? defaultLabel();
+	const { persona } = values;
+	if (persona !== undefined && !isPersona(persona)) {
+		throw new Error(`Unknown --persona "${persona}". Known: ${Object.keys(PERSONAS).join(', ')}`);
+	}
 	const fingerprintModel = values['fingerprint-model'] ?? models[0] ?? '';
+	// Only providers with full adult support, as the app uses (docs/dreams.md).
+	const routes = new Map<string, string[]>();
+	for (const model of new Set([...models, fingerprintModel])) {
+		routes.set(model, await fullAdultProviders(model, REQUIRED_LEVEL));
+	}
 	const fingerprint = (messages: Parameters<typeof stream>[0]['messages']) =>
 		stream({
 			baseUrl: BASE_URL,
 			apiKey: key,
 			model: fingerprintModel,
+			providers: routes.get(fingerprintModel),
 			messages,
 			temperature: 0,
 			maxTokens: 400
@@ -116,11 +136,14 @@ async function main(): Promise<void> {
 						fingerprint,
 						seed,
 						passages,
+						// The same model plays the user: a session is one model's to run.
+						...(persona ? { player: { persona } } : {}),
 						complete: (messages) =>
 							stream({
 								baseUrl: BASE_URL,
 								apiKey: key,
 								model,
+								providers: routes.get(model),
 								messages,
 								temperature,
 								maxTokens: 4000

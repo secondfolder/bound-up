@@ -37,6 +37,10 @@ randomness: the model lists several directions and code picks one.
 | Sealed kinds and storage | `src/lib/sealed-kinds/dreams.ts`, `src/lib/server/dreams.ts` |
 | The relay and the small calls' prompts | `src/lib/server/dream/relay.ts`, `prompts/fill.ts` |
 | The API | `src/routes/api/dreams/`, `src/lib/server/dream-api.ts` |
+| The play loop, setup steps, requests assembled, inline text | `src/lib/dream/story.ts`, `setup-flow.ts`, `assemble.ts`, `inline.ts` |
+| The browser half: requests, sealing, the session | `src/lib/dream-browser/` |
+| The pages and their components | `src/routes/(auth-required)/(app)/dreams/`, `src/lib/components/dreams/` |
+| The simulated player | `src/lib/server/dream/bench/player.ts`, `--persona` |
 
 Everything under `src/lib/dream/` is pure and alias-free, and so is everything
 under `src/lib/server/dream/`, so the bench can run it under `tsx` outside
@@ -152,6 +156,20 @@ overused names, clichés, repetition, and slow first words.
 
 `runBrief` takes its completion function as an argument, so
 `bench/run.test.ts` runs the whole pipeline against canned replies.
+
+**The simulated player.** With `--persona`, a model plays the user for every
+turn after the opening (`bench/player.ts`): eager, terse, steers, contrary,
+continues, or explorer, each a short prompt. It sees only what a reader
+would, each recent passage's words without markup or footer, and answers
+with words or CONTINUE. The run keeps memory the way the page does, from the
+same code (`memoryFor`, `sceneToSummarise`, `repeatedAt` in
+`src/lib/dream/story.ts`): finished scenes condensed with the summary prompt
+and sent as summaries, the recent passages word for word. So a long session
+checks the memory a long story would really get:
+
+```sh
+npm run dreams:bench -- --models z-ai/glm-5.2 --briefs training --runs 1 --passages 20 --persona eager
+```
 
 ### What the first runs found
 
@@ -294,21 +312,124 @@ updated with facts, a `<more>` expanded, a scene summarised
 
 ## Adult-friendly providers
 
-Each request needs an adult level (`src/lib/dream/routing.ts`): a passage's
-comes from its daydream's heat (none 0, suggestive 1, steamy 2, explicit 3);
-step 1 and the build ask for explicit, because a brief could ask for
-anything and a provider that would refuse the story should not set it up.
-`routeFor` lists the providers that passed that level and are not backing
-off. The relay (`src/lib/server/dream/relay.ts`) pins each attempt to one of
-them, so the outcome can be credited to it (`recordOutcome`), and tries the
-next once after a refusal, a filtered or empty reply, or a failure before any
-words. With no provider checked yet it sends one unpinned request under the
-configured model and records nothing.
+**Every request goes only to providers with full adult support**: those that
+passed the highest level of the adult-content check (`REQUIRED_LEVEL` in
+`src/lib/dream/routing.ts`, consent-play fantasy), or that the admin always
+allows, whatever the daydream's heat. A story can go anywhere its user takes
+it, and a provider that passed only the milder levels would refuse part way.
+`routeFor` lists those not backing off. With none, the request is refused
+with a 503 that says an admin can check them, and nothing is sent: there is
+no unpinned fallback that could reach a provider that refuses or filters.
+
+The relay (`src/lib/server/dream/relay.ts`) pins each attempt to one of them,
+so the outcome can be credited to it (`recordOutcome`), and tries the next
+once after a refusal, a filtered or empty reply, or a failure before any
+words. The small calls go to the first, and a refusal there counts against
+it too.
+
+The bench does the same from `local.db`'s checks (`fullAdultProviders` in
+`scripts/dreams-key.ts`), and refuses to run a model none of whose providers
+has passed. Check a model by making it the story model on a dev server and
+pressing *Check adult content*.
+
+## The pages
+
+`/dreams` (`src/routes/(auth-required)/(app)/dreams/`), reached from the
+Playroom's "Daydreams (new)" tile for an account with the feature:
+
+- The disclosure first, the same one the old engine asks for.
+- **One box**: "What do you feel like?" Start creates the daydream with just
+  the brief, sealed, and goes to its page.
+- **Your limits**: the hard ones among the user's preferences, as a simple
+  list, said to be followed as closely as the model can manage, not
+  guaranteed. The full preferences store comes with phase 5.
+- The daydreams so far, titled once built, "being set up" before.
+
+`/dreams/[id]` opens the setup and the branch in the browser and hands them to
+a `DreamSession` (`src/lib/dream-browser/session.svelte.ts`), which does the
+work; the components in `src/lib/components/dreams/` draw it.
+
+### The setup page
+
+Until the daydream has an opening, the page is the setup, live
+(`DreamSetupView`). `setupStep` (`src/lib/dream/setup-flow.ts`) says where it
+has got to, and the session runs the steps from there:
+
+1. **Reading the brief** streams; one line under the step shows the latest of
+   what the model is writing, cleaned of tags, and the musts appear as chips.
+2. **A question**, if step 1 asked one, waits for an answer (an option or
+   the user's own words). Step 1 then reads the brief again with it, and is
+   told not to ask again.
+3. **Picking**: code picks, leaning towards the less likely
+   (`codePick`), with the build's nudges drawn from the same seed. "Picked:
+   … · See all N ideas" opens the list, and choosing another stops the build
+   that is running and starts one from it. When the brief asked to choose,
+   the list waits open.
+4. **Building and the opening** stream together; the title, telling notes and
+   elements' names appear as they arrive, and the opening below them. Once it
+   is kept, the page turns into the story without another request.
+
+The setup is saved, sealed, after each finished step, so a reload carries on
+from the last one; a step that was streaming runs again.
+
+**"Not quite? Tell it what to change."** is always there. A change stops what
+is running and is kept with the brief (`withAmendment`): before a direction is
+chosen, step 1 reads the brief again with it; after, the build runs again from
+the previous build plus the change, keeping the reading and the direction.
+
+### Playing
+
+`DreamStory` shows the branch being read: each passage drawn by `DreamMarkup`,
+the user's turns between, and under each passage its versions (`‹ 2 / 3 ›`,
+hidden with one) and what can be done to it. None of them throws anything
+away; each adds a turn beside the passage:
+
+- **Retry**, only on a passage that stopped short, was refused or failed part
+  way: writes it again for the same turn.
+- **Another take**: the same events in new words. The passage being replaced
+  is sent, marked to be rewritten.
+- **Edit**: the user's own version of the passage, which later passages build
+  on. For now it edits the passage's source, markup included.
+- **Continue** (beside Send): the next passage with no turn from the user.
+- **Stop**: what had arrived is kept as a version, marked stopped.
+
+Switching versions moves `activeTurnId` to the newest end of that version's
+branch and reads the branch.
+
+**Memory** (`memoryFor`): finished scenes on this branch go as their
+summaries, and the passages since word for word, never fewer than the last 6
+nor more than 16. After a passage, if a scene has ended (a
+`<beat kind="scene"/>`, or 8 passages since the last summary), a summary is
+written and kept on its last turn. Summaries are only added to.
+
+**Elements as they stand** (`elementsAt`): the build's, then along the path
+the people and things a footer adds (`{"new": …}`, a name and a seed), stats a
+footer's `set` moves, and detail written after a turn, the latest winning.
+After each passage one background call keeps facts in the elements (and
+fills in new ones); its answer changes only elements that exist.
+
+**Detail on tap.** A name is linked wherever it appears, by code
+(`src/lib/dream/inline.ts`); tapping it opens its card (`DreamCard`). A card
+that is still only a name and a seed is filled in with one small call, kept
+against the turn the user is on. Fields marked not to show are under "Behind
+the scenes". A `<more>` is expanded in place with one to three sentences on
+tap, once, kept on its passage. Each branch keeps its own.
+
+**The repetition guard** (`repeatedAt`): three- and four-word phrases
+repeated across the last four passages' words go at the end of the prompt as
+"do not reuse".
+
+**Nothing typed is lost.** Every box (the brief, a limit, "change it", the
+answer, the turn, an edit) keeps an encrypted draft on the device
+(`src/lib/messaging/drafts.ts`, plain-text scopes) until what it holds is
+taken.
 
 ## Not built yet
 
-The pages (the live setup page, the story view and its renderer), the
-simulated player, and every later phase: interactive text and the block
-gallery, preferences, research, names, stats and dice, read-aloud. Step 1
-and the build are still two calls for a spread of 1. See the plan. The
-judge's agreement with your votes comes once there are votes to compare.
+Every later phase: interactive text and the block gallery (cycles, answers,
+rolls and fields, which `dream-turn` can already hold), names, preferences,
+research, stats and dice, pictures and the other views, read-aloud. Step 1
+and the build are still two calls for a spread of 1, and an edit works on the
+source rather than the rendered tree. Escaping a loop of similar next-step
+notes is not done yet. See the plan. The judge's agreement with your votes
+comes once there are votes to compare.

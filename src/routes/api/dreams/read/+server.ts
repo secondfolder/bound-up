@@ -19,7 +19,6 @@ export const POST: RequestHandler = async (event) => {
 	const input = parsed.data;
 	return await streamStory(event, userId, {
 		messages: readingMessages({ ...input, canFetch: false }),
-		heat: null,
 		// Hot enough for the unlikely directions the pick leans towards.
 		temperature: 1,
 		maxTokens: 4000

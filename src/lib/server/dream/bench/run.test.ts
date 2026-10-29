@@ -167,4 +167,43 @@ describe('the variety fingerprint', () => {
 		});
 		expect(bad.fingerprint).toBeNull();
 	});
+
+	it('lets a simulated player take the turns, seeing only the words', async () => {
+		if (!training) {
+			throw new Error('the training brief is missing from the bench set');
+		}
+		const sent: { step: string; messages: readonly ModelMessage[] }[] = [];
+		const run = await runBrief(training, {
+			label: 'test',
+			model: 'stub',
+			seed: 'test',
+			passages: 2,
+			player: { persona: 'terse' },
+			complete: (messages, step) => {
+				sent.push({ step, messages });
+				if (step.startsWith('player')) {
+					return Promise.resolve(reply(step === 'player 2' ? 'kneel' : 'CONTINUE'));
+				}
+				return stub().complete(messages, step);
+			}
+		});
+		expect(run.error).toBeUndefined();
+		expect(sent.map((entry) => entry.step)).toEqual([
+			'reading',
+			'build',
+			'player 2',
+			'passage 2',
+			'player 3',
+			'passage 3'
+		]);
+		expect(run.turns).toEqual([{ kind: 'words', text: 'kneel' }, { kind: 'continue' }]);
+		// The player sees the words, never the markup or the footer.
+		const seen = sent.find((entry) => entry.step === 'player 2')?.messages.at(-1)?.content ?? '';
+		expect(seen).toContain('Posture: poor.');
+		expect(seen).not.toContain('<after>');
+		expect(seen).not.toContain('<block');
+		// And the passage after it answers the player's turn.
+		const asked = sent.find((entry) => entry.step === 'passage 2')?.messages.at(-1)?.content ?? '';
+		expect(asked).toContain('kneel');
+	});
 });

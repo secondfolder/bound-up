@@ -222,6 +222,52 @@ function replyFor(messages) {
 	return withMeta(`${name} heard: "${last}"${takeNote}${heat}${thought}`, meta);
 }
 
+/**
+ * The new daydream engine's requests (docs/dreams.md), told apart by their
+ * step's instructions, or null for anything else. A brief containing `[ask]`
+ * makes step 1 ask a question until it is answered.
+ */
+
+function dreamReplyFor(messages) {
+	const system = messages.find((message) => message.role === 'system')?.content ?? '';
+	const user = lastUserMessage(messages);
+	if (system.includes("This step reads the user's brief")) {
+		const ask =
+			user.includes('[ask]') && !user.includes('You asked:')
+				? '<ask id="who" keep="story">Who is in charge?<option>You are</option><option>They are</option></ask>'
+				: '';
+		return `<musts>\n- a quiet evening\n</musts>\n<research needed="no"/>\n<spread n="3">Open, but small.</spread>\n<directions>\n<direction p="0.5">A lesson in a lighthouse.</direction>\n<direction p="0.3">Letters left under a door.</direction>\n<direction p="0.2">A night train with one other passenger.</direction>\n</directions>\n${ask}`;
+	}
+	if (system.includes('This step builds the daydream')) {
+		const changed = user.includes('<changes>') ? ' (changed)' : '';
+		return `<title>The Keeper${changed}</title>\n<heat level="suggestive"/>\n<telling>\nClose second person, unhurried.\n</telling>\n<presentation view="scroll" theme="dusk">Plain prose.</presentation>\n<capabilities>reveals</capabilities>\n<elements>\n<character id="ottilie" name="Ottilie Brandt" also="Ottilie">\n<manner>Precise, amused.</manner>\n<unspoken shown="no">She has been waiting for you.</unspoken>\n</character>\n</elements>\n<passage>\nThe lamp turns above you. <say who="ottilie">"You came,"</say> Ottilie says, and hands you <more>a brass key</more>.\n<after>\n{"next":"She shows you the stairs."}\n{"new":"character","id":"warden","name":"The Warden","seed":"keeps the logbook"}\n</after>\n</passage>`;
+	}
+	if (system.includes("This step keeps the daydream's elements")) {
+		return user.includes('"warden"')
+			? '<elements>\n<character id="warden" name="The Warden">\n<appearance>Grey coat, ink on his fingers.</appearance>\n<manner>Gruff and careful.</manner>\n</character>\n</elements>'
+			: '<elements></elements>';
+	}
+	if (system.includes('This step expands one phrase')) {
+		return 'It is warm from her hand, and heavier than it looks.';
+	}
+	if (system.includes('This step condenses one finished scene')) {
+		return 'You arrived at the lighthouse and Ottilie gave you a key.';
+	}
+	if (
+		system.includes('How to write a passage') ||
+		user.includes('Write the next passage now') ||
+		user.includes('Write it again')
+	) {
+		const said = user.split('<user>\n')[1]?.split('\n</user>')[0] ?? '';
+		const take = user.includes('Write it again') ? 'Again, differently: ' : '';
+		const reply = said
+			? `You say "${said}", and Ottilie smiles.`
+			: 'Ottilie waits for you to go on.';
+		return `${take}${reply} The sea is loud below.\n<after>\n{"next":"The stairs."}\n</after>`;
+	}
+	return null;
+}
+
 /** A setup suggestion's answer, as OpenRouter wraps a non-streamed completion. */
 function suggestionFor(messages) {
 	const ask = messages.at(-1)?.content ?? '';
@@ -585,6 +631,18 @@ const server = createServer(async (request, response) => {
 		return;
 	}
 
+	const dream = body.response_format ? null : dreamReplyFor(body.messages);
+	if (dream !== null && !body.stream) {
+		response.writeHead(200, { 'content-type': 'application/json' });
+		response.end(
+			JSON.stringify({
+				provider: 'Stub',
+				choices: [{ message: { content: dream }, finish_reason: 'stop' }]
+			})
+		);
+		return;
+	}
+
 	if (body.response_format && !body.stream) {
 		response.writeHead(200, { 'content-type': 'application/json' });
 		response.end(JSON.stringify(suggestionFor(body.messages)));
@@ -600,7 +658,7 @@ const server = createServer(async (request, response) => {
 	const event = (fields) =>
 		`data: ${JSON.stringify({ id: 'gen-stub', model: body.model, provider: 'Stub', ...fields })}\n\n`;
 	response.write(event({ choices: [{ delta: { reasoning: 'The stub thinks it over.' } }] }));
-	for (const piece of chunks(replyFor(body.messages))) {
+	for (const piece of chunks(dream ?? replyFor(body.messages))) {
 		if (response.destroyed) {
 			return;
 		}

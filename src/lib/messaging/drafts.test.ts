@@ -178,6 +178,23 @@ describe('openDraft', () => {
 		expect((await openDraft(newThread, ada, storage)).initial).toBeNull();
 	});
 
+	it('keeps the new engine’s boxes as plain text, each apart', async () => {
+		const ada = await owner();
+		const storage = memoryStorage();
+		const story = await openDraft({ kind: 'dream', dreamId: 'd1' }, ada, storage);
+		const change = await openDraft({ kind: 'dream-change', dreamId: 'd1' }, ada, storage);
+		story.save({ text: 'I sit.', tagIds: [] });
+		change.save({ text: 'less plot', tagIds: [] });
+		await Promise.all([story.settled(), change.settled()]);
+		expect(storage.entries.size).toBe(2);
+		expect((await openDraft({ kind: 'dream', dreamId: 'd1' }, ada, storage)).initial?.text).toBe(
+			'I sit.'
+		);
+		story.save({ text: '   ', tagIds: [] });
+		await story.settled();
+		expect(storage.entries.size).toBe(1);
+	});
+
 	it('does not bring back text that was deleted while it was being saved', async () => {
 		const ada = await owner();
 		const storage = memoryStorage();

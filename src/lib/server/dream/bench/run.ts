@@ -15,15 +15,25 @@ import { drawNudges, type Nudge } from '../../../dream/nudges';
 import { pickDirection } from '../../../dream/pick';
 import { seededRandom, seedFrom } from '../../../dream/random';
 import { type BriefReading, parseBriefReading } from '../../../dream/reading';
-import { repeatedPhrases } from '../../../dream/repetition';
+import {
+	memoryFor,
+	type PathTurn,
+	repeatedAt,
+	sceneToSummarise,
+	type UserTurn,
+	userTurnOf
+} from '../../../dream/story';
+import type { DreamSummary, DreamTurn } from '../../../sealed-kinds/dreams';
 import type { Completion } from '../openrouter';
 import { buildMessages } from '../prompts/build';
 import type { ModelMessage } from '../prompts/core';
-import { passageMessages, type UserTurn } from '../prompts/passage';
+import { summaryMessages } from '../prompts/fill';
+import { passageMessages } from '../prompts/passage';
 import { readingMessages } from '../prompts/reading';
 import type { BenchBrief } from './briefs';
 import { type CheckResult, runChecks } from './checks';
 import { type Fingerprint, fingerprintMessages, parseFingerprint } from './fingerprint';
+import { type Persona, playerMessages, readPlayerTurn } from './player';
 
 export type Complete = (messages: readonly ModelMessage[], step: string) => Promise<Completion>;
 
@@ -44,6 +54,10 @@ export type BenchRun = {
 	picked: string | null;
 	build: Build | null;
 	passages: string[];
+	/** The user's turn before each passage after the opening: the player's, or Continue. */
+	turns: UserTurn[];
+	/** Scene summaries written along the way. */
+	summaries: string[];
 	steps: BenchStep[];
 	checks: CheckResult[];
 	fingerprint: Fingerprint | null;
@@ -60,6 +74,8 @@ export type RunOptions = {
 	complete: Complete;
 	/** A cheap model for the variety fingerprint; none skips it. */
 	fingerprint?: Complete;
+	/** A simulated player taking each turn; without one, every turn is Continue. */
+	player?: { persona: Persona };
 };
 
 const BENCH_LIMITS: readonly string[] = [];
@@ -85,6 +101,8 @@ export async function runBrief(brief: BenchBrief, options: RunOptions): Promise<
 		picked: null,
 		build: null,
 		passages: [],
+		turns: [],
+		summaries: [],
 		steps,
 		checks: [],
 		cost: 0
@@ -152,33 +170,90 @@ async function runSteps(
 			recentNames: []
 		})
 	);
-	run.build = parseBuild(buildText);
-	if (!run.build.passage) {
+	const build = parseBuild(buildText);
+	run.build = build;
+	if (!build.passage) {
 		return;
 	}
-	run.passages.push(run.build.passage);
-	const continueTurn: UserTurn = { kind: 'continue' };
+	run.passages.push(build.passage);
+	const path: PathTurn[] = [{ id: 'p0', turn: passageTurn(build.passage) }];
+	const summaries: { turnId: string; summary: DreamSummary }[] = [];
 	for (let index = 0; index < options.passages; index += 1) {
+		const turn = options.player
+			? readPlayerTurn(
+					await call(
+						`player ${index + 2}`,
+						playerMessages(options.player.persona, brief.brief, storySoFar(path))
+					)
+				)
+			: CONTINUE;
+		run.turns.push(turn);
+		path.push({ id: `u${index + 1}`, turn: inputTurn(turn) });
+		const memory = memoryFor(path, summaries, turn);
 		const text = await call(
 			`passage ${index + 2}`,
 			passageMessages({
 				setup: {
-					heat: run.build.heat,
-					telling: run.build.telling,
-					capabilities: run.build.capabilities,
-					elements: run.build.elements,
-					presentation: run.build.presentation,
+					heat: build.heat,
+					telling: build.telling,
+					capabilities: build.capabilities,
+					elements: build.elements,
+					presentation: build.presentation,
 					musts: run.reading.musts,
 					research: run.reading.research.text
 				},
 				limits: BENCH_LIMITS,
 				preferences: [],
-				history: run.passages.map((passage) => ({ passage, turn: continueTurn })),
-				repeated: repeatedPhrases(run.passages).map((entry) => entry.phrase)
+				history: memory.history,
+				summaries: memory.summaries,
+				repeated: repeatedAt(path)
 			})
 		);
 		run.passages.push(text);
+		path.push({ id: `p${index + 1}`, turn: passageTurn(text) });
+		// Scenes are condensed as the page condenses them, so a long session
+		// tests the memory the page would give it.
+		const scene = sceneToSummarise(path, summaries);
+		if (scene) {
+			const summary = await call(
+				`summary ${summaries.length + 1}`,
+				summaryMessages({ telling: build.telling, limits: BENCH_LIMITS, passages: scene.passages })
+			);
+			summaries.push({
+				turnId: scene.throughTurnId,
+				summary: { text: summary.trim(), fromTurnId: scene.fromTurnId }
+			});
+			run.summaries.push(summary.trim());
+		}
 	}
+}
+
+const CONTINUE: UserTurn = { kind: 'continue' };
+
+function passageTurn(source: string): DreamTurn {
+	return { kind: 'passage', source, request: 'next', ended: 'complete', model: '', provider: '' };
+}
+
+function inputTurn(turn: UserTurn): DreamTurn {
+	return {
+		kind: 'input',
+		text: turn.kind === 'words' ? turn.text : '',
+		cycles: [],
+		answers: [],
+		rolls: [],
+		fields: []
+	};
+}
+
+/** Each passage with the turn after it, as the player sees the story. */
+function storySoFar(path: readonly PathTurn[]): { passage: string; turn: UserTurn | null }[] {
+	return path.flatMap((entry, index) => {
+		if (entry.turn?.kind !== 'passage') {
+			return [];
+		}
+		const next = path[index + 1]?.turn;
+		return [{ passage: entry.turn.source, turn: next?.kind === 'input' ? userTurnOf(next) : null }];
+	});
 }
 
 async function fingerprintOf(

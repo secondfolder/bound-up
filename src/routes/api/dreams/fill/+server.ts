@@ -34,7 +34,6 @@ export const POST: RequestHandler = async (event) => {
 	}
 	return await askOnce(event, userId, {
 		messages,
-		heat: input.heat,
 		temperature,
 		// Short answers, with room for a reasoning model to think first.
 		maxTokens: 3000

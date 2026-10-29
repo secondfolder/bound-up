@@ -1,6 +1,6 @@
 import { error, isHttpError, json } from '@sveltejs/kit';
-import { levelFor } from '$lib/dream/routing';
-import { type AdultLevel, classifyReply } from '$lib/model-providers';
+import { REQUIRED_LEVEL } from '$lib/dream/routing';
+import { classifyReply } from '$lib/model-providers';
 import { splitOpenRouterModelId } from '$lib/model-search';
 import { type DaydreamConfig, readDaydreamConfig } from '$lib/server/daydream/config';
 import { hasAcceptedDisclosure } from '$lib/server/daydreams';
@@ -68,12 +68,27 @@ async function admit(
 	);
 }
 
-function route(locals: App.Locals, config: DaydreamConfig, level: AdultLevel) {
+/**
+ * The providers a request may go to: only those that passed full adult
+ * support (`REQUIRED_LEVEL`) and are not backing off. None is a 503 saying
+ * what to do, never an unpinned request that could reach a provider that
+ * refuses or filters.
+ */
+async function route(locals: App.Locals, config: DaydreamConfig) {
 	const { listed } = splitOpenRouterModelId(config.openrouterModelId);
 	const key = { model: listed, kind: 'language' as const };
+	const [first, ...rest] = await routeFor(locals.db, key, REQUIRED_LEVEL, new Date());
+	if (first === undefined) {
+		console.error('[dreams] no provider with full adult support is available');
+		error(
+			503,
+			'No provider for the story model allows full adult content right now. An admin can check them under Admin → Server settings → Language models.'
+		);
+	}
 	return {
 		listed,
-		providers: () => routeFor(locals.db, key, level, new Date()),
+		first,
+		providers: [first, ...rest],
 		record: (provider: string, outcome: Parameters<typeof recordOutcome>[3]) =>
 			recordOutcome(locals.db, key, provider, outcome, new Date())
 	};
@@ -81,8 +96,6 @@ function route(locals: App.Locals, config: DaydreamConfig, level: AdultLevel) {
 
 export type StoryCall = {
 	messages: ModelMessage[];
-	/** The daydream's heat, or null before it is known. */
-	heat: Parameters<typeof levelFor>[0];
 	temperature: number;
 	maxTokens: number;
 };
@@ -98,7 +111,7 @@ export async function streamStory(
 	if (refused) {
 		return refused;
 	}
-	const routing = route(event.locals, config, levelFor(call.heat));
+	const routing = await route(event.locals, config);
 	const body = relay({
 		request: {
 			baseUrl: config.baseUrl,
@@ -112,7 +125,7 @@ export async function streamStory(
 		},
 		listedModel: routing.listed,
 		configuredModel: config.openrouterModelId,
-		providers: await routing.providers(),
+		providers: routing.providers,
 		record: routing.record
 	});
 	return new Response(body, { headers: SSE_HEADERS });
@@ -133,38 +146,32 @@ export async function askOnce(
 	if (refused) {
 		return refused;
 	}
-	const routing = route(event.locals, config, levelFor(call.heat));
-	const [provider] = await routing.providers();
+	const routing = await route(event.locals, config);
+	const provider = routing.first;
 	try {
 		const reply = await complete({
 			baseUrl: config.baseUrl,
 			apiKey: config.apiKey,
-			model: provider ? routing.listed : config.openrouterModelId,
+			model: routing.listed,
 			messages: call.messages,
 			temperature: call.temperature,
 			maxTokens: call.maxTokens,
 			signal: event.request.signal,
-			...(provider ? { providers: [provider] } : {})
+			providers: [provider]
 		});
 		// Only a refusal counts against a provider here: a fill's answer can
 		// rightly be short (`<elements></elements>`), which a passage's cannot.
 		if (classifyReply(reply.text, reply.finishReason) === 'refused') {
-			if (provider) {
-				await routing.record(provider, 'refused');
-			}
+			await routing.record(provider, 'refused');
 			error(502, 'That could not be filled in just now. Try again in a moment.');
 		}
-		if (provider) {
-			await routing.record(provider, 'complied');
-		}
+		await routing.record(provider, 'complied');
 		return json({ text: reply.text });
 	} catch (cause) {
 		if (isHttpError(cause)) {
 			throw cause;
 		}
-		if (provider) {
-			await routing.record(provider, 'error').catch(() => undefined);
-		}
+		await routing.record(provider, 'error').catch(() => undefined);
 		// Not the error: an upstream message can quote the request back.
 		console.error('[dreams] a fill call failed');
 		error(502, 'That could not be filled in just now. Try again in a moment.');

@@ -17,8 +17,9 @@ export type ProviderOverride = (typeof OVERRIDES)[number];
 
 /**
  * The adult levels a provider is checked at, mildest first. A provider's
- * level is the highest it passed, and a daydream needs the level its heat
- * calls for. No level involves minors, or ever will.
+ * level is the highest it passed. The daydream engine uses only providers
+ * that passed the highest (`REQUIRED_LEVEL` in `dream/routing.ts`). No level
+ * involves minors, or ever will.
  */
 export const ADULT_LEVELS = [
 	{ level: 1, label: 'Suggestive' },

@@ -1,0 +1,143 @@
+/**
+ * Where a daydream's setup has got to, and what each step changes
+ * (docs/dreams.md, "The setup page"). The setup is saved after each finished
+ * step, so a reload asks `setupStep` and carries on from there; a step that
+ * was streaming when the page went runs again.
+ *
+ * Pure and alias-free.
+ */
+
+import type { DreamSetup, DreamSetupBuild } from '../sealed-kinds/dreams';
+import { serializeElements } from './elements';
+import { escapeMarkup } from './markup';
+import { drawNudges, type Nudge } from './nudges';
+import { pickDirection } from './pick';
+import { type Random, seededRandom } from './random';
+import type { BriefReading } from './reading';
+
+export type SetupStep =
+	/** Step 1 has not been read yet, or must be read again. */
+	| 'read'
+	/** Step 1 asked a question the user has not answered. */
+	| 'ask'
+	/** The brief asked the user to choose the direction. */
+	| 'pick'
+	/** A direction is chosen; the build and opening are next. */
+	| 'build'
+	| 'ready';
+
+export function setupStep(setup: DreamSetup): SetupStep {
+	if (!setup.reading) {
+		return 'read';
+	}
+	if (setup.reading.ask && setup.reading.answer === null) {
+		return 'ask';
+	}
+	if (!setup.chosen) {
+		return setup.reading.pick.by === 'user' ? 'pick' : 'build';
+	}
+	return setup.build ? 'ready' : 'build';
+}
+
+/** A new daydream from a brief: nothing read yet. */
+export function newSetup(brief: string, preferences: DreamSetup['preferences'] = []): DreamSetup {
+	return { brief, amendments: [], reading: null, chosen: null, build: null, preferences };
+}
+
+/**
+ * Step 1's reply, kept. An answer given to an earlier question is carried
+ * over, so it is still known once the question has been dealt with.
+ */
+export function withReading(setup: DreamSetup, reading: BriefReading): DreamSetup {
+	const answer = setup.reading?.answer ?? null;
+	return {
+		...setup,
+		reading: {
+			musts: reading.musts,
+			research: reading.research,
+			spread: reading.spread,
+			directions: reading.directions,
+			pick: reading.pick,
+			// Once answered, the question shown stays the one that was answered,
+			// even if the model asks something again.
+			ask: answer === null ? reading.ask : (setup.reading?.ask ?? null),
+			answer
+		}
+	};
+}
+
+/** The user's answer: step 1 is read again with it. */
+export function withAnswer(setup: DreamSetup, answer: string): DreamSetup {
+	if (!setup.reading) {
+		return setup;
+	}
+	return { ...setup, reading: { ...setup.reading, answer }, chosen: null, build: null };
+}
+
+/**
+ * The direction code picks, leaning towards the less likely (`pickDirection`),
+ * with the nudges for the build drawn from the same seed, so a bench run can
+ * repeat it exactly.
+ */
+export function codePick(setup: DreamSetup, seed: number): DreamSetup {
+	const { reading } = setup;
+	if (!reading || setup.chosen) {
+		return setup;
+	}
+	const random = seededRandom(seed);
+	const direction = pickDirection(reading.directions, reading.spread.n, random);
+	return direction ? choose(setup, direction.id, 'code', seed, random) : setup;
+}
+
+/** The user choosing a direction: the build starts again from it. */
+export function userPick(setup: DreamSetup, directionId: string, seed: number): DreamSetup {
+	if (!setup.reading?.directions.some((direction) => direction.id === directionId)) {
+		return setup;
+	}
+	return choose({ ...setup, build: null }, directionId, 'user', seed, seededRandom(seed));
+}
+
+function choose(
+	setup: DreamSetup,
+	directionId: string,
+	by: 'code' | 'user',
+	seed: number,
+	random: Random
+): DreamSetup {
+	const nudges: Nudge[] = drawNudges(random);
+	return { ...setup, chosen: { directionId, by, nudges, seed } };
+}
+
+/**
+ * A change asked for while it is set up. Before a direction is chosen,
+ * step 1 reads the brief again with it; after, the build runs again from the
+ * previous build plus the change, keeping the reading and the direction.
+ */
+export function withAmendment(setup: DreamSetup, amendment: string): DreamSetup {
+	const amendments = [...setup.amendments, amendment];
+	if (!setup.chosen) {
+		return { ...setup, amendments, reading: null };
+	}
+	return { ...setup, amendments, build: null };
+}
+
+/** The chosen direction's words, or null. */
+export function chosenDirection(setup: DreamSetup): string | null {
+	const id = setup.chosen?.directionId;
+	return setup.reading?.directions.find((direction) => direction.id === id)?.text ?? null;
+}
+
+/**
+ * A build written back as the tags the model wrote it in, without its
+ * passage: what the build is asked to change when the user asks for a change.
+ */
+export function serializeBuild(build: DreamSetupBuild): string {
+	return [
+		`<title>${escapeMarkup(build.title)}</title>`,
+		`<heat level="${build.heat}"/>`,
+		`<telling>\n${escapeMarkup(build.telling)}\n</telling>`,
+		`<presentation view="${build.presentation.view}" theme="${build.presentation.theme}">${escapeMarkup(build.presentation.notes)}</presentation>`,
+		`<capabilities>${build.capabilities.join(', ')}</capabilities>`,
+		`<elements>\n${serializeElements(build.elements)}\n</elements>`
+	].join('\n\n');
+}
