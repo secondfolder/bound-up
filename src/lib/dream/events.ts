@@ -15,6 +15,13 @@
  * - `research`: what a separate research step found, for a story model that
  *   cannot call tools; it is kept as the daydream's research as written.
  *
+ * Speech (`/api/dreams/speak`, docs/dreams.md, "Read aloud") streams on the
+ * same terms, ending with `done` or `failed`:
+ *
+ * - `audio`: more of the clip, base64, to be joined in order.
+ * - `words`: the latest timings for one of the provider's chunks of text
+ *   (`seq`), in seconds from the clip's start, replacing any before.
+ *
  * Pure and alias-free.
  */
 
@@ -27,7 +34,9 @@ export type DreamEvent =
 	| { type: 'failed'; message: string }
 	| { type: 'fetch'; url: string; ok: boolean; allowed: boolean }
 	| { type: 'search'; query: string; ok: boolean }
-	| { type: 'research'; text: string };
+	| { type: 'research'; text: string }
+	| { type: 'audio'; data: string }
+	| { type: 'words'; seq: number; words: { text: string; start: number; end: number }[] };
 
 /** One event as server-sent-event bytes. */
 export function encodeEvent(event: DreamEvent): string {
@@ -52,6 +61,10 @@ function decode(name: string, data: string): DreamEvent | null {
 		case 'text':
 		case 'research':
 			return typeof event.text === 'string' ? event : null;
+		case 'audio':
+			return typeof event.data === 'string' ? event : null;
+		case 'words':
+			return Array.isArray(event.words) ? event : null;
 		case 'restart':
 		case 'done':
 		case 'failed':

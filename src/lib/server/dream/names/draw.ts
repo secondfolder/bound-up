@@ -7,26 +7,10 @@
  * Alias-free, for the bench.
  */
 
+import { genderOf } from '../../../dream/gender';
 import { drawDistinct, type Random } from '../../../dream/random';
 import { OVERUSED_NAMES } from '../../../dream/repetition';
 import { NAME_LISTS, type NameList } from './lists';
-
-export type Gender = 'feminine' | 'masculine';
-
-const FEMININE =
-	/\b(?:woman|women|female|she|her|girl|lady|feminine|mother|wife|sister|daughter|queen|mistress|madam|nun|actress)\b/i;
-const MASCULINE =
-	/\b(?:man|men|male|he|his|him|boy|gentleman|masculine|father|husband|brother|son|king|master|sir|priest|actor)\b/i;
-
-/** Which way a description leans, or null for neither or both. */
-export function genderOf(description: string): Gender | null {
-	const feminine = FEMININE.test(description);
-	const masculine = MASCULINE.test(description);
-	if (feminine === masculine) {
-		return null;
-	}
-	return feminine ? 'feminine' : 'masculine';
-}
 
 /** The list a description points to, or null when none does (a broad mix is drawn). */
 export function listFor(description: string): NameList | null {

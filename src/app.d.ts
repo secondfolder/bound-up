@@ -153,6 +153,7 @@ declare global {
 				 */
 				OPENROUTER_BASE_URL?: string;
 				RUNWARE_BASE_URL?: string;
+				FISH_AUDIO_BASE_URL?: string;
 				/** Likewise for Resend, so a Workers e2e run can read its mail. See `$lib/server/mail`. */
 				RESEND_BASE_URL?: string;
 				/**

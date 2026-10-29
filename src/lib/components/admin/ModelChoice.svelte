@@ -76,7 +76,18 @@
 	const baseErrors = base?.errors;
 
 	const providerName = $derived(MODEL_PROVIDERS[provider].label);
-	const idLabel = $derived(provider === 'openrouter' ? 'OpenRouter model ID' : 'Runware model AIR');
+	const ID_LABELS: Record<ModelProviderId, string> = {
+		openrouter: 'OpenRouter model ID',
+		runware: 'Runware model AIR',
+		fish: 'Fish Audio voice ID'
+	};
+	const idLabel = $derived(ID_LABELS[provider]);
+	/** What Custom offers: a model by its id, or for a voice provider, a voice. */
+	const customHint = $derived(
+		provider === 'fish'
+			? 'Any voice in Fish Audio’s library, by the ID at the end of its page’s address.'
+			: `Any model ${providerName} hosts, by its exact ID.`
+	);
 
 	function choose(id: string) {
 		$choice = id as typeof $choice;
@@ -160,15 +171,16 @@
 		/>
 		<span class="text">
 			<span class="label">Custom</span>
-			<small>Any model {providerName} hosts, by its exact ID.</small>
+			<small>{customHint}</small>
 		</span>
 	</label>
 
 	{#if $choice === 'custom'}
 		<div class="custom">
+			<!-- Fish's library has no search here: its voices are found on its site. -->
 			{#if provider === 'openrouter'}
 				<ModelSearch provider="openrouter" label="Search OpenRouter" onpick={pickOpenRouter} />
-			{:else}
+			{:else if provider === 'runware'}
 				<ModelSearch provider="runware" label="Search Runware" onpick={pickRunware} />
 			{/if}
 			<InputField {superform} field={idField} title={idLabel} type="text" autocomplete="off" />
@@ -180,7 +192,7 @@
 					onfound={foundRunware}
 					{onmissing}
 				/>
-			{:else}
+			{:else if provider === 'openrouter'}
 				<ModelDetails
 					provider="openrouter"
 					modelId={String($modelId ?? '')}

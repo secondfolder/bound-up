@@ -33,6 +33,11 @@ export const FEATURES = {
 		description:
 			'The new daydream engine: a story made from anything you describe, written by a hosted language model. Each passage costs money, so it is granted rather than on for everyone.'
 	},
+	dreamVoice: {
+		name: 'Daydreams read aloud',
+		description:
+			'Listen to a daydream of the new engine, in a voice per character. Speech costs money per character spoken, up to a daily cap per account.'
+	},
 	debugMode: {
 		name: 'Debug mode',
 		description:

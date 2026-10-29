@@ -323,6 +323,46 @@ describe('actions', () => {
 		expect(await stored('researchModel')).toBe('');
 	});
 
+	it('saves the narrator voice, a preset or a Fish voice by id, and the daily limit', async () => {
+		const save = async (fields: Record<string, string>) =>
+			runAction(
+				actions,
+				'saveVoices',
+				await event(admin, {
+					voiceProvider: 'fish',
+					fishVoiceId: '',
+					voiceDailyCap: '5000',
+					...fields
+				})
+			);
+		expect(await save({ narratorVoice: 'velvet' })).not.toMatchObject({ status: 400 });
+		expect(JSON.parse(await stored('narratorVoice'))).toEqual({
+			provider: 'fish',
+			preset: 'velvet'
+		});
+		expect(await stored('voiceDailyCap')).toBe('5000');
+
+		const id = 'a'.repeat(32);
+		await save({ narratorVoice: 'custom', fishVoiceId: id });
+		expect(JSON.parse(await stored('narratorVoice'))).toEqual({
+			provider: 'fish',
+			fishVoiceId: id
+		});
+		expect((await runLoad(load(await event(admin)))).voiceForm.data).toMatchObject({
+			narratorVoice: 'custom',
+			fishVoiceId: id,
+			voiceDailyCap: 5000
+		});
+
+		expect(await save({ narratorVoice: 'custom', fishVoiceId: 'not an id' })).toMatchObject({
+			status: 400
+		});
+		expect(await save({ narratorVoice: 'hermes' })).toMatchObject({ status: 400 });
+		expect(await save({ narratorVoice: 'velvet', voiceDailyCap: '-1' })).toMatchObject({
+			status: 400
+		});
+	});
+
 	it('saves a custom picture model with its base model, and refuses one without', async () => {
 		const pictures = {
 			photoProvider: 'runware',

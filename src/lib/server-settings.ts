@@ -27,10 +27,13 @@ export const SERVER_SETTING_KEYS = [
 	'mailOutboxDir',
 	'openrouterApiKey',
 	'runwareApiKey',
+	'fishAudioApiKey',
 	'storyModel',
 	'researchModel',
 	'photoModel',
-	'illustratedModel'
+	'illustratedModel',
+	'narratorVoice',
+	'voiceDailyCap'
 ] as const;
 
 export type ServerSettingKey = (typeof SERVER_SETTING_KEYS)[number];
@@ -51,7 +54,8 @@ export const SECRET_SETTING_KEYS: ReadonlySet<ServerSettingKey> = new Set([
 	'resendApiKey',
 	'smtpUrl',
 	'openrouterApiKey',
-	'runwareApiKey'
+	'runwareApiKey',
+	'fishAudioApiKey'
 ]);
 
 export type MailTransportKind = 'resend' | 'smtp' | 'outbox';
@@ -85,6 +89,13 @@ export const MODEL_PROVIDERS = {
 		keyLabel: 'Runware API key',
 		keyHint: 'From runware.ai → API Keys. Searching for a custom model needs it saved first.',
 		keyPlaceholder: null
+	},
+	fish: {
+		label: 'Fish Audio',
+		credentialKey: 'fishAudioApiKey',
+		keyLabel: 'Fish Audio API key',
+		keyHint: 'From fish.audio → API Keys. Speech is billed per character spoken.',
+		keyPlaceholder: null
 	}
 } as const satisfies Record<
 	string,
@@ -107,11 +118,13 @@ export const MODEL_PROVIDER_IDS = Object.keys(MODEL_PROVIDERS) as ModelProviderI
  */
 export const LANGUAGE_PROVIDERS = ['openrouter'] as const satisfies readonly ModelProviderId[];
 export const IMAGE_PROVIDERS = ['runware'] as const satisfies readonly ModelProviderId[];
+export const VOICE_PROVIDERS = ['fish'] as const satisfies readonly ModelProviderId[];
 
 export type LanguageProviderId = (typeof LANGUAGE_PROVIDERS)[number];
 export type ImageProviderId = (typeof IMAGE_PROVIDERS)[number];
+export type VoiceProviderId = (typeof VOICE_PROVIDERS)[number];
 
-export type ModelKind = 'language' | 'image';
+export type ModelKind = 'language' | 'image' | 'voice';
 
 /** What a provider runs, for the providers card. */
 export function modelKindsOf(provider: ModelProviderId): ModelKind[] {
@@ -121,6 +134,9 @@ export function modelKindsOf(provider: ModelProviderId): ModelKind[] {
 	}
 	if ((IMAGE_PROVIDERS as readonly string[]).includes(provider)) {
 		kinds.push('image');
+	}
+	if ((VOICE_PROVIDERS as readonly string[]).includes(provider)) {
+		kinds.push('voice');
 	}
 	return kinds;
 }
@@ -356,6 +372,152 @@ export const PICTURE_MODEL_SETTING = {
  */
 export const RUNWARE_MODEL_AIR: RegExp = /^[a-z0-9_-]+:[a-z0-9_-]+@[a-z0-9_.-]+$/i;
 
+// ── voices (Fish Audio) ──────────────────────────────────────────────────────
+
+/** What a voice sounds like, for matching one to a character's description. */
+export type VoiceGender = 'female' | 'male';
+export type VoiceAge = 'young' | 'middle-aged' | 'older';
+
+type VoicePreset = {
+	readonly id: string;
+	readonly label: string;
+	readonly description: string;
+	/** The voice's id in Fish Audio's library (its `reference_id`). */
+	readonly fishVoiceId: string;
+	readonly gender: VoiceGender;
+	/** "young" is a young adult: Fish tags adults so. Never a voice tagged as a child. */
+	readonly age: VoiceAge;
+	/** Words for how it sounds, from Fish's own tags, matched against a character's `voice`. */
+	readonly tags: readonly string[];
+};
+
+/**
+ * The voices read-aloud can use, by name (docs/dreams.md, "Read aloud"):
+ * public voices in Fish Audio's library, chosen 2026-10-30 from its
+ * sensual, seductive and narration tags. Never one named after or imitating
+ * a real person (one described as an actor's voice was left out), never one
+ * tagged as a child. Each is a narrator choice as well as a character voice.
+ * Stored by our id, so a voice that goes from Fish's library is replaced
+ * here rather than in every setting.
+ */
+export const FISH_VOICE_PRESETS = [
+	{
+		id: 'breathy',
+		label: 'Breathy',
+		description: 'A young woman, soft, breathy and intimate. The default narrator.',
+		fishVoiceId: '3effd15d464044c18bffa56fc7024225',
+		gender: 'female',
+		age: 'young',
+		tags: ['soft', 'breathy', 'intimate', 'calm', 'gentle', 'whispery']
+	},
+	{
+		id: 'tender',
+		label: 'Tender',
+		description: 'A young woman, warm and very slow.',
+		fishVoiceId: 'd4fae53a537c4da6b9e30ba1c5d96ef9',
+		gender: 'female',
+		age: 'young',
+		tags: ['warm', 'gentle', 'breathy', 'soft', 'tender', 'slow', 'sweet']
+	},
+	{
+		id: 'smoky',
+		label: 'Smoky',
+		description: 'A woman in middle age, Australian, raspy and deliberate.',
+		fishVoiceId: '0fd9107f401443a2bd8e828a8c765062',
+		gender: 'female',
+		age: 'middle-aged',
+		tags: ['smoky', 'raspy', 'husky', 'passionate', 'australian', 'slow', 'older']
+	},
+	{
+		id: 'fatale',
+		label: 'Fatale',
+		description: 'A young woman with a French accent, dark and a little smug.',
+		fishVoiceId: 'cb6f40faf16c42c4873fd5b1e951e14e',
+		gender: 'female',
+		age: 'young',
+		tags: ['smoky', 'dark', 'smug', 'cruel', 'french', 'cool', 'slow']
+	},
+	{
+		id: 'velvet',
+		label: 'Velvet',
+		description: 'A young woman, British, low and refined.',
+		fishVoiceId: '7ba27ef839634625964a74b5a999b985',
+		gender: 'female',
+		age: 'young',
+		tags: ['low', 'velvety', 'refined', 'british', 'composed', 'mysterious', 'clear']
+	},
+	{
+		id: 'storyteller',
+		label: 'Storyteller',
+		description: 'A young woman, softly British, calm. Made for narration.',
+		fishVoiceId: 'e6877a93f4744f3d85484fd5c3d7f831',
+		gender: 'female',
+		age: 'young',
+		tags: ['narration', 'calm', 'gentle', 'british', 'soft', 'warm', 'storytelling']
+	},
+	{
+		id: 'drawl',
+		label: 'Drawl',
+		description: 'A woman in middle age with a thick Southern drawl, husky and playful.',
+		fishVoiceId: 'f78f7957ce7b4ac0a6e29d2d6a16067f',
+		gender: 'female',
+		age: 'middle-aged',
+		tags: ['southern', 'husky', 'deep', 'playful', 'teasing', 'warm', 'older']
+	},
+	{
+		id: 'commanding',
+		label: 'Commanding',
+		description: 'A man, deep, confident and possessive.',
+		fishVoiceId: 'd2666f42721e48729b4907fdeb70e3c9',
+		gender: 'male',
+		age: 'middle-aged',
+		tags: ['deep', 'confident', 'commanding', 'possessive', 'husky', 'dominant', 'stern']
+	},
+	{
+		id: 'steady',
+		label: 'Steady',
+		description: 'A man in middle age, measured and serious. Made for narration.',
+		fishVoiceId: 'bf322df2096a46f18c579d0baa36f41d',
+		gender: 'male',
+		age: 'middle-aged',
+		tags: ['narration', 'deep', 'measured', 'serious', 'steady', 'calm', 'older']
+	},
+	{
+		id: 'low',
+		label: 'Low',
+		description: 'A man in middle age, low, calm and a little mysterious.',
+		fishVoiceId: 'ef9c79b62ef34530bf452c0e50e3c260',
+		gender: 'male',
+		age: 'middle-aged',
+		tags: ['low', 'deep', 'calm', 'mysterious', 'quiet', 'unhurried', 'older']
+	},
+	{
+		id: 'rough',
+		label: 'Rough',
+		description: 'A young man, gravelly, rough and dominant.',
+		fishVoiceId: 'f7160d2fbbce4db186dd23546ed72576',
+		gender: 'male',
+		age: 'young',
+		tags: ['rough', 'gravelly', 'dominant', 'assertive', 'deep', 'confident']
+	}
+] as const satisfies readonly VoicePreset[];
+
+export type FishVoicePresetId = (typeof FISH_VOICE_PRESETS)[number]['id'];
+
+/** What `narratorVoice` holds, as JSON: a preset by our id, or any Fish voice by its own. */
+export type VoiceChoice = { provider: 'fish' } & (
+	| { preset: FishVoicePresetId }
+	| { fishVoiceId: string }
+);
+
+export const DEFAULT_NARRATOR_VOICE: VoiceChoice = { provider: 'fish', preset: 'breathy' };
+
+/** A Fish Audio voice id: 32 hex characters. */
+export const FISH_VOICE_ID: RegExp = /^[0-9a-f]{32}$/;
+
+/** Characters of speech an account may have read aloud a day, when the setting is unset. */
+export const DEFAULT_VOICE_DAILY_CAP = 30_000;
+
 // ── reading a stored choice ──────────────────────────────────────────────────
 
 function parseJson(raw: string): unknown {
@@ -429,6 +591,36 @@ export function openrouterModelIdFor(choice: StoryModelChoice): string {
 	}
 	const preset = OPENROUTER_STORY_MODEL_PRESETS.find((entry) => entry.id === choice.preset);
 	return (preset ?? OPENROUTER_STORY_MODEL_PRESETS[0]).openrouterModelId;
+}
+
+/** A stored narrator voice, or the default; as above, never throws. */
+export function parseVoice(raw: string): VoiceChoice {
+	const value = parseJson(raw);
+	if (isRecord(value) && providerOf(value, VOICE_PROVIDERS) === 'fish') {
+		const { preset, fishVoiceId } = value;
+		if (FISH_VOICE_PRESETS.some((entry) => entry.id === preset)) {
+			return { provider: 'fish', preset: preset as FishVoicePresetId };
+		}
+		if (typeof fishVoiceId === 'string' && FISH_VOICE_ID.test(fishVoiceId)) {
+			return { provider: 'fish', fishVoiceId };
+		}
+	}
+	return DEFAULT_NARRATOR_VOICE;
+}
+
+/** The Fish voice a choice speaks with. */
+export function fishVoiceIdFor(choice: VoiceChoice): string {
+	if ('fishVoiceId' in choice) {
+		return choice.fishVoiceId;
+	}
+	const preset = FISH_VOICE_PRESETS.find((entry) => entry.id === choice.preset);
+	return (preset ?? FISH_VOICE_PRESETS[0]).fishVoiceId;
+}
+
+/** The daily cap in characters: a whole number of at least 0, or the default when unset. */
+export function parseVoiceDailyCap(raw: string): number {
+	const value = Number.parseInt(raw.trim(), 10);
+	return Number.isFinite(value) && value >= 0 ? value : DEFAULT_VOICE_DAILY_CAP;
 }
 
 /** A stored picture model choice for a style, or that style's default; as above, never throws. */

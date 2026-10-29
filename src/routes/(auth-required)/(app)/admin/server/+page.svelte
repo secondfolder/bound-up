@@ -15,9 +15,11 @@
 		imageModelSettingsFormSchema,
 		languageModelSettingsFormSchema,
 		mailSettingsFormSchema,
-		pushSettingsFormSchema
+		pushSettingsFormSchema,
+		voiceSettingsFormSchema
 	} from '$lib/schemas/serverSettingsForms';
 	import {
+		FISH_VOICE_PRESETS,
 		IMAGE_PROVIDERS,
 		LANGUAGE_PROVIDERS,
 		MODEL_PROVIDER_IDS,
@@ -27,7 +29,8 @@
 		PICTURE_BASE_MODELS,
 		PICTURE_MODEL_PRESETS,
 		type ServerSettingKey,
-		STORY_MODEL_PRESETS
+		STORY_MODEL_PRESETS,
+		VOICE_PROVIDERS
 	} from '$lib/server-settings';
 	import { superForm } from '$lib/superform';
 	import type { PageData } from './$types';
@@ -47,6 +50,8 @@
 	const languageModelForm = superForm(data.languageModelForm, { resetForm: false });
 	// svelte-ignore state_referenced_locally
 	const imageModelForm = superForm(data.imageModelForm, { resetForm: false });
+	// svelte-ignore state_referenced_locally
+	const voiceForm = superForm(data.voiceForm, { resetForm: false });
 	// svelte-ignore state_referenced_locally
 	const pushForm = superForm(data.pushForm, { resetForm: false });
 	// svelte-ignore state_referenced_locally
@@ -78,6 +83,13 @@
 		isTainted: imageModelIsTainted
 	} = imageModelForm;
 	const {
+		form: voices,
+		message: voiceMessage,
+		submitting: voiceSubmitting,
+		tainted: voiceTainted,
+		isTainted: voiceIsTainted
+	} = voiceForm;
+	const {
 		form: push,
 		message: pushMessage,
 		submitting: pushSubmitting,
@@ -99,6 +111,9 @@
 	const canSaveImageModels = $derived(
 		imageModelIsTainted($imageModelTainted) &&
 			imageModelSettingsFormSchema.safeParse($imageModels).success
+	);
+	const canSaveVoices = $derived(
+		voiceIsTainted($voiceTainted) && voiceSettingsFormSchema.safeParse($voices).success
 	);
 	const canSavePush = $derived(
 		pushIsTainted($pushTainted) && pushSettingsFormSchema.safeParse($push).success
@@ -153,6 +168,7 @@
 			ready: data.status.languageModels && !languageModelsBroken
 		},
 		{ id: 'image-models', label: 'Image', ready: data.status.imageModels && !imageModelsBroken },
+		{ id: 'voices', label: 'Voices', ready: data.status.voices },
 		{ id: 'push', label: 'Notifications', ready: data.status.push },
 		{ id: 'secret', label: 'Secret', ready: null }
 	]);
@@ -174,6 +190,11 @@
 			modelId: preset.runwareModelAir,
 			baseLabel: baseLabel(preset.base)
 		}));
+	const voicePresets: ModelPresetOption[] = FISH_VOICE_PRESETS.map((preset) => ({
+		...preset,
+		modelId: preset.fishVoiceId
+	}));
+	const firstVoicePreset = () => FISH_VOICE_PRESETS[0].id;
 	const photoPresets = $derived(picturePresets($imageModels.photoProvider, 'photo'));
 	const illustratedPresets = $derived(
 		picturePresets($imageModels.illustratedProvider, 'illustrated')
@@ -194,7 +215,11 @@
 
 	const keySet = (provider: ModelProviderId) => providerKey(provider).set;
 
-	const KIND_LABELS = { language: 'Language models', image: 'Image models' } as const;
+	const KIND_LABELS = {
+		language: 'Language models',
+		image: 'Image models',
+		voice: 'Voices'
+	} as const;
 
 	function kindsLabel(provider: ModelProviderId): string {
 		return modelKindsOf(provider)
@@ -660,6 +685,65 @@
 						disabled={$imageModelSubmitting}
 					>
 						Save image model settings
+					</wa-button>
+				</div>
+			</form>
+		</article>
+
+		<!-- ── Voices ────────────────────────────────────────────────────── -->
+		<article id="voices" class="panel" aria-labelledby="voices-heading">
+			<header>
+				<h2 id="voices-heading">Voices</h2>
+				{#if data.status.voices}
+					<wa-badge variant="success">Working</wa-badge>
+				{:else}
+					<wa-badge variant="neutral">Not set up</wa-badge>
+				{/if}
+			</header>
+			<p class="lead">
+				Daydreams can be read aloud, with a voice for the narrator and one matched to each
+				character from the presets. Without a key for the voice provider, there is no reading aloud.
+			</p>
+			<form method="POST" action="?/saveVoices" use:voiceForm.enhance>
+				<ModelChoice
+					superform={voiceForm}
+					choiceField="narratorVoice"
+					idField="fishVoiceId"
+					provider={$voices.voiceProvider}
+					legend="Narrator voice"
+					presets={voicePresets}
+				>
+					{#snippet providerField()}
+						<ModelProviderField
+							superform={voiceForm}
+							field="voiceProvider"
+							choiceField="narratorVoice"
+							idField="fishVoiceId"
+							providers={VOICE_PROVIDERS}
+							firstPreset={firstVoicePreset}
+							{keySet}
+							onaddkey={openProviderKey}
+						/>
+					{/snippet}
+				</ModelChoice>
+				<InputField
+					superform={voiceForm}
+					field="voiceDailyCap"
+					title="Daily limit per account, in characters"
+					type="number"
+					min="0"
+					step="1000"
+					hint="Speech is billed per character: Fish Audio charges $15 a million, so 30,000 is about 45¢ an account a day."
+				/>
+				<div class="actions">
+					{#if $voiceMessage}<SavedNote>{$voiceMessage}</SavedNote>{/if}
+					<wa-button
+						type="submit"
+						appearance={canSaveVoices ? 'accent' : 'outlined'}
+						variant={canSaveVoices ? 'brand' : 'neutral'}
+						disabled={$voiceSubmitting}
+					>
+						Save voice settings
 					</wa-button>
 				</div>
 			</form>

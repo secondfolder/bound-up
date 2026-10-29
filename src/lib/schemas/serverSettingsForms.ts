@@ -2,6 +2,8 @@ import { z } from 'zod';
 import type { PictureStyle } from '$lib/daydream';
 import { OVERRIDES } from '$lib/model-providers';
 import {
+	FISH_VOICE_ID,
+	FISH_VOICE_PRESETS,
 	IMAGE_PROVIDERS,
 	type ImageProviderId,
 	LANGUAGE_PROVIDERS,
@@ -11,7 +13,8 @@ import {
 	PICTURE_BASE_MODELS,
 	PICTURE_MODEL_PRESETS,
 	RUNWARE_MODEL_AIR,
-	STORY_MODEL_PRESETS
+	STORY_MODEL_PRESETS,
+	VOICE_PROVIDERS
 } from '$lib/server-settings';
 
 /**
@@ -228,3 +231,31 @@ export const providerOverrideFormSchema = z.object({
 });
 
 export type ProviderOverrideForm = z.output<typeof providerOverrideFormSchema>;
+
+/** The most a daily cap may be set to: about $15 of speech an account a day. */
+export const MAX_VOICE_DAILY_CAP = 1_000_000;
+
+/**
+ * Read aloud: the narrator's voice (a preset, or any Fish voice by its id),
+ * and how much each account may have read a day.
+ */
+export const voiceSettingsFormSchema = z
+	.object({
+		voiceProvider: z.enum(VOICE_PROVIDERS),
+		narratorVoice: z.string().max(100),
+		fishVoiceId: z.string().trim().max(100),
+		voiceDailyCap: z.number().int().min(0).max(MAX_VOICE_DAILY_CAP)
+	})
+	.superRefine((data, context) => {
+		requirePresetOf(data.narratorVoice, FISH_VOICE_PRESETS, 'narratorVoice', context);
+		if (data.narratorVoice === 'custom' && !FISH_VOICE_ID.test(data.fishVoiceId)) {
+			context.addIssue({
+				code: 'custom',
+				path: ['fishVoiceId'],
+				message:
+					'A Fish Audio voice ID: the 32 letters and numbers at the end of its page’s address.'
+			});
+		}
+	});
+
+export type VoiceSettingsForm = z.output<typeof voiceSettingsFormSchema>;

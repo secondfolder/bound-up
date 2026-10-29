@@ -21,6 +21,7 @@ import {
 import { HEAT_LEVELS, MAX_TELLING_CHARS, THEMES, VIEWS } from './build';
 import { CAPABILITIES } from './capabilities';
 import { MAX_ELEMENTS } from './elements';
+import { MAX_SPOKEN_CHARS } from './speech';
 
 const required = (max: number) => z.string().trim().min(1).max(max);
 const strings = (max: number, count: number) => z.array(required(max)).max(count);
@@ -157,3 +158,15 @@ export type FillRequest = z.output<typeof fillRequestSchema>;
 
 /** What a fill answers with: the model's reply, which the page reads. */
 export type FillResponse = { text: string };
+
+/**
+ * One utterance to read aloud (docs/dreams.md, "Read aloud"): its words
+ * with cues, and whose voice, by name: the narrator or a curated voice,
+ * never a provider's id, so a request cannot spend on any voice it likes.
+ */
+export const speakRequestSchema = z.object({
+	text: z.string().trim().min(1).max(MAX_SPOKEN_CHARS),
+	voice: z.string().max(40)
+});
+
+export type SpeakRequest = z.output<typeof speakRequestSchema>;

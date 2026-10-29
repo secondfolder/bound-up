@@ -11,7 +11,8 @@ import {
 	providerOverrideFormSchema,
 	pushSettingsFormSchema,
 	type SecretChange,
-	serverActionFormSchema
+	serverActionFormSchema,
+	voiceSettingsFormSchema
 } from '$lib/schemas/serverSettingsForms';
 import { requireAdmin } from '$lib/server/admin';
 import { openrouterBaseUrl } from '$lib/server/daydream/config';
@@ -31,6 +32,7 @@ import {
 import { legacyEnvStillSet } from '$lib/server/settings/legacy-env';
 import { serverSettingsStatus } from '$lib/server/settings/status';
 import {
+	type FishVoicePresetId,
 	MODEL_PROVIDER_IDS,
 	MODEL_PROVIDERS,
 	type ModelProviderId,
@@ -41,13 +43,16 @@ import {
 	parsePictureModel,
 	parseResearchModel,
 	parseStoryModel,
+	parseVoice,
+	parseVoiceDailyCap,
 	providerCredential,
 	SECRET_SETTING_KEYS,
 	type ServerSettingKey,
 	type ServerSettings,
 	type StoryModelChoice,
 	secretTail,
-	storyModelCallsTools
+	storyModelCallsTools,
+	type VoiceChoice
 } from '$lib/server-settings';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -56,6 +61,7 @@ const MAIL_FORM = 'mail';
 const TEST_EMAIL_FORM = 'test-email';
 const LANGUAGE_MODEL_FORM = 'language-models';
 const IMAGE_MODEL_FORM = 'image-models';
+const VOICE_FORM = 'voices';
 const PUSH_FORM = 'push';
 const VAPID_FORM = 'vapid';
 const SERVER_SECRET_FORM = 'server-secret';
@@ -143,6 +149,7 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 	const storyModelListed = listedStoryModel(settings);
 	const photo = pictureFields(settings, 'photo');
 	const illustrated = pictureFields(settings, 'illustrated');
+	const voice = parseVoice(settings.narratorVoice);
 
 	return {
 		adminEmail: admin.email,
@@ -209,6 +216,16 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 			},
 			zod4(imageModelSettingsFormSchema),
 			{ id: IMAGE_MODEL_FORM, errors: false }
+		),
+		voiceForm: await superValidate(
+			{
+				voiceProvider: voice.provider,
+				narratorVoice: 'preset' in voice ? voice.preset : 'custom',
+				fishVoiceId: 'fishVoiceId' in voice ? voice.fishVoiceId : '',
+				voiceDailyCap: parseVoiceDailyCap(settings.voiceDailyCap)
+			},
+			zod4(voiceSettingsFormSchema),
+			{ id: VOICE_FORM, errors: false }
 		),
 		pushForm: await superValidate(
 			{ vapidSubject: settings.vapidSubject },
@@ -476,6 +493,26 @@ export const actions: Actions = {
 			)
 		});
 		return message(imageModelForm, SAVED);
+	},
+
+	saveVoices: async ({ locals, request }) => {
+		requireAdmin(locals);
+		const voiceForm = await superValidate(request, zod4(voiceSettingsFormSchema), {
+			id: VOICE_FORM
+		});
+		if (!voiceForm.valid) {
+			return fail(400, { voiceForm });
+		}
+		const { data } = voiceForm;
+		const narrator: VoiceChoice =
+			data.narratorVoice === 'custom'
+				? { provider: data.voiceProvider, fishVoiceId: data.fishVoiceId }
+				: { provider: data.voiceProvider, preset: data.narratorVoice as FishVoicePresetId };
+		await saveServerSettings(locals.db, {
+			narratorVoice: JSON.stringify(narrator),
+			voiceDailyCap: String(data.voiceDailyCap)
+		});
+		return message(voiceForm, SAVED);
 	},
 
 	savePush: async ({ locals, request }) => {

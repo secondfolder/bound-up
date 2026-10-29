@@ -2194,3 +2194,24 @@ export const dreamPreferences = sqliteTable('dream_preferences', {
 	revision: integer('revision').notNull().default(0),
 	...timestamps
 });
+
+/**
+ * How much an account has had read aloud each day (docs/dreams.md, "Read
+ * aloud"), in UTF-8 bytes of text sent, which is what the voice provider
+ * bills by. Counted before each request, against `voiceDailyCap`. `day` is
+ * the UTC date, `YYYY-MM-DD`; nothing here says what was read.
+ */
+export const dreamVoiceUsage = sqliteTable(
+	'dream_voice_usage',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		day: text('day').notNull(),
+		bytes: integer('bytes').notNull().default(0)
+	},
+	(table) => [uniqueIndex('dream_voice_usage_user_day_idx').on(table.userId, table.day)]
+);

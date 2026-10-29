@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { genderOf } from '../../../dream/gender';
 import { seededRandom } from '../../../dream/random';
 import { OVERUSED_NAMES } from '../../../dream/repetition';
-import { drawNames, drawPool, genderOf, listFor } from './draw';
+import { drawNames, drawPool, listFor } from './draw';
 import { NAME_LISTS } from './lists';
 
 describe('names', () => {

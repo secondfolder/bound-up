@@ -2,6 +2,7 @@ import {
 	PICTURE_MODEL_SETTING,
 	parsePictureModel,
 	parseStoryModel,
+	parseVoice,
 	providerCredential,
 	type ServerSettings
 } from '$lib/server-settings';
@@ -19,6 +20,8 @@ export type ServerSettingsStatus = {
 	languageModels: boolean;
 	/** Every picture model's provider has a key: Daydreams can be drawn. */
 	imageModels: boolean;
+	/** The narrator voice's provider has a key: Daydreams can be read aloud. */
+	voices: boolean;
 };
 
 export function serverSettingsStatus(settings: ServerSettings): ServerSettingsStatus {
@@ -34,6 +37,7 @@ export function serverSettingsStatus(settings: ServerSettings): ServerSettingsSt
 					settings,
 					parsePictureModel(style, settings[PICTURE_MODEL_SETTING[style]]).provider
 				) !== ''
-		)
+		),
+		voices: providerCredential(settings, parseVoice(settings.narratorVoice).provider) !== ''
 	};
 }

@@ -11,6 +11,7 @@
 		{ name: 'Email', ready: data.status.mailProblem === null },
 		{ name: 'Language models', ready: data.status.languageModels },
 		{ name: 'Image models', ready: data.status.imageModels },
+		{ name: 'Voices', ready: data.status.voices },
 		{ name: 'Notifications', ready: data.status.push }
 	]);
 </script>

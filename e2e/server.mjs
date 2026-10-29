@@ -237,6 +237,8 @@ async function serveImage(image) {
 			`OPENROUTER_BASE_URL=http://host.docker.internal:${E2E_MODEL_PORT}/v1`,
 			'--env',
 			`RUNWARE_BASE_URL=http://host.docker.internal:${E2E_MODEL_PORT}/runware`,
+			'--env',
+			`FISH_AUDIO_BASE_URL=http://host.docker.internal:${E2E_MODEL_PORT}/fish`,
 			// Every test signs up from the same address, many times a minute; the
 			// sign-in limit would refuse most of them. `vite dev` has it off for
 			// the same reason. scripts/docker-smoke.sh checks the limit instead.
@@ -325,6 +327,8 @@ async function serveWorker() {
 			`OPENROUTER_BASE_URL:${stub}/v1`,
 			'--var',
 			`RUNWARE_BASE_URL:${stub}/runware`,
+			'--var',
+			`FISH_AUDIO_BASE_URL:${stub}/fish`,
 			'--var',
 			`RESEND_BASE_URL:${stub}/resend`,
 			// As for the image: every test signs up from one address, many times a

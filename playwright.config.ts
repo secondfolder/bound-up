@@ -88,6 +88,7 @@ export default defineConfig({
 			// pointed at the stub through the Docker host instead.
 			OPENROUTER_BASE_URL: `http://127.0.0.1:${E2E_MODEL_PORT}/v1`,
 			RUNWARE_BASE_URL: `http://127.0.0.1:${E2E_MODEL_PORT}/runware`,
+			FISH_AUDIO_BASE_URL: `http://127.0.0.1:${E2E_MODEL_PORT}/fish`,
 			// vite.config.ts points `server.origin` at a personal dev tunnel, which
 			// would make the page ask localhost for its assets over that hostname.
 			VITE_DEV_ORIGIN: E2E_BASE_URL,

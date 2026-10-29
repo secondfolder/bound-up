@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+	DEFAULT_VOICE_DAILY_CAP,
+	FISH_VOICE_PRESETS,
+	fishVoiceIdFor,
 	IMAGE_PROVIDERS,
 	LANGUAGE_PROVIDERS,
 	MODEL_PROVIDER_IDS,
@@ -9,6 +12,8 @@ import {
 	openrouterModelIdFor,
 	parsePictureModel,
 	parseStoryModel,
+	parseVoice,
+	parseVoiceDailyCap,
 	pictureBaseModelForRunware,
 	providerCredential,
 	RUNWARE_MODEL_AIR,
@@ -152,12 +157,48 @@ describe('model providers', () => {
 			expect(modelKindsOf(id)).toContain('image');
 		}
 		expect(modelKindsOf('openrouter')).toEqual(['language']);
+		expect(modelKindsOf('fish')).toEqual(['voice']);
 	});
 
 	it('reads a provider’s key from its own setting, trimmed', () => {
-		const settings = { openrouterApiKey: ' sk-or-1 ', runwareApiKey: '' };
+		const settings = { openrouterApiKey: ' sk-or-1 ', runwareApiKey: '', fishAudioApiKey: '' };
 		expect(providerCredential(settings, 'openrouter')).toBe('sk-or-1');
 		expect(providerCredential(settings, 'runware')).toBe('');
+	});
+});
+
+describe('voices', () => {
+	it('reads a narrator voice: a preset, a Fish id, or the default', () => {
+		expect(parseVoice(JSON.stringify({ provider: 'fish', preset: 'velvet' }))).toEqual({
+			provider: 'fish',
+			preset: 'velvet'
+		});
+		const custom = { provider: 'fish', fishVoiceId: 'a'.repeat(32) };
+		expect(parseVoice(JSON.stringify(custom))).toEqual(custom);
+		expect(parseVoice('')).toEqual({ provider: 'fish', preset: 'breathy' });
+		expect(parseVoice(JSON.stringify({ provider: 'fish', fishVoiceId: 'nope' }))).toEqual({
+			provider: 'fish',
+			preset: 'breathy'
+		});
+		expect(fishVoiceIdFor({ provider: 'fish', preset: 'breathy' })).toBe(
+			'3effd15d464044c18bffa56fc7024225'
+		);
+	});
+
+	it('offers only adults, each preset once', () => {
+		const ids = FISH_VOICE_PRESETS.map((preset) => preset.id);
+		expect(new Set(ids).size).toBe(ids.length);
+		for (const preset of FISH_VOICE_PRESETS) {
+			expect(preset.tags).not.toContain('child');
+			expect(preset.fishVoiceId).toMatch(/^[0-9a-f]{32}$/);
+		}
+	});
+
+	it('reads the daily cap, defaulting when unset or not a number', () => {
+		expect(parseVoiceDailyCap('5000')).toBe(5000);
+		expect(parseVoiceDailyCap('0')).toBe(0);
+		expect(parseVoiceDailyCap('')).toBe(DEFAULT_VOICE_DAILY_CAP);
+		expect(parseVoiceDailyCap('-3')).toBe(DEFAULT_VOICE_DAILY_CAP);
 	});
 });
 

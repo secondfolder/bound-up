@@ -34,7 +34,10 @@ const PLAIN: readonly (readonly [ServerSettingKey, string])[] = [
 	['smtpUrl', 'SMTP_URL'],
 	['mailOutboxDir', 'MAIL_OUTBOX_DIR'],
 	['openrouterApiKey', 'OPENROUTER_API_KEY'],
-	['runwareApiKey', 'RUNWARE_AI_API_KEY']
+	['runwareApiKey', 'RUNWARE_AI_API_KEY'],
+	// Not an old variable: where the key was put while read-aloud was built,
+	// carried in the same way so it is set once and then edited here.
+	['fishAudioApiKey', 'FISH_AUDIO_API_KEY']
 ];
 
 /** Every variable the import reads, which the admin screen warns about while it is still set. */

@@ -64,7 +64,9 @@ async function run(providers: string[], script: Script) {
 		failed: () => '',
 		fetch: () => '',
 		search: () => '',
-		research: () => ''
+		research: () => '',
+		audio: () => '',
+		words: () => ''
 	};
 	const text = events
 		.map((event) => pieces[event.type](event))
