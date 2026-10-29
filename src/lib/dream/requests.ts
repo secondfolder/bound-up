@@ -76,6 +76,16 @@ const turnExtras = {
 	answers: z
 		.array(z.object({ id: slug, text: required(400) }))
 		.max(2)
+		.optional(),
+	rolls: z
+		.array(
+			z.object({
+				id: slug,
+				sides: z.number().int().min(2).max(100),
+				value: z.number().int().min(1).max(100)
+			})
+		)
+		.max(2)
 		.optional()
 };
 

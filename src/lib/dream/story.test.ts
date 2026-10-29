@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { DreamInputTurn, DreamPassageTurn, DreamSummary } from '../sealed-kinds/dreams';
 import type { DreamElement } from './elements';
 import {
+	changedStat,
 	elementsAt,
 	expansionsAt,
 	historyFor,
@@ -241,5 +242,30 @@ describe('escaping a loop', () => {
 		expect(isStuck(path, { kind: 'continue' })).toBe(true);
 		expect(isStuck(path.slice(0, 6), { kind: 'continue' })).toBe(false);
 		expect(isStuck(path, { kind: 'words', text: 'I stand.' })).toBe(false);
+	});
+});
+
+describe('stats', () => {
+	it('moves a stat by a change, keeping a meter in range and a count above zero', () => {
+		const meter = { kind: 'meter', value: 30, max: 50 };
+		expect(changedStat(meter, '+5')).toBe(35);
+		expect(changedStat(meter, '+90')).toBe(50);
+		expect(changedStat(meter, '-90')).toBe(0);
+		expect(changedStat(meter, 12)).toBe(12);
+		expect(changedStat({ kind: 'count', value: 2 }, '-5')).toBe(0);
+		expect(changedStat({ kind: 'list', value: ['a'] }, 'b')).toEqual(['a', 'b']);
+		expect(changedStat({ kind: 'line', value: 'calm' }, 'shaken')).toBe('shaken');
+	});
+
+	it('applies changes earned in the text, along this branch only', () => {
+		const path = [
+			passage('p1', 'You hold still. <set ottilie.composure="+5">She notices.</set>'),
+			input('u1', 'x'),
+			passage('p2', '<set ottilie.composure="-10"/>A report.')
+		];
+		const [after] = elementsAt([ottilie], path, []);
+		expect(after?.stats[0]?.value).toBe(25);
+		const [first] = elementsAt([ottilie], path.slice(0, 1), []);
+		expect(first?.stats[0]?.value).toBe(35);
 	});
 });

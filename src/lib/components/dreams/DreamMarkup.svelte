@@ -15,6 +15,10 @@
 		answer?: (question: { id: string; text: string }, answer: string, remember: boolean) => void;
 		/** What was answered, on an earlier passage. */
 		answered?: Readonly<Record<string, string>>;
+		/** Rolls the passage's die, as the turn. */
+		roll?: (roll: { id: string; sides: number }) => void;
+		/** What was rolled, on an earlier passage, by roll id. */
+		rolled?: Readonly<Record<string, number>>;
 	};
 
 	const STILL: MarkupInputs = { live: false, choices: {}, values: {} };
@@ -24,14 +28,17 @@
 	import { splitBeats } from '$lib/dream/beats';
 	import {
 		fieldKey,
+		outcomeFor,
 		type PassageBlock,
 		type PassageField,
 		passageAsk,
 		passageBlocks,
-		passageCycles
+		passageCycles,
+		passageRoll
 	} from '$lib/dream/fields';
 	import { type InlineSegment, inlineSegments, speakerShade } from '$lib/dream/inline';
 	import { type MarkupNode, type MarkupTag, parseMarkup, plainText } from '$lib/dream/markup';
+	import { setChanges } from '$lib/dream/story';
 	import DreamField from './DreamField.svelte';
 
 	/**
@@ -109,6 +116,7 @@
 	const cycleFor = $derived(new Map(passageCycles(nodes).map((cycle) => [cycle.tag, cycle])));
 	const nameOf = $derived(new Map(names.map((entry) => [entry.id, entry.name])));
 	const ask = $derived(passageAsk(nodes));
+	const roll = $derived(passageRoll(nodes));
 	let remember = $state(false);
 
 	let revealed = $state(new Set<MarkupTag>());
@@ -133,7 +141,9 @@
 		'voice-note',
 		'call-response',
 		'lines',
-		'letter'
+		'letter',
+		'deck',
+		'countdown'
 	]);
 	const DONE_LABELS: Record<string, string> = {
 		contract: 'Sign and return',
@@ -142,7 +152,7 @@
 		'call-response': 'Done'
 	};
 	/** Kinds whose plain lines read as a list: one rule or one slot a line. */
-	const LISTED = new Set(['rules', 'schedule']);
+	const LISTED = new Set(['rules', 'schedule', 'countdown']);
 
 	function kindLabel(kind: string): string {
 		const text = kind.replaceAll('-', ' ');
@@ -273,6 +283,28 @@
 	</section>
 {/snippet}
 
+{#snippet dice(offered: NonNullable<typeof roll>)}
+	{const rolled = $derived(inputs.rolled?.[offered.id])}
+	{const landed = $derived(rolled === undefined ? undefined : outcomeFor(offered, rolled))}
+	<section class="roll" aria-label={`A roll of a d${offered.sides}`}>
+		<ul class="outcomes">
+			{#each offered.outcomes as outcome, index (index)}
+				<li class:landed={landed === outcome}>
+					<span class="faces">{outcome.from === outcome.to ? outcome.from : `${outcome.from}–${outcome.to}`}</span>
+					<span>{@render tree(outcome.tag.children)}</span>
+				</li>
+			{/each}
+		</ul>
+		{#if rolled !== undefined}
+			<p class="rolled" aria-live="polite">You rolled <strong>{rolled}</strong></p>
+		{:else if live && inputs.roll}
+			<wa-button appearance="accent" variant="brand" onclick={() => inputs.roll?.(offered)}>
+				Roll a d{offered.sides}
+			</wa-button>
+		{/if}
+	</section>
+{/snippet}
+
 {#snippet question(asked: NonNullable<typeof ask>)}
 	{const given = $derived(inputs.answered?.[asked.id])}
 	<section class="ask" aria-label="A question">
@@ -343,6 +375,18 @@
 			{/if}
 		{:else if node.name === 'option'}
 			<!-- Options belong to a field or a question, which draws them. -->
+		{:else if node.name === 'roll'}
+			{#if roll && roll.tag === node}
+				{@render dice(roll)}
+			{/if}
+		{:else if node.name === 'on'}
+			<!-- An outcome belongs to its roll, which draws it. -->
+		{:else if node.name === 'set'}
+			{const changes = $derived(setChanges(node))}
+			<span class="earned">{@render tree(node.children)}</span>
+			{#each Object.entries(changes) as [address, change] (address)}
+				<span class="stat-change">{change} {address.split('.')[1] ?? address}</span>
+			{/each}
 		{:else if node.name === 'ask'}
 			{#if ask && ask.tag === node}
 				{@render question(ask)}
@@ -582,6 +626,59 @@
 		letter-spacing: 0.04em;
 	}
 
+	.roll {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--wa-space-xs);
+		margin-block: var(--wa-space-s);
+		white-space: normal;
+	}
+
+	.outcomes {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+
+		li {
+			display: flex;
+			gap: var(--wa-space-s);
+			opacity: 0.85;
+		}
+
+		li.landed {
+			opacity: 1;
+			font-weight: var(--wa-font-weight-bold);
+		}
+
+		.faces {
+			min-width: 2.5em;
+			font-variant-numeric: tabular-nums;
+		}
+	}
+
+	.rolled {
+		margin: 0;
+	}
+
+	.earned {
+		text-decoration: underline dotted;
+		text-underline-offset: 0.25em;
+	}
+
+	.stat-change {
+		margin-inline-start: var(--wa-space-3xs);
+		padding: 0 var(--wa-space-2xs);
+		border-radius: var(--wa-border-radius-pill);
+		background: color-mix(
+			in oklab,
+			var(--dream-accent, var(--wa-color-brand-on-quiet)) 20%,
+			transparent
+		);
+		font-size: var(--wa-font-size-xs);
+		white-space: nowrap;
+	}
+
 	.ask {
 		display: flex;
 		flex-direction: column;
@@ -819,5 +916,13 @@
 		from {
 			opacity: 0;
 		}
+	}
+
+	.block[data-kind='countdown'] .lines {
+		padding: 0;
+		list-style: none;
+		text-align: center;
+		font-size: var(--wa-font-size-3xl);
+		font-variant-numeric: tabular-nums;
 	}
 </style>

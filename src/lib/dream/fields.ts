@@ -16,7 +16,8 @@ export const FIELD_TYPES = [
 	'text',
 	'sign',
 	'say',
-	'tap-count'
+	'tap-count',
+	'draw'
 ] as const;
 export type FieldType = (typeof FIELD_TYPES)[number];
 
@@ -187,4 +188,38 @@ export function passageAsk(nodes: readonly MarkupNode[]): PassageAsk | null {
 				as: tag.attrs.as?.trim() || null
 			}
 		: null;
+}
+
+export type PassageRoll = {
+	tag: MarkupTag;
+	id: string;
+	sides: number;
+	/** Each outcome's faces and what it says. */
+	outcomes: { from: number; to: number; tag: MarkupTag }[];
+};
+
+const FACES = /^\s*(?<from>\d+)\s*(?:-\s*(?<to>\d+))?\s*$/;
+
+/**
+ * The passage's roll, if it offers one (`<roll sides="6"><on n="1-2">…</on>`;
+ * docs/dreams.md, "Dice"). The browser rolls; the outcome for the face shows.
+ */
+export function passageRoll(nodes: readonly MarkupNode[]): PassageRoll | null {
+	const [tag] = findTags(nodes, 'roll');
+	if (!tag) {
+		return null;
+	}
+	const sides = Math.min(100, Math.max(2, Number.parseInt(tag.attrs.sides ?? '', 10) || 6));
+	const outcomes = findTags(tag.children, 'on').flatMap((on) => {
+		const match: RegExpExecArray | null = FACES.exec(on.attrs.n ?? '');
+		const from = Number.parseInt(match?.groups?.from ?? '', 10);
+		const to = Number.parseInt(match?.groups?.to ?? match?.groups?.from ?? '', 10);
+		return Number.isFinite(from) && Number.isFinite(to) ? [{ from, to, tag: on }] : [];
+	});
+	return { tag, id: slug(tag.attrs.id ?? '', 'roll'), sides, outcomes };
+}
+
+/** The outcome a face lands on, or undefined when the model left that face out. */
+export function outcomeFor(roll: PassageRoll, value: number) {
+	return roll.outcomes.find((outcome) => value >= outcome.from && value <= outcome.to);
 }

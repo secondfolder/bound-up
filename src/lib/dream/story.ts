@@ -32,6 +32,9 @@ export type TurnField = { block: string; name: string; value: string };
 /** An answer to a question the passage asked (`<ask id>`). */
 export type TurnAnswer = { id: string; text: string };
 
+/** A roll the passage offered, and what the browser rolled (`<roll id>`). */
+export type TurnRoll = { id: string; sides: number; value: number };
+
 /**
  * What the user did after a passage, as the prompt describes it: words, or
  * Continue, either with the choices they set, the fields they filled in
@@ -41,6 +44,7 @@ export type UserTurn = ({ kind: 'continue' } | { kind: 'words'; text: string }) 
 	choices?: TurnChoice[];
 	fields?: TurnField[];
 	answers?: TurnAnswer[];
+	rolls?: TurnRoll[];
 };
 
 export type HistoryEntry = { passage: string; turn: UserTurn };
@@ -60,7 +64,7 @@ function isInput(entry: PathTurn | undefined): entry is { id: string; turn: Drea
 	return entry?.turn?.kind === 'input';
 }
 
-/** What the user's turn tells the model: words, choices and fields. Answers and rolls come later. */
+/** What the user's turn tells the model: words, choices, fields, answers and rolls. */
 export function userTurnOf(input: DreamInputTurn | null): UserTurn {
 	const text = input?.text.trim() ?? '';
 	const extra = {
@@ -68,7 +72,8 @@ export function userTurnOf(input: DreamInputTurn | null): UserTurn {
 		...(input && input.fields.length > 0 ? { fields: input.fields } : {}),
 		...(input && input.answers.length > 0
 			? { answers: input.answers.map(({ id, text: answer }) => ({ id, text: answer })) }
-			: {})
+			: {}),
+		...(input && input.rolls.length > 0 ? { rolls: input.rolls } : {})
 	};
 	return text ? { kind: 'words', text, ...extra } : { kind: 'continue', ...extra };
 }
@@ -152,29 +157,64 @@ function applyNew(
 }
 
 /** A `set` line moves stats addressed `element.stat`. */
-function applySet(
-	elements: Map<string, DreamElement>,
-	entry: Extract<FooterEntry, { kind: 'set' }>
-) {
-	for (const [address, value] of Object.entries(entry.set)) {
+const RELATIVE = /^[+-]\d+(?:\.\d+)?$/;
+
+/**
+ * A stat's value after a change: "+5" and "-10" move a number, anything else
+ * replaces it; a meter stays within its range, a count at or above zero.
+ */
+export function changedStat(
+	stat: { kind: string; value: number | string | string[]; max?: number },
+	change: number | string
+): number | string | string[] {
+	let next: number | string | string[] = change;
+	if (typeof change === 'string' && RELATIVE.test(change.trim())) {
+		const base = typeof stat.value === 'number' ? stat.value : 0;
+		next = base + Number.parseFloat(change);
+	} else if (typeof change === 'string' && (stat.kind === 'meter' || stat.kind === 'count')) {
+		const parsed = Number.parseFloat(change);
+		next = Number.isFinite(parsed) ? parsed : stat.value;
+	} else if (stat.kind === 'list' && typeof change === 'string') {
+		next = [...(Array.isArray(stat.value) ? stat.value : []), change].slice(-20);
+	}
+	if (typeof next === 'number') {
+		if (stat.kind === 'meter') {
+			return Math.min(stat.max ?? 100, Math.max(0, next));
+		}
+		if (stat.kind === 'count') {
+			return Math.max(0, next);
+		}
+	}
+	return next;
+}
+
+/** Moves stats addressed `element.stat` (a footer's `set` line, or a `<set>` in the text). */
+function applySet(elements: Map<string, DreamElement>, changes: Record<string, number | string>) {
+	for (const [address, value] of Object.entries(changes)) {
 		const [elementId, statName] = address.split('.');
 		const element = elements.get(elementId ?? '');
 		const stat = element?.stats.find((candidate) => candidate.name === statName);
 		if (!(element && stat)) {
 			continue;
 		}
-		const max = stat.max ?? 100;
-		const next =
-			stat.kind === 'meter' && typeof value === 'number'
-				? Math.min(max, Math.max(0, value))
-				: value;
 		elements.set(element.id, {
 			...element,
 			stats: element.stats.map((candidate) =>
-				candidate === stat ? { ...candidate, value: next } : candidate
+				candidate === stat ? { ...candidate, value: changedStat(candidate, value) } : candidate
 			)
 		});
 	}
+}
+
+/** The stat changes a `<set>` tag carries: every attribute addressed `element.stat`. */
+export function setChanges(tag: {
+	attrs: Partial<Record<string, string>>;
+}): Record<string, string> {
+	return Object.fromEntries(
+		Object.entries(tag.attrs).filter(
+			(entry): entry is [string, string] => entry[0].includes('.') && entry[1] !== undefined
+		)
+	);
 }
 
 /**
@@ -190,11 +230,16 @@ export function elementsAt(
 	const elements = new Map(initial.map((element) => [element.id, element]));
 	for (const entry of path) {
 		if (isPassage(entry)) {
+			// Changes earned in the text first, in the order they were written,
+			// then any the footer adds.
+			for (const tag of findTags(parseMarkup(entry.turn.source, { final: true }), 'set')) {
+				applySet(elements, setChanges(tag));
+			}
 			for (const line of footerOf(entry.turn.source).entries) {
 				if (line.kind === 'new') {
 					applyNew(elements, line);
 				} else if (line.kind === 'set') {
-					applySet(elements, line);
+					applySet(elements, line.set);
 				}
 			}
 		}
@@ -304,7 +349,8 @@ function isEmptyTurn(turn: DreamInputTurn): boolean {
 		!turn.text.trim() &&
 		turn.cycles.length === 0 &&
 		turn.fields.length === 0 &&
-		turn.answers.length === 0
+		turn.answers.length === 0 &&
+		turn.rolls.length === 0
 	);
 }
 
@@ -331,7 +377,8 @@ export function isStuck(path: readonly PathTurn[], pending: UserTurn): boolean {
 		pending.kind === 'words' ||
 		(pending.fields?.length ?? 0) > 0 ||
 		(pending.choices?.length ?? 0) > 0 ||
-		(pending.answers?.length ?? 0) > 0;
+		(pending.answers?.length ?? 0) > 0 ||
+		(pending.rolls?.length ?? 0) > 0;
 	if (fresh) {
 		return false;
 	}

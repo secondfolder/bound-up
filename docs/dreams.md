@@ -687,10 +687,36 @@ configured, so it waits for that decision.
 A search query can echo the brief to the search provider, which a fetch of a
 link the user gave does not, so it is left off until that trade is decided.
 
+## Stats, dice and more views (phase 7)
+
+**Stats** live on elements (`<stat name kind value max>`: a meter, a count, a
+list or a line). The model changes one by wrapping the words that earned it,
+`<set you.composure="+5">You hold still.</set>`, or with a bare `<set …/>`
+where no phrase fits (a report that states the number), or a footer `set`
+line. Code applies the changes along the branch being read, in order
+(`elementsAt`, `changedStat`): "+5" and "-10" move a number, anything else
+replaces it, a meter stays within its range and a count at or above zero, a
+list gains the item. So each branch has its own values, and nothing is
+stored apart from the passages. The words that earned a change are marked,
+with the change beside them ("+5 composure"), and the stats as they stand
+show above the story.
+
+**Dice.** `<roll id sides="6"><on n="1-2">…</on><on n="3-6">…</on></roll>`
+offers a roll at an uncertain moment. Every outcome shows with its faces;
+"Roll a d6" rolls in the browser and sends the roll as the turn (`rolls` on
+the input turn, read as `The user rolled 4 on the d6 you offered ("door")`),
+and the outcome it landed on is marked. A **deck** or wheel is a block with
+a `draw` field whose options are the cards: "Draw a card" picks one in the
+browser and it goes with the turn like any field. A **countdown** block's
+lines are drawn as large numbers.
+
+**Views.** Besides scroll and tap-through, a build may choose `texts` (each
+passage a message bubble from the other side) or `monologue` (one voice in
+large, centred lines).
+
 ## Not built yet
 
-Every later phase: stats, dice and rolls, decks,
-pictures and the texts and monologue views, read-aloud. A block's Done sends
+Every later phase: pictures, and read-aloud. A block's Done sends
 its fields without the words in the input box. Step 1
 and the build are still two calls for a spread of 1, and an edit works on the
 source rather than the rendered tree. See the plan. The judge's agreement with your votes

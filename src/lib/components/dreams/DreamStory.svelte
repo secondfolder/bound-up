@@ -55,7 +55,8 @@
 				setValue: (key, value) => session.setValue(key, value),
 				done: () => void session.send(''),
 				answer: (question, answer, remember) =>
-					void session.answerQuestion(question, answer, remember)
+					void session.answerQuestion(question, answer, remember),
+				roll: (offered) => void session.roll(offered)
 			};
 		}
 		const after = session.path[index + 1]?.turn;
@@ -68,7 +69,8 @@
 			values: Object.fromEntries(
 				after.fields.map((field) => [fieldKey(field.block, field.name), field.value])
 			),
-			answered: Object.fromEntries(after.answers.map((answer) => [answer.id, answer.text]))
+			answered: Object.fromEntries(after.answers.map((answer) => [answer.id, answer.text])),
+			rolled: Object.fromEntries(after.rolls.map((rolled) => [rolled.id, rolled.value]))
 		};
 	}
 
@@ -100,6 +102,24 @@
 	// ── how it looks ─────────────────────────────────────────────────────────
 
 	const theme = $derived(build?.presentation.theme ?? 'rust');
+
+	/** Every stat on a shown element, labelled with whose it is unless it is the user's. */
+	const tracked = $derived(
+		elements
+			.filter((element) => element.shown)
+			.flatMap((element) =>
+				element.stats.map((stat) => ({
+					key: `${element.id}.${stat.name}`,
+					label: element.type === 'you' ? heading(stat.name) : `${element.name}: ${stat.name}`,
+					value: stat.value,
+					max: stat.kind === 'meter' ? (stat.max ?? 100) : null
+				}))
+			)
+	);
+
+	function heading(name: string): string {
+		return name.charAt(0).toUpperCase() + name.slice(1);
+	}
 	const viewKey = $derived(`bound-up:dream-view:${session.id}`);
 	let chosenView = $state<'scroll' | 'tap' | null>(null);
 	onMount(() => {
@@ -180,7 +200,27 @@
 		</header>
 	{/if}
 
-	<ol class="turns">
+	{#if tracked.length > 0}
+		<!-- The stats as they stand on this branch: each moved only by words that earned it. -->
+		<dl class="stats">
+			{#each tracked as entry (entry.key)}
+				<div>
+					<dt>{entry.label}</dt>
+					<dd>
+						{#if entry.max !== null}
+							<wa-progress-bar value={Math.round((Number(entry.value) / entry.max) * 100)} label={entry.label}
+							></wa-progress-bar>
+							<span class="readout">{entry.value} / {entry.max}</span>
+						{:else}
+							<span class="readout">{Array.isArray(entry.value) ? entry.value.join(', ') : entry.value}</span>
+						{/if}
+					</dd>
+				</div>
+			{/each}
+		</dl>
+	{/if}
+
+	<ol class="turns" data-view={build?.presentation.view ?? 'scroll'}>
 		{#each session.path as entry, index (entry.id)}
 			{#if entry.turn === null}
 				<li class="unreadable">This part can't be shown on this device.</li>
@@ -376,6 +416,51 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--wa-space-m);
+	}
+
+	.stats {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+		gap: var(--wa-space-xs) var(--wa-space-m);
+		margin: 0;
+
+		dt {
+			font-size: var(--wa-font-size-s);
+			color: var(--wa-color-text-quiet);
+		}
+
+		dd {
+			display: flex;
+			align-items: center;
+			gap: var(--wa-space-xs);
+			margin: 0;
+
+			wa-progress-bar {
+				flex: 1;
+				--track-height: 0.5rem;
+			}
+		}
+
+		.readout {
+			font-size: var(--wa-font-size-s);
+			font-variant-numeric: tabular-nums;
+		}
+	}
+
+	/* Monologue: one voice in short lines, set like a script read aloud. */
+	.turns[data-view='monologue'] .passage {
+		font-size: var(--wa-font-size-l);
+		line-height: 1.8;
+		text-align: center;
+	}
+
+	/* Texts: the story is the other side of a chat, passage by passage. */
+	.turns[data-view='texts'] .passage {
+		align-self: flex-start;
+		max-width: 85%;
+		padding: var(--wa-space-xs) var(--wa-space-m);
+		border-radius: var(--wa-border-radius-l);
+		background: var(--wa-color-surface-raised);
 	}
 
 	.title-line {

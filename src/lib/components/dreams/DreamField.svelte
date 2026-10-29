@@ -2,6 +2,7 @@
 	import RadioButton from '$lib/components/segmented/RadioButton.svelte';
 	import RadioButtonGroup from '$lib/components/segmented/RadioButtonGroup.svelte';
 	import type { PassageField } from '$lib/dream/fields';
+	import { cryptoRandom } from '$lib/dream/random';
 
 	/**
 	 * One field of a block (docs/dreams.md, "Fields"): a real control, named
@@ -68,6 +69,21 @@
 			{count} of {field.target}
 		</button>
 		<span class="visually-hidden" aria-live="polite">{count} of {field.target}</span>
+	{:else if field.type === 'draw' && field.options.length > 0}
+		<!-- A deck or a wheel: the browser draws, like a die (docs/dreams.md, "Dice"). -->
+		{#if value}
+			<span class="drawn">{value}</span>
+		{:else}
+			<button
+				type="button"
+				class="toggle"
+				disabled={!live}
+				onclick={() => onchange(field.options[Math.floor(cryptoRandom() * field.options.length)] ?? '')}
+			>
+				<span class="visually-hidden">Draw: {field.label}</span>
+				<span aria-hidden="true">Draw a card</span>
+			</button>
+		{/if}
 	{:else if field.type === 'choice' && field.options.length > 0}
 		{#if live}
 			<RadioButtonGroup label={field.label} value={value || undefined} onchange={(chosen) => onchange(String(chosen))}>
@@ -98,6 +114,15 @@
 		wa-input {
 			flex: 1 1 100%;
 		}
+	}
+
+	.drawn {
+		flex: 1 1 100%;
+		padding: var(--wa-space-m);
+		border: 1px solid currentColor;
+		border-radius: var(--wa-border-radius-m);
+		text-align: center;
+		font-weight: var(--wa-font-weight-bold);
 	}
 
 	.words {

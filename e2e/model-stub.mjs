@@ -251,7 +251,7 @@ function dreamReplyFor(messages) {
 		const changed = user.includes('<changes>') ? ' (changed)' : '';
 		// Which idea was built, so a spec can see "Try another idea" take another.
 		const idea = user.split('The chosen direction:\n')[1]?.split('\n')[0] ?? '';
-		return `<title>The Keeper${changed}</title>\n<heat level="suggestive"/>\n<telling>\nClose second person, unhurried.\n</telling>\n<presentation view="scroll" theme="dusk">Plain prose.</presentation>\n<capabilities>reveals, blocks, choices</capabilities>\n<elements>\n<character id="ottilie" name="Ottilie Brandt" also="Ottilie">\n<manner>Precise, amused.</manner>\n<unspoken shown="no">She has been waiting for you.</unspoken>\n</character>\n</elements>\n<passage>\nThe lamp turns above you (${idea}). <say who="ottilie">"You came,"</say> Ottilie says, and hands you <more>a brass key</more>.\n<after>\n{"next":"She shows you the stairs."}\n{"new":"character","id":"warden","name":"The Warden","seed":"keeps the logbook"}\n</after>\n</passage>`;
+		return `<title>The Keeper${changed}</title>\n<heat level="suggestive"/>\n<telling>\nClose second person, unhurried.\n</telling>\n<presentation view="scroll" theme="dusk">Plain prose.</presentation>\n<capabilities>reveals, blocks, choices, stats, dice</capabilities>\n<elements>\n<character id="ottilie" name="Ottilie Brandt" also="Ottilie">\n<manner>Precise, amused.</manner>\n<unspoken shown="no">She has been waiting for you.</unspoken>\n</character>\n<you><stat name="composure" kind="meter" value="30">Rises when you hold still.</stat></you>\n</elements>\n<passage>\nThe lamp turns above you (${idea}). <say who="ottilie">"You came,"</say> Ottilie says, and hands you <more>a brass key</more>.\n<after>\n{"next":"She shows you the stairs."}\n{"new":"character","id":"warden","name":"The Warden","seed":"keeps the logbook"}\n</after>\n</passage>`;
 	}
 	if (system.includes("This step keeps the daydream's elements")) {
 		return user.includes('"warden"')
@@ -282,6 +282,16 @@ function dreamReplyFor(messages) {
 		const answered = user.split('\n').find((line) => line.startsWith('The user answered'));
 		if (answered) {
 			return `Ottilie nods. ${answered}\n<after>\n{"next":"n"}\n</after>`;
+		}
+		if (user.includes('[hold]') && !user.includes('Write it again')) {
+			return 'You do not move. <set you.composure="+5">She notices.</set>\n<after>\n{"next":"n"}\n</after>';
+		}
+		if (user.includes('[roll]')) {
+			return 'The door may be locked. <roll id="door" sides="6"><on n="1-3">Locked.</on><on n="4-6">Open.</on></roll>\n<after>\n{"next":"n"}\n</after>';
+		}
+		const rolled = user.split('\n').find((line) => line.startsWith('The user rolled'));
+		if (rolled) {
+			return `The dice fall. ${rolled}\n<after>\n{"next":"n"}\n</after>`;
 		}
 		if (user.includes('[contract]')) {
 			return 'Ottilie slides a page across. Use <cycle id="pen" label="the pen">blue ink|red ink</cycle>.\n<block kind="contract" title="Terms">\n<field id="c1" type="initial">You will kneel when I enter.</field>\n<field id="sig" type="sign">Sign here</field>\n</block>\n<after>\n{"next":"She reads it."}\n</after>';

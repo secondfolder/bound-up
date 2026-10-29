@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { fieldKey, passageBlocks, passageCycles, turnInputs } from './fields';
+import {
+	fieldKey,
+	outcomeFor,
+	passageBlocks,
+	passageCycles,
+	passageRoll,
+	turnInputs
+} from './fields';
 import { parseMarkup } from './markup';
 
 const PASSAGE = `Pick <cycle id="pen" label="the pen">blue|black|red</cycle>.
@@ -52,5 +59,21 @@ describe('turnInputs', () => {
 			{ block: 'lines-3', name: 'f1', value: '20' }
 		]);
 		expect(turnInputs(nodes, { pen: 'blue' }, {}).cycles).toEqual([]);
+	});
+});
+
+describe('passageRoll', () => {
+	it('reads the die and which faces each outcome covers', () => {
+		const roll = passageRoll(
+			parseMarkup(
+				'<roll id="door" sides="6"><on n="1-2">Locked.</on><on n="3-6">Open.</on></roll>',
+				{ final: true }
+			)
+		);
+		expect(roll?.id).toBe('door');
+		expect(roll?.sides).toBe(6);
+		expect(roll && outcomeFor(roll, 2)?.from).toBe(1);
+		expect(roll && outcomeFor(roll, 5)?.to).toBe(6);
+		expect(passageRoll(parseMarkup('No dice.', { final: true }))).toBeNull();
 	});
 });

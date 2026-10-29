@@ -76,7 +76,7 @@ test.describe('daydreams, the new engine', () => {
 		await expect(page.getByText('Never: Nothing about feet')).toBeVisible();
 		await clickWaButton(page, 'They are');
 
-		await expect(page.getByText('“You came,”').or(page.getByText('"You came,"'))).toBeVisible();
+		await expect(page.locator('ol.turns')).toContainText('"You came,"');
 		await expect(page.getByRole('heading', { name: 'The Keeper' })).toBeVisible();
 		await saved(page);
 
@@ -293,6 +293,40 @@ test.describe('daydreams, the new engine', () => {
 		await expect(
 			page.getByText('By default: Slower, or faster? Slower', { exact: true })
 		).toBeVisible();
+	});
+
+	test('a stat moves only with the words that earned it, on its own branch; a roll is the turn', async ({
+		page
+	}) => {
+		await dreamer(page);
+		await start(page, 'A quiet evening');
+		await expect(page.getByRole('heading', { name: 'The Keeper' })).toBeVisible();
+		await saved(page);
+		const composure = page.locator('dl.stats');
+		await expect(composure).toContainText('30 / 100');
+
+		await box(page, 'Your turn').fill('[hold]');
+		await clickWaButton(page, 'Send');
+		await expect(page.getByText('+5 composure')).toBeVisible();
+		await saved(page);
+		await expect(composure).toContainText('35 / 100');
+
+		// Another take, without the change: that branch is back to 30.
+		await page.locator('li.passage').last().getByRole('button', { name: 'Another take' }).click();
+		await expect(page.getByText(/^Again, differently:/)).toBeVisible();
+		await saved(page);
+		await expect(composure).toContainText('30 / 100');
+		await page.getByRole('button', { name: 'Previous version' }).click();
+		await expect(composure).toContainText('35 / 100');
+
+		await box(page, 'Your turn').fill('[roll]');
+		await clickWaButton(page, 'Send');
+		await clickWaButton(page, 'Roll a d6');
+		await expect(page.getByText(/^The dice fall\./)).toContainText(
+			'on the d6 you offered ("door")'
+		);
+		await saved(page);
+		await expect(page.getByText(/You rolled \d/)).toBeVisible();
 	});
 
 	test('a change asked for while it is set up is read in, and shown', async ({ page }) => {

@@ -162,4 +162,34 @@ describe('DreamMarkup', () => {
 			true
 		);
 	});
+
+	it('offers a roll, and shows the outcome it landed on', async () => {
+		const roll = vi.fn();
+		const source =
+			'<roll id="door" sides="6"><on n="1-2">Locked.</on><on n="3-6">Open.</on></roll>';
+		draw({ source, inputs: { live: true, choices: {}, values: {}, roll } });
+		await userEvent.click(screen.getByText('Roll a d6'));
+		expect(roll).toHaveBeenCalledWith(expect.objectContaining({ id: 'door', sides: 6 }));
+		document.body.innerHTML = '';
+		draw({ source, inputs: { live: false, choices: {}, values: {}, rolled: { door: 4 } } });
+		expect(screen.getByText('You rolled', { exact: false })).toHaveTextContent('You rolled 4');
+		expect(screen.getByText('Open.').closest('li')).toHaveClass('landed');
+	});
+
+	it('marks the words that earned a stat change, with the change', () => {
+		draw({ source: '<set you.poise="+5">You hold still.</set>' });
+		expect(screen.getByText('You hold still.')).toHaveClass('earned');
+		expect(screen.getByText('+5 poise')).toBeVisible();
+	});
+
+	it('draws a card from a deck', async () => {
+		const setValue = vi.fn();
+		draw({
+			source:
+				'<block kind="deck" title="Tonight"><field id="card" type="draw">A task<option>Kneel</option><option>Wait</option></field></block>',
+			inputs: { live: true, choices: {}, values: {}, setValue }
+		});
+		await userEvent.click(screen.getByRole('button', { name: 'Draw: A task' }));
+		expect(['Kneel', 'Wait']).toContain(setValue.mock.calls[0]?.[1]);
+	});
 });

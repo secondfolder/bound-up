@@ -667,7 +667,8 @@ export class DreamSession {
 	/** The user's turn: what they wrote, or nothing for Continue. */
 	send(
 		text: string,
-		answers: { id: string; text: string; remember: boolean }[] = []
+		answers: { id: string; text: string; remember: boolean }[] = [],
+		rolls: { id: string; sides: number; value: number }[] = []
 	): Promise<void> {
 		const last = this.lastPassage;
 		if (!last) {
@@ -682,10 +683,10 @@ export class DreamSession {
 		return this.#attempt(async (signal) => {
 			let parentId = last.id;
 			let pending: UserTurn = { kind: 'continue' };
-			// A turn is kept when it says something: words, a choice or a field.
-			if (text.trim() || cycles.length > 0 || fields.length > 0 || answers.length > 0) {
+			// A turn is kept when it says something: words, a choice, a field, an answer or a roll.
+			if ([text.trim(), cycles.length, fields.length, answers.length, rolls.length].some(Boolean)) {
 				const id = crypto.randomUUID();
-				const input = { kind: 'input' as const, text, cycles, answers, rolls: [], fields };
+				const input = { kind: 'input' as const, text, cycles, answers, rolls, fields };
 				await appendTurn(this.id, { id, parentId, role: 'user', content: input });
 				this.#appended({ id, parentId, role: 'user' }, { id, turn: input });
 				parentId = id;
@@ -717,6 +718,15 @@ export class DreamSession {
 			}
 		}
 		await this.send('', [{ id: question.id, text: answer, remember }]);
+	}
+
+	/**
+	 * Rolls the die the passage offered, here in the browser (docs/dreams.md,
+	 * "Dice"), and sends the roll as the turn.
+	 */
+	roll(roll: { id: string; sides: number }): Promise<void> {
+		const value = 1 + Math.floor(this.#random() * roll.sides);
+		return this.send('', [], [{ id: roll.id, sides: roll.sides, value }]);
 	}
 
 	/** Sets a cycling choice in the passage being answered. */
