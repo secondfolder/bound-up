@@ -815,6 +815,14 @@ chunks. The browser joins the pieces into a clip and keeps it for the page,
 so replaying costs nothing; nothing is stored anywhere, and the server keeps
 only how much was read today (`dream_voice_usage`).
 
+**The output is held open between clips** (`#holdOutput`): from play until
+pause, stop or the end, the reader plays silence through Web Audio beside the
+clips. Without it the page sent no audio between two clips, and Bluetooth
+headphones, which close their link when nothing plays and take about a second
+to open it again, cut off the start of each clip. It starts as play is
+tapped, before the first clip is fetched, so they are awake for its first
+word.
+
 **Highlighting** uses the CSS Custom Highlight API (`::highlight(dream-reading)`),
 which marks a range of the page without changing it. `alignWords` places
 Fish's timed words in the utterance's visible text, each looked for a few

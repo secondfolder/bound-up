@@ -172,6 +172,8 @@ export class ReadAloud {
 	#clip: Clip | null = null;
 	/** Bumped by each start or stop, so a clip that arrives late does not play over another. */
 	#generation = 0;
+	/** The silence that holds the audio output open between clips (`#holdOutput`). */
+	#keepAlive: AudioContext | null = null;
 	#frame = 0;
 	/**
 	 * Set by the user's own scrolling, which stops auto-scroll until play is
@@ -206,11 +208,14 @@ export class ReadAloud {
 		this.count = said.length;
 		this.#scrolled.byUser = false;
 		this.#watchScrolling(root);
+		// Before the first clip is fetched, so headphones are awake for its first word.
+		this.#holdOutput();
 		void this.#playAt(Math.max(0, start));
 	}
 
 	pause(): void {
 		this.#audio?.pause();
+		this.#releaseOutput();
 		this.playing = false;
 		if ('mediaSession' in navigator) {
 			navigator.mediaSession.playbackState = 'paused';
@@ -222,6 +227,7 @@ export class ReadAloud {
 			return;
 		}
 		this.#scrolled.byUser = false;
+		this.#holdOutput();
 		void this.#audio.play().then(() => {
 			this.playing = true;
 			this.#follow();
@@ -257,6 +263,7 @@ export class ReadAloud {
 	stop(): void {
 		this.#generation += 1;
 		this.#audio?.pause();
+		this.#releaseOutput();
 		cancelAnimationFrame(this.#frame);
 		clearHighlight();
 		this.playing = false;
@@ -275,6 +282,8 @@ export class ReadAloud {
 	dispose(): void {
 		this.stop();
 		this.#controller.abort();
+		void this.#keepAlive?.close().catch(() => undefined);
+		this.#keepAlive = null;
 		for (const clip of this.#clips.values()) {
 			clip.then((ready) => URL.revokeObjectURL(ready.url)).catch(() => undefined);
 		}
@@ -343,12 +352,41 @@ export class ReadAloud {
 
 	#finish(): void {
 		this.#generation += 1;
+		this.#releaseOutput();
 		cancelAnimationFrame(this.#frame);
 		clearHighlight();
 		this.playing = false;
 		this.loading = false;
 		this.turnId = null;
 		this.speaker = '';
+	}
+
+	/**
+	 * Keeps the audio output open from play until pause, stop or the end, by
+	 * playing silence through Web Audio beside the clips. Each utterance is a
+	 * clip of its own, and between two the page would otherwise send no
+	 * audio: Bluetooth headphones close their link when nothing plays and
+	 * take about a second to open it again, which cut off the start of each
+	 * clip. Silence keeps the link up, so the gaps are only the clips' own.
+	 * Started from the tap that plays, which browsers require of audio.
+	 */
+	#holdOutput(): void {
+		if (typeof AudioContext === 'undefined') {
+			return;
+		}
+		if (!this.#keepAlive) {
+			const context = new AudioContext();
+			const silence = new ConstantSourceNode(context, { offset: 0 });
+			silence.connect(context.destination);
+			silence.start();
+			this.#keepAlive = context;
+		}
+		void this.#keepAlive.resume().catch(() => undefined);
+	}
+
+	/** Lets the output close again, so headphones and battery are not held for nothing. */
+	#releaseOutput(): void {
+		void this.#keepAlive?.suspend().catch(() => undefined);
 	}
 
 	#clipFor(utterance: Utterance): Promise<Clip> {
