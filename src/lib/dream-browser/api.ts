@@ -9,6 +9,7 @@
  * notice (AGENTS.md, "Every request the browser sends shows feedback").
  */
 
+import { decryptAttachment, encryptAttachment } from '$lib/crypto/messages';
 import { openRecord, sealRecord } from '$lib/crypto/sealed';
 import { vaultById, vaultsSettled } from '$lib/crypto/vaults.svelte';
 import { type DreamEvent, type Ended, readEvents } from '$lib/dream/events';
@@ -312,4 +313,59 @@ export async function drawNames(
 		given: string[];
 		family: string[];
 	};
+}
+
+// ── pictures ─────────────────────────────────────────────────────────────────
+
+/** Makes a picture (`/api/dreams/[id]/picture`): the image, in the clear, for the page to encrypt. */
+export async function makePicture(
+	dreamId: string,
+	body: { prompt: string; style: 'photo' | 'illustrated'; heat: 1 | 2 | 3 | 4 | 5 | null },
+	signal?: AbortSignal
+): Promise<Blob> {
+	const response = await send(`/api/dreams/${dreamId}/picture`, {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(body),
+		signal
+	});
+	return await response.blob();
+}
+
+/**
+ * Encrypts a picture under a key of its own and stores it; answers the key,
+ * which only the sealed detail keeps (docs/dreams.md, "Pictures").
+ */
+export async function storePicture(
+	dreamId: string,
+	pictureId: string,
+	picture: Blob
+): Promise<string> {
+	const { key, body, byteSize } = await encryptAttachment(
+		new File([picture], 'picture.webp', { type: picture.type || 'image/webp' })
+	);
+	const ciphertext = await new Response(body).blob();
+	await send(`/api/dreams/${dreamId}/pictures/${pictureId}`, {
+		method: 'PUT',
+		headers: { 'content-type': 'application/octet-stream', 'content-length': String(byteSize) },
+		body: ciphertext
+	});
+	return key;
+}
+
+/** A stored picture, decrypted, as something an <img> can show. */
+export async function openPicture(
+	dreamId: string,
+	pictureId: string,
+	fileKey: string
+): Promise<string> {
+	const response = await send(`/api/dreams/${dreamId}/pictures/${pictureId}`);
+	const picture = await decryptAttachment(await response.arrayBuffer(), {
+		id: pictureId,
+		key: fileKey,
+		kind: 'image',
+		mimeType: 'image/webp',
+		fileName: 'picture.webp'
+	});
+	return URL.createObjectURL(picture);
 }

@@ -329,6 +329,34 @@ test.describe('daydreams, the new engine', () => {
 		await expect(page.getByText(/You rolled \d/)).toBeVisible();
 	});
 
+	test('a picture is drawn on tap, kept encrypted, and the same after a reload', async ({
+		page
+	}) => {
+		await dreamer(page);
+		const id = await start(page, 'A quiet evening');
+		await expect(page.getByRole('heading', { name: 'The Keeper' })).toBeVisible();
+		await saved(page);
+		await box(page, 'Your turn').fill('[picture]');
+		await clickWaButton(page, 'Send');
+		await expect(page.getByText('She waits by the lamp.')).toBeVisible();
+		await saved(page);
+
+		const made = page.waitForResponse(
+			(response) => response.url().endsWith(`/api/dreams/${id}/picture`) && response.ok()
+		);
+		await clickWaButton(page, 'Show a picture');
+		const sent = (await made).request().postDataJSON() as { prompt: string };
+		// Described from her card, never from the passage's own words about her.
+		expect(sent.prompt).toContain('Silver bob, reading glasses on a chain.');
+		const picture = page.getByRole('img', { name: 'Ottilie by the lamp' });
+		await expect(picture).toBeVisible();
+
+		await page.reload();
+		await waitForHydration(page);
+		await expect(page.getByRole('img', { name: 'Ottilie by the lamp' })).toBeVisible();
+		await expect(page.getByText('Show a picture')).toHaveCount(0);
+	});
+
 	test('a change asked for while it is set up is read in, and shown', async ({ page }) => {
 		await dreamer(page);
 		await start(page, 'A quiet evening [ask]');

@@ -710,13 +710,32 @@ a `draw` field whose options are the cards: "Draw a card" picks one in the
 browser and it goes with the turn like any field. A **countdown** block's
 lines are drawn as large numbers.
 
+**Pictures.** With the pictures capability, a passage may offer one at a
+moment worth seeing: `<picture of="ottilie study">a caption</picture>`. On a
+server with an image model, it shows "Show a picture"; nothing is made
+until it is tapped. The description is built only from the elements'
+`appearance` (and a place's `feel`) fields plus the caption
+(`picturePrompt` in `src/lib/dream/pictures.ts`), never from what the
+passage says about anyone's looks, so it is a description the user can read
+on a card and correct. It goes through the same path as the first engine's
+pictures (`pictureResponse` in `src/lib/server/daydream/picture.ts`, which
+both engines now share): checked for anything coded as a minor before it is
+counted or sent, everyone anchored as an adult, nothing stored or logged on
+the server. The browser encrypts the picture under a key of its own, stores
+the ciphertext (`/api/dreams/[id]/pictures/[pictureId]`, under
+`permanent/dreams/<id>/` in the media store), and seals the key in a
+`dream-detail` on the passage (version 2 of the kind, which added the
+picture variant; version 1 reads unchanged). So it is drawn once, the same
+on every visit, and each branch keeps its own. Deleting a daydream deletes
+its pictures by prefix.
+
 **Views.** Besides scroll and tap-through, a build may choose `texts` (each
 passage a message bubble from the other side) or `monologue` (one voice in
 large, centred lines).
 
 ## Not built yet
 
-Every later phase: pictures, and read-aloud. A block's Done sends
+Read-aloud (phase 8) and the switch-over (phase 9). A block's Done sends
 its fields without the words in the input box. Step 1
 and the build are still two calls for a spread of 1, and an edit works on the
 source rather than the rendered tree. See the plan. The judge's agreement with your votes

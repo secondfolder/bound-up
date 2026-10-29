@@ -100,6 +100,21 @@ export function daydreamPicturesPrefix(daydreamId: string): string {
 }
 
 /**
+ * Where a daydream of the new engine keeps its pictures (docs/dreams.md,
+ * "Pictures"): as the first engine's, kept for good under `permanent/`, one
+ * prefix per daydream so deleting it takes them all. No partnership id is
+ * ever `dreams`, so this cannot meet a partnership's prefix.
+ */
+export function dreamPictureKey(dreamId: string, pictureId: string): string {
+	return `${dreamPicturesPrefix(dreamId)}${pictureId}`;
+}
+
+/** All of one new-engine daydream's pictures, for `deletePrefix`. */
+export function dreamPicturesPrefix(dreamId: string): string {
+	return `permanent/dreams/${dreamId}/`;
+}
+
+/**
  * Where a notebook entry's versions live (docs/notebook.md, "Versions"): the
  * sealed snapshots, kept for good, so under `permanent/`.
  *

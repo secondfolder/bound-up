@@ -16,6 +16,7 @@ import { CAPABILITIES } from '../dream/capabilities';
 import { MAX_ELEMENT_CHARS, MAX_ELEMENTS } from '../dream/elements';
 import { MAX_DIRECTIONS } from '../dream/reading';
 import { defineSealedKind } from '../sealed';
+import { isClientId } from '../vault';
 
 const text = (max: number) => z.string().trim().max(max);
 const required = (max: number) => z.string().trim().min(1).max(max);
@@ -210,15 +211,38 @@ export type DreamInputTurn = Extract<DreamTurn, { kind: 'input' }>;
  * filled in on tap, or facts added after a passage), or the sentences a
  * `<more>` expanded into. The latest along the branch wins.
  */
+const elementDetail = z.object({ kind: z.literal('element'), element: dreamElementSchema });
+const moreDetail = z.object({ kind: z.literal('more'), key: required(80), text: required(1200) });
+
+/** What opens a stored picture: one age key per picture, never sent to the server. */
+const AGE_SECRET_KEY = /^AGE-SECRET-KEY-1[0-9A-Z]{58}$/;
+
 export const dreamDetailKind = defineSealedKind({
 	name: 'dream-detail',
 	maxCiphertextLength: 16 * 1024,
 	versions: [
 		{
 			version: 1,
+			schema: z.discriminatedUnion('kind', [elementDetail, moreDetail]),
+			// Version 2 only adds a kind of detail.
+			upcast: (value: unknown) => value
+		},
+		{
+			version: 2,
 			schema: z.discriminatedUnion('kind', [
-				z.object({ kind: z.literal('element'), element: dreamElementSchema }),
-				z.object({ kind: z.literal('more'), key: required(80), text: required(1200) })
+				elementDetail,
+				moreDetail,
+				/**
+				 * A `<picture>` drawn on tap (docs/dreams.md, "Pictures"): which
+				 * marker, where the encrypted picture is stored, and the key that
+				 * opens it.
+				 */
+				z.object({
+					kind: z.literal('picture'),
+					key: required(80),
+					pictureId: z.string().refine(isClientId, 'Malformed id'),
+					fileKey: z.string().regex(AGE_SECRET_KEY)
+				})
 			])
 		}
 	]

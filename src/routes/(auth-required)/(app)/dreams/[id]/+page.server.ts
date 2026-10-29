@@ -1,6 +1,7 @@
 import { error, redirect } from '@sveltejs/kit';
 import { resolve } from '$app/paths';
 import { readDaydreamConfig } from '$lib/server/daydream/config';
+import { readImageConfig } from '$lib/server/daydream/image-config';
 import { hasAcceptedDisclosure } from '$lib/server/daydreams';
 import { getDream } from '$lib/server/dreams';
 import { requireFeature } from '$lib/server/features';
@@ -23,5 +24,10 @@ export const load: PageServerLoad = async ({
 	if (!dream) {
 		error(404, 'That daydream is not there any more.');
 	}
-	return { dream, userId: user.id, available: readDaydreamConfig(settings, platform) !== null };
+	return {
+		dream,
+		userId: user.id,
+		available: readDaydreamConfig(settings, platform) !== null,
+		pictures: readImageConfig(settings, platform) !== null
+	};
 };

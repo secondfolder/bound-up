@@ -25,6 +25,7 @@ import { turnInputs } from '$lib/dream/fields';
 import { findTag, parseMarkup } from '$lib/dream/markup';
 import { drawNudges } from '$lib/dream/nudges';
 import { pickDirection } from '$lib/dream/pick';
+import { picturePrompt } from '$lib/dream/pictures';
 import {
 	preferenceFromAnswer,
 	preferenceFromFooter,
@@ -74,7 +75,9 @@ import {
 	fill,
 	listDirections,
 	listDreams,
+	makePicture,
 	openDetail,
+	openPicture,
 	openSetup,
 	openSummary,
 	openTurn,
@@ -86,6 +89,7 @@ import {
 	saveSetup,
 	saveSummary,
 	setActiveTurn,
+	storePicture,
 	streamReply
 } from './api';
 
@@ -1112,6 +1116,79 @@ export class DreamSession {
 			await saveDetail(this.id, { id: crypto.randomUUID(), turnId, detail });
 			this.details = [...this.details, { turnId, value: detail }];
 		});
+	}
+
+	// ── pictures ──────────────────────────────────────────────────────────────
+
+	/** Pictures opened on this page, by marker key, as object URLs. */
+	pictures = $state<Record<string, string>>({});
+	readonly #opening = new Set<string>();
+
+	/** The picture detail kept for a marker on this branch, if any. */
+	#pictureDetail(key: string) {
+		return this.details
+			.map(({ value }) => value)
+			.findLast((detail) => detail.kind === 'picture' && detail.key === key) as
+			| Extract<DreamDetail, { kind: 'picture' }>
+			| undefined;
+	}
+
+	/** Whether a marker already has a picture, drawn or still being opened. */
+	hasPicture(key: string): boolean {
+		return this.#pictureDetail(key) !== undefined;
+	}
+
+	/** Opens a marker's stored picture, once, in the background. */
+	showPicture(key: string): void {
+		const detail = this.#pictureDetail(key);
+		if (!detail || this.pictures[key] || this.#opening.has(key)) {
+			return;
+		}
+		this.#opening.add(key);
+		openPicture(this.id, detail.pictureId, detail.fileKey)
+			.then((url) => {
+				this.pictures = { ...this.pictures, [key]: url };
+			})
+			.catch(() => undefined)
+			.finally(() => this.#opening.delete(key));
+	}
+
+	/**
+	 * Draws a `<picture>` on tap (docs/dreams.md, "Pictures"): described from
+	 * the elements' appearance, made by the server, encrypted and stored here,
+	 * its key sealed in a detail on the passage. Drawn once; revisiting shows
+	 * the same picture.
+	 */
+	async drawPicture(
+		turnId: string,
+		key: string,
+		picture: { of: string; caption: string }
+	): Promise<void> {
+		const { setup } = this;
+		if (!setup?.build || this.filling.has(key) || this.hasPicture(key)) {
+			return;
+		}
+		const asked = picturePrompt(picture, this.elements, setup.build.heat);
+		if (!asked) {
+			return;
+		}
+		this.filling = new Set([...this.filling, key]);
+		try {
+			const made = await makePicture(this.id, { ...asked, style: 'illustrated' });
+			const pictureId = crypto.randomUUID();
+			const fileKey = await storePicture(this.id, pictureId, made);
+			const detail: DreamDetail = { kind: 'picture', key, pictureId, fileKey };
+			await saveDetail(this.id, { id: crypto.randomUUID(), turnId, detail });
+			this.details = [...this.details, { turnId, value: detail }];
+			this.pictures = { ...this.pictures, [key]: URL.createObjectURL(made) };
+		} catch (cause) {
+			this.problem =
+				cause instanceof DreamRequestError ? cause.message : 'That picture could not be made.';
+		} finally {
+			const next = new Set(this.filling);
+			next.delete(key);
+			this.filling = next;
+		}
 	}
 
 	/** Expanding a `<more>`: written once, kept on its passage. */

@@ -1804,6 +1804,18 @@
 					}
 				]
 			}
+		},
+		{
+			"kind": "dream-detail",
+			"version": 2,
+			"recordId": "00000000-0000-4000-8000-000000000206",
+			"ciphertext": "sb1.E1D7B6Li_T9bqcYbWtyOvW4aNeO5SgmUt4D7kOUNeQw9Yrh9L1n_a6dqqLw6sdPiq-jk7kj-QVv49oQkKGsgNyWhSLB4rvyMyu-bA8T6KpKNaDLmX0_bBmm_SzylVYMb9M7Fpdb8mM_IAeAmnAf9EqtTp7Vv-vOTtB1QAsOBDpVpc-TF1ks4gNfcEykDLOYR2icHcet-5KghMPXeNkKJWQXdnFDy4eMQnslF-3lFsMUNBzKWWduzwTZFHSjpYqEE1zN_MINSxZXFWqUFu-6sUycQJD4MF57uH2IVsl0S_SJ9hQf7iCs-2qxAdTIelvY",
+			"expected": {
+				"kind": "picture",
+				"key": "00000000-0000-4000-8000-000000000202:picture:0",
+				"pictureId": "00000000-0000-4000-8000-000000000207",
+				"fileKey": "AGE-SECRET-KEY-1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE"
+			}
 		}
 	]
 }

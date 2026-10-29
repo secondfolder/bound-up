@@ -22,6 +22,19 @@
 	};
 
 	const STILL: MarkupInputs = { live: false, choices: {}, values: {} };
+
+	/** Pictures on a passage (docs/dreams.md, "Pictures"), by marker key. */
+	export type MarkupPictures = {
+		/** Whether this server makes pictures. */
+		enabled: boolean;
+		url: (key: string) => string | undefined;
+		/** A picture is kept for the marker, opened or not. */
+		has: (key: string) => boolean;
+		making: (key: string) => boolean;
+		/** Opens a kept picture. */
+		show: (key: string) => void;
+		draw: (key: string, picture: { of: string; caption: string }) => void;
+	};
 </script>
 
 <script lang="ts">
@@ -61,6 +74,7 @@
 		streaming = false,
 		view = 'scroll',
 		inputs = STILL,
+		pictures,
 		onref,
 		onmore
 	}: {
@@ -74,6 +88,7 @@
 		streaming?: boolean;
 		view?: 'scroll' | 'tap';
 		inputs?: MarkupInputs;
+		pictures?: MarkupPictures;
 		onref: (id: string) => void;
 		onmore: (key: string, phrase: string) => void;
 	} = $props();
@@ -85,6 +100,7 @@
 	const moreKeys = $derived.by(() => {
 		const keys = new Map<MarkupTag, string>();
 		let count = 0;
+		let pictureCount = 0;
 		const walk = (list: readonly MarkupNode[]) => {
 			for (const node of list) {
 				if (node.type !== 'tag') {
@@ -93,6 +109,10 @@
 				if (node.name === 'more') {
 					keys.set(node, `${turnId ?? 'streaming'}:more:${count}`);
 					count += 1;
+				}
+				if (node.name === 'picture') {
+					keys.set(node, `${turnId ?? 'streaming'}:picture:${pictureCount}`);
+					pictureCount += 1;
 				}
 				walk(node.children);
 			}
@@ -387,6 +407,26 @@
 			{#each Object.entries(changes) as [address, change] (address)}
 				<span class="stat-change">{change} {address.split('.')[1] ?? address}</span>
 			{/each}
+		{:else if node.name === 'picture'}
+			{const key = $derived(moreKeys.get(node) ?? '')}
+			{const caption = $derived(words(node.children).trim())}
+			{const url = $derived(pictures?.url(key))}
+			<figure class="picture">
+				{#if url}
+					<img src={url} alt={caption || 'A picture from the story'} />
+				{:else if pictures?.making(key) || pictures?.has(key)}
+					<div class="picture-waiting" role="status" aria-label="Making the picture" {@attach () => pictures?.show(key)}>
+						<wa-skeleton effect="sheen"></wa-skeleton>
+					</div>
+				{:else if pictures?.enabled && turnId !== null && !streaming}
+					<wa-button
+						size="s"
+						appearance="outlined"
+						onclick={() => pictures?.draw(key, { of: node.attrs.of ?? '', caption })}>Show a picture</wa-button
+					>
+				{/if}
+				{#if caption}<figcaption>{caption}</figcaption>{/if}
+			</figure>
 		{:else if node.name === 'ask'}
 			{#if ask && ask.tag === node}
 				{@render question(ask)}
@@ -924,5 +964,38 @@
 		text-align: center;
 		font-size: var(--wa-font-size-3xl);
 		font-variant-numeric: tabular-nums;
+	}
+
+	.picture {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--wa-space-2xs);
+		margin: var(--wa-space-s) 0;
+		white-space: normal;
+
+		img {
+			max-width: 100%;
+			border-radius: var(--wa-border-radius-m);
+		}
+
+		figcaption {
+			font-size: var(--wa-font-size-s);
+			opacity: 0.8;
+		}
+	}
+
+	.picture-waiting {
+		width: min(100%, 20rem);
+		aspect-ratio: 832 / 1216;
+
+		wa-skeleton {
+			width: 100%;
+			height: 100%;
+		}
+
+		wa-skeleton::part(indicator) {
+			border-radius: var(--wa-border-radius-m);
+		}
 	}
 </style>

@@ -18,7 +18,20 @@
 	 * and the user's turn. Retry, Another take and Edit each add a version
 	 * beside the passage rather than replacing it.
 	 */
-	let { session }: { session: DreamSession } = $props();
+	let { session, pictures: picturesOn = false }: { session: DreamSession; pictures?: boolean } =
+		$props();
+
+	const pictures = $derived({
+		enabled: picturesOn,
+		url: (key: string) => session.pictures[key],
+		has: (key: string) => session.hasPicture(key),
+		making: (key: string) => session.filling.has(key),
+		show: (key: string) => session.showPicture(key),
+		draw: (key: string, picture: { of: string; caption: string }) => {
+			const turnId = key.split(':')[0] ?? '';
+			void session.drawPicture(turnId, key, picture);
+		}
+	});
 
 	const elements = $derived(session.elements);
 	const names = $derived(linkableNames(elements));
@@ -244,6 +257,7 @@
 						filling={session.filling}
 						view={entry.id === answering ? view : 'scroll'}
 						inputs={inputsFor(entry.id, index)}
+						{pictures}
 						onref={openCard}
 						onmore={(key, phrase) => expand(entry.id, key, phrase)}
 					/>

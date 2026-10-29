@@ -66,7 +66,7 @@
 		{:else if session.unreadable}
 			<wa-callout variant="warning">This daydream can't be shown on this device.</wa-callout>
 		{:else if playing}
-			<DreamStory {session} />
+			<DreamStory {session} pictures={data.pictures} />
 		{:else}
 			<DreamSetupView {session} />
 		{/if}
