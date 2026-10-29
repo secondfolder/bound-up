@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { buildRequestSchema } from '$lib/dream/requests';
 import { buildMessages } from '$lib/server/dream/prompts/build';
+import { SAMPLING } from '$lib/server/dream/sampling';
 import { dreamsGuard, streamStory } from '$lib/server/dream-api';
 import type { RequestHandler } from './$types';
 
@@ -17,9 +18,6 @@ export const POST: RequestHandler = async (event) => {
 	}
 	return await streamStory(event, userId, {
 		messages: buildMessages(parsed.data),
-		temperature: 0.9,
-		// The build and the opening, plus room for a reasoning model to think:
-		// its reasoning counts against this too.
-		maxTokens: 9000
+		...SAMPLING.build
 	});
 };

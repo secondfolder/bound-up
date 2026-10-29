@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { readRequestSchema } from '$lib/dream/requests';
 import { readingMessages } from '$lib/server/dream/prompts/reading';
+import { SAMPLING } from '$lib/server/dream/sampling';
 import { dreamsGuard, streamStory } from '$lib/server/dream-api';
 import type { RequestHandler } from './$types';
 
@@ -19,8 +20,6 @@ export const POST: RequestHandler = async (event) => {
 	const input = parsed.data;
 	return await streamStory(event, userId, {
 		messages: readingMessages({ ...input, canFetch: false }),
-		// Hot enough for the unlikely directions the pick leans towards.
-		temperature: 1,
-		maxTokens: 4000
+		...SAMPLING.reading
 	});
 };

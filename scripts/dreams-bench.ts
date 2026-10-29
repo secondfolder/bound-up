@@ -28,6 +28,7 @@ import { isPersona, PERSONAS } from '../src/lib/server/dream/bench/player.ts';
 import { runDocument, summary } from '../src/lib/server/dream/bench/report.ts';
 import { type BenchRun, runBrief } from '../src/lib/server/dream/bench/run.ts';
 import { stream } from '../src/lib/server/dream/openrouter.ts';
+import { isStep, SAMPLING, type Sampling } from '../src/lib/server/dream/sampling.ts';
 import { apiKey, bestTierProviders, ROOT } from './dreams-key.ts';
 
 const BASE_URL = process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1';
@@ -40,7 +41,7 @@ const { values } = parseArgs({
 		passages: { type: 'string', default: '2' },
 		seed: { type: 'string', default: 'bench' },
 		concurrency: { type: 'string', default: '4' },
-		temperature: { type: 'string', default: '1' },
+		temperature: { type: 'string' },
 		label: { type: 'string' },
 		'fingerprint-model': { type: 'string' },
 		persona: { type: 'string' }
@@ -100,7 +101,14 @@ async function main(): Promise<void> {
 	const key = await apiKey();
 	const models = values.models.split(',');
 	const passages = Number.parseInt(values.passages, 10);
-	const temperature = Number.parseFloat(values.temperature);
+	/** The app's settings for the step (`SAMPLING`), unless --temperature overrides them. */
+	const samplingFor = (step: string): Sampling => {
+		const name = step.split(' ')[0] ?? '';
+		const base: Sampling = isStep(name) ? SAMPLING[name] : SAMPLING.passage;
+		return values.temperature
+			? { ...base, temperature: Number.parseFloat(values.temperature) }
+			: base;
+	};
 	const label = values.label ?? defaultLabel();
 	const { persona } = values;
 	if (persona !== undefined && !isPersona(persona)) {
@@ -137,15 +145,14 @@ async function main(): Promise<void> {
 						passages,
 						// The same model plays the user: a session is one model's to run.
 						...(persona ? { player: { persona } } : {}),
-						complete: (messages) =>
+						complete: (messages, step) =>
 							stream({
 								baseUrl: BASE_URL,
 								apiKey: key,
 								model,
 								providers: routes.get(model),
 								messages,
-								temperature,
-								maxTokens: 4000
+								...samplingFor(step)
 							})
 					});
 					process.stdout.write(`${run.error ? '✗' : '·'} ${brief.id} · ${model} · ${seed}\n`);

@@ -2,6 +2,7 @@ import { error } from '@sveltejs/kit';
 import { fillRequestSchema } from '$lib/dream/requests';
 import type { ModelMessage } from '$lib/server/dream/prompts/core';
 import { elementsMessages, moreMessages, summaryMessages } from '$lib/server/dream/prompts/fill';
+import { SAMPLING } from '$lib/server/dream/sampling';
 import { askOnce, dreamsGuard } from '$lib/server/dream-api';
 import type { RequestHandler } from './$types';
 
@@ -18,24 +19,15 @@ export const POST: RequestHandler = async (event) => {
 	}
 	const input = parsed.data;
 	let messages: ModelMessage[];
-	let temperature: number;
 	switch (input.kind) {
 		case 'elements':
 			messages = elementsMessages(input);
-			temperature = 0.6;
 			break;
 		case 'more':
 			messages = moreMessages(input);
-			temperature = 0.9;
 			break;
 		default:
 			messages = summaryMessages(input);
-			temperature = 0.3;
 	}
-	return await askOnce(event, userId, {
-		messages,
-		temperature,
-		// Short answers, with room for a reasoning model to think first.
-		maxTokens: 3000
-	});
+	return await askOnce(event, userId, { messages, ...SAMPLING[input.kind] });
 };

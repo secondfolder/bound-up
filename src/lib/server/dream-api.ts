@@ -6,6 +6,7 @@ import { hasAcceptedDisclosure } from '$lib/server/daydreams';
 import { complete } from '$lib/server/dream/openrouter';
 import type { ModelMessage } from '$lib/server/dream/prompts/core';
 import { relay } from '$lib/server/dream/relay';
+import type { Sampling } from '$lib/server/dream/sampling';
 import { requireFeature } from '$lib/server/features';
 import { recordOutcome, routeToBest } from '$lib/server/model-providers/store';
 import { rateLimitMessage } from '$lib/server/rate-limit';
@@ -93,11 +94,7 @@ async function route(locals: App.Locals, config: DaydreamConfig) {
 	};
 }
 
-export type StoryCall = {
-	messages: ModelMessage[];
-	temperature: number;
-	maxTokens: number;
-};
+export type StoryCall = { messages: ModelMessage[] } & Sampling;
 
 /** Streams a reply as the engine's events (`$lib/dream/events`). */
 export async function streamStory(
@@ -117,6 +114,7 @@ export async function streamStory(
 			apiKey: config.apiKey,
 			messages: call.messages,
 			temperature: call.temperature,
+			minP: call.minP,
 			maxTokens: call.maxTokens,
 			// The user pressing Stop, or leaving, ends the request upstream, so a
 			// reply nobody will read is not paid for to the end.
@@ -155,6 +153,7 @@ export async function askOnce(
 			model: provider ? routing.listed : config.openrouterModelId,
 			messages: call.messages,
 			temperature: call.temperature,
+			minP: call.minP,
 			maxTokens: call.maxTokens,
 			signal: event.request.signal,
 			...(provider ? { providers: [provider] } : {})

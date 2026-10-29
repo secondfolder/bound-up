@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { passageRequestSchema } from '$lib/dream/requests';
 import { passageMessages } from '$lib/server/dream/prompts/passage';
+import { SAMPLING } from '$lib/server/dream/sampling';
 import { dreamsGuard, streamStory } from '$lib/server/dream-api';
 import type { RequestHandler } from './$types';
 
@@ -17,8 +18,6 @@ export const POST: RequestHandler = async (event) => {
 	const input = parsed.data;
 	return await streamStory(event, userId, {
 		messages: passageMessages(input),
-		// Another take a little hotter, so it goes somewhere new in its words.
-		temperature: input.take ? 1 : 0.9,
-		maxTokens: 6000
+		...(input.take ? SAMPLING.take : SAMPLING.passage)
 	});
 };
