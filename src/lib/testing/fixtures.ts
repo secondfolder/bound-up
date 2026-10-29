@@ -746,6 +746,11 @@ export async function grantTestDaydreams(db: Db, userId: string): Promise<void> 
 	await grantFeature(db, { userId, feature: 'daydreams', grantedByUserId: userId });
 }
 
+/** The new engine's feature (docs/dreams.md). */
+export async function grantTestDreams(db: Db, userId: string): Promise<void> {
+	await grantFeature(db, { userId, feature: 'dreams', grantedByUserId: userId });
+}
+
 /**
  * A daydream with a stand-in sealed setup, and these turns one after another
  * (each the child of the last), through the same functions the endpoints use.

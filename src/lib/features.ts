@@ -28,6 +28,11 @@ export const FEATURES = {
 		description:
 			'Roleplay with a made-up character, whose replies are written by a hosted language model.'
 	},
+	dreams: {
+		name: 'Daydreams (new)',
+		description:
+			'The new daydream engine: a story made from anything you describe, written by a hosted language model. Each passage costs money, so it is granted rather than on for everyone.'
+	},
 	debugMode: {
 		name: 'Debug mode',
 		description:

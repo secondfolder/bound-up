@@ -13,7 +13,14 @@ import { THEMES, VIEWS } from '../../../dream/build';
 import { CAPABILITIES } from '../../../dream/capabilities';
 import type { Nudge } from '../../../dream/nudges';
 import { OVERUSED_NAMES } from '../../../dream/repetition';
-import { bulletList, CORE_RULES, limitsSection, type ModelMessage, wrap } from './core';
+import {
+	amendmentParts,
+	bulletList,
+	CORE_RULES,
+	limitsSection,
+	type ModelMessage,
+	wrap
+} from './core';
 import { passageFormat } from './passage-format';
 
 export type BuildInput = {
@@ -27,6 +34,13 @@ export type BuildInput = {
 	preferences: readonly string[];
 	/** Names from this user's recent daydreams, to avoid along with the overused ones. */
 	recentNames: readonly string[];
+	/** Changes the user asked for while it was being set up, oldest first. */
+	amendments?: readonly string[];
+	/**
+	 * The build these changes are to, without its passage: rebuilt keeping
+	 * everything the changes do not touch (docs/dreams.md, "The setup page").
+	 */
+	previous?: string | null;
 };
 
 const INSTRUCTIONS = `This step builds the daydream from the brief and the chosen direction, and then writes its opening.
@@ -103,6 +117,12 @@ export function buildMessages(input: BuildInput): ModelMessage[] {
 	if (input.recentNames.length > 0) {
 		parts.push(`Names this user has had recently, to avoid: ${input.recentNames.join(', ')}`);
 	}
+	if (input.previous) {
+		parts.push(
+			`The daydream was already built as below. Build it again with the changes that follow, keeping everything they do not touch, and write a new opening.\n${wrap('previous', input.previous)}`
+		);
+	}
+	parts.push(...amendmentParts(input.amendments ?? []));
 	return [
 		{ role: 'system', content: system },
 		{ role: 'user', content: parts.join('\n\n') }

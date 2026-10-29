@@ -56,9 +56,12 @@ function body(request: CompletionRequest, streamed: boolean): Record<string, unk
 		seed: request.seed,
 		max_tokens: request.maxTokens,
 		usage: { include: true },
-		provider: request.providers?.length
-			? { order: request.providers, allow_fallbacks: false }
-			: undefined
+		// Never a provider that keeps or trains on prompts: these carry what
+		// the user wrote (docs/dreams.md, "Cost, storage and privacy").
+		provider: {
+			data_collection: 'deny',
+			...(request.providers?.length ? { order: request.providers, allow_fallbacks: false } : {})
+		}
 	};
 }
 

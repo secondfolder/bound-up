@@ -26,6 +26,7 @@ import {
 import { createLibraryItem } from './daydreams';
 import { type Db, schema } from './db';
 import { partnerships, spaceMembers, spaces, user, vaults } from './db/schema';
+import { createDream } from './dreams';
 import { saveKinkList } from './kink-lists';
 import { createTag } from './messaging';
 import { acceptInvite, deletePartnership, getPartnershipForUser } from './partnerships';
@@ -235,6 +236,11 @@ async function fillSpaces(partnershipId: string) {
 		throw new Error('fixture: the escrow was refused');
 	}
 	await createTestDaydream(db, ada.id);
+	await createDream(db, ada.id, crypto.randomUUID(), {
+		vaultId: own,
+		ciphertext: fakeSealed('dream'),
+		payloadVersion: 1
+	});
 	for (const kind of ['characters', 'ideas'] as const) {
 		await createLibraryItem(db, ada.id, kind, {
 			id: crypto.randomUUID(),

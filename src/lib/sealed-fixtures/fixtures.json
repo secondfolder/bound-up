@@ -1600,6 +1600,210 @@
 				},
 				"neverShow": ["next-day"]
 			}
+		},
+		{
+			"kind": "dream-setup",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-000000000201",
+			"ciphertext": "sb1.OqQHpgLUdMoX5P8M2Dqfgn5UwJ35oKbgh6Al_STVHuhs9UuE6qMGkDQbOvU7ciAMwjXSHnJZP9Y2fy3o8rxFCj78bhEip1Z_4Fhs-aG4dMh6kTQYNPAicdKVslqc7a0GGhCJygk7DY0Hf6PrAe_FQUXcNiZc0csvcBW4zQgODyUrz-ZXNB1gPP-yJHh5lpnHyCZO5mS0dIV-GkEREIWy7QYF09ZOOzrT8bU31nplm_ybUn8unMVtMLLaXXrb0BfQJ_RQaTiy7LvcPho5NhHroea2e5NWD4mZuVbWv8wSGLo4uTbYnqYXJmwnCtOUHlU7tlEGbaSLQX8T9sfguT76SgGRYHh9HzderW12zSsTaJnZuiChzM0WiqlI8cn2SSihjtHOL_k3HIq0Lw3DZG8e-DLl40L7Pn0Ga9HQhRVtd0b6r0GX3pat65QMtgZfhRKSNaR9JV9l5a5uqYbLZx_qXmv-a8PKbG3EUggsMKD0yByqYc65YdcZrM459w6UYfmKg9I3FXILT1VEjxUbd7Xh13ywhfgPLEGGNkluQ-O-rtWVbhrlwa8jJz-78WSWA64y3abIqx4KxjQuJSO4AvR4hzr1bqtOCn-z8gjHzlyn6ockw4zv3iwxGaMDhf_IX-E6O8_I6iIRaHHgWi0zKYFGuMVclcxklKmKaLRUxJO1oGHnRkimBdiP8cO_nycRsNqE56V_oIuEgJeit8X18--26kyK_LYRXS3QDL4qp-n4-Qa3mmLZvr1uOQU6-Re4YvgMAaWHly9YfR5a5ORmfWKgmyxnE6kP-WxrUNMcICc55Pat9yab2ekz5DAOmFS4fwKC2Gdf-aGvuQp-XgvWfHvQQz-mWipOOHJFeW7QSc4LUgLXChgFr1IeXsD-iI54rLloEeJeFXZISRgdvRv-C-WbIp4bFYEoWW2hwRIvDFlZzVX18aBbarkYEZTMvpcQJ7V2-XJRcG2z2hh__ok3JSRoEXYhtO1op-AtpWo-paY8CEYmjs5Q064XFgmxaO9L0WcGYidfgpfGAOx9BNLgLBNJPeC-9SLM818Gx3b8EeIa_ccdMhMd0KrtUAVOsKTTtGhIxoBda_bR2jniPff1ri3dS7CZO3soowmYuNlSOYuy5yjdnPv4lwVaOojAN2CfpNdPMjU1xCVSIj-SGSR5MD6pGO4HJpJ4ena2V4Yf0-YVwl9VGYo24EHsXCquGqxhBepZoLdWC43PFobUGUjuan5HWzD4leFZ2L-CH-A9f_2S74m-sGVv7Jb_DCyISegxwXlHPnhB5vY_fs6QfXFlMh0lyApNLTZ5JwXxfCb0M_CMUxuyrqQl0pfD3jKlJ9SGjaVXMvfuUOrA17Tu9DcsNBZGcH2riclw2QbLDFbqIuc2ae8sKp-h35Ly2iGRurR3dC-dzUEAqZsHssCHHsDJDOZTonM8HxyXPgh1oQR4tL0wrRQevvItRYfMjWM-25_52xWM2EGtXAKtf8D28GBpQpwI7Wp-XjJb-v7kNnuakr4nUro-BdnHDrC-d1T5xU6qv2WAOYDV4sHCWOClu-cG2_f-EydJmrwCs-uVfMgNK6NZrprMzbnYhqoi0B1fp9kiy2WOIkw2ImWe10-Fj1ZL9owbPixJm6MPtDoW6eVoJ-oxgkZiruZ4QjZPQZlf8w8ABKaac2pkYxkohrA4GqK39Qr4mX1kFQrDyrWiQQSQDpBSvq0-ayUb5ktiqbYU7E-f3FPOSSU2qeNJcezEeUr5cb5k_VkKCAxJ31-haohm6aHI5J3_RpjV_PCChqozNwWdH0J0w9AKR_PbCUbdgx3UsPHXWySkHyvsw2o1N8qI0Z7E3O_DlMO0xuhrJ0oOxmh-_2PY8g2eBpb23-wetX-rNpzduqN6_KH8XxEBl22JtZ2oC_vqK0ojlYtjpAIxzRIeRQsMfRxMwmYm8B2NCsIoWfqkxBg1-LBXHN9cjGUej9JxkY9lbTTaHCOOZb78zRMaNjD1XZ2i-j-fX_WdesImyDQ",
+			"expected": {
+				"brief": "a training dynamic",
+				"amendments": ["less plot"],
+				"reading": {
+					"musts": ["a training dynamic"],
+					"research": {
+						"needed": false,
+						"text": ""
+					},
+					"spread": {
+						"n": 4,
+						"reason": "Open brief."
+					},
+					"directions": [
+						{
+							"id": "d1",
+							"p": 0.4,
+							"text": "A live-in apprenticeship."
+						},
+						{
+							"id": "d2",
+							"p": 0.1,
+							"text": "Weekly reports to someone you never meet."
+						}
+					],
+					"pick": {
+						"by": "code",
+						"reason": ""
+					},
+					"ask": {
+						"id": "q1",
+						"text": "Who trains whom?",
+						"options": ["You train them", "They train you"],
+						"keep": "story"
+					},
+					"answer": "They train you"
+				},
+				"chosen": {
+					"directionId": "d2",
+					"by": "code",
+					"nudges": [
+						{
+							"dimension": "era",
+							"text": "the 1970s"
+						}
+					],
+					"seed": 42
+				},
+				"build": {
+					"title": "Week by Week",
+					"heat": "steamy",
+					"telling": "Reports, never scenes. Second person.",
+					"presentation": {
+						"view": "scroll",
+						"theme": "clinical",
+						"notes": "Typewritten."
+					},
+					"capabilities": ["stats", "blocks"],
+					"elements": [
+						{
+							"id": "ottilie",
+							"type": "character",
+							"name": "Ottilie Brandt",
+							"also": ["Ottilie", "Ms Brandt"],
+							"shown": true,
+							"nameFrom": "a composed trainer in her fifties, German-born",
+							"fields": [
+								{
+									"name": "appearance",
+									"text": "Silver bob, reading glasses on a chain.",
+									"shown": true
+								},
+								{
+									"name": "unspoken",
+									"text": "She is grading herself as much as you.",
+									"shown": false
+								}
+							],
+							"stats": [
+								{
+									"name": "composure",
+									"kind": "meter",
+									"value": 37,
+									"max": 100,
+									"description": "Drops when you surprise her."
+								},
+								{
+									"name": "rules",
+									"kind": "list",
+									"value": ["Kneel at the door"],
+									"description": "House rules so far."
+								}
+							]
+						}
+					]
+				},
+				"preferences": [
+					{
+						"id": "p1",
+						"text": "Older, composed characters",
+						"firmness": "leaning",
+						"appliesTo": "",
+						"source": "answer"
+					}
+				]
+			}
+		},
+		{
+			"kind": "dream-turn",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-000000000202",
+			"ciphertext": "sb1.oCqsHEZDlw9S0hwScqu6ehuixD9UEbF0OUFb0KuxgePmEy_n92KNChRdwhd3mc8adeUDXJqvrEFVQIK6gguo9g8Yj_04ies1JHUU7Cg_3sm_alz6Te2thqFEYOBekp2wnQ-XvYMC05n5pjwEOE4qUBHQwniy7z0kxD8ggDlD9xl4QMCVSmdEkPzyOaVxbVbcFp06aDet4yzRsEWJ1O2Op97dmUhW-JLZGlRr3q6-gPMzpdZE6XXzN_q9PgsEt-auKMPkmzAVzb9WxSV6KfAIYdqGxx_djhVk69G6x4v1I0a5doZxTxdd7zbhGZqiBThIAlx1f2U1jlan",
+			"expected": {
+				"kind": "passage",
+				"source": "<say who=\"ottilie\">\"Again.\"</say>\n<beat/>\n<after>\n{\"next\":\"She tests the new rule.\"}\n</after>",
+				"request": "next",
+				"ended": "complete",
+				"model": "z-ai/glm-5.2",
+				"provider": "deepinfra/fp4"
+			}
+		},
+		{
+			"kind": "dream-detail",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-000000000203",
+			"ciphertext": "sb1.He9LTpRQd8SkSlSe0wpPTM8hqFblK9kA-Nh2ShOLL0FdX9P1eQiiK0PZekj_iZvFyh3n06CKoMX5wyAtdaqKkWljMySL_WeM45zmsfP2A5lQGKuk4ovwbQQoLEdrt5iUbgrIvbpTyW_YF8SY33JjQG3duJ1qeBzSUawHT8B7lK57Gj2kA08JNDtx1h9vX5lMY6WR_MieCC4G48DcZcqu-C_-DcZM1JZbKyI2TZ8WygawdlGbU07h1ZeM4mlwPcrgflwRH9V1SkTwW0VemkoK1ex4B8CxDhmM6dFQrCVnKd4_NikXcc52yRGFKnQDTbwCTLGQocV1cLNKZ_jWaLu5VcKYa5w860Owv5JXCRY6ozjHCEpuATmv6hren9Jv6gOLL1espqT4l3NhwXnRgf3qf215QdN2BZ61LJZuNae0SKchmaPwKXfGGPnLYHPob9yekIxv4zTkc8blsnA9qbOGgZY5ncG3La5uaK8Feoi_bIS6qdtYrOoysbKyNzl7coim-nzhU4hNzNyRjkzB7gBlUhXT722CRSMVLb0zBJ1KDDBFHHDGc8RatLJRgOQtXRBy90JJQ7iwELMXZHPNYWLCRoH909jvG9AYhsOJEF7ceRQjTjOeJUcIf6yLXc_eyNKP1GTMYFnfX7lvH_FL6cm-uxsmFElQhRdISQcqBKfjU96HcN1qv4NzaL8bWBDHbFjG0F7ORUPl5oFJjBQlMujEOo4kk01swni183Ix-WgtVGoEEtJEuSqWw3zFod5gMJJfBqG0pdEhZm_HI8ZIyKt9_cIXEb6T7aTG7zUv9XGQ",
+			"expected": {
+				"kind": "element",
+				"element": {
+					"id": "ottilie",
+					"type": "character",
+					"name": "Ottilie Brandt",
+					"also": ["Ottilie", "Ms Brandt"],
+					"shown": true,
+					"nameFrom": "a composed trainer in her fifties, German-born",
+					"fields": [
+						{
+							"name": "appearance",
+							"text": "Silver bob, reading glasses on a chain.",
+							"shown": true
+						},
+						{
+							"name": "unspoken",
+							"text": "She is grading herself as much as you.",
+							"shown": false
+						}
+					],
+					"stats": [
+						{
+							"name": "composure",
+							"kind": "meter",
+							"value": 37,
+							"max": 100,
+							"description": "Drops when you surprise her."
+						},
+						{
+							"name": "rules",
+							"kind": "list",
+							"value": ["Kneel at the door"],
+							"description": "House rules so far."
+						}
+					]
+				}
+			}
+		},
+		{
+			"kind": "dream-summary",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-000000000204",
+			"ciphertext": "sb1.jcmjWYYnhTF0iz4r4n3UVkDHFPNfqpgEtREGhPVv40xxMdL6WvN0O0rvgIeF43h2bJuKYsZ0wsqvTmlqqwkAWdjybYyKttA0Ddwd3Kf5dG-MVkpBoj8YAgT7o_Yw066LWi-iGn-oI45fx0y2Tcmu-dAEgicYxTfl9JNdy1W5Fd6gwkXev9q0b6b5nxT75YAy7kGHQdDMgqTSAA",
+			"expected": {
+				"text": "The first report arrives; Ottilie sets the rule about the door.",
+				"fromTurnId": "00000000-0000-4000-8000-000000000202"
+			}
+		},
+		{
+			"kind": "dream-preferences",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-000000000205",
+			"ciphertext": "sb1.RZLQcFWuAaw5PZY1pVdUrrokdbPpvmZ-QvWT6eQe1xIFwm3tv7cBAHRDnp5H5ScwnQtKI9uJs7IkAqRYjRjpyPROxPC5brQNSsZ3iGjvAigtRf6FYQQUHgC2V5jWJkdOSTgtBUrWHea1Z6_lNoiVBerAkdAvIecwGbodniZDbUCF7gblEZ8qenfdHoORwo6rKjsyD6sWL5dS6ASUZwSJ9lWEgQU-T5nyatmDreTQf0DoGTOAd3jcDK0mnUf1GmFLkIG6DO3Uz7ZobBQWOJwnelAm7KwdJa_jmIXQECWY2Qu5Nm-iWc8dvokP-B-P1LRyz3CTC_1wrQNHhErDjnCOd-P2ODbt7Xr8bDD8xs6qbjLt",
+			"expected": {
+				"preferences": [
+					{
+						"id": "p1",
+						"text": "Never humiliation about my body",
+						"firmness": "hard",
+						"appliesTo": "",
+						"source": "typed"
+					},
+					{
+						"id": "p2",
+						"text": "Start without showing me options",
+						"firmness": "default",
+						"appliesTo": "training stories",
+						"source": "noticed"
+					}
+				]
+			}
 		}
 	]
 }

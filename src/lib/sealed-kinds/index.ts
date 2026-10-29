@@ -19,6 +19,13 @@ import {
 	daydreamSetupKind,
 	daydreamTurnKind
 } from './daydreams';
+import {
+	dreamDetailKind,
+	dreamPreferencesKind,
+	dreamSetupKind,
+	dreamSummaryKind,
+	dreamTurnKind
+} from './dreams';
 import { kinkListKind, kinkListPartnerKind } from './kink-list';
 import { messageBodyKind, messageMetadataKind, messageReactionKind } from './messages';
 import {
@@ -54,5 +61,10 @@ export const ALL_SEALED_KINDS: readonly SealedKind<unknown>[] = [
 	notebookUpdateKind,
 	notebookAwarenessKind,
 	notebookSnapshotKind,
-	scenePreferencesKind
+	scenePreferencesKind,
+	dreamSetupKind,
+	dreamTurnKind,
+	dreamDetailKind,
+	dreamSummaryKind,
+	dreamPreferencesKind
 ];

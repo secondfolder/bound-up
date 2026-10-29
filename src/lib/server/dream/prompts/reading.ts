@@ -6,7 +6,14 @@
  */
 
 import type { Nudge } from '../../../dream/nudges';
-import { bulletList, CORE_RULES, limitsSection, type ModelMessage, wrap } from './core';
+import {
+	amendmentParts,
+	bulletList,
+	CORE_RULES,
+	limitsSection,
+	type ModelMessage,
+	wrap
+} from './core';
 
 export type ReadingInput = {
 	brief: string;
@@ -20,6 +27,10 @@ export type ReadingInput = {
 	canFetch: boolean;
 	/** Research from a separate step, for a model that cannot fetch. */
 	research?: string;
+	/** Changes the user asked for while it was being set up, oldest first. */
+	amendments?: readonly string[];
+	/** The user's answer to the question this step asked last time. */
+	answer?: { question: string; answer: string } | null;
 };
 
 const INSTRUCTIONS = `This step reads the user's brief and proposes directions for the daydream. Another step writes it, from whichever direction is picked.
@@ -65,6 +76,12 @@ export function readingMessages(input: ReadingInput): ModelMessage[] {
 		'\n\n'
 	);
 	const parts = [wrap('brief', input.brief)];
+	parts.push(...amendmentParts(input.amendments ?? []));
+	if (input.answer) {
+		parts.push(
+			`You asked: ${input.answer.question}\nThe user answered: ${input.answer.answer}\nDo not ask again.`
+		);
+	}
 	if (input.research) {
 		parts.push(wrap('research', input.research));
 	}

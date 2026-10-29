@@ -19,7 +19,7 @@ how it reads) and **elements** (anything worth a record, of any type), and
 offers a **menu of capabilities** it may opt into. Code supplies the
 randomness: the model lists several directions and code picks one.
 
-## What exists now (phase 0, the tooling)
+## What exists now
 
 | Piece | Where |
 | --- | --- |
@@ -33,13 +33,18 @@ randomness: the model lists several directions and code picks one.
 | The bench, its checks and the variety fingerprint | `src/lib/server/dream/bench/`, `scripts/dreams-bench.ts` |
 | The pairwise judge | `bench/judge.ts`, `scripts/dreams-judge.ts` |
 | Blind A/B votes and the leaderboard | `/debug/dreams`, `src/lib/server/dream/ab.ts`, `bench/leaderboard.ts` |
+| The story tree, request schemas, stream events, routing level | `src/lib/dream/tree.ts`, `requests.ts`, `events.ts`, `routing.ts` |
+| Sealed kinds and storage | `src/lib/sealed-kinds/dreams.ts`, `src/lib/server/dreams.ts` |
+| The relay and the small calls' prompts | `src/lib/server/dream/relay.ts`, `prompts/fill.ts` |
+| The API | `src/routes/api/dreams/`, `src/lib/server/dream-api.ts` |
 
 Everything under `src/lib/dream/` is pure and alias-free, and so is everything
 under `src/lib/server/dream/`, so the bench can run it under `tsx` outside
 Vite. Keep it that way: an import of `$lib` or `$env` there breaks the bench.
 
-There is no player-facing route, table or UI yet: only the dev-only voting
-page.
+`src/lib/server/dream-api.ts` and `src/lib/server/dreams.ts` are outside
+that directory on purpose: they reach the database, settings and features
+through `$lib`, which the bench never needs.
 
 ## The markup
 
@@ -203,10 +208,107 @@ text for now; the renderer comes with the player.
 Which of a model's providers allow adult content, and routing around the ones
 that refuse, is in [server-settings.md](server-settings.md#adult-content-by-provider):
 the admin's *Check adult content*, the `model_providers` table, the back-off,
-and `routeFor`, which the engine will call once it serves daydreams.
+and `routeFor`. The engine's routes call it for every request (see
+[Adult-friendly providers](#adult-friendly-providers)).
+
+## The feature
+
+`dreams` in `src/lib/features.ts`, separate from the old `daydreams`
+because every passage costs money: an account has to be granted it. Every
+route under `/api/dreams/` starts with `dreamsGuard`
+(`src/lib/server/dream-api.ts`), which checks the session and the feature,
+since `api/` routes sit outside both route groups and inherit no guard.
+
+## Storage
+
+New tables and new sealed kinds, independent of the old engine's
+(`src/lib/server/db/schema/app.ts`, migration `0056_add_dreams`, which only
+adds tables). Everything the user or the model writes is sealed in the
+browser to the user's own vault; the server checks the envelope, that it is
+the owner's vault, and the tree's shape, and never reads content.
+
+| Table | Sealed kind | Holds |
+| --- | --- | --- |
+| `dreams` | `dream-setup` | The brief, changes asked for while setting up, step 1's reading, the direction taken and code's draws, the build (title, heat, telling notes, presentation, capabilities, elements), this story's preferences |
+| `dream_turns` | `dream-turn` | A passage (its source with markup and footer, what asked for it, how it ended, model and provider) or the user's turn (words, cycle settings, answers, rolls, filled-in fields) |
+| `dream_details` | `dream-detail` | An element as it now stands (a card filled in, facts added), or a `<more>` expanded, on the turn it was written after |
+| `dream_summaries` | `dream-summary` | A finished scene condensed, on its last turn |
+| `dream_preferences` | `dream-preferences` | The user's own preferences for every daydream, hard limits among them |
+
+The kinds are in `src/lib/sealed-kinds/dreams.ts`, each with a frozen
+fixture. Recent directions (`dream-recent` in the plan) come with phase 4.
+
+**Turns are a tree.** Every version of a passage (a retry, another take, an
+edit) is a sibling under the same parent, and nothing is replaced. `role`
+(`user` or `model`), the parent and the depth are the only plaintext. The
+page shows one path, the opening down to `activeTurnId`; `getDream` loads the
+whole tree's shape without content and only that path's turns, detail and
+summaries, and `readDreamBranch` reads another path when the user moves to
+it (`src/lib/dream/tree.ts` has the tree rules). Detail and summaries hang
+off a turn, so each branch has its own, and the latest along the path wins.
+
+**What a detail is about is sealed.** Element ids are words from the story,
+so `dream_details` has no key column: the browser opens the path's details
+and works out which is latest for each element.
+
+**The setup is saved compare-and-swap** on `revision`, after each finished
+step of setting up, so a reload carries on from there. The user's
+preferences are the same, with a null revision to create them.
+
+A daydream belongs to its owner's solo space and goes with it
+(`deleteSpaceStatements`); its turns, details and summaries cascade.
+
+## What the server sees
+
+The routes that ask the model (`read`, `build`, `passage`, `fill`) are where
+the server handles what the user wrote in plaintext. The browser posts the
+words the model needs, because the server cannot open the sealed copies; the
+request schemas in `src/lib/dream/requests.ts` bound their size and shape,
+the prompt is assembled on the server from them, and the answer goes back.
+Nothing stores, logs or inspects either: a failure is logged by kind alone,
+never with an upstream message, which can quote the request back. Every
+request to OpenRouter carries `data_collection: deny`. Before the first, the
+user accepts the same disclosure the old engine asks for
+(`hasAcceptedDisclosure`), since it is the same provider on the same terms.
+
+A passage, a build or step 1 counts against the account's story replies
+(`daydreamRateLimit`); a fill counts against its suggestions.
+
+## Streaming
+
+`read`, `build` and `passage` stream the engine's own events
+(`src/lib/dream/events.ts`), not the provider's passed through, because the
+server reads the reply to tell a refusal from a passage:
+
+- `text`: more of the reply;
+- `restart`: what came so far was refused or failed before any words; drop it,
+  another provider is writing it again;
+- `done`: finished, and how: `complete`, `stopped` (out of room), or
+  `refused` when no provider was left to try;
+- `failed`: it could not be finished. Words that already arrived are kept,
+  and the page offers Retry.
+
+`fill` answers whole, as JSON, for the small calls: an element filled in or
+updated with facts, a `<more>` expanded, a scene summarised
+(`src/lib/server/dream/prompts/fill.ts`).
+
+## Adult-friendly providers
+
+Each request needs an adult level (`src/lib/dream/routing.ts`): a passage's
+comes from its daydream's heat (none 0, suggestive 1, steamy 2, explicit 3);
+step 1 and the build ask for explicit, because a brief could ask for
+anything and a provider that would refuse the story should not set it up.
+`routeFor` lists the providers that passed that level and are not backing
+off. The relay (`src/lib/server/dream/relay.ts`) pins each attempt to one of
+them, so the outcome can be credited to it (`recordOutcome`), and tries the
+next once after a refusal, a filtered or empty reply, or a failure before any
+words. With no provider checked yet it sends one unpinned request under the
+configured model and records nothing.
 
 ## Not built yet
 
-Every later phase: routes, storage, the live setup page, the views, preferences, research, names, read-aloud. See
-the plan. The judge's agreement with your votes and the simulated player come
-once there are votes to compare and a play loop to play.
+The pages (the live setup page, the story view and its renderer), the
+simulated player, and every later phase: interactive text and the block
+gallery, preferences, research, names, stats and dice, read-aloud. Step 1
+and the build are still two calls for a spread of 1. See the plan. The
+judge's agreement with your votes comes once there are votes to compare.

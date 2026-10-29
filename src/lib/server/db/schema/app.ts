@@ -2061,3 +2061,136 @@ export const modelProviders = sqliteTable(
 
 export type ModelProviderRow = typeof modelProviders.$inferSelect;
 export type NewModelProviderRow = typeof modelProviders.$inferInsert;
+
+/**
+ * A daydream of the new engine (docs/dreams.md, "Storage"). Independent of
+ * `daydreams`, which the old engine keeps until the switch-over.
+ *
+ * Everything in it is sealed in the owner's own vault: the setup is one
+ * record, saved after each finished step of setting it up. The id is chosen
+ * by the browser, because it is part of what the setup is sealed to.
+ */
+export const dreams = sqliteTable(
+	'dreams',
+	{
+		id: text('id').primaryKey(),
+		ownerId: text('owner_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		/** The owner's solo space: daydreams are solo for now (docs/spaces.md). */
+		spaceId: spaceColumn(),
+		/** The setup (`dream-setup`): brief, reading, direction, build, preferences. */
+		ciphertext: text('ciphertext').notNull(),
+		vaultId: text('vault_id')
+			.notNull()
+			.references(() => vaults.id, { onDelete: 'cascade' }),
+		payloadVersion: integer('payload_version').notNull(),
+		/** Bumped by every write of the setup, so saving it is compare-and-swap. */
+		revision: integer('revision').notNull().default(0),
+		/** What the list sorts by. Null before the opening. */
+		lastTurnAt: integer('last_turn_at', { mode: 'timestamp_ms' }),
+		/**
+		 * The turn the user is on: the end of the branch the page shows. The
+		 * server checks it names one of this daydream's turns before storing it.
+		 */
+		activeTurnId: text('active_turn_id'),
+		...timestamps
+	},
+	(table) => [
+		index('dreams_owner_last_turn_idx').on(table.ownerId, table.lastTurnAt),
+		index('dreams_space_id_idx').on(table.spaceId)
+	]
+);
+
+/**
+ * One turn of a daydream (`dream-turn`): a passage, or the user's turn.
+ * Turns form a tree, so every version of a passage (a retry, another take,
+ * an edit) is a sibling and nothing is thrown away. Never changed once
+ * written. `role` and the tree's shape are the only plaintext.
+ */
+export const dreamTurns = sqliteTable(
+	'dream_turns',
+	{
+		id: text('id').primaryKey(),
+		dreamId: text('dream_id')
+			.notNull()
+			.references(() => dreams.id, { onDelete: 'cascade' }),
+		/**
+		 * The turn this one follows; null for an opening. No foreign key: turns
+		 * are only deleted with their daydream, whose cascade takes them all, and
+		 * `appendDreamTurn` checks the parent is in the same daydream.
+		 */
+		parentId: text('parent_id'),
+		role: text('role').$type<'user' | 'model'>().notNull(),
+		/** 0 for an opening, its parent's plus one otherwise. */
+		depth: integer('depth').notNull(),
+		ciphertext: text('ciphertext').notNull(),
+		vaultId: text('vault_id')
+			.notNull()
+			.references(() => vaults.id, { onDelete: 'cascade' }),
+		payloadVersion: integer('payload_version').notNull(),
+		...timestamps
+	},
+	(table) => [index('dream_turns_dream_parent_idx').on(table.dreamId, table.parentId)]
+);
+
+/**
+ * Detail filled in on a turn (`dream-detail`): a card, facts added after a
+ * passage, or an expanded `<more>`. What it is about (an element's id, a
+ * marker's) is sealed, since ids are words from the story; the server knows
+ * only the turn it belongs to.
+ */
+export const dreamDetails = sqliteTable(
+	'dream_details',
+	{
+		id: text('id').primaryKey(),
+		dreamId: text('dream_id')
+			.notNull()
+			.references(() => dreams.id, { onDelete: 'cascade' }),
+		turnId: text('turn_id')
+			.notNull()
+			.references(() => dreamTurns.id, { onDelete: 'cascade' }),
+		ciphertext: text('ciphertext').notNull(),
+		vaultId: text('vault_id')
+			.notNull()
+			.references(() => vaults.id, { onDelete: 'cascade' }),
+		payloadVersion: integer('payload_version').notNull(),
+		...timestamps
+	},
+	(table) => [index('dream_details_dream_turn_idx').on(table.dreamId, table.turnId)]
+);
+
+/** A scene's summary (`dream-summary`), stored against the scene's last turn. */
+export const dreamSummaries = sqliteTable(
+	'dream_summaries',
+	{
+		id: text('id').primaryKey(),
+		dreamId: text('dream_id')
+			.notNull()
+			.references(() => dreams.id, { onDelete: 'cascade' }),
+		turnId: text('turn_id')
+			.notNull()
+			.references(() => dreamTurns.id, { onDelete: 'cascade' }),
+		ciphertext: text('ciphertext').notNull(),
+		vaultId: text('vault_id')
+			.notNull()
+			.references(() => vaults.id, { onDelete: 'cascade' }),
+		payloadVersion: integer('payload_version').notNull(),
+		...timestamps
+	},
+	(table) => [index('dream_summaries_dream_turn_idx').on(table.dreamId, table.turnId)]
+);
+
+/** The user's own preferences for every daydream (`dream-preferences`), hard limits among them. */
+export const dreamPreferences = sqliteTable('dream_preferences', {
+	userId: text('user_id')
+		.primaryKey()
+		.references(() => user.id, { onDelete: 'cascade' }),
+	ciphertext: text('ciphertext').notNull(),
+	vaultId: text('vault_id')
+		.notNull()
+		.references(() => vaults.id, { onDelete: 'cascade' }),
+	payloadVersion: integer('payload_version').notNull(),
+	revision: integer('revision').notNull().default(0),
+	...timestamps
+});

@@ -30,6 +30,17 @@ export type PassageInput = {
 	history: readonly { passage: string; turn: UserTurn }[];
 	/** Phrases repeated in recent passages, for "don't reuse". */
 	repeated: readonly string[];
+	/**
+	 * Earlier scenes, condensed, oldest first: the story before `history`
+	 * begins (docs/dreams.md, "Memory"). Only ever added to, so the start of
+	 * the prompt stays the same and stays cached.
+	 */
+	summaries?: readonly string[];
+	/**
+	 * A passage to write again: the same events in new words ("Another
+	 * take"). It answers the same turn as the one it replaces.
+	 */
+	take?: string | null;
 };
 
 const FOOTER_TAG = /<after>[\s\S]*?(?:<\/after>|$)/;
@@ -73,9 +84,13 @@ function lastNext(passage: string): string | null {
 	return footer ? nextNote(parseFooter(plainText(footer.children))) : null;
 }
 
-function nowSection(input: PassageInput, last: { passage: string; turn: UserTurn }): string {
-	const parts = [describeTurn(last.turn)];
-	const next = lastNext(last.passage);
+function nowSection(
+	input: PassageInput,
+	last: { passage: string; turn: UserTurn } | undefined
+): string {
+	// No last passage only for another take of the opening.
+	const parts = [last ? describeTurn(last.turn) : 'This is the opening passage.'];
+	const next = last ? lastNext(last.passage) : null;
 	if (next) {
 		parts.push(`Where the last passage thought the story could go: ${next}`);
 	}
@@ -84,14 +99,23 @@ function nowSection(input: PassageInput, last: { passage: string; turn: UserTurn
 			`Phrases already used more than once; do not reuse them: ${input.repeated.map((phrase) => `"${phrase}"`).join(', ')}`
 		);
 	}
-	parts.push('Write the next passage now, ending with its footer.');
+	if (input.take) {
+		parts.push(
+			`This passage was already written for this moment:\n${wrap('take', historyPassage(input.take))}\nWrite it again: the same events, in new words. Do not reuse its sentences or its images.`
+		);
+	} else {
+		parts.push('Write the next passage now, ending with its footer.');
+	}
 	return parts.join('\n\n');
 }
 
-/** The messages for the next passage. Throws without an opening passage to follow. */
+/**
+ * The messages for the next passage. Throws without an opening passage to
+ * follow, unless it is another take of the opening itself.
+ */
 export function passageMessages(input: PassageInput): ModelMessage[] {
 	const last = input.history.at(-1);
-	if (!last) {
+	if (!(last || input.take)) {
 		throw new Error('passageMessages needs at least the opening passage in its history.');
 	}
 	const system = [
@@ -101,6 +125,12 @@ export function passageMessages(input: PassageInput): ModelMessage[] {
 		setupSection(input)
 	].join('\n\n');
 	const messages: ModelMessage[] = [{ role: 'system', content: system }];
+	if (input.summaries && input.summaries.length > 0) {
+		messages.push({
+			role: 'user',
+			content: `The story so far, scene by scene, before the passages below:\n${wrap('summaries', input.summaries.map((summary, index) => `Scene ${index + 1}: ${summary}`).join('\n\n'))}`
+		});
+	}
 	for (const [index, entry] of input.history.entries()) {
 		messages.push({ role: 'assistant', content: historyPassage(entry.passage) });
 		// Every turn but the last goes between passages; the last is in "now".
