@@ -9,6 +9,9 @@
  *   npm run dreams:bench -- --models a/b,c/d --briefs training,texts --runs 3 --seed tuesday
  *   npm run dreams:bench -- --models a/b --briefs training --runs 1 --passages 20 --persona eager
  *
+ * `--plain` leaves out code's variety (nudges, the weighted pick, the name
+ * pool), as a baseline to measure it against.
+ *
  * `--persona` has a simulated player take every turn (bench/player.ts):
  * eager, terse, steers, contrary, continues or explorer. Without it every
  * turn is Continue.
@@ -44,7 +47,8 @@ const { values } = parseArgs({
 		temperature: { type: 'string' },
 		label: { type: 'string' },
 		'fingerprint-model': { type: 'string' },
-		persona: { type: 'string' }
+		persona: { type: 'string' },
+		plain: { type: 'boolean', default: false }
 	}
 });
 
@@ -145,6 +149,7 @@ async function main(): Promise<void> {
 						passages,
 						// The same model plays the user: a session is one model's to run.
 						...(persona ? { player: { persona } } : {}),
+						plain: values.plain,
 						complete: (messages, step) =>
 							stream({
 								baseUrl: BASE_URL,

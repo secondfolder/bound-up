@@ -531,6 +531,25 @@ Every source of randomness is code's, never the model's habits:
   model lists possibilities (step 1, directions), steadier where it keeps
   records; the bench uses the same table unless `--temperature` overrides it.
 
+### What the variety run found
+
+Eight runs of "a training dynamic" on GLM 5.2, with code's variety and with
+`--plain` (no nudges, the model's most likely direction, no name pool), on
+2026-10-30, about 50¢ in all:
+
+- **Plain** gave eight versions of one idea: a first session or a handler
+  with a pet, in a quiet studio or training room, in "spare prose with
+  deliberate beats", the characters mostly given German names (Dagmar,
+  Constanze, Astrid).
+- **With variety**: a trainee's journal, domestic pet play threaded through
+  chores, a monologue, old rivals at a kink club, military drill, a merchant
+  and his clerk; set in a shared flat, an office, a club; told as a journal,
+  a monologue, vignettes, a stat-tracked story.
+- Not yet solved: one name from the pool, Constance, was chosen in three of
+  the eight; the fingerprint model answered for only three and five of the
+  runs; and the build's first words took 40 to 75 seconds on this model,
+  far over the 12-second target, which wants measuring on other models.
+
 ### Names
 
 Models name characters from a tiny set, so code draws real names and the

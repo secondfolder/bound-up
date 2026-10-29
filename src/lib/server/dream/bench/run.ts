@@ -75,6 +75,12 @@ export type RunOptions = {
 	complete: Complete;
 	/** A cheap model for the variety fingerprint; none skips it. */
 	fingerprint?: Complete;
+	/**
+	 * Without code's variety: no nudges, the model's most likely direction,
+	 * no name pool. A baseline for measuring what the variety adds
+	 * (docs/dreams.md, "Variety").
+	 */
+	plain?: boolean;
 	/** A simulated player taking each turn; without one, every turn is Continue. */
 	player?: { persona: Persona };
 };
@@ -84,7 +90,7 @@ const BENCH_LIMITS: readonly string[] = [];
 /** A bench run never throws: a failure is recorded on the run, with whatever it got that far. */
 export async function runBrief(brief: BenchBrief, options: RunOptions): Promise<BenchRun> {
 	const random = seededRandom(seedFrom(`${options.seed}:${brief.id}`));
-	const nudges = drawNudges(random);
+	const nudges = options.plain ? [] : drawNudges(random);
 	const steps: BenchStep[] = [];
 	const call = async (step: string, messages: readonly ModelMessage[]): Promise<string> => {
 		const completion = await options.complete(messages, step);
@@ -156,7 +162,10 @@ async function runSteps(
 	);
 	run.reading = parseBriefReading(readingText);
 	// A user pick is a person's choice; the bench stands in with the same weighted pick.
-	const direction = pickDirection(run.reading.directions, run.reading.spread.n, random);
+	// Plain takes the model's own favourite, as asking it for one answer would.
+	const direction = options.plain
+		? ([...run.reading.directions].sort((a, b) => b.p - a.p)[0] ?? null)
+		: pickDirection(run.reading.directions, run.reading.spread.n, random);
 	run.picked = direction?.text ?? null;
 	const buildText = await call(
 		'build',
@@ -170,7 +179,7 @@ async function runSteps(
 			preferences: [],
 			recentNames: [],
 			// Drawn from the run's seed, so prompt versions compare on the same pool.
-			namePool: drawPool(random)
+			...(options.plain ? {} : { namePool: drawPool(random) })
 		})
 	);
 	const build = parseBuild(buildText);
