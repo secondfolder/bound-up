@@ -198,9 +198,15 @@ It reads the developer's own dream-bench/, so it exists only on a dev server.
 behind `dev`, which keeps it out of every build. Passages are shown as plain
 text for now; the renderer comes with the player.
 
+## Providers (phase 1)
+
+Which of a model's providers allow adult content, and routing around the ones
+that refuse, is in [server-settings.md](server-settings.md#adult-content-by-provider):
+the admin's *Check adult content*, the `model_providers` table, the back-off,
+and `routeFor`, which the engine will call once it serves daydreams.
+
 ## Not built yet
 
-Every later phase: providers and their adult-content checks, routes, storage,
-the live setup page, the views, preferences, research, names, read-aloud. See
+Every later phase: routes, storage, the live setup page, the views, preferences, research, names, read-aloud. See
 the plan. The judge's agreement with your votes and the simulated player come
 once there are votes to compare and a play loop to play.

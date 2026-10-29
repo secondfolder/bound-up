@@ -8,6 +8,7 @@ import {
 	languageModelSettingsFormSchema,
 	mailSettingsFormSchema,
 	modelProviderFormSchema,
+	providerOverrideFormSchema,
 	pushSettingsFormSchema,
 	type SecretChange,
 	serverActionFormSchema
@@ -16,6 +17,8 @@ import { requireAdmin } from '$lib/server/admin';
 import { openrouterBaseUrl } from '$lib/server/daydream/config';
 import { createMailer, resendBaseUrl } from '$lib/server/mail';
 import { MAIL_NODE_TARGET, MailNotSetUpError, readMailConfig } from '$lib/server/mail/config';
+import { checkModel, openRouterEndpoints } from '$lib/server/model-providers/check';
+import { loadProviderStates, setOverride } from '$lib/server/model-providers/store';
 import { loadOpenRouterCatalogue } from '$lib/server/openrouter-models';
 import { defaultVapidSubject } from '$lib/server/push';
 import {
@@ -32,10 +35,12 @@ import {
 	MODEL_PROVIDERS,
 	type ModelProviderId,
 	type OpenRouterStoryModelPresetId,
+	openrouterModelIdFor,
 	PICTURE_MODEL_SETTING,
 	type PictureModelChoice,
 	parsePictureModel,
 	parseStoryModel,
+	providerCredential,
 	SECRET_SETTING_KEYS,
 	type ServerSettingKey,
 	type ServerSettings,
@@ -53,6 +58,13 @@ const IMAGE_MODEL_FORM = 'image-models';
 const PUSH_FORM = 'push';
 const VAPID_FORM = 'vapid';
 const SERVER_SECRET_FORM = 'server-secret';
+const PROVIDER_CHECK_FORM = 'provider-check';
+const PROVIDER_OVERRIDE_FORM = 'provider-override';
+
+/** The story model as OpenRouter lists it: what its providers are stored under. */
+function listedStoryModel(settings: ServerSettings): string {
+	return splitOpenRouterModelId(openrouterModelIdFor(parseStoryModel(settings.storyModel))).listed;
+}
 /** One form per model provider, for its key. */
 const providerFormId = (provider: ModelProviderId) => `provider-${provider}`;
 
@@ -127,6 +139,7 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 	const rows = await loadServerSettingRows(locals.db, platform);
 	const settings = settingsFromRows(rows);
 	const story = parseStoryModel(settings.storyModel);
+	const storyModelListed = listedStoryModel(settings);
 	const photo = pictureFields(settings, 'photo');
 	const illustrated = pictureFields(settings, 'illustrated');
 
@@ -201,7 +214,20 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 			{ id: PUSH_FORM, errors: false }
 		),
 		vapidForm: await superValidate(zod4(serverActionFormSchema), { id: VAPID_FORM }),
-		serverSecretForm: await superValidate(zod4(serverActionFormSchema), { id: SERVER_SECRET_FORM })
+		serverSecretForm: await superValidate(zod4(serverActionFormSchema), { id: SERVER_SECRET_FORM }),
+		/** The story model's providers: their adult-content checks, overrides and health. */
+		storyModelListed,
+		storyProviders: await loadProviderStates(locals.db, {
+			model: storyModelListed,
+			kind: 'language'
+		}),
+		providerCheckForm: await superValidate(zod4(serverActionFormSchema), {
+			id: PROVIDER_CHECK_FORM
+		}),
+		providerOverrideForm: await superValidate(zod4(providerOverrideFormSchema), {
+			id: PROVIDER_OVERRIDE_FORM,
+			errors: false
+		})
 	};
 };
 
@@ -334,6 +360,70 @@ export const actions: Actions = {
 			storyModel: JSON.stringify(await storyModelChoice(data, platform, request.signal))
 		});
 		return message(languageModelForm, SAVED);
+	},
+
+	/**
+	 * Asks every provider serving the story model the adult-content probes
+	 * (docs/server-settings.md, "Adult content by provider"). The model and
+	 * the key come from the saved settings, never the form.
+	 */
+	checkProviders: async ({ locals, platform, request }) => {
+		requireAdmin(locals);
+		const providerCheckForm = await superValidate(request, zod4(serverActionFormSchema), {
+			id: PROVIDER_CHECK_FORM
+		});
+		const apiKey = providerCredential(locals.settings, 'openrouter');
+		if (!apiKey) {
+			return message(
+				providerCheckForm,
+				'Add an OpenRouter key under Model providers first: the check asks each provider through it.',
+				{ status: 400 }
+			);
+		}
+		const baseUrl = openrouterBaseUrl(platform);
+		try {
+			const results = await checkModel({
+				db: locals.db,
+				apiKey,
+				baseUrl,
+				model: listedStoryModel(locals.settings),
+				kind: 'language',
+				endpoints: openRouterEndpoints(baseUrl)
+			});
+			const passing = results.filter((result) => (result.levelPassed ?? 0) > 0).length;
+			return message(
+				providerCheckForm,
+				`Checked ${results.length} providers: ${passing} allow adult content.`
+			);
+		} catch (error) {
+			return message(
+				providerCheckForm,
+				error instanceof Error ? error.message : 'The check could not reach OpenRouter.',
+				{ status: 502 }
+			);
+		}
+	},
+
+	setProviderOverride: async ({ locals, request }) => {
+		requireAdmin(locals);
+		const providerOverrideForm = await superValidate(request, zod4(providerOverrideFormSchema), {
+			id: PROVIDER_OVERRIDE_FORM
+		});
+		if (!providerOverrideForm.valid) {
+			return fail(400, { providerOverrideForm });
+		}
+		const key = { model: listedStoryModel(locals.settings), kind: 'language' as const };
+		const known = await loadProviderStates(locals.db, key);
+		const { provider, override } = providerOverrideForm.data;
+		if (!known.some((state) => state.provider === provider)) {
+			return setError(
+				providerOverrideForm,
+				'provider',
+				'That provider isn’t one the story model has been checked on. Run the check first.'
+			);
+		}
+		await setOverride(locals.db, key, provider, override);
+		return message(providerOverrideForm, SAVED);
 	},
 
 	saveImageModels: async ({ locals, request }) => {

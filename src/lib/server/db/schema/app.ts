@@ -12,6 +12,7 @@ import type { DaydreamTurnRole } from '../../../daydream';
 import type { AccountRecoveryStatus, KeyWrapParams, KeyWrapType } from '../../../encryption';
 import type { FeatureKey, FeatureSource } from '../../../features';
 import type { RestoreRequestStatus, ThreadIcon } from '../../../messaging';
+import type { AdultLevel, ProviderKind, ProviderOverride } from '../../../model-providers';
 import type { NotebookKind, PartnerAccess } from '../../../notebook';
 import type { PartnershipControl, PartnershipStatus } from '../../../partnership';
 import type { Intensity, Role, Vibe } from '../../../playroom/iq-test/settings';
@@ -2015,3 +2016,48 @@ export const serverSettings = sqliteTable('server_settings', {
 
 export type ServerSettingRow = typeof serverSettings.$inferSelect;
 export type NewServerSettingRow = typeof serverSettings.$inferInsert;
+
+/**
+ * One row per (model, provider endpoint, kind): what its adult-content check
+ * found, the admin's override, and its health in use (docs/server-settings.md,
+ * "Adult content by provider"). Server state, not user content, so nothing
+ * here is sealed, and nothing of any story is ever stored: only the level a
+ * provider passed and the kind and code of its last rejection.
+ */
+export const modelProviders = sqliteTable(
+	'model_providers',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		/** The model as listed, without an `@` routing suffix. */
+		model: text('model').notNull(),
+		/** OpenRouter's endpoint tag, e.g. "deepinfra/fp4", which routing accepts. */
+		provider: text('provider').notNull(),
+		kind: text('kind').$type<ProviderKind>().notNull(),
+		/** Cheapest first, as OpenRouter lists them: the tie-break in routing. */
+		listOrder: integer('list_order').notNull().default(0),
+		/** The highest adult level it passed; null when never checked. */
+		levelPassed: integer('level_passed').$type<AdultLevel>(),
+		checkedAt: integer('checked_at', { mode: 'timestamp_ms' }),
+		override: text('override').$type<ProviderOverride>().notNull().default('auto'),
+		refusalsInRow: integer('refusals_in_row').notNull().default(0),
+		errorsInRow: integer('errors_in_row').notNull().default(0),
+		successesInRow: integer('successes_in_row').notNull().default(0),
+		refusalBackoffUntil: integer('refusal_backoff_until', { mode: 'timestamp_ms' }),
+		errorBackoffUntil: integer('error_backoff_until', { mode: 'timestamp_ms' }),
+		lastReason: text('last_reason'),
+		...timestamps
+	},
+	(table) => [
+		// Every lookup is "this model's providers of this kind", for routing and the admin page.
+		uniqueIndex('model_providers_model_provider_kind_idx').on(
+			table.model,
+			table.provider,
+			table.kind
+		)
+	]
+);
+
+export type ModelProviderRow = typeof modelProviders.$inferSelect;
+export type NewModelProviderRow = typeof modelProviders.$inferInsert;

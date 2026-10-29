@@ -301,6 +301,61 @@ a cleared one cleared and the old rows where they were, so a rollback to an
 older build still finds them; this build ignores them, like any key it does
 not know.
 
+## Adult content by provider
+
+On OpenRouter, a model is served by many providers, as **endpoints**: one per
+provider and quantisation, each with a tag (`deepinfra/fp4`,
+`deepinfra/fp4/flex`, `relace`) that routing accepts. They do not agree about
+adult content, so it is checked rather than assumed. Asked for an explicit
+passage on 2026-10-30, Wafer's endpoint for GLM 5.2 refused in words while
+Relace's and Morph's wrote it.
+
+**The check** (Language models → *Check adult content*, the `checkProviders`
+action) asks every endpoint serving the story model four probes, mildest
+first (`PROBES` in `$lib/server/model-providers/probes.ts`): suggestive,
+explicit, explicit with kink, and consent-play fantasy. Each request is pinned
+to the one endpoint (`provider.order` with fallbacks off), and an endpoint's
+**level** is the highest probe it passed; the first refusal stops its climb.
+An endpoint that errors before any verdict is left unchecked rather than
+marked as refusing. Every probe is about adults and says so; nothing
+involving minors is a level, or ever will be. Endpoints are checked four at a
+time, so a check of a model with a dozen endpoints takes about a minute.
+
+Replies are classified cheaply (`classifyReply` in `$lib/model-providers.ts`):
+a `content_filter` finish reason, a reply that opens with a refusal ("I'm
+sorry", "I can't", "As an AI"…), or one too short to be a passage. A
+character apologising mid-passage is not a refusal, because only the opening
+is read.
+
+**What is stored** is a row per model, endpoint and kind in `model_providers`:
+the level passed and when, the admin's override, and the endpoint's health in
+use. It is server state, not user content, so nothing in it is sealed, and
+nothing of any story is ever stored there: only the kind and code of the last
+rejection. The model is stored as listed, without an `@` routing suffix,
+because the suffix only says how a request is routed. The model comes from
+the saved settings, never the form, and an override for a provider the model
+was not checked on is refused.
+
+**Routing** (`eligibleProviders`, `routeFor`) gives a request an explicit,
+ordered provider list: endpoints that passed the level the content needs, or
+that the admin set to *Always*, minus any backing off, never one set to
+*Never*, cheapest first as OpenRouter lists them.
+
+**Back-off.** Each reply in use can be recorded (`recordOutcome`). A refusal
+skips the endpoint for 10 minutes, then 30, 90, 270 and 810 minutes, and at
+most a day; three successes in a row clear it. Plain errors have their own
+shorter back-off (1, 2, 5, then 15 minutes), so a busy provider is not mistaken
+for a prudish one. The table on the admin page shows each endpoint's level,
+when it was checked, its health ("Skipped until 14:32 · 3 refusals in a row")
+and its override.
+
+Not yet: the new daydream engine records outcomes and routes through this once
+it serves daydreams ([dreams.md](dreams.md)); the old Daydreams feature does
+not use it. The check runs when the admin asks; a weekly re-check needs the
+scheduled handler, whose imports must stay alias-free (AGENTS.md,
+invariant 17), and is still to come. Voice models get the same check, verified
+by transcribing the probe audio back, with read-aloud.
+
 ## Email on a new server
 
 A server without email starts, unlike before, because its email is set up

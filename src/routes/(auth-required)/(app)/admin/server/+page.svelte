@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import ModelChoice, { type ModelPresetOption } from '$lib/components/admin/ModelChoice.svelte';
 	import ModelProviderField from '$lib/components/admin/ModelProviderField.svelte';
+	import ProviderChecks from '$lib/components/admin/ProviderChecks.svelte';
 	import ProviderKeyDialog from '$lib/components/admin/ProviderKeyDialog.svelte';
 	import SecretSettingField from '$lib/components/admin/SecretSettingField.svelte';
 	import InputField from '$lib/components/InputField.svelte';
@@ -521,6 +522,12 @@
 					</wa-button>
 				</div>
 			</form>
+			<ProviderChecks
+				model={data.storyModelListed}
+				providers={data.storyProviders}
+				checkForm={data.providerCheckForm}
+				overrideForm={data.providerOverrideForm}
+			/>
 		</article>
 
 		<!-- ── Image models ──────────────────────────────────────────────── -->

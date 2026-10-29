@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { PictureStyle } from '$lib/daydream';
+import { OVERRIDES } from '$lib/model-providers';
 import {
 	IMAGE_PROVIDERS,
 	type ImageProviderId,
@@ -205,3 +206,16 @@ export type PushSettingsForm = z.output<typeof pushSettingsFormSchema>;
 
 /** The buttons with nothing to fill in: regenerating a key, sending a test email. */
 export const serverActionFormSchema = z.object({});
+
+/**
+ * The admin's override for one provider of the story model
+ * (docs/server-settings.md, "Adult content by provider"). The model is not in
+ * the form: the server takes it from the saved settings, and refuses a
+ * provider it has no row for.
+ */
+export const providerOverrideFormSchema = z.object({
+	provider: z.string().trim().min(1).max(120),
+	override: z.enum(OVERRIDES).default('auto')
+});
+
+export type ProviderOverrideForm = z.output<typeof providerOverrideFormSchema>;
