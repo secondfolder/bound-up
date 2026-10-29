@@ -295,6 +295,12 @@
 							"summary": "Share a daydream with your partner, or let them set one up for you.",
 							"status": "exploring",
 							"dependsOn": ["partner-linking"]
+						},
+						{
+							"id": "daydreams-anything",
+							"title": "Daydreams shaped to whatever you ask",
+							"summary": "Ask for any kind of daydream, from a full story to a string of texts or a single voice, and get a different take each time, with cards for everyone in it, spoilers and choices in the text, and the option to have it read to you.",
+							"status": "in-progress"
 						}
 					]
 				},
