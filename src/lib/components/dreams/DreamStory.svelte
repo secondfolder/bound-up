@@ -444,6 +444,7 @@
 				nameOf: (who) => speakerName(who),
 				onNearEnd: keepGoing,
 				onFinished: carryOn,
+				onPosition: (turnId, index, done) => savePosition({ turnId, index, done }),
 				coveredFrom: () => dock?.getBoundingClientRect().top ?? null,
 				onSpoken: (turnId, spoken) =>
 					session.noteExtra(turnId, {
@@ -514,6 +515,69 @@
 		const passages = session.path.filter((entry) => entry.turn?.kind === 'passage');
 		const at = passages.findIndex((entry) => entry.id === turnId);
 		return at > 0 ? (passages[at - 1]?.id ?? null) : null;
+	}
+
+	/**
+	 * Where reading got to in this daydream, on this device, so play after a
+	 * reload carries on from there (docs/dreams.md, "Read aloud"). In local
+	 * storage: a turn's id and a count, never any words, and a convenience,
+	 * so a storage that is not there only means starting from the newest.
+	 */
+	type ReadingPosition = { turnId: string; index: number; done: boolean };
+	const positionKey = $derived(`dream-reading:${session.id}`);
+
+	function savePosition(position: ReadingPosition) {
+		try {
+			localStorage.setItem(positionKey, JSON.stringify(position));
+		} catch {
+			// Storage refused (a private window): it only means no carrying on.
+		}
+	}
+
+	function savedPosition(): ReadingPosition | null {
+		try {
+			const value: unknown = JSON.parse(localStorage.getItem(positionKey) ?? 'null');
+			if (
+				typeof value === 'object' &&
+				value !== null &&
+				'turnId' in value &&
+				typeof value.turnId === 'string' &&
+				'index' in value &&
+				typeof value.index === 'number' &&
+				'done' in value
+			) {
+				return { turnId: value.turnId, index: value.index, done: value.done === true };
+			}
+		} catch {
+			// Unreadable: as if there were none.
+		}
+		return null;
+	}
+
+	/**
+	 * Play with nothing playing: from where reading got to, if that passage is
+	 * on this branch; the passage after it if that one was finished (or it
+	 * again, with none after); else the newest passage, from its start.
+	 */
+	function carryOnReading() {
+		const saved = savedPosition();
+		const onPath =
+			saved !== null &&
+			session.path.some((entry) => entry.id === saved.turnId && entry.turn?.kind === 'passage');
+		if (!(saved && onPath)) {
+			if (session.lastPassage) {
+				listen(session.lastPassage.id);
+			}
+			return;
+		}
+		if (saved.done) {
+			listen(passageAfter(saved.turnId) ?? saved.turnId);
+			return;
+		}
+		const root = passageRoot(saved.turnId);
+		if (reader && root) {
+			reader.play(saved.turnId, root, undefined, saved.index);
+		}
 	}
 
 	function listen(turnId: string, at?: { x: number; y: number }) {
@@ -1075,8 +1139,8 @@
 							onclick={() => {
 								if (reader.turnId) {
 									reader.resume();
-								} else if (session.lastPassage) {
-									listen(session.lastPassage.id);
+								} else {
+									carryOnReading();
 								}
 							}}
 						>

@@ -244,6 +244,7 @@ export class ReadAloud {
 	#scroller: HTMLElement | null = null;
 	readonly #coveredFrom: (() => number | null) | undefined;
 	readonly #onFinished: ((turnId: string) => void) | undefined;
+	readonly #onPosition: ((turnId: string, index: number, done: boolean) => void) | undefined;
 
 	constructor(options: {
 		voiceOf: (who: string | null) => VoiceName;
@@ -259,6 +260,8 @@ export class ReadAloud {
 		coveredFrom?: () => number | null;
 		/** A passage was read to its very end. */
 		onFinished?: (turnId: string) => void;
+		/** Where reading has got to: each sentence started, and the end, for carrying on after a reload. */
+		onPosition?: (turnId: string, index: number, done: boolean) => void;
 	}) {
 		this.#voiceOf = options.voiceOf;
 		this.#nameOf = options.nameOf;
@@ -266,10 +269,15 @@ export class ReadAloud {
 		this.#onSpoken = options.onSpoken;
 		this.#coveredFrom = options.coveredFrom;
 		this.#onFinished = options.onFinished;
+		this.#onPosition = options.onPosition;
 	}
 
-	/** Reads a passage from its element, from the start or from a point tapped on it. */
-	play(turnId: string, root: HTMLElement, at?: { x: number; y: number }): void {
+	/**
+	 * Reads a passage from its element: from the start, from a point tapped
+	 * on it, or from a sentence (`from`, where reading got to before a
+	 * reload).
+	 */
+	play(turnId: string, root: HTMLElement, at?: { x: number; y: number }, from?: number): void {
 		this.stop();
 		const passage = passageRuns(root);
 		const said = utterances(passage.runs);
@@ -277,7 +285,8 @@ export class ReadAloud {
 			return;
 		}
 		const offset = at ? offsetAt(passage, at.x, at.y) : null;
-		const start = Math.max(0, offset === null ? 0 : said.findIndex((entry) => entry.to > offset));
+		const tappedAt = offset === null ? 0 : said.findIndex((entry) => entry.to > offset);
+		const start = Math.min(said.length - 1, Math.max(0, from ?? tappedAt));
 		// The whole utterance is asked for, cues before the word included, and
 		// played from the word tapped.
 		const tapped = said[start];
@@ -394,6 +403,9 @@ export class ReadAloud {
 		const generation = this.#generation;
 		this.#audio?.pause();
 		this.index = index;
+		if (this.turnId) {
+			this.#onPosition?.(this.turnId, index, false);
+		}
 		this.speaker = this.#nameOf(utterance.who);
 		this.speakerId = utterance.who;
 		this.loading = true;
@@ -552,6 +564,7 @@ export class ReadAloud {
 		this.speaker = '';
 		this.speakerId = null;
 		if (finished) {
+			this.#onPosition?.(finished, this.#utterances.length, true);
 			this.#onFinished?.(finished);
 		}
 	}

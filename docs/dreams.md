@@ -1142,6 +1142,15 @@ capability on for the passages asked for (`passageRequestFor`), so the story
 model writes delivery cues (`<say how="low, amused">`, `how` on a tone tag)
 and `<sound>`s for them; without listening it never does (see "Tag hygiene").
 
+**Carrying on after a reload.** Where reading has got to (the passage's
+turn and which sentence, and whether it was finished) is kept on the device
+for each daydream (`dream-reading:<id>` in local storage: an id and a
+count, never any words). Play with nothing playing carries on from there,
+if that passage is on the branch being read; from the passage after it, if
+it was finished (or that one again, with none after); and otherwise from
+the newest passage, as it always did. Listen on a passage, or a tap on a
+word, still plays from there.
+
 **Reading carries on.** A passage read to its very end, with the passage
 after it already there and finished, goes straight on into it, whatever
 "Read new passages" says (`onFinished` and `carryOn` in `DreamStory`): any

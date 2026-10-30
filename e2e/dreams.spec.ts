@@ -807,6 +807,73 @@ test.describe('daydreams, the new engine', () => {
 			.toBe(true);
 	});
 
+	test('after a reload, play carries on from where reading got to', async ({ page }) => {
+		const who = await dreamer(page);
+		await grantFeature(who.email, 'dreamVoice');
+		const dreamId = await start(page, 'A quiet evening');
+		await play(page);
+		await saved(page);
+		await reply(page, 'I wait');
+		await saved(page);
+
+		const key = `dream-reading:${dreamId}`;
+		const position = () =>
+			page.evaluate((name) => JSON.parse(localStorage.getItem(name) ?? 'null'), key);
+		const firstLit = () =>
+			page.evaluate(
+				() =>
+					new Promise<{ word: string; passage: number }>((resolve) => {
+						const look = () => {
+							const lit = CSS.highlights.get('dream-reading');
+							const range = lit ? [...lit][0] : undefined;
+							const passage = range?.startContainer.parentElement?.closest('li.passage');
+							if (range && passage) {
+								resolve({
+									word: range.toString(),
+									passage: [...document.querySelectorAll('li.passage')].indexOf(passage)
+								});
+							} else {
+								requestAnimationFrame(look);
+							}
+						};
+						look();
+					})
+			);
+		await page.getByRole('button', { name: 'Read aloud' }).click();
+		const player = page.getByRole('region', { name: 'Reading aloud' });
+		const opening = page.locator('li.passage').first();
+		await opening.getByRole('button', { name: 'More for this passage' }).click();
+		await opening.getByRole('menuitem', { name: 'Listen' }).click();
+		// Paused past the opening's first sentence.
+		await expect
+			.poll(async () => (await position())?.index ?? 0, { timeout: 15_000 })
+			.toBeGreaterThan(0);
+		await player.getByRole('button', { name: 'Pause' }).click();
+		const kept = await position();
+
+		await page.reload();
+		await waitForHydration(page);
+		await page.getByRole('button', { name: 'Read aloud' }).click();
+		await player.getByRole('button', { name: 'Play' }).click();
+		const resumed = await firstLit();
+		expect(resumed.passage).toBe(0);
+		expect(resumed.word).not.toBe('The');
+		expect((await position())?.index).toBeGreaterThanOrEqual(kept.index);
+
+		// Kept as finished, play goes on to the passage after it.
+		await player.getByRole('button', { name: 'Pause' }).click();
+		await page.evaluate(
+			([name, turnId]) =>
+				localStorage.setItem(name, JSON.stringify({ turnId, index: 99, done: true })),
+			[key, kept.turnId] as const
+		);
+		await page.reload();
+		await waitForHydration(page);
+		await page.getByRole('button', { name: 'Read aloud' }).click();
+		await player.getByRole('button', { name: 'Play' }).click();
+		expect((await firstLit()).passage).toBe(1);
+	});
+
 	test('reading aloud does not pull the page back once it is scrolled away', async ({ page }) => {
 		await page.setViewportSize({ width: 390, height: 520 });
 		const who = await dreamer(page);
