@@ -19,7 +19,9 @@ const ALWAYS = `How to write a passage:
 const FOOTER = `End every passage with a footer, one JSON object per line:
 <after>
 {"next": "a line or two on where the story could go from here"}
+{"suggest": ["something the user might write next", "another", "a third"]}
 </after>
+The suggestions are offered to the user as replies they can tap, so write each as they would: in the first person, as what they say or do in the story, a short line. Make them different from each other: one that goes along with the moment, one that resists or turns it, one that takes it somewhere unexpected. Two to four.
 Optionally, also:
 {"new": "character", "id": "short-id", "name": "Their name", "seed": "a line on who they are"} for anyone or anything new who should have a card;
 {"pref": "what the user seems to want", "scope": "story", "firmness": "leaning", "why": "what they said"} when the user says something about what they want;

@@ -5,6 +5,8 @@
 	import { unlockedIdentity } from '$lib/crypto/session.svelte';
 	import { elementLabel, linkableNames } from '$lib/dream/elements';
 	import { fieldKey } from '$lib/dream/fields';
+	import { suggestionsIn } from '$lib/dream/footer';
+	import { footerOf } from '$lib/dream/story';
 	import { voiceForSpeaker } from '$lib/dream/voices';
 	import { ReadAloud, SPEEDS } from '$lib/dream-browser/reader.svelte';
 	import type { DreamSession } from '$lib/dream-browser/session.svelte';
@@ -55,6 +57,7 @@
 	const build = $derived(session.setup?.build ?? null);
 
 	let cardId = $state<string | null>(null);
+	let turnBox = $state<ReturnType<typeof DreamTextBox> | null>(null);
 	let editing = $state<{ turnId: string; source: string } | null>(null);
 	const card = $derived(elements.find((element) => element.id === cardId) ?? null);
 
@@ -420,6 +423,22 @@
 							{/each}
 						</fieldset>
 					{/if}
+					{#if entry.id === answering && !session.busy}
+						{const suggested = $derived(suggestionsIn(footerOf(passage.source)))}
+						{#if suggested.length > 0}
+							<ul class="suggestions" aria-label="You could say">
+								{#each suggested as suggestion (suggestion)}
+									<li>
+										<!-- Native: a reply bubble, drawn as the user's own turn is. -->
+										<button type="button" class="suggestion" onclick={() => session.send(suggestion)}>{suggestion}</button>
+										<wa-button size="s" appearance="plain" onclick={() => turnBox?.put(suggestion)}>
+											<wa-icon name="pen" label={`Change “${suggestion}” first`}></wa-icon>
+										</wa-button>
+									</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
 					<!-- Where one passage ends: a rule with what can be done to it in the
 					     middle. Versions and Retry stay in sight; the rest is in the menu. -->
 					<div class="passage-end">
@@ -569,6 +588,7 @@
 
 	<div class="compose">
 		<DreamTextBox
+			bind:this={turnBox}
 			id="dream-turn"
 			label="Your turn"
 			max={MAX_INPUT_CHARS}
@@ -909,5 +929,42 @@
 		bottom: 0;
 		padding-block: var(--wa-space-s);
 		background: var(--wa-color-surface-default);
+	}
+
+	.suggestions {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: var(--wa-space-2xs);
+		margin: var(--wa-space-s) 0 0;
+		padding: 0;
+		list-style: none;
+
+		li {
+			display: flex;
+			align-items: center;
+			gap: var(--wa-space-3xs);
+			max-width: 85%;
+		}
+
+		/* Shaped like the user's own turn, outlined where a sent one is filled. */
+		.suggestion {
+			padding: var(--wa-space-xs) var(--wa-space-s);
+			border: 1px solid var(--wa-color-brand-border-normal);
+			border-radius: var(--wa-border-radius-l);
+			background: transparent;
+			color: inherit;
+			font: inherit;
+			text-align: start;
+			cursor: pointer;
+
+			&:hover {
+				background: var(--wa-color-brand-fill-quiet);
+			}
+
+			&:focus-visible {
+				outline: var(--wa-focus-ring);
+			}
+		}
 	}
 </style>

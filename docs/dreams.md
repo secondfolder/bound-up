@@ -465,6 +465,14 @@ them throws anything away; each adds a turn beside the passage:
   along with what is asked of them or pushing back.
 - **Stop**: what had arrived is kept as a version, marked stopped.
 
+**Suggestions.** Each passage's footer offers two to four things the user
+might write next (`{"suggest": [...]}`), in their own voice and varied: one
+going along with the moment, one resisting or turning it, one somewhere
+unexpected. Under the newest passage they are drawn as replies, shaped like
+the user's own turn but outlined: a tap sends one, and the pencil beside it
+puts it in the box to change first (`DreamTextBox.put`). They are never
+sent back to the model.
+
 Switching versions moves `activeTurnId` to the newest end of that version's
 branch and reads the branch.
 

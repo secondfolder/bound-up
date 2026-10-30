@@ -11,6 +11,8 @@
 import { z } from 'zod';
 
 const ID = /^[\w-]{1,40}$/;
+/** At most this many suggestions under a passage. */
+export const MAX_SUGGESTIONS = 4;
 
 const nextLine = z.object({ next: z.string().trim().min(1).max(400) });
 
@@ -34,12 +36,18 @@ const setLine = z.object({
 
 const tellingLine = z.object({ telling: z.string().trim().min(1).max(2000) });
 
+/** Things the user might write next, offered under the newest passage (docs/dreams.md, "Suggestions"). */
+const suggestLine = z.object({
+	suggest: z.array(z.string().trim().min(1).max(200)).min(1).max(MAX_SUGGESTIONS)
+});
+
 export type FooterEntry =
 	| ({ kind: 'next' } & z.output<typeof nextLine>)
 	| ({ kind: 'new' } & z.output<typeof newLine>)
 	| ({ kind: 'pref' } & z.output<typeof prefLine>)
 	| ({ kind: 'set' } & z.output<typeof setLine>)
-	| ({ kind: 'telling' } & z.output<typeof tellingLine>);
+	| ({ kind: 'telling' } & z.output<typeof tellingLine>)
+	| ({ kind: 'suggest' } & z.output<typeof suggestLine>);
 
 export type Footer = { entries: FooterEntry[]; dropped: number };
 
@@ -62,6 +70,10 @@ function readLine(value: unknown): FooterEntry | null {
 	if ('set' in value) {
 		const parsed = setLine.safeParse(value);
 		return parsed.success ? { kind: 'set', ...parsed.data } : null;
+	}
+	if ('suggest' in value) {
+		const parsed = suggestLine.safeParse(value);
+		return parsed.success ? { kind: 'suggest', ...parsed.data } : null;
 	}
 	if ('telling' in value) {
 		const parsed = tellingLine.safeParse(value);
@@ -107,4 +119,15 @@ export function nextNote(footer: Footer): string | null {
 		}
 	}
 	return note;
+}
+
+/** The passage's suggestions for what the user might write next: the last line of them, each once. */
+export function suggestionsIn(footer: Footer): string[] {
+	let found: string[] = [];
+	for (const entry of footer.entries) {
+		if (entry.kind === 'suggest') {
+			found = entry.suggest;
+		}
+	}
+	return [...new Set(found)];
 }

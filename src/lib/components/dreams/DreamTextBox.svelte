@@ -82,6 +82,11 @@
 		draft?.save({ text: $form.text, tagIds: [] });
 	});
 
+	/** Puts words in the box to change before sending: a suggestion's pencil. */
+	export function put(text: string) {
+		$form.text = text;
+	}
+
 	const ready = $derived(Boolean($tainted) && $form.text.trim() !== '' && $allErrors.length === 0);
 </script>
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseBuild } from './build';
 import { allowedTags, parseCapabilities } from './capabilities';
 import { elementLabel, parseElements, serializeElements } from './elements';
-import { nextNote, parseFooter } from './footer';
+import { nextNote, parseFooter, suggestionsIn } from './footer';
 import { parseMarkup } from './markup';
 import { drawNudges } from './nudges';
 import { pickDirection } from './pick';
@@ -193,6 +193,14 @@ describe('parseFooter', () => {
 		expect(footer.entries.map((entry) => entry.kind)).toEqual(['next', 'pref', 'new', 'set']);
 		expect(footer.dropped).toBe(2);
 		expect(nextNote(footer)).toBe('She tests the first position.');
+	});
+
+	it('reads the suggestions, each once, and drops a line of none', () => {
+		const footer = parseFooter(
+			['{"suggest": ["I kneel.", "I stay standing.", "I kneel."]}', '{"suggest": []}'].join('\n')
+		);
+		expect(suggestionsIn(footer)).toEqual(['I kneel.', 'I stay standing.']);
+		expect(footer.dropped).toBe(1);
 	});
 });
 

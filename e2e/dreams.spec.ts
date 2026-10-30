@@ -249,6 +249,28 @@ test.describe('daydreams, the new engine', () => {
 		await expect(page.locator('ol.turns')).toContainText('"You came,"');
 	});
 
+	test('a suggestion is sent with a tap, or put in the box to change first', async ({ page }) => {
+		await dreamer(page);
+		await start(page, 'A quiet evening');
+		await play(page);
+		await saved(page);
+
+		const suggestions = page.getByRole('list', { name: 'You could say' });
+		await expect(
+			suggestions.getByRole('button', { name: 'I take the key.', exact: true })
+		).toBeVisible();
+		await suggestions
+			.getByRole('button', { name: 'Change “I leave it in her hand.” first' })
+			.click();
+		await expect(box(page, 'Your turn')).toHaveValue('I leave it in her hand.');
+
+		await suggestions.getByRole('button', { name: 'I take the key.', exact: true }).click();
+		await expect(page.getByText('You say "I take the key.", and Ottilie smiles.')).toBeVisible();
+		await saved(page);
+		// Only the newest passage offers any.
+		await expect(page.getByRole('button', { name: 'I take the key.', exact: true })).toHaveCount(0);
+	});
+
 	test('choosing first, Surprise me, and Try another idea', async ({ page }) => {
 		await dreamer(page);
 		await start(page, 'A quiet evening [pick]');
