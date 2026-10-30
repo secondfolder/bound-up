@@ -11,7 +11,12 @@ import type { DreamPreference, DreamSetup, DreamSetupBuild } from '../sealed-kin
 import { passageCapabilities } from './capabilities';
 import type { DreamElement } from './elements';
 import type { Nudge } from './nudges';
-import type { BuildRequest, PassageRequest, ReadRequest } from './requests';
+import {
+	type BuildRequest,
+	MAX_RECENT_NAMES,
+	type PassageRequest,
+	type ReadRequest
+} from './requests';
 import { chosenDirection, serializeBuild } from './setup-flow';
 import { type HistoryEntry, similarity } from './story';
 import { readStyle } from './styles';
@@ -72,17 +77,20 @@ export function recentFrom(others: readonly DreamSetup[], brief: string): Recent
 		.map((other) => chosenDirection(other))
 		.filter((direction): direction is string => direction !== null)
 		.slice(0, 8);
+	// People only: places and things ("The kitchen counter", and each word of
+	// it) used to fill the list, pushing out the names it was for after a few
+	// daydreams, so the same few came round again.
 	const names = [
 		...new Set(
 			others.flatMap((other) =>
 				(other.build?.elements ?? []).flatMap((element) =>
-					element.type === 'you' ? [] : [element.name, ...element.name.split(' ')]
+					element.type === 'character' ? [element.name, ...element.name.split(' ')] : []
 				)
 			)
 		)
 	]
 		.filter((name) => name.length > 1)
-		.slice(0, 40);
+		.slice(0, MAX_RECENT_NAMES);
 	return { directions, names };
 }
 

@@ -74,6 +74,29 @@ describe('recentFrom', () => {
 		expect(recent.names).toEqual(['Ines Varga', 'Ines', 'Varga', 'Hal Brine', 'Hal', 'Brine']);
 	});
 
+	it('remembers people, not places or things, which used to crowd them out', () => {
+		const setup = built('a brief', 'A direction.', 'Gwen Pryce');
+		const withPlace = {
+			...setup,
+			build: {
+				...defined(setup.build, 'the build'),
+				elements: [
+					...defined(setup.build, 'the build').elements,
+					{
+						id: 'counter',
+						type: 'place',
+						name: 'The kitchen counter',
+						also: [],
+						shown: true,
+						fields: [],
+						stats: []
+					}
+				]
+			}
+		};
+		expect(recentFrom([withPlace], 'another').names).toEqual(['Gwen Pryce', 'Gwen', 'Pryce']);
+	});
+
 	it('asks for delivery cues and sounds only while the user is listening', () => {
 		const setup = built('a brief', 'A direction.', 'Ines Varga');
 		const story = { elements: [], summaries: [], history: [], take: null, repeated: [] };

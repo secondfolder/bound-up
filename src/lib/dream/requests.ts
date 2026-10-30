@@ -29,6 +29,9 @@ import { writingStyleSchema } from './styles';
 const required = (max: number) => z.string().trim().min(1).max(max);
 const strings = (max: number, count: number) => z.array(required(max)).max(count);
 
+/** How many recent names are avoided: about the people of the last twenty daydreams. */
+export const MAX_RECENT_NAMES = 120;
+
 /** The most passages sent word for word: the rest go as scene summaries. */
 export const MAX_HISTORY = 16;
 /** The most scene summaries sent. */
@@ -59,7 +62,7 @@ export const buildRequestSchema = z.object({
 	nudges,
 	limits,
 	preferences,
-	recentNames: strings(80, 40),
+	recentNames: strings(80, MAX_RECENT_NAMES),
 	/** The build being changed, without its passage. */
 	previous: z.string().max(40_000).nullable()
 });

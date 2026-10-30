@@ -910,7 +910,11 @@ Every source of randomness is code's, never the model's habits:
   the page opens the user's 20 most recent other daydreams' setups (the
   server cannot) and sends the directions taken for briefs like this one
   (word overlap of 0.2 or more), which step 1 is told not to repeat, and
-  every name given, which the build avoids. The plan had a separate
+  every character's name, whole and word by word, up to 120
+  (`MAX_RECENT_NAMES`), which the build avoids and its pool leaves out.
+  People only: places and things ("The kitchen counter", and each word of
+  it) used to fill the list, so the names it was for dropped off it after a
+  few daydreams and the same ones (Gwen, Gareth) came round again. The plan had a separate
   `dream-recent` record for this; every setup already holds its brief, its
   direction and its names, so they are read from there, and a deleted
   daydream simply drops out.
@@ -944,9 +948,11 @@ Eight runs of "a training dynamic" on GLM 5.2, with code's variety and with
 Models name characters from a tiny set, so code draws real names and the
 model chooses among them (`src/lib/server/dream/names/`):
 
-- **Lists** for twelve broad backgrounds (`lists.ts`), each a few dozen
-  uncommon-but-real first names by gender and family names, hand-compiled to
-  start with; the plan's openly licensed datasets can replace them a
+- **Lists** for twelve broad backgrounds (`lists.ts`), each twenty
+  uncommon-but-real first names of each gender and twenty family names,
+  hand-compiled to start with; sixty of each for English-speaking, where most
+  daydreams are set, since five drawn from twenty each time brought the same
+  few round again; the plan's openly licensed datasets can replace them a
   background at a time.
 - **The pool**: the build route draws about five names of each gender and
   four family names per background into the build prompt (`drawPool`),
