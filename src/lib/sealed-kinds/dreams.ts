@@ -197,6 +197,12 @@ export const dreamSetupKind = defineSealedKind({
 				 */
 				pendingEdits: z.array(required(400)).max(24).optional(),
 				/**
+				 * Each pending edit's element as it was before it, by position,
+				 * so an edit can be undone. Added in place before the engine was
+				 * deployed.
+				 */
+				editedFrom: z.array(dreamElementSchema).max(24).optional(),
+				/**
 				 * Blocks designed for this daydream (docs/dreams.md, "Designed
 				 * blocks"), offered to the story model by kind from then on.
 				 * Added in place before the engine was deployed.

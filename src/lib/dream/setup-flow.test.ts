@@ -13,6 +13,7 @@ import {
 	withAnswer,
 	withEditsApplied,
 	withElementChange,
+	withoutEdit,
 	withReading
 } from './setup-flow';
 
@@ -162,5 +163,17 @@ describe('changing an element by hand', () => {
 		}
 		expect(setup.amendments).toHaveLength(12);
 		expect(setup.amendments.at(-1)).toBe('change 14');
+	});
+
+	it('undoes a change, and any later change to the same element with it', () => {
+		const ana = { ...ines, id: 'ana', name: 'Ana' };
+		const withBoth = { ...built, build: { ...build, elements: [ines, ana] } };
+		const first = withElementChange(withBoth, { ...ines, name: 'Ines Vogt' });
+		const second = withElementChange(first, { ...ana, name: 'Anna' });
+		const third = withElementChange(second, { ...ines, name: 'Ines Vogt-Hart' });
+		const undone = withoutEdit(third, 0);
+		expect(undone.build?.elements.map((element) => element.name)).toEqual(['Ines Varga', 'Anna']);
+		expect(undone.pendingEdits).toEqual(['Ana is now called Anna']);
+		expect(undone.editedFrom?.map((element) => element.id)).toEqual(['ana']);
 	});
 });

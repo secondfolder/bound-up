@@ -501,7 +501,10 @@ reach further than the element (the telling notes, how others are written,
 the opening), **Update** then takes Start's place, with the changes listed:
 it asks the build again from the build as changed, with the changes as one
 change asked for, keeping them exactly and following them through
-(`withEditsApplied`), and the result waits on Start like any build.
+(`withEditsApplied`), and the result waits on Start like any build. Each
+change listed can be undone (`withoutEdit`): the element goes back to how it
+was before it (`editedFrom`, kept beside each change), and a later change to
+the same element, made on top of it, goes too.
 
 **Going back.** "How it was set up" beside the story's title shows the same
 page with "Back to the story". Choosing another idea or changing it from

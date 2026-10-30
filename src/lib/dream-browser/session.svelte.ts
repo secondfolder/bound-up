@@ -47,6 +47,7 @@ import {
 	withAnswer,
 	withEditsApplied,
 	withElementChange,
+	withoutEdit,
 	withReading
 } from '$lib/dream/setup-flow';
 import type { LiveStep, ResearchMode } from '$lib/dream/setup-progress';
@@ -915,6 +916,15 @@ export class DreamSession {
 		}
 		await this.#attempt(() => this.#saveSetup(withElementChange(setup, changed)));
 		return this.problem === null;
+	}
+
+	/** Undoes a change made by hand, and any later one to the same element. */
+	undoEdit(index: number): Promise<void> {
+		const { setup } = this;
+		if (!setup) {
+			return Promise.resolve();
+		}
+		return this.#attempt(() => this.#saveSetup(withoutEdit(setup, index)));
 	}
 
 	/** Update: the build follows what was changed by hand, and waits on Start again. */

@@ -316,6 +316,18 @@ test.describe('daydreams, the new engine', () => {
 		await expect(card.getByText('Warm, then cold.')).toBeVisible();
 		await page.keyboard.press('Escape');
 
+		// A change can be undone, and made again.
+		await expect(ready).toContainText('Changed by hand');
+		await ready.getByRole('button', { name: /^Undo/ }).click();
+		await expect(ready).not.toContainText('Changed by hand');
+		await ready.getByRole('button', { name: 'Start', exact: true }).waitFor();
+		await ready.getByRole('button', { name: /Ottilie/ }).click();
+		await card.locator('wa-button', { hasText: 'Change' }).click();
+		await card.locator('wa-textarea[name="fields[1].text"] textarea').fill('Warm, then cold.');
+		await card.getByRole('button', { name: 'Save', exact: true }).click();
+		await expect(card.getByText('Warm, then cold.')).toBeVisible();
+		await page.keyboard.press('Escape');
+
 		// Start waits until the change is followed through the rest.
 		await expect(ready).toContainText('Changed by hand');
 		await expect(ready.getByRole('button', { name: 'Start', exact: true })).toHaveCount(0);

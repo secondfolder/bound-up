@@ -209,7 +209,33 @@ export function withElementChange(setup: DreamSetup, changed: DreamElement): Dre
 			...build,
 			elements: build.elements.map((element) => (element.id === changed.id ? changed : element))
 		},
-		pendingEdits: [...(setup.pendingEdits ?? []), change].slice(-24)
+		pendingEdits: [...(setup.pendingEdits ?? []), change].slice(-24),
+		editedFrom: [...(setup.editedFrom ?? []), before].slice(-24)
+	};
+}
+
+/**
+ * Undoes a change made by hand (docs/dreams.md, "Changing what was made"):
+ * the element goes back to how it was before it. A later change to the
+ * same element was made on top of this one, so it goes too.
+ */
+export function withoutEdit(setup: DreamSetup, index: number): DreamSetup {
+	const edits = setup.pendingEdits ?? [];
+	const before = setup.editedFrom?.[index];
+	if (!(setup.build && before && index < edits.length)) {
+		return setup;
+	}
+	const keep = edits
+		.map((_, at) => at)
+		.filter((at) => at < index || setup.editedFrom?.[at]?.id !== before.id);
+	return {
+		...setup,
+		build: {
+			...setup.build,
+			elements: setup.build.elements.map((element) => (element.id === before.id ? before : element))
+		},
+		pendingEdits: keep.map((at) => edits[at] ?? '').filter(Boolean),
+		editedFrom: keep.map((at) => setup.editedFrom?.[at]).filter((entry) => entry !== undefined)
 	};
 }
 
@@ -225,6 +251,6 @@ export function withEditsApplied(setup: DreamSetup): DreamSetup {
 		return setup;
 	}
 	const amendment = `I changed these by hand. Keep them exactly, and change anything else they affect: ${edits.join('; ')}`;
-	const { pendingEdits: _done, ...rest } = setup;
+	const { pendingEdits: _done, editedFrom: _from, ...rest } = setup;
 	return withAmendment(rest, amendment.slice(0, 500));
 }

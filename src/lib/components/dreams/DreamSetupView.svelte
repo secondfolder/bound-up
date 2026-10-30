@@ -470,7 +470,15 @@
 				<div class="edits">
 					<p><strong>Changed by hand</strong>, not yet followed through the rest:</p>
 					<ul>
-						{#each edits as change, index (index)}<li>{change}</li>{/each}
+						{#each edits as change, index (index)}
+							<li>
+								<span>{change}</span>
+								<wa-button size="s" appearance="plain" onclick={() => session.undoEdit(index)}>
+									<wa-icon slot="start" name="rotate-left" aria-hidden="true"></wa-icon>
+									Undo<span class="wa-visually-hidden">: {change}</span>
+								</wa-button>
+							</li>
+						{/each}
 					</ul>
 				</div>
 			{/if}
@@ -712,6 +720,19 @@
 		p,
 		ul {
 			margin: 0;
+		}
+
+		ul {
+			padding: 0;
+			list-style: none;
+		}
+
+		li {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: var(--wa-space-xs);
+			overflow-wrap: anywhere;
 		}
 	}
 
