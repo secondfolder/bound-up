@@ -89,6 +89,53 @@
 		return usage.promptTokens > 0 ? Math.round((usage.cachedTokens / usage.promptTokens) * 100) : 0;
 	}
 	let turnBox = $state<ReturnType<typeof DreamTextBox> | null>(null);
+	/** Whether the turn box is open: put away, it is a button drawn as the box it opens into. */
+	let writing = $state(false);
+	/** What the turn box holds, shown on the button while it is put away. */
+	let turnText = $state('');
+	const drafted = $derived(turnText.trim());
+	const suggested = $derived(
+		session.lastPassage ? suggestionsIn(footerOf(session.lastPassage.turn.source)) : []
+	);
+
+	/**
+	 * A change to the turn area, morphed from what it was where the browser
+	 * can (a view transition: the button grows into the box), and made at
+	 * once where it cannot or the device asks for less motion.
+	 */
+	function morph(change: () => void, after?: () => void) {
+		const still = globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		if (still || !('startViewTransition' in document)) {
+			change();
+			void tick().then(after);
+			return;
+		}
+		const transition = document.startViewTransition(async () => {
+			change();
+			await tick();
+		});
+		void transition.updateCallbackDone.then(after);
+	}
+
+	/** Opens the turn box, focused, with a suggestion in it to change first when given one. */
+	function openReply(text?: string) {
+		morph(
+			() => {
+				writing = true;
+				if (text !== undefined) {
+					turnBox?.put(text);
+				}
+			},
+			() => turnBox?.focus()
+		);
+	}
+
+	/** Puts the box away; what it holds stays as a draft, shown on the button. */
+	function closeReply() {
+		morph(() => {
+			writing = false;
+		});
+	}
 	let editing = $state<{ turnId: string; source: string } | null>(null);
 	const card = $derived(elements.find((element) => element.id === cardId) ?? null);
 
@@ -624,22 +671,6 @@
 							{/each}
 						</fieldset>
 					{/if}
-					{#if entry.id === answering && !session.busy}
-						{const suggested = $derived(suggestionsIn(footerOf(passage.source)))}
-						{#if suggested.length > 0}
-							<ul class="suggestions" aria-label="You could say">
-								{#each suggested as suggestion (suggestion)}
-									<li>
-										<!-- Native: a reply bubble, drawn as the user's own turn is. -->
-										<button type="button" class="suggestion" onclick={() => session.send(suggestion)}>{suggestion}</button>
-										<wa-button size="s" appearance="plain" onclick={() => turnBox?.put(suggestion)}>
-											<wa-icon name="pen" label={`Change “${suggestion}” first`}></wa-icon>
-										</wa-button>
-									</li>
-								{/each}
-							</ul>
-						{/if}
-					{/if}
 					<!-- Where one passage ends: a rule with what can be done to it in the
 					     middle. Versions and Retry stay in sight; the rest is in the menu. -->
 					<div class="passage-end">
@@ -806,31 +837,79 @@
 		</section>
 	{/if}
 
-	<div class="compose">
-		<DreamTextBox
-			bind:this={turnBox}
-			id="dream-turn"
-			label="Your turn"
-			max={MAX_INPUT_CHARS}
-			draft={{ kind: 'dream', dreamId: session.id }}
-			submitLabel="Send"
-			disabled={session.busy}
-			onsend={async (text) => {
-				await session.send(text);
-				return true;
-			}}
-		>
-			{#snippet actions()}
-				{#if session.busy}
-					<wa-button appearance="outlined" onclick={() => session.stop()}>
-						<wa-icon slot="start" name="stop" variant="solid"></wa-icon>
-						Stop
-					</wa-button>
-				{:else}
-					<wa-button appearance="plain" onclick={() => session.send('')}>Continue</wa-button>
-				{/if}
-			{/snippet}
-		</DreamTextBox>
+	<!-- The user's turn, three ways (docs/dreams.md, "Your turn"): a suggestion,
+	     their own words, or Continue. Each is drawn as what it is: suggestions
+	     as the speech bubbles a sent turn becomes, their own words as the box
+	     they will be, Continue as handing the story on. -->
+	<div class="compose" data-writing={writing}>
+		{#if session.busy}
+			<div class="turn-row">
+				<wa-button appearance="outlined" onclick={() => session.stop()}>
+					<wa-icon slot="start" name="stop" variant="solid"></wa-icon>
+					Stop
+				</wa-button>
+			</div>
+		{:else if !writing}
+			{#if suggested.length > 0}
+				<p class="suggestions-label" aria-hidden="true">You could say</p>
+				<ul class="suggestions" aria-label="You could say">
+					{#each suggested as suggestion (suggestion)}
+						<li>
+							<wa-button size="s" appearance="plain" onclick={() => openReply(suggestion)}>
+								<wa-icon name="pen" label={`Change “${suggestion}” first`}></wa-icon>
+							</wa-button>
+							<!-- Native: a reply bubble, drawn as the user's own turn is. -->
+							<button type="button" class="suggestion" onclick={() => session.send(suggestion)}
+								><span>{suggestion}</span></button
+							>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+			<div class="turn-row">
+				<!-- Native: a disclosure, which opens into the box it is drawn as. -->
+				<button
+					type="button"
+					class="write"
+					aria-expanded="false"
+					aria-controls="dream-turn-box"
+					onclick={() => openReply()}
+				>
+					<wa-icon name="pen" aria-hidden="true"></wa-icon>
+					{#if drafted}
+						<span class="write-text" data-draft><span class="wa-visually-hidden">Your draft: </span>{drafted}</span>
+					{:else}
+						<span class="write-text">Write your own…</span>
+					{/if}
+				</button>
+				<wa-button class="continue" appearance="plain" onclick={() => session.send('')}>
+					Continue
+					<wa-icon slot="end" name="forward" aria-hidden="true"></wa-icon>
+				</wa-button>
+			</div>
+		{/if}
+		<!-- Kept while put away, so a draft is restored and a suggestion can be put in it. -->
+		<div id="dream-turn-box" class="reply" hidden={!writing || session.busy}>
+			<DreamTextBox
+				bind:this={turnBox}
+				bind:text={turnText}
+				id="dream-turn"
+				label="Your turn"
+				max={MAX_INPUT_CHARS}
+				draft={{ kind: 'dream', dreamId: session.id }}
+				submitLabel="Send"
+				disabled={session.busy}
+				onsend={async (text) => {
+					writing = false;
+					await session.send(text);
+					return session.problem === null;
+				}}
+			>
+				{#snippet actions()}
+					<wa-button appearance="plain" onclick={closeReply}>Cancel</wa-button>
+				{/snippet}
+			</DreamTextBox>
+		</div>
 	</div>
 </div>
 
@@ -1215,8 +1294,75 @@
 	.compose {
 		position: sticky;
 		bottom: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--wa-space-xs);
 		padding-block: var(--wa-space-s);
 		background: var(--wa-color-surface-default);
+
+		/* Drawn as the empty box it opens into: a field's shape and quiet text.
+		   Web Awesome's native button styles are undone (centred, one fixed line). */
+		.write {
+			view-transition-name: dream-reply;
+			flex: 1 1 auto;
+			justify-content: flex-start;
+			gap: var(--wa-space-xs);
+			min-width: 0;
+			height: var(--wa-form-control-height);
+			padding-inline: var(--wa-form-control-padding-inline);
+			border: var(--wa-form-control-border-width) var(--wa-form-control-border-style)
+				var(--wa-form-control-border-color);
+			border-radius: var(--wa-form-control-border-radius);
+			background: var(--wa-form-control-background-color);
+			color: var(--wa-color-text-quiet);
+			font: inherit;
+			font-weight: normal;
+			text-align: start;
+			cursor: text;
+
+			&:hover {
+				border-color: var(--wa-color-brand-border-normal);
+			}
+
+			&:focus-visible {
+				outline: var(--wa-focus-ring);
+			}
+		}
+	}
+
+	/* The button and the box it opens into are one thing to the view
+	   transition, so the one grows into the other. */
+	.reply {
+		view-transition-name: dream-reply;
+	}
+
+	.turn-row {
+		display: flex;
+		align-items: center;
+		gap: var(--wa-space-xs);
+	}
+
+	.write-text {
+		min-width: 0;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+
+		/* A draft is words already written, not a placeholder. */
+		&[data-draft] {
+			color: var(--wa-color-text-normal);
+		}
+	}
+
+	.continue {
+		flex: none;
+	}
+
+	.suggestions-label {
+		margin: 0;
+		color: var(--wa-color-text-quiet);
+		font-size: var(--wa-font-size-xs);
+		text-align: end;
 	}
 
 	.suggestions {
@@ -1224,7 +1370,7 @@
 		flex-direction: column;
 		align-items: flex-end;
 		gap: var(--wa-space-2xs);
-		margin: var(--wa-space-s) 0 0;
+		margin: 0;
 		padding: 0;
 		list-style: none;
 
@@ -1235,9 +1381,10 @@
 			max-width: 85%;
 		}
 
-		/* Shaped like the user's own turn, outlined where a sent one is filled. */
-		/* A sentence, not a control's label: Web Awesome's native button styles
-		   (one line, a fixed height) would run a long one off the screen. */
+		/* Shaped like the user's own turn once sent, a speech bubble with its
+		   tail at the corner, outlined where a sent one is filled. A sentence,
+		   not a control's label: Web Awesome's native button styles (one line,
+		   a fixed height) are undone, and a long one is cut to two lines. */
 		.suggestion {
 			height: auto;
 			white-space: normal;
@@ -1245,11 +1392,21 @@
 			padding: var(--wa-space-xs) var(--wa-space-s);
 			border: 1px solid var(--wa-color-brand-border-normal);
 			border-radius: var(--wa-border-radius-l);
+			border-end-end-radius: var(--wa-border-radius-s);
 			background: transparent;
 			color: inherit;
 			font: inherit;
+			font-weight: normal;
 			text-align: start;
 			cursor: pointer;
+
+			span {
+				display: -webkit-box;
+				overflow: hidden;
+				-webkit-box-orient: vertical;
+				-webkit-line-clamp: 2;
+				line-clamp: 2;
+			}
 
 			&:hover {
 				background: var(--wa-color-brand-fill-quiet);

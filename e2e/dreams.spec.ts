@@ -62,6 +62,13 @@ async function play(page: Page, title = 'The Keeper') {
 	await expect(page.locator('ol.turns')).toBeVisible();
 }
 
+/** Writes a turn in the user's own words: opens the box, fills it and sends it. */
+async function reply(page: Page, text: string) {
+	await page.getByRole('button', { name: 'Write your own…' }).click();
+	await box(page, 'Your turn').fill(text);
+	await clickWaButton(page, 'Send');
+}
+
 /** Chooses from the menu at the end of the newest passage. */
 async function passageMenu(page: Page, item: string) {
 	const passage = page.locator('li.passage').last();
@@ -129,8 +136,7 @@ test.describe('daydreams, the new engine', () => {
 		await play(page);
 		await saved(page);
 
-		await box(page, 'Your turn').fill('I light the lamp');
-		await clickWaButton(page, 'Send');
+		await reply(page, 'I light the lamp');
 		await expect(page.getByText('You say "I light the lamp", and Ottilie smiles.')).toBeVisible();
 		await saved(page);
 
@@ -165,8 +171,7 @@ test.describe('daydreams, the new engine', () => {
 		await play(page);
 		await saved(page);
 
-		await box(page, 'Your turn').fill('[contract]');
-		await clickWaButton(page, 'Send');
+		await reply(page, '[contract]');
 		const contract = page.getByRole('region', { name: 'Terms' });
 		await expect(contract).toBeVisible();
 		await saved(page);
@@ -203,8 +208,7 @@ test.describe('daydreams, the new engine', () => {
 		await start(page, 'A quiet evening');
 		await play(page);
 		await saved(page);
-		await box(page, 'Your turn').fill('I wait');
-		await clickWaButton(page, 'Send');
+		await reply(page, 'I wait');
 		await expect(page.getByText(/and Ottilie smiles/)).toBeVisible();
 		await saved(page);
 
@@ -286,13 +290,32 @@ test.describe('daydreams, the new engine', () => {
 		await suggestions
 			.getByRole('button', { name: 'Change “I leave it in her hand.” first' })
 			.click();
-		await expect(box(page, 'Your turn')).toHaveValue('I leave it in her hand.');
+		// The pencil opens the box, focused, with the suggestion in it to change.
+		const turn = box(page, 'Your turn');
+		await expect(turn).toHaveValue('I leave it in her hand.');
+		await expect(turn).toBeFocused();
+		await expect(suggestions).toHaveCount(0);
+
+		// Put away, what it holds is kept, and shown on the button it went back into.
+		await clickWaButton(page, 'Cancel');
+		await expect(turn).toBeHidden();
+		const draft = page.getByRole('button', { name: 'Your draft: I leave it in her hand.' });
+		await expect(draft).toBeVisible();
 
 		await suggestions.getByRole('button', { name: 'I take the key.', exact: true }).click();
 		await expect(page.getByText('You say "I take the key.", and Ottilie smiles.')).toBeVisible();
 		await saved(page);
 		// Only the newest passage offers any.
 		await expect(page.getByRole('button', { name: 'I take the key.', exact: true })).toHaveCount(0);
+
+		// The draft is still there to send, and the box is empty once it is sent.
+		await draft.click();
+		await expect(turn).toHaveValue('I leave it in her hand.');
+		await clickWaButton(page, 'Send');
+		await expect(turn).toBeHidden();
+		await saved(page);
+		await page.getByRole('button', { name: 'Write your own…' }).click();
+		await expect(turn).toHaveValue('');
 	});
 
 	test('a turn is drawn as it was read, written out for you, and can be read differently', async ({
@@ -304,8 +327,7 @@ test.describe('daydreams, the new engine', () => {
 		await saved(page);
 
 		// An instruction for the user's own turn is written out for them.
-		await box(page, 'Your turn').fill('Tell her I am staying');
-		await clickWaButton(page, 'Send');
+		await reply(page, 'Tell her I am staying');
 		await saved(page);
 		const turn = page.locator('li.you').last();
 		await expect(turn).toContainText('"I am staying," I tell her.');
@@ -384,8 +406,7 @@ test.describe('daydreams, the new engine', () => {
 		await saved(page);
 
 		// Every passage is asked for in it; the story can change it, and that can be undone.
-		await box(page, 'Your turn').fill('[style]');
-		await clickWaButton(page, 'Send');
+		await reply(page, '[style]');
 		await saved(page);
 		await expect(page.locator('li.passage').last()).toContainText('Written as: Write tersely');
 		const notice = page.locator('.notice', { hasText: 'The story changed how it is written' });
@@ -401,8 +422,7 @@ test.describe('daydreams, the new engine', () => {
 		// Chosen from the reading settings, it applies from the next passage.
 		await page.getByRole('menuitemcheckbox', { name: 'Raw and filthy' }).click();
 		await saved(page);
-		await box(page, 'Your turn').fill('[style] again');
-		await clickWaButton(page, 'Send');
+		await reply(page, '[style] again');
 		await saved(page);
 		await expect(page.locator('li.passage').last()).toContainText(
 			'Written as: Write like two people sexting'
@@ -450,8 +470,7 @@ test.describe('daydreams, the new engine', () => {
 		const designed = page.waitForResponse(
 			(response) => response.url().endsWith('/api/dreams/design') && response.ok()
 		);
-		await box(page, 'Your turn').fill('[design]');
-		await clickWaButton(page, 'Send');
+		await reply(page, '[design]');
 		await designed;
 		// Drawn from its design: the stamp and four punch boxes, two of them filled.
 		const card = page.getByRole('region', { name: 'Week 3' });
@@ -575,8 +594,7 @@ test.describe('daydreams, the new engine', () => {
 		await start(page, 'A quiet evening');
 		await play(page);
 		await saved(page);
-		await box(page, 'Your turn').fill('[ask]');
-		await clickWaButton(page, 'Send');
+		await reply(page, '[ask]');
 		await expect(page.getByText('Slower, or faster?')).toBeVisible();
 		await saved(page);
 
@@ -630,8 +648,7 @@ test.describe('daydreams, the new engine', () => {
 		const composure = page.locator('dl.stats');
 		await expect(composure).toContainText('30 / 100');
 
-		await box(page, 'Your turn').fill('[hold]');
-		await clickWaButton(page, 'Send');
+		await reply(page, '[hold]');
 		await expect(page.getByText('+5 composure')).toBeVisible();
 		await saved(page);
 		await expect(composure).toContainText('35 / 100');
@@ -644,8 +661,7 @@ test.describe('daydreams, the new engine', () => {
 		await page.getByRole('button', { name: 'Previous version' }).click();
 		await expect(composure).toContainText('35 / 100');
 
-		await box(page, 'Your turn').fill('[roll]');
-		await clickWaButton(page, 'Send');
+		await reply(page, '[roll]');
 		await clickWaButton(page, 'Roll a d6');
 		await expect(page.getByText(/^The dice fall\./)).toContainText(
 			'on the d6 you offered ("door")'
@@ -661,8 +677,7 @@ test.describe('daydreams, the new engine', () => {
 		const id = await start(page, 'A quiet evening');
 		await play(page);
 		await saved(page);
-		await box(page, 'Your turn').fill('[picture]');
-		await clickWaButton(page, 'Send');
+		await reply(page, '[picture]');
 		await expect(page.getByText('She waits by the lamp.')).toBeVisible();
 		await saved(page);
 
@@ -770,8 +785,7 @@ test.describe('daydreams, the new engine', () => {
 
 		// Listening, the next passage is asked for delivery cues and sounds.
 		const next = page.waitForRequest((request) => request.url().endsWith('/api/dreams/passage'));
-		await box(page, 'Your turn').fill('I wait.');
-		await clickWaButton(page, 'Send');
+		await reply(page, 'I wait.');
 		expect((await next).postDataJSON().setup.capabilities).toContain('voice');
 		await saved(page);
 	});

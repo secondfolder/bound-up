@@ -569,7 +569,8 @@ them throws anything away; each adds a turn beside the passage:
   is sent, marked to be rewritten.
 - **Edit**: the user's own version of the passage, which later passages build
   on. For now it edits the passage's source, markup included.
-- **Continue** (beside Send): the next passage with no turn from the user.
+- **Continue** (in the turn area, see "Your turn"): the next passage with no
+  turn from the user.
   It reaches the model as handing it the next step (`CONTINUE` in
   `prompts/passage.ts`), not as the user's character staying silent, which
   the characters then reacted to, nor as their going along: the model
@@ -607,10 +608,28 @@ button is still there for everyone.
 **Suggestions.** Each passage's footer offers two to four things the user
 might write next (`{"suggest": [...]}`), in their own voice and varied: one
 going along with the moment, one resisting or turning it, one somewhere
-unexpected. Under the newest passage they are drawn as replies, shaped like
-the user's own turn but outlined: a tap sends one, and the pencil beside it
-puts it in the box to change first (`DreamTextBox.put`). They are never
-sent back to the model.
+unexpected. They are never sent back to the model.
+
+**Your turn** is one area pinned under the story, holding the three ways to
+take it, each drawn as what it is:
+
+- the newest passage's **suggestions**, under "You could say", as speech
+  bubbles shaped like the user's own turn once sent but outlined, cut to two
+  lines: a tap sends one, and the pencil beside it opens the box with it in,
+  to change first (`DreamTextBox.put`);
+- **Write your own…**, drawn as the empty box it opens into, which grows
+  into the box, focused, with Send and Cancel (a view transition, at once
+  where the browser has none or the device asks for less motion). Cancel
+  puts it away keeping what it holds, which the button then shows as "Your
+  draft"; the box stays mounted while put away, so a draft is restored on
+  load;
+- **Continue**, a plain button with a forward arrow: handing the story on.
+
+While a passage is being written, the area holds only Stop. The box empties
+as its words are sent, not once the answer has finished, and gets them back
+if sending failed. It used to keep them until the end and then put them
+back: superforms writes the submitted form into the box after `onUpdate`,
+so the submitted copy is emptied too once they are taken.
 
 Switching versions moves `activeTurnId` to the newest end of that version's
 branch and reads the branch.

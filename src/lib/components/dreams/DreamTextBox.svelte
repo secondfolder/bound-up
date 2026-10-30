@@ -12,8 +12,8 @@
 	/**
 	 * One of the new engine's text boxes, keeping an encrypted draft on the
 	 * device until what it holds is sent (AGENTS.md, "Never lose something a
-	 * user typed"). `onsend` answers whether it was taken; the box empties
-	 * only then.
+	 * user typed"). The box empties as it is sent; `onsend` answers whether
+	 * it was taken, and what it held comes back if it was not.
 	 */
 	let {
 		id,
@@ -26,7 +26,8 @@
 		rows = 2,
 		initial = '',
 		onsend,
-		actions
+		actions,
+		text = $bindable('')
 	}: {
 		id: string;
 		label: string;
@@ -41,7 +42,11 @@
 		onsend: (text: string) => Promise<boolean>;
 		/** More buttons beside the submit one. */
 		actions?: Snippet;
+		/** What the box holds, read only: a draft in a box that is put away. */
+		text?: string;
 	} = $props();
+
+	let formElement = $state<HTMLFormElement | null>(null);
 
 	let draft: DraftSession | null = null;
 
@@ -58,8 +63,15 @@
 			if (!submitted.valid) {
 				return;
 			}
-			if (await onsend(submitted.data.text)) {
-				$form.text = '';
+			// Emptied as it is sent, not once the answer has finished
+			// streaming. superforms writes `submitted` back into the box when
+			// this returns, which used to put the words straight back: so it
+			// is emptied too once they are taken, and left as it was (the
+			// words restored, nothing typed lost) when they are not.
+			const { text: sent } = submitted.data;
+			$form.text = '';
+			if (await onsend(sent)) {
+				submitted.data.text = '';
 				draft?.clear();
 			}
 		}
@@ -82,15 +94,24 @@
 		draft?.save({ text: $form.text, tagIds: [] });
 	});
 
+	$effect(() => {
+		({ text } = $form);
+	});
+
+	/** Puts the caret in the box, at the end of what it holds. */
+	export function focus() {
+		formElement?.querySelector<HTMLElement>('wa-textarea')?.focus();
+	}
+
 	/** Puts words in the box to change before sending: a suggestion's pencil. */
-	export function put(text: string) {
-		$form.text = text;
+	export function put(words: string) {
+		$form.text = words;
 	}
 
 	const ready = $derived(Boolean($tainted) && $form.text.trim() !== '' && $allErrors.length === 0);
 </script>
 
-<form method="POST" use:enhance class="text-box">
+<form method="POST" use:enhance class="text-box" bind:this={formElement}>
 	<InputField {superform} field="text" type="textarea" title={label} {placeholder} {rows} maxlength={max} />
 	<div class="actions">
 		{@render actions?.()}
