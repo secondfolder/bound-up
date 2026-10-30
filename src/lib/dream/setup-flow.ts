@@ -7,7 +7,7 @@
  * Pure and alias-free.
  */
 
-import type { DreamSetup, DreamSetupBuild } from '../sealed-kinds/dreams';
+import type { DreamSetup, DreamSetupBuild, DreamSetupReading } from '../sealed-kinds/dreams';
 import { serializeElements } from './elements';
 import { escapeMarkup } from './markup';
 import { drawNudges, type Nudge } from './nudges';
@@ -48,7 +48,11 @@ export function newSetup(brief: string, preferences: DreamSetup['preferences'] =
  * Step 1's reply, kept. An answer given to an earlier question is carried
  * over, so it is still known once the question has been dealt with.
  */
-export function withReading(setup: DreamSetup, reading: BriefReading): DreamSetup {
+export function withReading(
+	setup: DreamSetup,
+	reading: BriefReading,
+	lookups: NonNullable<DreamSetupReading['lookups']> = []
+): DreamSetup {
 	const answer = setup.reading?.answer ?? null;
 	return {
 		...setup,
@@ -61,7 +65,8 @@ export function withReading(setup: DreamSetup, reading: BriefReading): DreamSetu
 			// Once answered, the question shown stays the one that was answered,
 			// even if the model asks something again.
 			ask: answer === null ? reading.ask : (setup.reading?.ask ?? null),
-			answer
+			answer,
+			lookups: lookups.slice(0, 24)
 		}
 	};
 }

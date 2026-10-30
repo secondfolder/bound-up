@@ -372,23 +372,52 @@ work; the components in `src/lib/components/dreams/` draw it.
 
 ### The setup page
 
-Until the daydream has an opening, the page is the setup, live
-(`DreamSetupView`). `setupStep` (`src/lib/dream/setup-flow.ts`) says where it
-has got to, and the session runs the steps from there:
+Until the daydream is built and the user has pressed Start, the page is the
+setup, live (`DreamSetupView`). It lists every step it really takes, in the
+order they happen (`setupProgress` in `src/lib/dream/setup-progress.ts`), each
+marked as the plan's mockup marks them: a ring to come, a turning ring while it
+works, a filled tick when done. While a step is being written, the latest of
+what the model is writing shows under it, cleaned of tags; once it is done,
+what came of it does. Within one streamed reply a step is done as its tag
+closes, so they tick off as the model moves on.
 
-1. **Reading the brief** streams; one line under the step shows the latest of
-   what the model is writing, cleaned of tags, and the musts appear as chips.
-2. **A question**, if step 1 asked one, waits for an answer (an option or
-   the user's own words). Step 1 then reads the brief again with it, and is
-   told not to ask again.
-3. **Picking**: code picks, leaning towards the less likely
-   (`codePick`), with the build's nudges drawn from the same seed. "Picked:
-   … · See all N ideas" opens the list, and choosing another stops the build
-   that is running and starts one from it. When the brief asked to choose,
-   the list waits open.
-4. **Building and the opening** stream together; the title, telling notes and
-   elements' names appear as they arrive, and the opening below them. Once it
-   is kept, the page turns into the story without another request.
+1. **Looking things up**, only for a brief with links or one asking for
+   research, on a server that can (the page load's `research`: the story
+   model itself, a research model, or neither). It comes first either way:
+   a research model runs before the reading, and a story model calls its
+   tools before it writes. Each page read and each search is a line under
+   it, and what was found opens under "What it found". The lookups are kept
+   with the reading (`reading.lookups`), so they are still there after a
+   reload.
+2. **Reading what you asked for**: the musts, as chips.
+3. **Thinking of directions** ("Thinking of 7 directions" once the spread is
+   written): the ideas as they arrive; once one is picked, "7 ideas · See
+   them all", each with "Use this one".
+4. **A question for you**, if step 1 asked one: it waits for an answer (an
+   option or the user's own words), and step 1 reads the brief again with
+   it, told not to ask again. Answered, it shows the answer.
+5. **Picking one**: code picks, leaning towards the less likely
+   (`codePick`), with the build's nudges drawn from the same seed; "Picked:
+   …" with "Try another idea". When the brief asked to choose, it is
+   **Choose an idea** and waits, with "Surprise me".
+6. **Building it**: the title, how sexual, how it is shown, and the cast with
+   an icon for each known type (`element-icons.ts`) and its short name.
+7. **Writing the opening**: the build's `<passage>`, in the same reply; done,
+   its first sentence.
+
+**Then a summary, which waits on Start** (the plan's "a surprise, with a
+quick look first"; it offered straight in as well, which this replaced):
+the title, the first line of the telling notes, who and what is in it with a
+line each, how it is shown, how sexual, what it keeps track of, and the
+telling notes and research in full. **Start** plays it; **Pick another** picks
+again from the same ideas and builds that. The setup records that it is
+waiting (`awaitingStart`, set when the build is kept, cleared by Start), so a
+reload still shows the summary. A daydream from before it has no such field,
+and is played.
+
+**Going back.** "How it was set up" beside the story's title shows the same
+page with "Back to the story". Choosing another idea or changing it from
+there builds a new opening beside the old one, which waits on Start again.
 
 The setup is saved, sealed, after each finished step, so a reload carries on
 from the last one; a step that was streaming runs again.

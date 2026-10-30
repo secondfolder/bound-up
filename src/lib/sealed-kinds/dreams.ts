@@ -97,6 +97,17 @@ const questionSchema = z.object({
 	keep: z.enum(['story', 'general'])
 });
 
+/** A page read or a search made while the brief was read (`Lookup` in the browser). */
+const lookupSchema = z.discriminatedUnion('type', [
+	z.object({
+		type: z.literal('fetch'),
+		url: z.string().max(2000),
+		ok: z.boolean(),
+		allowed: z.boolean()
+	}),
+	z.object({ type: z.literal('search'), query: z.string().max(400), ok: z.boolean() })
+]);
+
 /** Step 1's reading of the brief (`BriefReading`, without the build it may carry). */
 const readingSchema = z.object({
 	musts: z.array(required(400)).max(20),
@@ -106,7 +117,13 @@ const readingSchema = z.object({
 	pick: z.object({ by: z.enum(['code', 'user']), reason: text(400) }),
 	ask: questionSchema.nullable(),
 	/** The answer to `ask`, when it was answered. */
-	answer: text(400).nullable()
+	answer: text(400).nullable(),
+	/**
+	 * What was looked up to read it, so the setup page still shows it after a
+	 * reload. Added in place before the engine was deployed
+	 * (sealed-fixtures/README.md).
+	 */
+	lookups: z.array(lookupSchema).max(24).optional()
 });
 
 /** Which direction was taken, by whom, and code's draws that went with it. */
@@ -148,7 +165,14 @@ export const dreamSetupKind = defineSealedKind({
 				reading: readingSchema.nullable(),
 				chosen: chosenSchema.nullable(),
 				build: buildSchema.nullable(),
-				preferences: z.array(dreamPreferenceSchema).max(MAX_PREFERENCES)
+				preferences: z.array(dreamPreferenceSchema).max(MAX_PREFERENCES),
+				/**
+				 * Built, and waiting on the user's Start (docs/dreams.md, "The
+				 * setup page"). Absent is started: daydreams from before it had
+				 * none. Added in place before the engine was deployed
+				 * (sealed-fixtures/README.md).
+				 */
+				awaitingStart: z.boolean().optional()
 			})
 		}
 	]

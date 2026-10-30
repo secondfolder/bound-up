@@ -38,11 +38,29 @@
 			.catch((cause: unknown) => reportRequestFailure(cause));
 	});
 
+	/** The setup reopened from the story ("How it was set up"). */
+	let viewingSetup = $state(false);
+
+	/**
+	 * Played once it is built and the user has pressed Start: until then the
+	 * setup page shows what was made (docs/dreams.md, "The setup page").
+	 */
 	const playing = $derived(
 		session !== null &&
 			(session.path.length > 0 || session.streaming?.what === 'passage') &&
-			session.step === 'ready'
+			session.step === 'ready' &&
+			!session.awaitingStart &&
+			!viewingSetup
 	);
+	const started = $derived(
+		session !== null && session.step === 'ready' && !session.awaitingStart && session.path.length > 0
+	);
+	const title = $derived.by(() => {
+		if (playing) {
+			return '';
+		}
+		return started ? 'How it was set up' : 'Setting it up';
+	});
 </script>
 
 <div class="page">
@@ -50,7 +68,7 @@
 		backHref={resolve('/(auth-required)/(app)/dreams')}
 		backLabel="Back to your daydreams"
 		backText="Daydreams"
-		title={playing ? '' : 'Setting it up'}
+		{title}
 	/>
 	<div class="content" data-dream={id}>
 		{#if !data.available}
@@ -66,9 +84,28 @@
 		{:else if session.unreadable}
 			<wa-callout variant="warning">This daydream can't be shown on this device.</wa-callout>
 		{:else if playing}
-			<DreamStory {session} pictures={data.pictures} voice={data.voice} />
+			<DreamStory
+				{session}
+				pictures={data.pictures}
+				voice={data.voice}
+				onsetup={() => {
+					viewingSetup = true;
+				}}
+			/>
 		{:else}
-			<DreamSetupView {session} />
+			<DreamSetupView
+				{session}
+				research={data.research}
+				onstart={async () => {
+					await session?.start();
+					viewingSetup = false;
+				}}
+				onback={started
+					? () => {
+							viewingSetup = false;
+						}
+					: null}
+			/>
 		{/if}
 	</div>
 </div>

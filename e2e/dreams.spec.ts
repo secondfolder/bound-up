@@ -51,6 +51,17 @@ async function start(page: Page, brief: string): Promise<string> {
 	return new URL(page.url()).pathname.split('/').at(-1) ?? '';
 }
 
+/**
+ * The summary of what was made, then Start: a daydream is shown before it is
+ * played (docs/dreams.md, "The setup page").
+ */
+async function play(page: Page, title = 'The Keeper') {
+	const ready = page.getByRole('region', { name: title });
+	await expect(ready).toBeVisible();
+	await ready.getByRole('button', { name: 'Start', exact: true }).click();
+	await expect(page.locator('ol.turns')).toBeVisible();
+}
+
 /** Waits for the newest passage to be saved, not just shown. */
 async function saved(page: Page) {
 	await expect(page.locator('li.passage[aria-busy]')).toHaveCount(0);
@@ -76,8 +87,8 @@ test.describe('daydreams, the new engine', () => {
 		await expect(page.getByText('Never: Nothing about feet')).toBeVisible();
 		await clickWaButton(page, 'They are');
 
+		await play(page);
 		await expect(page.locator('ol.turns')).toContainText('"You came,"');
-		await expect(page.getByRole('heading', { name: 'The Keeper' })).toBeVisible();
 		await saved(page);
 
 		// Sealed: nothing the model or the user wrote is in the database.
@@ -108,7 +119,7 @@ test.describe('daydreams, the new engine', () => {
 	}) => {
 		await dreamer(page);
 		const id = await start(page, 'A quiet evening');
-		await expect(page.getByRole('heading', { name: 'The Keeper' })).toBeVisible();
+		await play(page);
 		await saved(page);
 
 		await box(page, 'Your turn').fill('I light the lamp');
@@ -144,7 +155,7 @@ test.describe('daydreams, the new engine', () => {
 	}) => {
 		await dreamer(page);
 		await start(page, 'A quiet evening');
-		await expect(page.getByRole('heading', { name: 'The Keeper' })).toBeVisible();
+		await play(page);
 		await saved(page);
 
 		await box(page, 'Your turn').fill('[contract]');
@@ -183,7 +194,7 @@ test.describe('daydreams, the new engine', () => {
 	}) => {
 		await dreamer(page);
 		await start(page, 'A quiet evening');
-		await expect(page.getByRole('heading', { name: 'The Keeper' })).toBeVisible();
+		await play(page);
 		await saved(page);
 		await box(page, 'Your turn').fill('I wait');
 		await clickWaButton(page, 'Send');
@@ -207,14 +218,44 @@ test.describe('daydreams, the new engine', () => {
 		await expect(page.locator('li.passage').last()).toContainText('3 / 3');
 	});
 
+	test('what was made is shown before it is played, and can be gone back to', async ({ page }) => {
+		await dreamer(page);
+		await start(page, 'A quiet evening');
+		const ready = page.getByRole('region', { name: 'The Keeper' });
+		await expect(ready).toBeVisible();
+		// Every step done, each with what came of it, and nothing played yet.
+		const steps = page.locator('ol.steps > li');
+		await expect(steps).toHaveCount(5);
+		await expect(page.locator('ol.steps > li[data-status="done"]')).toHaveCount(5);
+		await expect(page.locator('li[data-step="pick"]')).toContainText('Picked:');
+		await expect(ready).toContainText('Ottilie');
+		await expect(page.locator('ol.turns')).toHaveCount(0);
+
+		// Still waiting on Start after a reload.
+		await page.reload();
+		await waitForHydration(page);
+		await expect(page.getByRole('region', { name: 'The Keeper' })).toBeVisible();
+		await play(page);
+		await saved(page);
+
+		// The setup can be gone back to from the story, and left again.
+		await page.getByRole('button', { name: 'How it was set up' }).click();
+		await expect(page.getByRole('heading', { name: 'How it was set up' })).toBeVisible();
+		await expect(page.locator('li[data-step="pick"]')).toContainText('Picked:');
+		await clickWaButton(page, 'Back to the story');
+		await expect(page.locator('ol.turns')).toContainText('"You came,"');
+	});
+
 	test('choosing first, Surprise me, and Try another idea', async ({ page }) => {
 		await dreamer(page);
 		await start(page, 'A quiet evening [pick]');
-		await expect(page.getByText('Choose an idea, or let it choose for you.')).toBeVisible();
+		await expect(
+			page.getByText('You asked to choose: pick one of the ideas above, or')
+		).toBeVisible();
 		// Nothing is built until the user chooses.
 		await expect(page.getByRole('heading', { name: 'The Keeper' })).toHaveCount(0);
 		await clickWaButton(page, 'Surprise me');
-		await expect(page.getByRole('heading', { name: 'The Keeper' })).toBeVisible();
+		await play(page);
 		await saved(page);
 
 		// Built from one of step 1's ideas, picked for the user.
@@ -226,7 +267,7 @@ test.describe('daydreams, the new engine', () => {
 	test('another name for a character, keeping the old one linked', async ({ page }) => {
 		await dreamer(page);
 		await start(page, 'A quiet evening');
-		await expect(page.getByRole('heading', { name: 'The Keeper' })).toBeVisible();
+		await play(page);
 		await saved(page);
 		await page.locator('ol.turns').getByRole('button', { name: 'Ottilie', exact: true }).click();
 		await clickWaButton(page, 'Another name');
@@ -248,7 +289,7 @@ test.describe('daydreams, the new engine', () => {
 	}) => {
 		await dreamer(page);
 		await start(page, 'A quiet evening');
-		await expect(page.getByRole('heading', { name: 'The Keeper' })).toBeVisible();
+		await play(page);
 		await saved(page);
 		await box(page, 'Your turn').fill('[ask]');
 		await clickWaButton(page, 'Send');
@@ -300,7 +341,7 @@ test.describe('daydreams, the new engine', () => {
 	}) => {
 		await dreamer(page);
 		await start(page, 'A quiet evening');
-		await expect(page.getByRole('heading', { name: 'The Keeper' })).toBeVisible();
+		await play(page);
 		await saved(page);
 		const composure = page.locator('dl.stats');
 		await expect(composure).toContainText('30 / 100');
@@ -334,7 +375,7 @@ test.describe('daydreams, the new engine', () => {
 	}) => {
 		await dreamer(page);
 		const id = await start(page, 'A quiet evening');
-		await expect(page.getByRole('heading', { name: 'The Keeper' })).toBeVisible();
+		await play(page);
 		await saved(page);
 		await box(page, 'Your turn').fill('[picture]');
 		await clickWaButton(page, 'Send');
@@ -376,7 +417,7 @@ test.describe('daydreams, the new engine', () => {
 		const who = await dreamer(page);
 		await grantFeature(who.email, 'dreamVoice');
 		await start(page, 'A quiet evening');
-		await expect(page.getByRole('heading', { name: 'The Keeper' })).toBeVisible();
+		await play(page);
 		await saved(page);
 
 		// Nothing plays, and there is no player, until it is asked for.

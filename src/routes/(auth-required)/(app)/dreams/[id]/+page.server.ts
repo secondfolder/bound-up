@@ -1,5 +1,6 @@
 import { error, redirect } from '@sveltejs/kit';
 import { resolve } from '$app/paths';
+import type { ResearchMode } from '$lib/dream/setup-progress';
 import { readDaydreamConfig } from '$lib/server/daydream/config';
 import { readImageConfig } from '$lib/server/daydream/image-config';
 import { readVoiceConfig } from '$lib/server/daydream/voice-config';
@@ -26,10 +27,19 @@ export const load: PageServerLoad = async ({
 		error(404, 'That daydream is not there any more.');
 	}
 	const voice = readVoiceConfig(settings, platform);
+	const story = readDaydreamConfig(settings, platform);
+	let research: ResearchMode = 'none';
+	if (story?.readsLinks) {
+		research = 'self';
+	} else if (story?.researchModel) {
+		research = 'model';
+	}
 	return {
 		dream,
 		userId: user.id,
-		available: readDaydreamConfig(settings, platform) !== null,
+		available: story !== null,
+		/** How a brief is researched here, so the setup page shows the steps really taken. */
+		research,
 		pictures: readImageConfig(settings, platform) !== null,
 		/**
 		 * Read aloud, when the server has a voice provider and the account the

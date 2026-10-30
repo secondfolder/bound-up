@@ -1,22 +1,46 @@
 <script lang="ts">
 	import RadioButton from '$lib/components/segmented/RadioButton.svelte';
 	import RadioButtonGroup from '$lib/components/segmented/RadioButtonGroup.svelte';
-	import { parseBuild } from '$lib/dream/build';
+	import { type Build, parseBuild } from '$lib/dream/build';
+	import { type DreamElement, elementLabel } from '$lib/dream/elements';
 	import { parseMarkup, plainText } from '$lib/dream/markup';
 	import { parseBriefReading } from '$lib/dream/reading';
+	import {
+		type ResearchMode,
+		type SetupStepKey,
+		type StepStatus,
+		setupProgress
+	} from '$lib/dream/setup-progress';
 	import type { DreamSession } from '$lib/dream-browser/session.svelte';
 	import { MAX_AMENDMENT_CHARS } from '$lib/sealed-kinds/dreams';
-	import DreamMarkup from './DreamMarkup.svelte';
 	import DreamNotices from './DreamNotices.svelte';
 	import DreamTextBox from './DreamTextBox.svelte';
+	import { elementIcon } from './element-icons';
 
 	/**
-	 * Setting a daydream up, live (docs/dreams.md, "The setup page"): each
-	 * step with a line of what the model is writing, results in their places
-	 * as they arrive, every idea a tap away, and a box to change it while it
-	 * works. Nothing waits behind a spinner.
+	 * Setting a daydream up, live (docs/dreams.md, "The setup page"): every
+	 * step it really takes, in order, each with a line of what the model is
+	 * writing while it works and what came of it once it is done, every idea
+	 * a tap away, and a box to change it while it works. Then a summary of
+	 * what was made, which waits on Start: nothing is played until the user
+	 * has seen it.
+	 *
+	 * Reopened from the story (`onback`), it shows how the daydream was set
+	 * up, and choosing another idea or changing it builds a new opening beside
+	 * the old one.
 	 */
-	let { session }: { session: DreamSession } = $props();
+	let {
+		session,
+		research = 'none',
+		onstart,
+		onback = null
+	}: {
+		session: DreamSession;
+		research?: ResearchMode;
+		onstart: () => void | Promise<void>;
+		/** Back to the story, when it has been started. */
+		onback?: (() => void) | null;
+	} = $props();
 
 	const setup = $derived(session.setup);
 	const streaming = $derived(session.streaming);
@@ -24,13 +48,37 @@
 	const reading = $derived(
 		streaming?.what === 'read' ? parseBriefReading(streaming.text) : (setup?.reading ?? null)
 	);
-	const build = $derived(
+	const streamedBuild = $derived(
 		streaming?.what === 'build' ? parseBuild(streaming.text, { final: false }) : null
+	);
+	/** The build, as it streams or as kept. */
+	const build = $derived<Omit<Build, 'passage'> | null>(streamedBuild ?? setup?.build ?? null);
+	const opening = $derived(session.path[0]?.turn);
+	const openingText = $derived(
+		streamedBuild?.passage ?? (opening?.kind === 'passage' ? opening.source : '')
 	);
 	const chosen = $derived(
 		setup?.reading?.directions.find((direction) => direction.id === setup.chosen?.directionId) ?? null
 	);
 	const step = $derived(session.step);
+	const researchText = $derived(
+		session.researched ?? (reading?.research.needed ? reading.research.text : '')
+	);
+
+	const progress = $derived(
+		setup
+			? setupProgress({
+					setup,
+					streaming,
+					research,
+					lookups: session.lookups.length,
+					researched: session.researched !== null
+				})
+			: []
+	);
+
+	const SPACES = /\s+/g;
+	const FIRST_SENTENCE = /^.+?[.!?…](?:\s|$)/;
 
 	/** The latest of what the model is writing, cleaned of tags: so you can watch it think. */
 	const liveLine = $derived.by(() => {
@@ -38,113 +86,161 @@
 			return '';
 		}
 		const words = plainText(parseMarkup(streaming.text, { final: false }))
-			.replaceAll(/\s+/g, ' ')
+			.replaceAll(SPACES, ' ')
 			.trim();
 		return words.length > 140 ? `…${words.slice(-140)}` : words;
 	});
 
-	type Status = 'done' | 'active' | 'waiting';
-	function status(done: boolean, started: boolean): Status {
-		if (done) {
-			return 'done';
-		}
-		return started ? 'active' : 'waiting';
+	/** The live line goes under the step being written, never under one waiting on the user. */
+	const LIVE_STEPS = new Set<SetupStepKey>(['read', 'directions', 'build', 'opening']);
+
+	const STATUS_WORDS: Record<StepStatus, string> = {
+		done: 'done',
+		active: 'in progress',
+		waiting: 'to come'
+	};
+
+	const VIEW_WORDS: Record<string, string> = {
+		scroll: 'read as a story',
+		tap: 'one beat at a time',
+		texts: 'as messages',
+		monologue: 'as a monologue'
+	};
+	const HEAT_WORDS: Record<string, string> = {
+		none: 'Not sexual',
+		suggestive: 'Suggestive',
+		steamy: 'Steamy',
+		explicit: 'Explicit'
+	};
+
+	/** One line saying who or what an element is: the first field it shows. */
+	function lineOf(element: DreamElement): string {
+		const field = element.fields.find((entry) => entry.shown && entry.text.trim());
+		const text = field?.text.trim() ?? '';
+		return text.length > 140 ? `${text.slice(0, 140)}…` : text;
 	}
-	const steps = $derived.by((): { label: string; status: Status }[] => {
-		const readDone = Boolean(setup?.reading) && streaming?.what !== 'read';
-		const picked = Boolean(setup?.chosen);
-		const built = Boolean(setup?.build) && streaming?.what !== 'build';
-		return [
-			{ label: 'Reading what you asked for', status: readDone ? 'done' : 'active' },
-			{
-				label: step === 'pick' ? 'Choose an idea' : 'Thinking of directions',
-				status: status(picked, readDone)
-			},
-			{
-				label: 'Building it and writing the opening',
-				status: status(built, picked)
-			}
-		];
-	});
+
+	/** The first sentence of the opening, as its result. */
+	function firstLine(source: string): string {
+		const text = plainText(parseMarkup(source, { final: true }))
+			.replaceAll(SPACES, ' ')
+			.trim();
+		const sentence = text.match(FIRST_SENTENCE)?.[0] ?? text;
+		return sentence.length > 160 ? `${sentence.slice(0, 160)}…` : sentence.trim();
+	}
+
+	/** Every stat on the build's elements, worded for the summary. */
+	const tracked = $derived(
+		(build?.elements ?? []).flatMap((element) =>
+			element.stats.map((stat) =>
+				element.type === 'you' ? stat.name : `${elementLabel(element)}'s ${stat.name}`
+			)
+		)
+	);
 
 	let showIdeas = $state(false);
 	/** Saved for this daydream unless the user says otherwise (docs/dreams.md, "Preferences"). */
 	let remember = $state<'story' | 'general' | 'none'>('story');
 	const worded = $derived(session.worded);
+	let starting = $state(false);
+
+	async function start() {
+		starting = true;
+		try {
+			await onstart();
+		} finally {
+			starting = false;
+		}
+	}
 </script>
 
-<div class="setup">
-	<p class="brief">“{setup?.brief}”</p>
-	{#each setup?.amendments ?? [] as amendment, index (index)}
-		<p class="amendment">Then: “{amendment}”</p>
-	{/each}
-
-	<ol class="steps">
-		{#each steps as entry (entry.label)}
-			<li data-status={entry.status}>
-				<span class="mark" aria-hidden="true">
-					{#if entry.status === 'done'}
-						<wa-icon name="check"></wa-icon>
-					{:else if entry.status === 'active' && streaming}
-						<wa-spinner></wa-spinner>
-					{:else}
-						<wa-icon name="circle" variant="regular"></wa-icon>
-					{/if}
-				</span>
-				<span>{entry.label}</span>
-			</li>
-		{/each}
-	</ol>
-
-	{#if liveLine}
-		<p class="live" aria-live="off">{liveLine}</p>
-	{/if}
-
+{#snippet lookups()}
 	{#if session.lookups.length > 0}
-		<ul class="lookups" aria-label="Looked up for the brief">
+		<ul class="substeps" aria-label="Looked up for the brief">
 			{#each session.lookups as lookup, index (index)}
 				{#if lookup.type === 'search'}
 					<li data-ok={lookup.ok}>
-						{lookup.ok ? '✓ Searched for' : '✗ Could not search for'}
-						<span class="what">“{lookup.query}”</span>
+						<span aria-hidden="true">{lookup.ok ? '✓' : '✗'}</span>
+						<span>
+							{lookup.ok ? 'Searched for' : 'Could not search for'}
+							<span class="what">“{lookup.query}”</span>
+						</span>
 					</li>
 				{:else}
 					<li data-ok={lookup.ok && lookup.allowed}>
-						{#if !lookup.allowed}
-							✗ Not opened: not one of the brief's sites
-						{:else if lookup.ok}
-							✓ Read
-						{:else}
-							✗ Could not be read
-						{/if}
-						<span class="what">{lookup.url}</span>
+						<span aria-hidden="true">{lookup.ok && lookup.allowed ? '✓' : '✗'}</span>
+						<span>
+							{#if !lookup.allowed}
+								Not opened, not one of the brief's sites:
+							{:else if lookup.ok}
+								Read
+							{:else}
+								Could not be read:
+							{/if}
+							<span class="what">{lookup.url}</span>
+						</span>
 					</li>
 				{/if}
 			{/each}
 		</ul>
 	{/if}
-
-	{#if reading?.research.needed && reading.research.text}
-		<wa-details summary="Background">
-			<p class="research">{reading.research.text}</p>
+	{#if researchText}
+		<wa-details summary="What it found">
+			<p class="research">{researchText}</p>
 		</wa-details>
 	{/if}
+{/snippet}
 
-	{#if reading && reading.musts.length > 0}
-		<fieldset class="chips musts">
-			<legend>What it must have</legend>
-			{#each reading.musts as must (must)}
-				<wa-badge variant="neutral" appearance="outlined">{must}</wa-badge>
-			{/each}
-		</fieldset>
+{#snippet directions()}
+	{#if reading && reading.directions.length > 0}
+		{#if chosen && !showIdeas}
+			<p class="result">
+				{reading.directions.length}
+				{reading.directions.length === 1 ? 'idea' : 'ideas'} ·
+				<!-- A disclosure: native, since wa-button forwards no aria-expanded. -->
+				<button
+					type="button"
+					class="link"
+					aria-expanded="false"
+					onclick={() => {
+						showIdeas = true;
+					}}>See them all</button
+				>
+			</p>
+		{:else}
+			<ul class="directions">
+				{#each reading.directions as direction (direction.id)}
+					<li class:current={direction.id === chosen?.id}>
+						<span>{direction.text}</span>
+						{#if setup?.reading && direction.id !== chosen?.id && streaming?.what !== 'read'}
+							<wa-button size="s" appearance="outlined" onclick={() => session.choose(direction.id)}>
+								Use this one
+							</wa-button>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+			{#if chosen}
+				<button
+					type="button"
+					class="link"
+					aria-expanded="true"
+					onclick={() => {
+						showIdeas = false;
+					}}>Hide them</button
+				>
+			{/if}
+		{/if}
 	{/if}
+{/snippet}
 
+{#snippet question()}
 	{#if step === 'ask' && setup?.reading?.ask}
-		{const question = $derived(setup.reading.ask)}
+		{const asked = $derived(setup.reading.ask)}
 		<section class="question" aria-labelledby="question">
-			<h2 id="question">{question.text}</h2>
+			<h2 id="question">{asked.text}</h2>
 			<div class="options">
-				{#each question.options as option (option)}
+				{#each asked.options as option (option)}
 					<wa-button appearance="outlined" onclick={() => session.answer(option, remember)}>{option}</wa-button>
 				{/each}
 			</div>
@@ -166,80 +262,153 @@
 				<RadioButton value="none">Don't</RadioButton>
 			</RadioButtonGroup>
 		</section>
+	{:else if setup?.reading?.ask && setup.reading.answer}
+		<p class="result">{setup.reading.ask.text} <strong>{setup.reading.answer}</strong></p>
 	{/if}
+{/snippet}
 
-	{#if setup?.reading && setup.reading.directions.length > 0}
-		<section class="ideas">
-			{#if chosen}
-				<p>
-					Picked: <strong>{chosen.text}</strong>
-					{#if setup.reading.directions.length > 1}
-						·
-						<!-- A disclosure: native, since wa-button forwards no aria-expanded. -->
-						<button type="button" class="link" aria-expanded={showIdeas} onclick={() => {
-								showIdeas = !showIdeas;
-							}}>
-							See all {setup.reading.directions.length} ideas
-						</button>
+{#snippet pick()}
+	{#if chosen}
+		<p class="result">Picked: <strong>{chosen.text}</strong></p>
+		{#if !(setup?.build && step === 'ready')}
+			<wa-button size="s" appearance="plain" onclick={() => session.tryAnother()}>Try another idea</wa-button>
+		{/if}
+	{:else if step === 'pick'}
+		<p class="result">You asked to choose: pick one of the ideas above, or</p>
+		<wa-button size="s" appearance="outlined" onclick={() => session.surprise()}>Surprise me</wa-button>
+	{/if}
+{/snippet}
+
+{#snippet built()}
+	{#if build && (build.title || build.elements.length > 0)}
+		{#if build.title}<p class="result"><strong>{build.title}</strong></p>{/if}
+		<p class="result quiet">
+			{HEAT_WORDS[build.heat]}, {VIEW_WORDS[build.presentation.view] ?? build.presentation.view},
+			{build.presentation.theme} theme
+		</p>
+		{#if build.elements.length > 0}
+			<ul class="chips cast" aria-label="Who and what is in it">
+				{#each build.elements as element (element.id)}
+					<li>
+						<wa-icon name={elementIcon(element.type)} aria-hidden="true"></wa-icon>
+						{elementLabel(element)}
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	{/if}
+{/snippet}
+
+{#snippet result(key: SetupStepKey)}
+	{#if key === 'research'}
+		{@render lookups()}
+	{:else if key === 'read'}
+		{#if reading && reading.musts.length > 0}
+			<ul class="chips" aria-label="What it must have">
+				{#each reading.musts as must (must)}
+					<li><wa-badge variant="neutral" appearance="outlined">{must}</wa-badge></li>
+				{/each}
+			</ul>
+		{/if}
+	{:else if key === 'directions'}
+		{@render directions()}
+	{:else if key === 'ask'}
+		{@render question()}
+	{:else if key === 'pick'}
+		{@render pick()}
+	{:else if key === 'build'}
+		{@render built()}
+	{:else if key === 'opening' && openingText && !streamedBuild}
+		<p class="result quiet">“{firstLine(openingText)}”</p>
+	{/if}
+{/snippet}
+
+<div class="setup">
+	<p class="brief">“{setup?.brief}”</p>
+	{#each setup?.amendments ?? [] as amendment, index (index)}
+		<p class="amendment">Then: “{amendment}”</p>
+	{/each}
+
+	<ol class="steps">
+		{#each progress as entry (entry.key)}
+			<li data-status={entry.status} data-step={entry.key}>
+				<span class="mark" aria-hidden="true"></span>
+				<div class="body">
+					<span class="label"
+						>{entry.label}<span class="wa-visually-hidden">, {STATUS_WORDS[entry.status]}</span></span
+					>
+					{#if entry.status === 'active' && LIVE_STEPS.has(entry.key) && liveLine}
+						<p class="live" aria-live="off">{liveLine}</p>
 					{/if}
-				</p>
-			{/if}
-			{#if step === 'pick'}
-				<p class="pick-note">Choose an idea, or let it choose for you.</p>
-				<wa-button size="s" appearance="outlined" onclick={() => session.surprise()}>Surprise me</wa-button>
-			{:else if chosen}
-				<wa-button size="s" appearance="plain" onclick={() => session.tryAnother()}>Try another idea</wa-button>
-			{/if}
-			{#if !chosen || showIdeas}
-				<ul class="directions">
-					{#each setup.reading.directions as direction (direction.id)}
-						<li class:current={direction.id === chosen?.id}>
-							<span>{direction.text}</span>
-							{#if direction.id !== chosen?.id}
-								<wa-button size="s" appearance="outlined" onclick={() => session.choose(direction.id)}>
-									Use this one
-								</wa-button>
-							{/if}
-						</li>
-					{/each}
-				</ul>
-			{/if}
-		</section>
-	{/if}
-
-	{#if build}
-		<section class="build">
-			{#if build.title}<h2>{build.title}</h2>{/if}
-			{#if build.telling}<p class="telling">{build.telling}</p>{/if}
-			{#if build.elements.length > 0}
-				<div class="chips">
-					{#each build.elements as element (element.id)}
-						<wa-badge variant="brand" appearance="outlined">{element.name}</wa-badge>
-					{/each}
+					{@render result(entry.key)}
 				</div>
-			{/if}
-			{#if build.passage}
-				<div class="opening">
-					<DreamMarkup
-						source={build.passage}
-						turnId={null}
-						names={[]}
-						expansions={new Map()}
-						filling={new Set()}
-						streaming
-						onref={() => undefined}
-						onmore={() => undefined}
-					/>
-				</div>
-			{/if}
-		</section>
-	{/if}
+			</li>
+		{/each}
+	</ol>
 
 	{#if session.problem}
 		<wa-callout variant="danger">
 			<p>{session.problem}</p>
 			<wa-button size="s" appearance="outlined" onclick={() => session.runSetup()}>Try again</wa-button>
 		</wa-callout>
+	{/if}
+
+	{#if setup?.build && step === 'ready' && !streaming && session.path.length > 0}
+		{const made = $derived(setup.build)}
+		<!-- What was made, before it is played: the plan's "a quick look first". -->
+		<section class="ready" aria-labelledby="ready-title">
+			<h2 id="ready-title">{made.title}</h2>
+			{#if made.telling}
+				<p class="what">{made.telling.split('\n')[0]}</p>
+			{/if}
+			{#if made.elements.length > 0}
+				<h3>Who and what is in it</h3>
+				<ul class="people">
+					{#each made.elements as element (element.id)}
+						<li>
+							<wa-icon name={elementIcon(element.type)} aria-hidden="true"></wa-icon>
+							<span>
+								<strong>{elementLabel(element)}</strong>
+								{#if lineOf(element)}<small>{lineOf(element)}</small>{/if}
+							</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+			<dl class="facts">
+				<div>
+					<dt>Shown</dt>
+					<dd>{VIEW_WORDS[made.presentation.view] ?? made.presentation.view}, {made.presentation.theme} theme</dd>
+				</div>
+				<div>
+					<dt>How sexual</dt>
+					<dd>{HEAT_WORDS[made.heat]}</dd>
+				</div>
+				{#if tracked.length > 0}
+					<div>
+						<dt>Keeps track of</dt>
+						<dd>{tracked.join(', ')}</dd>
+					</div>
+				{/if}
+			</dl>
+			{#if made.telling || researchText}
+				<wa-details summary="Telling notes and background">
+					{#if made.telling}<p class="telling">{made.telling}</p>{/if}
+					{#if researchText}<p class="research">{researchText}</p>{/if}
+				</wa-details>
+			{/if}
+			<div class="start">
+				{#if onback}
+					<wa-button appearance="accent" variant="brand" onclick={() => onback?.()}>Back to the story</wa-button>
+					<wa-button appearance="outlined" onclick={() => session.tryAnother()}
+						>Start again with another idea</wa-button
+					>
+				{:else}
+					<wa-button appearance="accent" variant="brand" disabled={starting} onclick={start}>Start</wa-button>
+					<wa-button appearance="outlined" onclick={() => session.tryAnother()}>Pick another</wa-button>
+				{/if}
+			</div>
+		</section>
 	{/if}
 
 	{#if worded.limits.length + worded.preferences.length > 0}
@@ -288,28 +457,79 @@
 	}
 
 	.steps {
+		display: flex;
+		flex-direction: column;
+		gap: var(--wa-space-s);
 		margin: 0;
 		padding: 0;
 		list-style: none;
+
+		> li {
+			display: grid;
+			grid-template-columns: 1.25rem 1fr;
+			gap: var(--wa-space-s);
+			align-items: start;
+		}
+
+		> li[data-status='waiting'] {
+			opacity: 0.4;
+		}
+	}
+
+	/* The plan's marks: a ring to come, a turning ring while it works, a filled tick when done. */
+	.mark {
+		position: relative;
+		box-sizing: border-box;
+		width: 1.125rem;
+		height: 1.125rem;
+		margin-top: 0.15rem;
+		border: 2px solid var(--wa-color-brand-border-loud);
+		border-radius: 50%;
+	}
+
+	li[data-status='done'] > .mark {
+		background: var(--wa-color-brand-fill-loud);
+		border-color: var(--wa-color-brand-fill-loud);
+
+		&::after {
+			content: '';
+			position: absolute;
+			left: 0.28rem;
+			top: 0.08rem;
+			width: 0.25rem;
+			height: 0.55rem;
+			border: solid var(--wa-color-brand-on-loud);
+			border-width: 0 2px 2px 0;
+			transform: rotate(45deg);
+		}
+	}
+
+	li[data-status='active'] > .mark {
+		border-top-color: transparent;
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		li[data-status='active'] > .mark {
+			animation: turn 0.8s linear infinite;
+		}
+	}
+
+	@keyframes turn {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	.body {
 		display: flex;
 		flex-direction: column;
-		gap: var(--wa-space-xs);
+		align-items: flex-start;
+		gap: var(--wa-space-2xs);
+		min-width: 0;
+	}
 
-		li {
-			display: flex;
-			align-items: center;
-			gap: var(--wa-space-s);
-		}
-
-		li[data-status='waiting'] {
-			color: var(--wa-color-text-quiet);
-		}
-
-		.mark {
-			display: inline-grid;
-			place-items: center;
-			width: 1.25rem;
-		}
+	.label {
+		font-weight: var(--wa-font-weight-semibold);
 	}
 
 	.live {
@@ -317,30 +537,71 @@
 		font-size: var(--wa-font-size-s);
 		color: var(--wa-color-text-quiet);
 		font-style: italic;
+		overflow-wrap: anywhere;
 	}
 
-	.musts {
+	.result {
 		margin: 0;
-		padding: 0;
-		border: 0;
+		overflow-wrap: anywhere;
+	}
 
-		legend {
-			padding: 0;
-			margin-bottom: var(--wa-space-2xs);
-			font-size: var(--wa-font-size-s);
-			color: var(--wa-color-text-quiet);
-		}
+	.quiet {
+		color: var(--wa-color-text-quiet);
+		font-size: var(--wa-font-size-s);
 	}
 
 	.chips {
 		display: flex;
 		flex-wrap: wrap;
 		gap: var(--wa-space-2xs);
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.cast li {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--wa-space-3xs);
+		padding: var(--wa-space-3xs) var(--wa-space-xs);
+		border: 1px solid var(--wa-color-brand-border-normal);
+		border-radius: var(--wa-border-radius-pill);
+		font-size: var(--wa-font-size-s);
+	}
+
+	.substeps {
+		display: flex;
+		flex-direction: column;
+		gap: var(--wa-space-3xs);
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		font-size: var(--wa-font-size-s);
+
+		li {
+			display: flex;
+			gap: var(--wa-space-xs);
+		}
+
+		li[data-ok='false'] {
+			color: var(--wa-color-text-quiet);
+		}
+
+		.what {
+			overflow-wrap: anywhere;
+		}
+	}
+
+	.research,
+	.telling {
+		margin: 0;
+		white-space: pre-line;
 	}
 
 	.question {
 		display: flex;
 		flex-direction: column;
+		align-self: stretch;
 		gap: var(--wa-space-s);
 
 		h2 {
@@ -355,21 +616,11 @@
 		gap: var(--wa-space-xs);
 	}
 
-	.ideas {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: var(--wa-space-xs);
-
-		p {
-			margin: 0;
-		}
-	}
-
 	.link {
 		all: unset;
 		cursor: pointer;
 		text-decoration: underline;
+		font-size: var(--wa-font-size-s);
 
 		&:focus-visible {
 			outline: var(--wa-focus-ring);
@@ -377,13 +628,13 @@
 	}
 
 	.directions {
-		align-self: stretch;
-		margin: var(--wa-space-s) 0 0;
-		padding: 0;
-		list-style: none;
 		display: flex;
 		flex-direction: column;
+		align-self: stretch;
 		gap: var(--wa-space-xs);
+		margin: 0;
+		padding: 0;
+		list-style: none;
 
 		li {
 			display: flex;
@@ -396,50 +647,83 @@
 		}
 
 		li.current {
-			border-color: var(--wa-color-brand-on-quiet);
+			border-color: var(--wa-color-brand-border-loud);
 		}
 	}
 
-	.build {
+	.ready {
 		display: flex;
 		flex-direction: column;
 		gap: var(--wa-space-s);
+		padding: var(--wa-space-m);
+		border: 1px solid var(--wa-color-surface-border);
+		border-radius: var(--wa-border-radius-l);
+		background: var(--wa-color-surface-raised);
 
-		h2 {
+		h2,
+		h3 {
 			margin: 0;
 		}
-	}
 
-	.telling {
-		margin: 0;
-		color: var(--wa-color-text-quiet);
-		white-space: pre-line;
-	}
-
-	.opening {
-		padding: var(--wa-space-m);
-		border-radius: var(--wa-border-radius-m);
-		background: var(--wa-color-surface-raised);
-	}
-
-	.lookups {
-		margin: 0;
-		padding: 0;
-		list-style: none;
-		font-size: var(--wa-font-size-s);
-
-		li[data-ok='false'] {
+		h3 {
+			font-size: var(--wa-font-size-s);
 			color: var(--wa-color-text-quiet);
 		}
 
 		.what {
-			overflow-wrap: anywhere;
+			margin: 0;
 		}
 	}
 
-	.research {
+	.people {
+		display: flex;
+		flex-direction: column;
+		gap: var(--wa-space-xs);
 		margin: 0;
-		white-space: pre-line;
+		padding: 0;
+		list-style: none;
+
+		li {
+			display: grid;
+			grid-template-columns: 1.25rem 1fr;
+			gap: var(--wa-space-xs);
+			align-items: baseline;
+		}
+
+		span {
+			display: flex;
+			flex-direction: column;
+		}
+
+		small {
+			color: var(--wa-color-text-quiet);
+		}
+	}
+
+	.facts {
+		display: grid;
+		gap: var(--wa-space-2xs);
+		margin: 0;
+
+		div {
+			display: flex;
+			flex-wrap: wrap;
+			gap: var(--wa-space-xs);
+		}
+
+		dt {
+			color: var(--wa-color-text-quiet);
+		}
+
+		dd {
+			margin: 0;
+		}
+	}
+
+	.start {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--wa-space-xs);
 	}
 
 	.kept {

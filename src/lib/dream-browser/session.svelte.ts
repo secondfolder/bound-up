@@ -184,8 +184,13 @@ export class DreamSession {
 	general = $state<DreamPreference[]>([]);
 	#generalRevision: number | null;
 	readonly #userId: string;
-	/** Pages step 1 read and searches it made for the brief on this page, each with how it went. Not stored. */
+	/**
+	 * Pages step 1 read and searches it made for the brief, each with how it
+	 * went, as they happen; kept with the reading once it is saved.
+	 */
 	lookups = $state<Lookup[]>([]);
+	/** What a separate research step found, as soon as it has (`research` event). */
+	researched = $state<string | null>(null);
 	/**
 	 * Whether the user is listening to this daydream read aloud, which asks
 	 * passages for delivery cues and sounds. For this page only.
@@ -277,6 +282,7 @@ export class DreamSession {
 			return;
 		}
 		this.setup = setup;
+		this.lookups = setup.reading?.lookups ?? [];
 		await this.#openBranch(view);
 	}
 
@@ -378,6 +384,7 @@ export class DreamSession {
 	async #read(setup: DreamSetup, signal: AbortSignal) {
 		this.streaming = { what: 'read', text: '' };
 		this.lookups = [];
+		this.researched = null;
 		let researched: string | null = null;
 		const reply = await streamReply(
 			'read',
@@ -393,6 +400,7 @@ export class DreamSession {
 				},
 				onResearch: (text) => {
 					researched = text;
+					this.researched = text;
 				}
 			}
 		);
@@ -408,7 +416,8 @@ export class DreamSession {
 		await this.#saveSetup(
 			withReading(
 				setup,
-				researched ? { ...reading, research: { needed: true, text: researched } } : reading
+				researched ? { ...reading, research: { needed: true, text: researched } } : reading,
+				this.lookups
 			)
 		);
 	}
@@ -428,7 +437,9 @@ export class DreamSession {
 			);
 		}
 		this.#previousBuild = null;
-		await this.#saveSetup({ ...setup, build });
+		// Shown to the user before it is played: the summary waits on Start
+		// (docs/dreams.md, "The setup page").
+		await this.#saveSetup({ ...setup, build, awaitingStart: true });
 		await this.#keepPassage({
 			parentId: null,
 			request: 'opening',
@@ -669,6 +680,20 @@ export class DreamSession {
 		return this.#attempt(() =>
 			this.#saveSetup({ ...setup, reading: null, chosen: null, build: null })
 		).then(() => this.runSetup());
+	}
+
+	/** Start: the daydream is played from its opening (docs/dreams.md, "The setup page"). */
+	start(): Promise<void> {
+		const { setup } = this;
+		if (!setup?.awaitingStart) {
+			return Promise.resolve();
+		}
+		return this.#attempt(() => this.#saveSetup({ ...setup, awaitingStart: false }));
+	}
+
+	/** Whether it is built and waiting on Start. */
+	get awaitingStart(): boolean {
+		return Boolean(this.setup?.build && this.setup.awaitingStart);
 	}
 
 	/** "Not quite? Tell it what to change." Stops what is running and goes back as far as it must. */

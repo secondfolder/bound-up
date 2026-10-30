@@ -25,10 +25,13 @@
 	let {
 		session,
 		pictures: picturesOn = false,
-		voice = null
+		voice = null,
+		onsetup
 	}: {
 		session: DreamSession;
 		pictures?: boolean;
+		/** Opens how it was set up (docs/dreams.md, "The setup page"). */
+		onsetup?: () => void;
 		/** Read aloud, when this server and account have it. */
 		voice?: { narratorPreset: FishVoicePresetId | null } | null;
 	} = $props();
@@ -276,6 +279,12 @@
 				<h2>{build.title}</h2>
 				<!-- A toggle: native, because wa-button forwards no aria-pressed. -->
 				<span class="switches">
+					{#if onsetup}
+						<button type="button" class="view-switch" onclick={() => onsetup?.()}>
+							<wa-icon name="list-check" aria-hidden="true"></wa-icon>
+							How it was set up
+						</button>
+					{/if}
 					{#if reader}
 						<!-- A toggle: native, because wa-button forwards no aria-pressed. -->
 						<button type="button" class="view-switch" aria-pressed={session.listening} onclick={toggleListening}>
