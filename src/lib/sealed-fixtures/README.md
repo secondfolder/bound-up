@@ -34,7 +34,8 @@ data would simply stop showing. So:
   `dream-setup` v1 and `dream-detail` v1 and v2 gained optional fields in
   place (an element's `short` name, the reading's `lookups`, the setup's
   `awaitingStart`, `pendingEdits`, `editedFrom`, `designs` and `trail`, the
-  build's writing `style`, a passage's `readAs` and `usage`; `editedFrom`
+  build's writing `style`, the setup's `voices`, a passage's `readAs` and
+  `usage`; `editedFrom`
   also widened to hold a style as well as an element) before the engine was
   first deployed; being optional, the
   fixtures still open unchanged. Once a version has been

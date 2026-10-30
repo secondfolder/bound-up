@@ -874,6 +874,57 @@ test.describe('daydreams, the new engine', () => {
 		expect((await firstLit()).passage).toBe(1);
 	});
 
+	test('everyone speaks in the narrator’s voice until a voice is chosen for them', async ({
+		page
+	}) => {
+		const who = await dreamer(page);
+		await grantFeature(who.email, 'dreamVoice');
+		await start(page, 'A quiet evening');
+		await play(page);
+		await saved(page);
+
+		const asked: { text: string; voice: string }[] = [];
+		page.on('request', (request) => {
+			if (request.url().endsWith('/api/dreams/speak')) {
+				const body = request.postDataJSON() ?? {};
+				asked.push({ text: String(body.text ?? ''), voice: String(body.voice ?? '') });
+			}
+		});
+		await page.getByRole('button', { name: 'Read aloud' }).click();
+		const player = page.getByRole('region', { name: 'Reading aloud' });
+		await passageMenu(page, 'Listen');
+		await expect(player).toContainText('Tap Listen on a passage', { timeout: 20_000 });
+		expect(asked.length).toBeGreaterThan(0);
+		expect(asked.every((entry) => entry.voice === 'narrator')).toBe(true);
+
+		// A voice chosen for Ottilie, kept with the daydream.
+		await player.getByRole('button', { name: 'Voices' }).click();
+		const dialog = page.locator('wa-dialog[open]');
+		const row = dialog.locator('.row', { hasText: 'Ottilie' });
+		const trigger = row.locator('wa-button[slot="trigger"]');
+		await expect(trigger).toHaveText('Same as the narrator');
+		await trigger.click();
+		await row.getByRole('menuitemcheckbox', { name: /^Smoky/ }).click();
+		await expect(trigger).toHaveText('Smoky');
+		await page.keyboard.press('Escape');
+		await page.reload();
+		await waitForHydration(page);
+		await page.getByRole('button', { name: 'Read aloud' }).click();
+		await player.getByRole('button', { name: 'Voices' }).click();
+		await expect(trigger).toHaveText('Smoky');
+		await page.keyboard.press('Escape');
+
+		// Her lines are read in it, and the narration still in the narrator's.
+		asked.length = 0;
+		await passageMenu(page, 'Listen');
+		await expect
+			.poll(() => asked.find((entry) => entry.text.includes('You came'))?.voice, {
+				timeout: 15_000
+			})
+			.toBe('smoky');
+		expect(asked.find((entry) => entry.text.includes('lamp turns'))?.voice).toBe('narrator');
+	});
+
 	test('reading aloud does not pull the page back once it is scrolled away', async ({ page }) => {
 		await page.setViewportSize({ width: 390, height: 520 });
 		const who = await dreamer(page);

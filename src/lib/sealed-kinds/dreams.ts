@@ -19,6 +19,7 @@ import { MAX_DIRECTIONS } from '../dream/reading';
 import { READINGS } from '../dream/readings';
 import { writingStyleSchema } from '../dream/styles';
 import { defineSealedKind } from '../sealed';
+import { FISH_VOICE_PRESETS, type FishVoicePresetId } from '../server-settings';
 import { isClientId } from '../vault';
 
 const text = (max: number) => z.string().trim().max(max);
@@ -161,6 +162,19 @@ const editedFromSchema = z.union([
 	z.object({ kind: z.literal('style'), style: writingStyleSchema.optional() })
 ]);
 
+const voicePreset = z.enum(
+	FISH_VOICE_PRESETS.map((preset) => preset.id) as [FishVoicePresetId, ...FishVoicePresetId[]]
+);
+
+/** The voices chosen for a daydream (`ChosenVoices`): one for each character at most. */
+const voicesSchema = z.object({
+	narrator: voicePreset.optional(),
+	characters: z
+		.record(z.string().max(40), voicePreset)
+		.refine((voices) => Object.keys(voices).length <= MAX_ELEMENTS, 'Too many voices.')
+		.optional()
+});
+
 const buildSchema = z.object({
 	title: required(120),
 	heat: z.enum(HEAT_LEVELS),
@@ -234,7 +248,14 @@ export const dreamSetupKind = defineSealedKind({
 				 * and what it looked up, each pick and answer. Added in place
 				 * before the engine was deployed.
 				 */
-				trail: z.array(trailStepSchema).max(MAX_TRAIL).optional()
+				trail: z.array(trailStepSchema).max(MAX_TRAIL).optional(),
+				/**
+				 * The voices the user chose for reading it aloud (docs/dreams.md,
+				 * "Voices"): the narrator's, and any character's, by element id.
+				 * Absent is the server's narrator for everyone. Added in place
+				 * before the engine was deployed.
+				 */
+				voices: voicesSchema.optional()
 			})
 		}
 	]

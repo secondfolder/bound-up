@@ -1190,17 +1190,28 @@ sound is its words in brackets (`[sighs]`). Square brackets in the text itself
 are dropped, so nothing becomes a cue by accident.
 
 **Voices** (`src/lib/dream/voices.ts`): the narration and the user's own
-lines are in the narrator's voice (a setting); each character is matched by
-code to one of the curated voices (`FISH_VOICE_PRESETS`) from their `voice`
-field, then manner and appearance: never the other gender when the
-description says one (`genderOf`, shared with names), older or younger as
-described, then by how many of the voice's tags the description uses. Among
-the best and anything one short of them, one is chosen by a hash of the
-daydream and the character, so a character keeps their voice, and the same
-description need not sound the same in every daydream. The narrator's own
-preset is left out while there are others. A request names a voice by our id
-(`narrator`, or a preset), never Fish's, so it cannot spend on any voice it
-likes.
+lines are in the narrator's voice, the server's (a setting) unless the user
+chose another of the curated voices (`FISH_VOICE_PRESETS`) for this
+daydream; and every character speaks in the narrator's voice until the user
+chooses one for them. Both are chosen from **Voices** in the player, a menu
+for the narrator and one for each character, in their colour, and kept with
+the daydream (`voices` in the sealed setup, `session.setVoice`).
+
+A voice that suits each character is still worked out, but only marked in
+their menu ("suits them"), never chosen for them: a voice of code's choosing
+for every character sounded like a cast the user had not asked for. It comes
+from their `voice` field, then manner and appearance (`voiceFor`): never the
+other gender when the description says one (`genderOf`, shared with names),
+older or younger as described, then by how many of the voice's tags the
+description uses. Among the best and anything one short of them, one is
+chosen by a hash of the daydream and the character, and the narrator's own
+voice is left out while there are others.
+
+A request names a voice by our id (`narrator`, or a preset), never Fish's, so
+it cannot spend on any voice it likes. Changing a setting (a voice, the view,
+the style) while a passage is written no longer stops the passage: settings
+are saved beside whatever is running (`#saveSetting`), not through the one
+that aborts it.
 
 **One clip per utterance**, each `POST /api/dreams/speak`, fetched ahead of
 the one playing until about twelve seconds of playback are in hand at the

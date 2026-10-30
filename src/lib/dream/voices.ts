@@ -1,11 +1,12 @@
 /**
- * Who speaks in which voice (docs/dreams.md, "Read aloud"). The narrator has
- * the server's narrator voice; each character is matched by code to one of
- * the curated voices (`FISH_VOICE_PRESETS`) from how the build described
- * them: their `voice` field first, then their manner and appearance. Among
- * the close matches one is chosen by the daydream and the character, so a
- * character keeps their voice from passage to passage, and the same
- * description need not get the same voice in every daydream.
+ * Who speaks in which voice (docs/dreams.md, "Voices"). The narrator has the
+ * server's narrator voice unless the user chose another of the curated
+ * voices (`FISH_VOICE_PRESETS`) for this daydream, and every character
+ * speaks in the narrator's voice unless the user chose one for them. A
+ * voice to suit a character is still worked out (`voiceFor`), from how the
+ * build described them, but only as a suggestion beside the choice: a
+ * voice of code's choosing for every character sounded like a cast the
+ * user had not asked for.
  *
  * Pure and alias-free.
  */
@@ -74,16 +75,22 @@ export function voiceFor(
 	return picked?.id ?? FISH_VOICE_PRESETS[0].id;
 }
 
-/** The voice a line is read in: the narrator's, or its speaker's. */
-export function voiceForSpeaker(
-	who: string | null,
-	elements: readonly DreamElement[],
-	dreamId: string,
-	narrator: FishVoicePresetId | null
-): VoiceName {
-	if (who === null || who === 'you') {
-		return 'narrator';
-	}
-	const element = elements.find((entry) => entry.id === who);
-	return element ? voiceFor(element, dreamId, narrator) : 'narrator';
+/** The voices the user chose for a daydream: absent is the default. */
+export type ChosenVoices = {
+	narrator?: FishVoicePresetId | undefined;
+	characters?: Readonly<Record<string, FishVoicePresetId>> | undefined;
+};
+
+/** The narrator's voice: the one chosen, or the server's own. */
+export function narratorVoice(chosen: ChosenVoices | undefined): VoiceName {
+	return chosen?.narrator ?? 'narrator';
+}
+
+/**
+ * The voice a line is read in: its speaker's, if one was chosen for them,
+ * else the narrator's. The user's own lines are the narrator's.
+ */
+export function voiceForSpeaker(who: string | null, chosen: ChosenVoices | undefined): VoiceName {
+	const own = who === null || who === 'you' ? undefined : chosen?.characters?.[who];
+	return own ?? narratorVoice(chosen);
 }

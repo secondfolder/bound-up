@@ -124,8 +124,14 @@ describe('voices', () => {
 	});
 
 	it('reads the narration and the user’s own lines in the narrator’s voice', () => {
-		expect(voiceForSpeaker(null, [], 'd', null)).toBe('narrator');
-		expect(voiceForSpeaker('you', [], 'd', null)).toBe('narrator');
-		expect(voiceForSpeaker('nobody', [], 'd', null)).toBe('narrator');
+		// Everyone speaks in the narrator's voice until a voice is chosen for them.
+		expect(voiceForSpeaker(null, undefined)).toBe('narrator');
+		expect(voiceForSpeaker('ines', undefined)).toBe('narrator');
+		expect(voiceForSpeaker('ines', { narrator: 'smoky' })).toBe('smoky');
+		expect(voiceForSpeaker('you', { narrator: 'smoky', characters: { you: 'tender' } })).toBe(
+			'smoky'
+		);
+		expect(voiceForSpeaker('ines', { characters: { ines: 'tender' } })).toBe('tender');
+		expect(voiceForSpeaker('marc', { characters: { ines: 'tender' } })).toBe('narrator');
 	});
 });

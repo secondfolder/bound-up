@@ -30,6 +30,7 @@
 	import DreamMarkup, { type MarkupInputs } from './DreamMarkup.svelte';
 	import DreamNotices from './DreamNotices.svelte';
 	import DreamTextBox from './DreamTextBox.svelte';
+	import DreamVoices from './DreamVoices.svelte';
 	import { elementIcon } from './element-icons';
 
 	/**
@@ -92,6 +93,8 @@
 		return usage.promptTokens > 0 ? Math.round((usage.cachedTokens / usage.promptTokens) * 100) : 0;
 	}
 	let turnBox = $state<ReturnType<typeof DreamTextBox> | null>(null);
+	/** Whether the voices dialog is open. */
+	let voicesOpen = $state(false);
 	/** The dock at the bottom, which the line being read is kept in sight above. */
 	let dock = $state<HTMLElement | null>(null);
 	/** Whether the turn box is open: put away, it is a button drawn as the box it opens into. */
@@ -440,7 +443,7 @@
 	// page is open, and the reader holds the clips already fetched.
 	const reader = voice
 		? new ReadAloud({
-				voiceOf: (who) => voiceForSpeaker(who, session.elements, session.id, voice.narratorPreset),
+				voiceOf: (who) => voiceForSpeaker(who, session.setup?.voices),
 				nameOf: (who) => speakerName(who),
 				onNearEnd: keepGoing,
 				onFinished: carryOn,
@@ -1169,6 +1172,12 @@
 						onclick={() => reader.setHighlight(!reader.highlight)}
 						>{reader.highlight ? '✓ ' : ''}Highlight</button
 					>
+					<wa-button size="s" appearance="plain" onclick={() => {
+								voicesOpen = true;
+							}}>
+						<wa-icon slot="start" name="user-gear" aria-hidden="true"></wa-icon>
+						Voices
+					</wa-button>
 					<button
 						type="button"
 						class="toggle"
@@ -1185,6 +1194,18 @@
 	<!-- In sight exactly when the page is scrolled to its end (`watchStuck`). -->
 	<div class="dock-end" aria-hidden="true" {@attach watchStuck}></div>
 </div>
+
+{#if voicesOpen && voice}
+	<DreamVoices
+		{session}
+		characters={elements.filter((element) => element.type === 'character')}
+		{colours}
+		serverNarrator={voice.narratorPreset}
+		onclose={() => {
+			voicesOpen = false;
+		}}
+	/>
+{/if}
 
 {#if about?.kind === 'passage' && aboutId}
 	<DreamExchange

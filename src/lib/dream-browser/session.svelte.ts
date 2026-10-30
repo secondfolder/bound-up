@@ -79,6 +79,7 @@ import {
 	MAX_TRAIL,
 	type PassageRequest as PassageKind
 } from '$lib/sealed-kinds/dreams';
+import type { FishVoicePresetId } from '$lib/server-settings';
 import {
 	appendTurn,
 	DreamRequestError,
@@ -896,7 +897,7 @@ export class DreamSession {
 		const next = this.awaitingStart
 			? withStyleChange(setup, style)
 			: { ...setup, build: { ...setup.build, style: { ...style, by: 'user' as const } } };
-		return this.#attempt(() => this.#saveSetup(next));
+		return this.#saveSetting(next);
 	}
 
 	/** Chooses a direction, stopping a build of another. */
@@ -1027,7 +1028,47 @@ export class DreamSession {
 			return Promise.resolve();
 		}
 		const build = { ...setup.build, presentation: { ...setup.build.presentation, view } };
-		return this.#attempt(() => this.#saveSetup({ ...setup, build }));
+		return this.#saveSetting({ ...setup, build });
+	}
+
+	/**
+	 * A voice chosen for the narrator or a character (docs/dreams.md,
+	 * "Voices"), kept with the daydream; null goes back to the default (the
+	 * server's narrator; for a character, the narrator's voice).
+	 */
+	setVoice(who: string, voice: FishVoicePresetId | null): Promise<void> {
+		const { setup } = this;
+		if (!setup) {
+			return Promise.resolve();
+		}
+		const { narrator, characters = {} } = setup.voices ?? {};
+		let voices: NonNullable<DreamSetup['voices']>;
+		if (who === 'narrator') {
+			voices = { ...(voice ? { narrator: voice } : {}), characters };
+		} else {
+			const { [who]: _was, ...others } = characters;
+			voices = {
+				...(narrator ? { narrator } : {}),
+				characters: voice ? { ...others, [who]: voice } : others
+			};
+		}
+		return this.#saveSetting({ ...setup, voices });
+	}
+
+	/**
+	 * Saves a setting the user changed (the view, the style, a voice) without
+	 * stopping what is running: changing how it is shown or read while a
+	 * passage is written used to stop the passage, since `#attempt` aborts
+	 * whatever came before it.
+	 */
+	async #saveSetting(setup: DreamSetup): Promise<void> {
+		try {
+			await this.#saveSetup(setup);
+		} catch (cause) {
+			this.problem =
+				cause instanceof DreamRequestError ? cause.message : 'That could not be saved just now.';
+			this.problemDetail = detailOf(cause);
+		}
 	}
 
 	/** Undoes a change made by hand, and any later one to the same element. */
