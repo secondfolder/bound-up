@@ -505,6 +505,8 @@ test.describe('daydreams, the new engine', () => {
 		await last.getByRole('button', { name: "About this passage's request" }).click();
 		const dialog = page.locator('wa-dialog[open]');
 		await expect(dialog.getByText('Provider', { exact: true })).toBeVisible();
+		// The opening came with the build, which may write up to its whole budget.
+		await expect(dialog.locator('dl')).toContainText('Max tokens16000');
 		// Kept on this page: the messages sent, and the reply.
 		await expect(dialog.getByText('Sent', { exact: true })).toBeVisible();
 		await expect(dialog.getByText('system', { exact: true })).toBeVisible();

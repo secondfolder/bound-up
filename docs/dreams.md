@@ -155,7 +155,8 @@ Every reply also says what it cost and how much of its prompt the cache
 served (`usage` on `done`), which each passage keeps (`usage` on the turn).
 With debug mode on, each passage's end shows "N% cached" and an info button
 that opens the request (`DreamExchange`): provider, model, tokens, cost,
-time, and the full transcript when this page sent it.
+time, and, when this page sent it, the most the reply could have been (max
+tokens, for telling a reply cut off by its budget) and the full transcript.
 
 ### Capturing in development
 

@@ -36,6 +36,12 @@
 			: null
 	);
 
+	/** The most the reply could have been: a reply that stopped short may have hit it. */
+	const maxTokens = $derived.by(() => {
+		const request = exchange?.request as { maxTokens?: unknown } | undefined;
+		return typeof request?.maxTokens === 'number' ? request.maxTokens : null;
+	});
+
 	type Message = { role?: string; content?: unknown };
 
 	const messages = $derived.by((): Message[] => {
@@ -68,6 +74,9 @@
 				</div>
 				<div><dt>Reply</dt><dd>{usage.completionTokens} tokens</dd></div>
 				{#if usage.cost !== null}<div><dt>Cost</dt><dd>${usage.cost.toFixed(5)}</dd></div>{/if}
+			{/if}
+			{#if maxTokens !== null}
+				<div><dt>Max tokens</dt><dd>{maxTokens}</dd></div>
 			{/if}
 			{#if took}
 				<div><dt>Took</dt><dd>{(took / 1000).toFixed(1)} s</dd></div>
