@@ -23,14 +23,7 @@ export const VIEWS = ['scroll', 'tap', 'texts', 'monologue'] as const;
 export type View = (typeof VIEWS)[number];
 
 /** A curated set, so every daydream's look is one somebody designed (docs/dreams.md, "Risks"). */
-export const THEMES = ['rust', 'paper', 'black', 'dusk', 'clinical', 'velvet', 'neon'] as const;
-export type Theme = (typeof THEMES)[number];
-
-export type Presentation = { view: View; theme: Theme; notes: string };
-
-function isTheme(value: string | undefined): value is Theme {
-	return (THEMES as readonly string[]).includes(value ?? '');
-}
+export type Presentation = { view: View; notes: string };
 
 /**
  * How sexual it is. The model chooses it from the brief and the user's
@@ -66,10 +59,8 @@ function isView(value: string | undefined): value is View {
 function readPresentation(nodes: readonly MarkupNode[]): Presentation {
 	const tag = findTag(nodes, 'presentation');
 	const view = tag?.attrs.view;
-	const theme = tag?.attrs.theme?.trim().toLowerCase();
 	return {
 		view: isView(view) ? view : 'scroll',
-		theme: isTheme(theme) ? theme : 'rust',
 		notes: tag ? plainText(tag.children).trim() : ''
 	};
 }

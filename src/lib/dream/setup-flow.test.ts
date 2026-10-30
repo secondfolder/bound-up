@@ -35,7 +35,7 @@ const build: DreamSetupBuild = {
 	title: 'Week by Week',
 	heat: 'steamy',
 	telling: 'Reports, never scenes.',
-	presentation: { view: 'scroll', theme: 'clinical', notes: 'Typed.' },
+	presentation: { view: 'scroll', notes: 'Typed.' },
 	capabilities: ['stats'],
 	elements: []
 };

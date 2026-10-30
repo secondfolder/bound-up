@@ -70,7 +70,7 @@ describe('setupProgress', () => {
 			title: 'T',
 			heat: 'steamy' as const,
 			telling: '',
-			presentation: { view: 'scroll' as const, theme: 'rust' as const, notes: '' },
+			presentation: { view: 'scroll' as const, notes: '' },
 			capabilities: [],
 			elements: []
 		};

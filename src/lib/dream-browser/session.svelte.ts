@@ -890,7 +890,7 @@ export class DreamSession {
 		for (const request of wanted) {
 			this.designing = new Set([...this.designing, request.kind]);
 			try {
-				const reply = await designBlock({ ...request, theme: setup.build.presentation.theme });
+				const reply = await designBlock(request);
 				const design = parseDesign(reply, request);
 				const latest = this.setup;
 				if (design && latest) {
@@ -916,6 +916,16 @@ export class DreamSession {
 		}
 		await this.#attempt(() => this.#saveSetup(withElementChange(setup, changed)));
 		return this.problem === null;
+	}
+
+	/** How the story is shown, chosen by the user over the build's choice; kept with the daydream. */
+	setView(view: DreamSetupBuild['presentation']['view']): Promise<void> {
+		const { setup } = this;
+		if (!setup?.build || setup.build.presentation.view === view) {
+			return Promise.resolve();
+		}
+		const build = { ...setup.build, presentation: { ...setup.build.presentation, view } };
+		return this.#attempt(() => this.#saveSetup({ ...setup, build }));
 	}
 
 	/** Undoes a change made by hand, and any later one to the same element. */

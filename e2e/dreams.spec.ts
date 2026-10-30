@@ -450,6 +450,22 @@ test.describe('daydreams, the new engine', () => {
 		await expect(dialog.getByText('system', { exact: true })).toBeVisible();
 	});
 
+	test('how the story is shown can be changed from the reading settings, and is kept', async ({
+		page
+	}) => {
+		await dreamer(page);
+		await start(page, 'A quiet evening');
+		await play(page);
+		await saved(page);
+
+		await page.getByRole('button', { name: 'Reading settings' }).click();
+		await page.getByRole('menuitemcheckbox', { name: 'As messages' }).click();
+		await expect(page.locator('ol.turns')).toHaveAttribute('data-view', 'texts');
+		await page.reload();
+		await waitForHydration(page);
+		await expect(page.locator('ol.turns')).toHaveAttribute('data-view', 'texts');
+	});
+
 	test('choosing first, Surprise me, and Try another idea', async ({ page }) => {
 		await dreamer(page);
 		await start(page, 'A quiet evening [pick]');

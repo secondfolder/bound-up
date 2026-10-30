@@ -46,7 +46,7 @@ describe('history', () => {
 				telling: '',
 				capabilities: ['reveals'],
 				elements: [],
-				presentation: { view: 'scroll', theme: 'rust', notes: '' },
+				presentation: { view: 'scroll', notes: '' },
 				musts: [],
 				research: ''
 			},
@@ -91,7 +91,7 @@ describe('history', () => {
 					telling: 'Reports.',
 					capabilities: ['stats'],
 					elements: [element(composure)],
-					presentation: { view: 'scroll', theme: 'rust', notes: '' },
+					presentation: { view: 'scroll', notes: '' },
 					musts: [],
 					research: ''
 				},

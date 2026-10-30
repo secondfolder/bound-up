@@ -152,7 +152,7 @@ export function serializeBuild(build: DreamSetupBuild): string {
 		`<title>${escapeMarkup(build.title)}</title>`,
 		`<heat level="${build.heat}"/>`,
 		`<telling>\n${escapeMarkup(build.telling)}\n</telling>`,
-		`<presentation view="${build.presentation.view}" theme="${build.presentation.theme}">${escapeMarkup(build.presentation.notes)}</presentation>`,
+		`<presentation view="${build.presentation.view}">${escapeMarkup(build.presentation.notes)}</presentation>`,
 		`<elements>\n${serializeElements(build.elements)}\n</elements>`
 	].join('\n\n');
 }

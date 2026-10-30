@@ -11,7 +11,7 @@
  */
 
 import { z } from 'zod';
-import { HEAT_LEVELS, MAX_TELLING_CHARS, THEMES, VIEWS } from '../dream/build';
+import { HEAT_LEVELS, MAX_TELLING_CHARS, VIEWS } from '../dream/build';
 import { CAPABILITIES } from '../dream/capabilities';
 import { blockDesignSchema, MAX_DESIGNS } from '../dream/designs';
 import { MAX_ELEMENT_CHARS, MAX_ELEMENTS } from '../dream/elements';
@@ -157,7 +157,12 @@ const buildSchema = z.object({
 	telling: text(MAX_TELLING_CHARS),
 	presentation: z.object({
 		view: z.enum(VIEWS),
-		theme: z.enum(THEMES),
+		/**
+		 * A look the build used to choose from a set of themes, since removed:
+		 * blocks give a passage its style now. Read from older setups, never
+		 * written or used.
+		 */
+		theme: z.string().max(40).optional(),
 		notes: text(400)
 	}),
 	capabilities: z.array(z.enum(CAPABILITIES)),

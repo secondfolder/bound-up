@@ -91,7 +91,7 @@ const passageBody: PassageRequest = {
 		telling: 'Close second person.',
 		capabilities: [],
 		elements: [],
-		presentation: { view: 'scroll', theme: 'rust', notes: '' },
+		presentation: { view: 'scroll', notes: '' },
 		musts: [],
 		research: ''
 	},

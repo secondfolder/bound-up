@@ -120,7 +120,7 @@ that scene on, which is the user asking it to.
    raised to a power set by the spread (`tiltFor`), so a wide brief leans
    towards the unlikely directions.
 3. **Building and opening** (`buildMessages`): title, heat, telling notes,
-   presentation (view and a theme from a curated set), elements, and the
+   presentation (the view), elements, and the
    opening passage in the same reply.
 4. **Passages** (`passageMessages`): the fixed core and every capability's
    block first, then what stays the same in the setup (telling notes, musts,
@@ -663,7 +663,7 @@ longer offers `voice`, which is on only when the user listens.
 
 `<block kind="…" title="…">`, with `<texts>` and `<letter>` as shorthands
 (`blockKind`). Twelve kinds have their own layout, plus `letter`; every other
-kind is a labelled card in the daydream's theme:
+kind is a labelled card:
 
 | Kind | Layout |
 | --- | --- |
@@ -702,7 +702,7 @@ card, paper, ticket, screen, badge or plain). Never HTML: `parseDesign` checks
 the reply against the language, its size (40 parts, 5 deep) and that it draws
 only the slots given, and keeps nothing that fails, so a design can shape a
 block but never put anything else on the page. Each part is drawn from the
-daydream's theme (`DreamDesign.svelte`).
+app's palette (`DreamDesign.svelte`).
 
 A design is kept with the daydream (the setup's `designs`, twelve at most)
 and listed in every later passage's prompt by kind, slots and description,
@@ -713,20 +713,23 @@ asked for. Fields in a designed block are drawn under it, and work as in
 any block. Capabilities are untouched: this is something the blocks
 capability can do.
 
-### Views and themes
+### Views
+
+**The view is the build's choice** (`presentation.view`: as a story, one
+beat at a time, as messages, as a monologue), and the user's to change from
+**Reading settings** on the story page (`session.setView`), which keeps it
+with the daydream, so it holds on every device.
 
 **Tap-through** shows the passage being answered a beat at a time
 (`splitBeats` in `src/lib/dream/beats.ts`: at `<beat/>` and paragraph breaks,
 never inside a block or a spoiler), with Back and Next buttons and a tap
 anywhere on the passage as a pointer's shortcut. The newest beat fades in,
-unless the device asks for reduced motion. The build suggests the view
-(`presentation.view`); "One beat at a time" switches it, remembered for that
-daydream on the device. Texts and monologue views come with phase 7.
+unless the device asks for reduced motion.
 
-**Themes** are the build's choice from a curated seven (rust, paper, black,
-dusk, clinical, velvet, neon), each a page, ink, accent and face for the
-passages' own area, defined as `--dream-<theme>-*` tokens in
-`src/lib/theme.css`. The app around the story keeps its own palette.
+**There are no themes.** The build used to choose one of seven looks for
+the passages' area; blocks, which give a part of a passage the style of what
+it is, do that better, so themes went (2026-10-30). An older setup's stored
+theme is read and ignored.
 
 ## Variety (phase 4)
 

@@ -52,7 +52,7 @@ describe('recentFrom', () => {
 				title: 't',
 				heat: 'steamy',
 				telling: '',
-				presentation: { view: 'scroll', theme: 'rust', notes: '' },
+				presentation: { view: 'scroll', notes: '' },
 				capabilities: [],
 				elements: [
 					{ id: 'a', type: 'character', name, also: [], shown: true, fields: [], stats: [] },

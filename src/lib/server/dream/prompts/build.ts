@@ -9,7 +9,7 @@
  * Alias-free, for the bench.
  */
 
-import { THEMES, VIEWS } from '../../../dream/build';
+import { VIEWS } from '../../../dream/build';
 import { passageCapabilities } from '../../../dream/capabilities';
 import type { Nudge } from '../../../dream/nudges';
 import { OVERUSED_NAMES } from '../../../dream/repetition';
@@ -62,9 +62,8 @@ Notes for whoever writes every passage: what this daydream is, its form, its rhy
 Form: when the brief asks for a form, every passage is written in it, and the telling notes say so, with how long a passage is. Vignettes, snippets or moments: each passage one short, self-contained moment of about 60 to 150 words, a new scene each time, joined by the brief's theme rather than a plot, never carrying on from the last unless the user asks. Without a form asked for, say in the telling notes what length suits this daydream.
 Pacing: when the brief explicitly asks for a kink, a sexual act or a particular scene, get to it soon, in the opening or the passage after: the act itself, written as what it is, rather than hints of it or a build-up held back as a payoff. Build up to it only when something says to: the brief or the user's preferences ask for a slow burn, a tease or a build-up, or the chosen direction is about the anticipation itself. Say which in the telling notes.
 
-<presentation view="…" theme="…">a sentence on what passages should look like</presentation>
+<presentation view="…">a sentence on what passages should look like</presentation>
 view: ${VIEWS.join(', ')}. scroll is ordinary reading; tap shows one beat at a time, for slow, heavy scenes; texts is for a daydream told as messages; monologue is one voice in short lines.
-theme: ${THEMES.join(', ')}.
 
 <elements>
 Anything worth keeping a record of, as tags. The tag is the element's type, and any type is allowed. Known types the app does more with:

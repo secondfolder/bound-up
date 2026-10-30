@@ -13,7 +13,6 @@ export type DesignInput = {
 	kind: string;
 	description: string;
 	slots: readonly { name: string; example: string }[];
-	theme: string;
 };
 
 const INSTRUCTIONS = `You design one block for an interactive story app: a small object or document from inside a story (a card, a form, a ticket, a schedule, a screen), drawn on the page from a layout you write. You never write HTML or CSS. You write the layout as JSON in this language, and nothing else:
@@ -49,8 +48,7 @@ export function designMessages(input: DesignInput): ModelMessage[] {
 			content: [
 				`The block's kind: ${input.kind}`,
 				wrap('description', input.description),
-				`Its slots, with what first filled them:\n${slots}`,
-				`The story's look: the ${input.theme} theme.`
+				`Its slots, with what first filled them:\n${slots}`
 			].join('\n\n')
 		}
 	];

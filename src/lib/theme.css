@@ -95,39 +95,6 @@
 			var(--page-wash-floor) 800px
 		),
 		linear-gradient(to right, var(--rust-light) 10%, var(--rust-dark) 100%);
-
-	/* A daydream's look (docs/dreams.md, "Themes"): a curated set the build
-	   picks from, so every one is a look somebody designed. Each is a page,
-	   ink, accent and face for the story's own area; the app around it keeps
-	   its palette. `rust` is the app's own. */
-	--dream-rust-page: transparent;
-	--dream-rust-ink: oklch(94% 0.035 78);
-	--dream-rust-accent: var(--accent-color);
-	--dream-rust-face: var(--wa-font-family-body);
-	--dream-paper-page: oklch(95% 0.02 85);
-	--dream-paper-ink: oklch(25% 0.02 60);
-	--dream-paper-accent: oklch(45% 0.12 30);
-	--dream-paper-face: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
-	--dream-black-page: oklch(12% 0 0);
-	--dream-black-ink: oklch(92% 0 0);
-	--dream-black-accent: oklch(80% 0 0);
-	--dream-black-face: var(--wa-font-family-body);
-	--dream-dusk-page: oklch(22% 0.06 285);
-	--dream-dusk-ink: oklch(92% 0.03 300);
-	--dream-dusk-accent: oklch(78% 0.12 330);
-	--dream-dusk-face: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
-	--dream-clinical-page: oklch(97% 0.005 220);
-	--dream-clinical-ink: oklch(28% 0.02 240);
-	--dream-clinical-accent: oklch(55% 0.13 240);
-	--dream-clinical-face: ui-monospace, 'SF Mono', Menlo, monospace;
-	--dream-velvet-page: oklch(20% 0.07 15);
-	--dream-velvet-ink: oklch(92% 0.03 20);
-	--dream-velvet-accent: oklch(70% 0.16 15);
-	--dream-velvet-face: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
-	--dream-neon-page: oklch(15% 0.03 270);
-	--dream-neon-ink: oklch(94% 0.02 200);
-	--dream-neon-accent: oklch(82% 0.18 150);
-	--dream-neon-face: var(--wa-font-family-body);
 }
 
 @layer wa-theme-overrides {

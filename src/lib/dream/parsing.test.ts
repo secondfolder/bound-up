@@ -84,11 +84,8 @@ describe('parseBuild', () => {
 
 	it('reads the parts and keeps only known capabilities', () => {
 		expect(build.title).toBe('Week by week');
-		expect(build.presentation).toEqual({
-			view: 'scroll',
-			theme: 'paper',
-			notes: 'Reports as document blocks.'
-		});
+		// A theme a model still writes is ignored: themes are gone.
+		expect(build.presentation).toEqual({ view: 'scroll', notes: 'Reports as document blocks.' });
 		expect(build.capabilities).toEqual(['blocks', 'stats', 'reveals']);
 	});
 

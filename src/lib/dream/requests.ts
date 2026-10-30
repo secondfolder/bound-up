@@ -18,7 +18,7 @@ import {
 	MAX_PASSAGE_CHARS,
 	MAX_SUMMARY_CHARS
 } from '../sealed-kinds/dreams';
-import { HEAT_LEVELS, MAX_TELLING_CHARS, THEMES, VIEWS } from './build';
+import { HEAT_LEVELS, MAX_TELLING_CHARS, VIEWS } from './build';
 import { CAPABILITIES } from './capabilities';
 import { MAX_DESIGNS } from './designs';
 import { MAX_ELEMENTS } from './elements';
@@ -111,7 +111,6 @@ const setupSchema = z.object({
 	elements: z.array(dreamElementSchema).max(MAX_ELEMENTS),
 	presentation: z.object({
 		view: z.enum(VIEWS),
-		theme: z.enum(THEMES),
 		notes: z.string().max(400)
 	}),
 	musts: strings(400, 20),
@@ -198,8 +197,7 @@ export const designRequestSchema = z.object({
 	slots: z
 		.array(z.object({ name: z.string().regex(DESIGN_NAME), example: z.string().max(1000) }))
 		.min(1)
-		.max(16),
-	theme: z.enum(THEMES)
+		.max(16)
 });
 
 export type DesignRequest = z.output<typeof designRequestSchema>;

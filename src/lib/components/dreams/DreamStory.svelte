@@ -4,6 +4,7 @@
 	import { page } from '$app/state';
 	import ResponsiveDialog from '$lib/components/ResponsiveDialog.svelte';
 	import { unlockedIdentity } from '$lib/crypto/session.svelte';
+	import type { View } from '$lib/dream/build';
 	import { elementLabel, linkableNames } from '$lib/dream/elements';
 	import { fieldKey } from '$lib/dream/fields';
 	import { suggestionsIn } from '$lib/dream/footer';
@@ -369,8 +370,6 @@
 
 	// ── how it looks ─────────────────────────────────────────────────────────
 
-	const theme = $derived(build?.presentation.theme ?? 'rust');
-
 	/** Every stat on a shown element, labelled with whose it is unless it is the user's. */
 	const tracked = $derived(
 		elements
@@ -388,24 +387,24 @@
 	function heading(name: string): string {
 		return name.charAt(0).toUpperCase() + name.slice(1);
 	}
-	const viewKey = $derived(`bound-up:dream-view:${session.id}`);
-	let chosenView = $state<'scroll' | 'tap' | null>(null);
-	onMount(() => {
-		try {
-			const saved = localStorage.getItem(viewKey);
-			chosenView = saved === 'tap' || saved === 'scroll' ? saved : null;
-		} catch {
-			// Storage refused: the build's suggestion stands.
-		}
-	});
-	const view = $derived(chosenView ?? (build?.presentation.view === 'tap' ? 'tap' : 'scroll'));
+	/**
+	 * How the story is shown: the build's choice, which the user can change
+	 * from the reading settings, kept with the daydream (docs/dreams.md,
+	 * "Views").
+	 */
+	const view = $derived(build?.presentation.view ?? 'scroll');
+	const VIEW_CHOICES: { value: View; label: string }[] = [
+		{ value: 'scroll', label: 'As a story' },
+		{ value: 'tap', label: 'One beat at a time' },
+		{ value: 'texts', label: 'As messages' },
+		{ value: 'monologue', label: 'As a monologue' }
+	];
 
-	function switchView() {
-		chosenView = view === 'tap' ? 'scroll' : 'tap';
-		try {
-			localStorage.setItem(viewKey, chosenView);
-		} catch {
-			// Remembered for this page only.
+	function chooseView(event: WaSelectEvent) {
+		const choice = event.detail.item.value;
+		const picked = VIEW_CHOICES.find((option) => option.value === choice);
+		if (picked) {
+			void session.setView(picked.value);
 		}
 	}
 
@@ -418,11 +417,6 @@
 
 <div
 	class="story"
-	data-theme={theme}
-	style:--dream-page={`var(--dream-${theme}-page)`}
-	style:--dream-ink={`var(--dream-${theme}-ink)`}
-	style:--dream-accent={`var(--dream-${theme}-accent)`}
-	style:--dream-face={`var(--dream-${theme}-face)`}
 
 	{@attach pullToContinue}
 >
@@ -445,10 +439,19 @@
 							Read aloud
 						</button>
 					{/if}
-					<button type="button" class="view-switch" aria-pressed={view === 'tap'} onclick={switchView}>
-						<wa-icon name="circle-half-stroke" aria-hidden="true"></wa-icon>
-						One beat at a time
-					</button>
+					<!-- Reading settings: how the story is shown, which the build chose. -->
+					<wa-dropdown placement="bottom-end" onwa-select={chooseView}>
+						<wa-button slot="trigger" size="s" appearance="outlined" pill>
+							<wa-icon slot="start" name="sliders" aria-hidden="true"></wa-icon>
+							Reading settings
+						</wa-button>
+						<h3 class="menu-heading">Show it</h3>
+						{#each VIEW_CHOICES as option (option.value)}
+							<wa-dropdown-item type="checkbox" value={option.value} checked={view === option.value}>
+								{option.label}
+							</wa-dropdown-item>
+						{/each}
+					</wa-dropdown>
 				</span>
 			</div>
 			<wa-details summary="How this daydream was set up">
@@ -508,7 +511,7 @@
 		</dl>
 	{/if}
 
-	<ol class="turns" data-view={build?.presentation.view ?? 'scroll'}>
+	<ol class="turns" data-view={view}>
 		{#each session.path as entry, index (entry.id)}
 			{#if entry.turn === null}
 				<li class="unreadable">This part can't be shown on this device.</li>
@@ -572,7 +575,7 @@
 						{names}
 						{expansions}
 						filling={session.filling}
-						view={entry.id === answering ? view : 'scroll'}
+						view={entry.id === answering && view === 'tap' ? 'tap' : 'scroll'}
 						inputs={inputsFor(entry.id, index)}
 						{pictures}
 						{designs}
@@ -927,6 +930,12 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: var(--wa-space-xs);
+
+		.menu-heading {
+			margin: var(--wa-space-xs) var(--wa-space-s) var(--wa-space-3xs);
+			font-size: var(--wa-font-size-xs);
+			color: var(--wa-color-text-quiet);
+		}
 	}
 
 	.view-switch {
@@ -1070,13 +1079,10 @@
 		font-family: var(--wa-font-family-body);
 	}
 
-	/* The daydream's theme is the passages' own: their page, ink and face. */
+	/* The passages' own area. Blocks give a part of it a style of its own. */
 	.turns {
 		padding: var(--wa-space-m);
 		border-radius: var(--wa-border-radius-l);
-		background: var(--dream-page);
-		color: var(--dream-ink);
-		font-family: var(--dream-face);
 		margin: 0;
 		list-style: none;
 		display: flex;

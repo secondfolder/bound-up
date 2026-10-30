@@ -19,7 +19,7 @@ describe('passageRequestSchema', () => {
 				telling: '',
 				capabilities: [],
 				elements: [],
-				presentation: { view: 'scroll', theme: 'rust', notes: '' },
+				presentation: { view: 'scroll', notes: '' },
 				musts: [],
 				research: ''
 			},

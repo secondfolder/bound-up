@@ -322,8 +322,7 @@
 	{#if build && (build.title || build.elements.length > 0)}
 		{#if build.title}<p class="result"><strong>{build.title}</strong></p>{/if}
 		<p class="result quiet">
-			{HEAT_WORDS[build.heat]}, {VIEW_WORDS[build.presentation.view] ?? build.presentation.view},
-			{build.presentation.theme} theme
+			{HEAT_WORDS[build.heat]}, {VIEW_WORDS[build.presentation.view] ?? build.presentation.view}
 		</p>
 		{#if build.elements.length > 0}
 			<ul class="chips cast" aria-label="Who and what is in it">
@@ -447,7 +446,7 @@
 			<dl class="facts">
 				<div>
 					<dt>Shown</dt>
-					<dd>{VIEW_WORDS[made.presentation.view] ?? made.presentation.view}, {made.presentation.theme} theme</dd>
+					<dd>{VIEW_WORDS[made.presentation.view] ?? made.presentation.view}</dd>
 				</div>
 				<div>
 					<dt>How sexual</dt>
