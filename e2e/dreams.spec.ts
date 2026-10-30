@@ -582,6 +582,49 @@ test.describe('daydreams, the new engine', () => {
 		await expect(player).toContainText('Tap Listen on a passage', { timeout: 20_000 });
 		expect(await page.evaluate(() => CSS.highlights.has('dream-reading'))).toBe(false);
 
+		// With read aloud on and nothing playing, a tap on a word plays from it:
+		// its whole sentence is fetched (here, already kept from before), and
+		// played from that word, which is the first one lit.
+		const point = await page
+			.locator('li.passage .markup')
+			.first()
+			.evaluate((root) => {
+				const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+				for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+					const at = node.textContent?.indexOf('hands') ?? -1;
+					if (at >= 0) {
+						const range = document.createRange();
+						range.setStart(node, at + 1);
+						range.setEnd(node, at + 2);
+						const rect = range.getBoundingClientRect();
+						return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+					}
+				}
+				return null;
+			});
+		expect(point).not.toBeNull();
+		await page.mouse.click(point?.x ?? 0, point?.y ?? 0);
+		const firstLit = await page.evaluate(
+			() =>
+				new Promise<string>((resolve) => {
+					const look = () => {
+						const lit = CSS.highlights.get('dream-reading');
+						const range = lit ? [...lit][0] : undefined;
+						if (range) {
+							resolve(range.toString());
+						} else {
+							requestAnimationFrame(look);
+						}
+					};
+					look();
+				})
+		);
+		expect(firstLit).toBe('hands');
+		await page
+			.getByRole('region', { name: 'Reading aloud' })
+			.getByRole('button', { name: 'Pause' })
+			.click();
+
 		// Listening, the next passage is asked for delivery cues and sounds.
 		const next = page.waitForRequest((request) => request.url().endsWith('/api/dreams/passage'));
 		await box(page, 'Your turn').fill('I wait.');

@@ -303,15 +303,17 @@
 	}
 
 	/**
-	 * While a passage is being read, a tap on any sentence of it plays from
-	 * there. Only a pointer's shortcut, like the tap-through's tap: Listen and
-	 * the player are the controls for the keyboard and a screen reader.
+	 * With read aloud on, a tap on any word of a passage plays from it, before
+	 * play has been pressed as much as while it reads (docs/dreams.md, "Read
+	 * aloud"). Only a pointer's shortcut, like the tap-through's tap: Listen
+	 * and the player are the controls for the keyboard and a screen reader.
 	 */
 	function tapToListen(turnId: string): Attachment<HTMLElement> {
 		return (element) => {
 			const onClick = (event: MouseEvent) => {
 				if (
-					reader?.turnId === turnId &&
+					reader &&
+					session.listening &&
 					!(
 						event.target instanceof Element &&
 						event.target.closest('button, a, input, wa-input, wa-button')
@@ -703,7 +705,8 @@
 				<wa-button size="s" appearance="plain" disabled={reader.turnId === null} onclick={() => reader.back()}>
 					<wa-icon name="backward-step" label="Back a sentence"></wa-icon>
 				</wa-button>
-				{#if reader.playing}
+				{#if reader.turnId && !reader.paused}
+					<!-- Playing, or loading to play: pausing holds a clip still on its way. -->
 					<wa-button size="s" appearance="plain" onclick={() => reader.pause()}>
 						<wa-icon name="pause" label="Pause"></wa-icon>
 					</wa-button>

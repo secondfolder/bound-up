@@ -959,8 +959,13 @@ place is a privacy risk and browsers block it anyway. It adds a Listen button
 to each passage and a player above the input box: who is speaking, back a
 sentence, play and pause, speed (0.75× to 2×, tapping cycles), "Read new
 passages" (each passage that arrives from then on is read once it is
-finished) and "Highlight". While a passage is being read, tapping any
-sentence of it plays from there. Listening also turns the `voice`
+finished) and "Highlight". With read aloud on, tapping any word of a
+passage plays from that word, before play has been pressed as much as
+while it reads: the whole utterance it is in is asked for, so the cues
+before the word still shape how it is said, and playback starts at the word
+(a moment before it, so its start is not clipped, with the word itself lit
+from the start). Pause works while a clip is still loading: it arrives and
+waits for play. Listening also turns the `voice`
 capability on for the passages asked for (`passageRequestFor`), so the story
 model writes delivery cues (`<say how="low, amused">`, `how` on a tone tag)
 and `<sound>`s for them; without listening it never does (see "Tag hygiene").
@@ -999,8 +1004,12 @@ preset is left out while there are others. A request names a voice by our id
 (`narrator`, or a preset), never Fish's, so it cannot spend on any voice it
 likes.
 
-**One clip per utterance**, each `POST /api/dreams/speak`, fetched one ahead
-of the one playing so a change of speaker does not wait. The route checks the
+**One clip per utterance**, each `POST /api/dreams/speak`, fetched ahead of
+the one playing until about twelve seconds of playback are in hand at the
+speed it plays (`#lookAhead`): what is left of this clip, then each next
+utterance by its length, measured once its clip has come and guessed from
+its words until then, four fetches at most. A short line played at 2× is
+over in a second, so one clip ahead was not always enough. The route checks the
 feature, the disclosure and the daily limit (`spendVoice`, counted before the
 request, in UTF-8 bytes as Fish bills; a day is a UTC date), then relays
 Fish's stream (`/v1/tts/stream/with-timestamp`, S2.1 Pro at `balanced`
@@ -1022,8 +1031,9 @@ word.
 which marks a range of the page without changing it. `alignWords` places
 Fish's timed words in the utterance's visible text, each looked for a few
 words on from the last; one it cannot place (a number Fish spelled out) is
-skipped, and the light stays on the word before. Without timings the whole
-utterance is lit. Nothing is guessed at. Auto-scroll keeps the line in view
+skipped, and the light stays on the word before. Before its first word is
+said, that word is lit, never the whole utterance, which used to flash up at
+the start of each one; only a clip with no timings at all is lit whole. Nothing is guessed at. Auto-scroll keeps the line in view
 and stops once the user scrolls.
 
 **The lock screen** shows "Bound Up" and nothing else (Media Session), with

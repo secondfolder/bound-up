@@ -67,6 +67,7 @@ const BLOCKS = new Set([
 ]);
 const TONES = new Set<string>(['whisper', 'loud', 'slow']);
 const SCROLLS = /auto|scroll/;
+const WHITESPACE = /\s+/;
 
 type Context = { who: string | null; how: string; tone: Tone | null; sound: boolean };
 
@@ -167,6 +168,11 @@ export class ReadAloud {
 	readNew = $state(false);
 	index = $state(0);
 	count = $state(0);
+	/**
+	 * Paused by the user, while playing or still loading: a clip that
+	 * arrives then waits for play rather than starting by itself.
+	 */
+	paused = $state(false);
 
 	readonly #voiceOf: (who: string | null) => VoiceName;
 	readonly #nameOf: (who: string | null) => string;
@@ -178,6 +184,16 @@ export class ReadAloud {
 	#utterances: Utterance[] = [];
 	/** The clip playing, for the highlight. */
 	#clip: Clip | null = null;
+	/** Where in its utterance the first clip starts: the word tapped, in its visible text. */
+	#startOffset: number | null = null;
+	/**
+	 * The word playing started from, lit until the audio reaches the next:
+	 * the audio starts a moment before it so its start is not clipped, and
+	 * the word before should not light up for that moment.
+	 */
+	#startWord: PlacedWord | null = null;
+	/** Each utterance's clip's length in seconds, once it has come. */
+	readonly #lengths = new Map<string, number>();
 	/** Bumped by each start or stop, so a clip that arrives late does not play over another. */
 	#generation = 0;
 	/** The silence that holds the audio output open between clips (`#holdOutput`). */
@@ -208,7 +224,12 @@ export class ReadAloud {
 			return;
 		}
 		const offset = at ? offsetAt(passage, at.x, at.y) : null;
-		const start = offset === null ? 0 : said.findIndex((entry) => entry.to > offset);
+		const start = Math.max(0, offset === null ? 0 : said.findIndex((entry) => entry.to > offset));
+		// The whole utterance is asked for, cues before the word included, and
+		// played from the word tapped.
+		const tapped = said[start];
+		this.#startOffset = offset !== null && tapped ? Math.max(0, offset - tapped.from) : null;
+		this.paused = false;
 		this.turnId = turnId;
 		this.#root = root;
 		this.#passage = passage;
@@ -218,10 +239,11 @@ export class ReadAloud {
 		this.#watchScrolling(root);
 		// Before the first clip is fetched, so headphones are awake for its first word.
 		this.#holdOutput();
-		void this.#playAt(Math.max(0, start));
+		void this.#playAt(start);
 	}
 
 	pause(): void {
+		this.paused = true;
 		this.#audio?.pause();
 		this.#releaseOutput();
 		this.playing = false;
@@ -231,7 +253,9 @@ export class ReadAloud {
 	}
 
 	resume(): void {
-		if (!this.#audio?.src) {
+		this.paused = false;
+		// Still loading: it plays as soon as the clip comes.
+		if (this.loading || !this.#audio?.src) {
 			return;
 		}
 		this.#scrolled.byUser = false;
@@ -259,6 +283,8 @@ export class ReadAloud {
 		if (this.#audio) {
 			this.#audio.playbackRate = rate;
 		}
+		// Faster, the clips in hand run out sooner.
+		this.#lookAhead();
 	}
 
 	setHighlight(on: boolean): void {
@@ -276,6 +302,7 @@ export class ReadAloud {
 		clearHighlight();
 		this.playing = false;
 		this.loading = false;
+		this.paused = false;
 		this.turnId = null;
 		this.speaker = '';
 		this.problem = null;
@@ -328,16 +355,28 @@ export class ReadAloud {
 		if (generation !== this.#generation) {
 			return;
 		}
-		const next = this.#utterances[index + 1];
-		if (next) {
-			// One ahead, so the next speaker is ready when this one ends.
-			this.#clipFor(next).catch(() => undefined);
-		}
 		this.#clip = clip;
 		const audio = this.#audioElement();
 		audio.src = clip.url;
 		audio.playbackRate = this.rate;
+		const startAt = this.#startOffset;
+		this.#startOffset = null;
+		if (startAt === null) {
+			this.#startWord = null;
+		} else {
+			// From the start of the word tapped; the words before it were asked
+			// for too, so the cues before it shape how it is said.
+			const word = clip.placed.find((placed) => placed.to > startAt);
+			audio.currentTime = word ? Math.max(0, word.start - 0.05) : 0;
+			this.#startWord = word ?? null;
+		}
 		this.loading = false;
+		this.#lookAhead();
+		if (this.paused) {
+			// Paused while it loaded: ready, and waiting on play.
+			this.playing = false;
+			return;
+		}
 		try {
 			await audio.play();
 		} catch (cause) {
@@ -347,6 +386,50 @@ export class ReadAloud {
 		this.playing = true;
 		this.#mediaSession();
 		this.#follow();
+	}
+
+	/** At normal speed, about how long speech takes a word, with a beat for cues and breaths. */
+	static readonly SECONDS_PER_WORD = 0.4;
+	/** Clips are fetched ahead until this much playback is in hand, at the speed it plays. */
+	static readonly LEAD_SECONDS = 12;
+	/** At most this many clips are fetched at once. */
+	static readonly AHEAD = 4;
+
+	/** How long an utterance plays at the current speed: measured once its clip came, else guessed. */
+	#seconds(utterance: Utterance): number {
+		const known = this.#lengths.get(this.#keyOf(utterance));
+		const words =
+			this.#passage?.text.slice(utterance.from, utterance.to).split(WHITESPACE).length ?? 1;
+		return (known ?? words * ReadAloud.SECONDS_PER_WORD + 0.5) / this.rate;
+	}
+
+	/**
+	 * Fetches clips ahead of the one playing until enough playback is in
+	 * hand to hide the next fetch: what is left of this clip, then each
+	 * following utterance by its length at this speed. A short line, a quote
+	 * of a few words, plays out in a second at 2×, so one clip ahead was not
+	 * always enough; a long passage needs no more than a few.
+	 */
+	#lookAhead(): void {
+		const audio = this.#audio;
+		let ahead =
+			audio && Number.isFinite(audio.duration)
+				? Math.max(0, audio.duration - audio.currentTime) / this.rate
+				: 0;
+		let fetched = 0;
+		for (let index = this.index + 1; index < this.#utterances.length; index += 1) {
+			const utterance = this.#utterances[index];
+			if (!utterance || ahead >= ReadAloud.LEAD_SECONDS || fetched >= ReadAloud.AHEAD) {
+				return;
+			}
+			this.#clipFor(utterance).catch(() => undefined);
+			fetched += 1;
+			ahead += this.#seconds(utterance);
+		}
+	}
+
+	#keyOf(utterance: Utterance): string {
+		return `${this.#voiceOf(utterance.who)}\u0000${utterance.spoken}`;
 	}
 
 	readonly #refused = (cause: unknown) => {
@@ -399,14 +482,20 @@ export class ReadAloud {
 
 	#clipFor(utterance: Utterance): Promise<Clip> {
 		const voice = this.#voiceOf(utterance.who);
-		const key = `${voice}\u0000${utterance.spoken}`;
+		const key = this.#keyOf(utterance);
 		let clip = this.#clips.get(key);
 		if (!clip) {
 			const visible = this.#passage?.text.slice(utterance.from, utterance.to) ?? '';
-			clip = speak({ text: utterance.spoken, voice }, this.#controller.signal).then((spoken) => ({
-				url: URL.createObjectURL(spoken.audio),
-				placed: alignWords(visible, spoken.words)
-			}));
+			clip = speak({ text: utterance.spoken, voice }, this.#controller.signal).then((spoken) => {
+				const last = spoken.words.at(-1);
+				if (last) {
+					this.#lengths.set(key, last.end + 0.3);
+				}
+				return {
+					url: URL.createObjectURL(spoken.audio),
+					placed: alignWords(visible, spoken.words)
+				};
+			});
 			// A failed clip is asked for again next time, not remembered as failed.
 			clip.catch(() => this.#clips.delete(key));
 			this.#clips.set(key, clip);
@@ -430,6 +519,7 @@ export class ReadAloud {
 	#follow(): void {
 		cancelAnimationFrame(this.#frame);
 		const generation = this.#generation;
+		let ticks = 0;
 		const tick = () => {
 			if (generation !== this.#generation || !this.playing) {
 				return;
@@ -437,7 +527,13 @@ export class ReadAloud {
 			const utterance = this.#utterances[this.index];
 			const clip = this.#clip;
 			if (utterance && clip && this.#passage && this.highlight) {
-				const word = wordAt(clip.placed, this.#audio?.currentTime ?? 0);
+				// Before its first word is said, that word: never the whole
+				// utterance, which flashed up at the start of each one. Only a
+				// clip with no timings at all is lit whole.
+				const time = this.#audio?.currentTime ?? 0;
+				const from = this.#startWord;
+				const word =
+					from && time < from.start ? from : (wordAt(clip.placed, time) ?? clip.placed[0]);
 				const range = word
 					? rangeFor(this.#passage, utterance.from + word.from, utterance.from + word.to)
 					: rangeFor(this.#passage, utterance.from, utterance.to);
@@ -445,6 +541,11 @@ export class ReadAloud {
 					showHighlight(range);
 					this.#keepInView(range);
 				}
+			}
+			// How much is in hand changes as it plays, and with the speed.
+			ticks += 1;
+			if (ticks % 30 === 0) {
+				this.#lookAhead();
 			}
 			this.#frame = requestAnimationFrame(tick);
 		};
