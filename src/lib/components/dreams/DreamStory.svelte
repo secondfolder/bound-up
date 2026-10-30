@@ -1754,9 +1754,13 @@
 		}
 
 		/* A box of its own, in the middle of the button, not a line's worth of
-		   inline space with room left under it for descenders. */
-		wa-icon {
+		   inline space with room left under it for descenders; and none of the
+		   margin Web Awesome's native button styles give an icon beside a
+		   label, which there is none of here: it pushed the icon off centre. */
+		wa-icon,
+		wa-spinner {
 			display: block;
+			margin: 0;
 		}
 
 		/* A triangle looks left of centre when its box is centred: its weight

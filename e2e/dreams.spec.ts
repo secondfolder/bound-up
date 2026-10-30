@@ -1485,6 +1485,29 @@ test.describe('daydreams, the new engine', () => {
 		await expect(
 			page.locator('.dock').getByRole('region', { name: 'Reading aloud' })
 		).toBeVisible();
+		// Its play icon is in the middle of it: the glyph, not just its box, within
+		// the little nudge right a triangle is given to look centred.
+		// Polled: the icon's drawing comes from Font Awesome's CDN after the page.
+		const offCentre = () =>
+			player.locator('.bubble').evaluate((bubble) => {
+				const bounds = bubble.getBoundingClientRect();
+				const path = bubble.querySelector('wa-icon')?.shadowRoot?.querySelector('path');
+				const matrix = path?.getScreenCTM();
+				if (!(path && matrix)) {
+					return null;
+				}
+				const drawn = path.getBBox();
+				const from = new DOMPoint(drawn.x, drawn.y).matrixTransform(matrix);
+				const to = new DOMPoint(drawn.x + drawn.width, drawn.y + drawn.height).matrixTransform(
+					matrix
+				);
+				return {
+					x: Math.abs((from.x + to.x) / 2 - (bounds.x + bounds.width / 2)),
+					y: Math.abs((from.y + to.y) / 2 - (bounds.y + bounds.height / 2))
+				};
+			});
+		await expect.poll(async () => (await offCentre())?.x ?? 99).toBeLessThanOrEqual(3);
+		await expect.poll(async () => (await offCentre())?.y ?? 99).toBeLessThanOrEqual(1);
 		const continueLeft =
 			(await page.getByRole('button', { name: 'Continue daydream' }).boundingBox())?.x ?? 0;
 		const playerLeft = (await player.boundingBox())?.x ?? 0;
