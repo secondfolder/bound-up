@@ -658,7 +658,12 @@ so none is said rather than left to be guessed), which scrolls to them
 (`watchSuggestions`, on the turn's place at the end, against `<main>` less
 the row's height). Hovered, Continue, Write and Your turn are tinted over
 their own solid background: the tint alone is see-through, and the story
-showed through. At the row's end is the read-aloud bubble (see "Read aloud").
+showed through. At the row's end is the read-aloud bubble (see "Read aloud"). Without
+read aloud, Continue, Write and Your turn are in the middle of the row: a
+spring each side (`.lead`, `.gap`), each taking back the row's gap beside
+them. Turned on, the first spring gives way (its `flex-grow` animated, 250ms)
+so they slide to the start as the bubble fades in at the end; turned off,
+they slide back. At once where the device asks for less motion.
 
 The row never pushes the player off the screen. Its labels step down as room
 runs out (`fitLabels`): "Continue daydream" and "Write response…" become

@@ -1513,6 +1513,26 @@ test.describe('daydreams, the new engine', () => {
 		// Nothing plays, and there is no player, until it is asked for.
 		const player = page.getByRole('region', { name: 'Reading aloud' });
 		await expect(player).toHaveCount(0);
+		// Without it, the turn's controls are in the middle of the row; with it,
+		// they slide to its start for the player, and back again once it is off.
+		const placed = () =>
+			page.locator('.turn-row').evaluate((row) => {
+				const bounds = row.getBoundingClientRect();
+				const controls = row.querySelector('.turn-controls')?.getBoundingClientRect();
+				return controls
+					? {
+							offCentre: Math.abs(controls.x + controls.width / 2 - (bounds.x + bounds.width / 2)),
+							fromStart: controls.x - bounds.x
+						}
+					: null;
+			});
+		await expect.poll(async () => (await placed())?.offCentre ?? 99).toBeLessThan(2);
+		await page.getByRole('button', { name: 'Read aloud' }).click();
+		await expect(player).toContainText('Tap Listen on a passage');
+		await expect.poll(async () => (await placed())?.fromStart ?? 99).toBeLessThan(2);
+		await page.getByRole('button', { name: 'Read aloud' }).click();
+		await expect(player).toHaveCount(0);
+		await expect.poll(async () => (await placed())?.offCentre ?? 99).toBeLessThan(2);
 		await page.getByRole('button', { name: 'Read aloud' }).click();
 		await expect(player).toContainText('Tap Listen on a passage');
 		// A bubble at the end of the floating row, after the turn, so it stays in

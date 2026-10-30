@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount, tick } from 'svelte';
 	import type { Attachment } from 'svelte/attachments';
+	import { fade } from 'svelte/transition';
 	import { page } from '$app/state';
 	import ResponsiveDialog from '$lib/components/ResponsiveDialog.svelte';
 	import { unlockedIdentity } from '$lib/crypto/session.svelte';
@@ -191,6 +192,14 @@
 	/** While the labels animate to a new step, when the controls are held on one line. */
 	let fitAnimating = $state(false);
 	const FIT_STEPS = 4;
+	/** How long the turn's controls take to slide aside for the player, or back. */
+	const SLIDE_MS = 250;
+
+	/** A transition's length, or none where the device asks for less motion. */
+	function motionMs(ms: number): number {
+		return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : ms;
+	}
+
 	/** How long a button takes to grow or shrink to its new label. */
 	const FIT_MS = 180;
 
@@ -1319,7 +1328,17 @@
 	     read-aloud bubble. Writing, it is the box instead. -->
 	<div class="dock" data-writing={writing} bind:this={dock}>
 		{#if session.busy || !writing}
-			<div class="turn-row" data-fit={fitStep} data-animating={fitAnimating || undefined} {@attach fitLabels}>
+			<div
+				class="turn-row"
+				class:listening={Boolean(reader && session.listening)}
+				data-fit={fitStep}
+				data-animating={fitAnimating || undefined}
+				{@attach fitLabels}
+			>
+				<!-- With a spring each side the turn's controls are in the middle;
+				     with read aloud on, this one gives way and they slide to the
+				     start, the player coming in at the end. -->
+				<span class="lead"></span>
 				<!-- The turn's own controls, which wrap rather than push the player
 				     off the screen once even their icons alone do not fit. -->
 				<div class="turn-controls">
@@ -1370,6 +1389,7 @@
 				{#if reader && session.listening}
 					{const around = reader.progress}
 					<section
+						transition:fade={{ duration: motionMs(SLIDE_MS) }}
 						class="player"
 						aria-label="Reading aloud"
 						style:--speaker-colour={reader.speakerId ? colours.get(reader.speakerId) : undefined}
@@ -2194,9 +2214,32 @@
 			flex-wrap: nowrap;
 		}
 
+		/* The springs: one each side centres the turn's controls; with read
+		   aloud on the first gives way, so they slide to the start. Its growing
+		   and shrinking is the slide. Kept in step with `SLIDE_MS`. */
+		.lead,
 		.gap {
 			flex: 1 1 0;
 			min-inline-size: 0;
+		}
+
+		/* Each takes back the row's gap beside the controls, so a spring
+		   given way leaves them right at the start, not a gap in. */
+		.gap {
+			margin-inline-start: calc(-1 * var(--wa-space-xs));
+		}
+
+		.lead {
+			margin-inline-end: calc(-1 * var(--wa-space-xs));
+			transition: flex-grow 250ms ease-in-out;
+
+			@media (prefers-reduced-motion: reduce) {
+				transition: none;
+			}
+		}
+
+		&.listening .lead {
+			flex-grow: 0;
 		}
 
 		.fits {
