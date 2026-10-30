@@ -1012,7 +1012,11 @@ line. Code applies the changes along the branch being read, in order
 (`elementsAt`, `changedStat`): "+5" and "-10" move a number, anything else
 replaces it, a meter stays within its range and a count at or above zero, a
 list gains the item. So each branch has its own values, and nothing is
-stored apart from the passages. The words that earned a change are marked,
+stored apart from the passages. An element written again after a passage (a
+card filled in, facts added) keeps code's stats: the model writing it is
+sent both the passage that moved a stat and the stat already moved, and
+moved it again (a count the opening raised to 1 showed 2). Only a stat the
+element did not have yet is taken from it. The words that earned a change are marked,
 with the change beside them ("+5 composure"), and the stats as they stand
 show above the story.
 

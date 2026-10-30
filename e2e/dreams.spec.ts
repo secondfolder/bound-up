@@ -234,6 +234,15 @@ test.describe('daydreams, the new engine', () => {
 		await expect(page.locator('li[data-step="pick"]')).toContainText('Picked:');
 		await expect(ready).toContainText('Ottilie');
 		await expect(page.locator('ol.turns')).toHaveCount(0);
+		// On a narrow phone an element's line wraps inside its row rather than
+		// running out of it (Web Awesome keeps a native button to one line).
+		await page.setViewportSize({ width: 320, height: 800 });
+		const rows = ready.locator('button.person');
+		await expect(rows.first()).toBeVisible();
+		const overflowing = await rows.evaluateAll(
+			(buttons) => buttons.filter((button) => button.scrollWidth > button.clientWidth + 1).length
+		);
+		expect(overflowing).toBe(0);
 
 		// In the list it is a draft until it is started.
 		const dreamUrl = page.url();

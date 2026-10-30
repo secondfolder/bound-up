@@ -35,7 +35,7 @@ Reply with <elements>…</elements> holding only the elements that change, each 
 - Add durable facts the passages establish: promises made, what has been revealed, who now knows what (in a <knows> field on a character), what someone has started calling someone. Not what merely happened in a scene.
 - Keep every field that is still true. Never drop a field, and never contradict what a passage said.
 - Keep shown="no" on what the card should not show.
-- Update a stat only if a passage moved it and it was not already updated.`;
+- Write every stat exactly as it stands: code moves stats from the passages' own <set> tags, and has already.`;
 
 const CARD_FOCUS = (id: string) =>
 	`The user has opened the card for "${id}", which is still little more than a name. Fill it in: the fields its type calls for (a character's appearance, manner, background and who they are to the user), consistent with everything the passages say about them. Include it in your reply even if nothing else changes.`;

@@ -1236,7 +1236,12 @@
 		}
 
 		/* Shaped like the user's own turn, outlined where a sent one is filled. */
+		/* A sentence, not a control's label: Web Awesome's native button styles
+		   (one line, a fixed height) would run a long one off the screen. */
 		.suggestion {
+			height: auto;
+			white-space: normal;
+			overflow-wrap: anywhere;
 			padding: var(--wa-space-xs) var(--wa-space-s);
 			border: 1px solid var(--wa-color-brand-border-normal);
 			border-radius: var(--wa-border-radius-l);

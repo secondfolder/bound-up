@@ -229,6 +229,18 @@ function applySet(elements: Map<string, DreamElement>, changes: Record<string, n
 	}
 }
 
+/**
+ * The stats of an element written again after a passage (a card filled in,
+ * facts added): code's own, never the model's. The model writing it is sent
+ * the passage that moved a stat as well as the stat already moved, and moved
+ * it again: a count the opening raised to 1 showed 2 (seen on GLM,
+ * 2026-10-30). Only a stat the element did not have yet is taken from it.
+ */
+function keptStats(current: DreamElement, written: DreamElement): DreamElement['stats'] {
+	const known = new Set(current.stats.map((stat) => stat.name));
+	return [...current.stats, ...written.stats.filter((stat) => !known.has(stat.name))];
+}
+
 /** The stat changes a `<set>` tag carries: every attribute addressed `element.stat`. */
 export function setChanges(tag: {
 	attrs: Partial<Record<string, string>>;
@@ -268,7 +280,13 @@ export function elementsAt(
 		}
 		for (const { detail } of details.filter((candidate) => candidate.turnId === entry.id)) {
 			if (detail.kind === 'element') {
-				elements.set(detail.element.id, detail.element);
+				const current = elements.get(detail.element.id);
+				elements.set(
+					detail.element.id,
+					current
+						? { ...detail.element, stats: keptStats(current, detail.element) }
+						: detail.element
+				);
 			}
 		}
 	}

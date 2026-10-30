@@ -149,6 +149,35 @@ describe('elementsAt', () => {
 		expect(byId.get('renwick')?.fields).toEqual([{ name: 'manner', text: 'Gruff.', shown: true }]);
 	});
 
+	it('keeps code’s stats when detail writes an element again, moving them once', () => {
+		// The opening moved a count to 1; the elements step, sent the passage and
+		// the count already moved, wrote it back at 2 (seen on GLM, 2026-10-30).
+		const tally: DreamElement = {
+			...ottilie,
+			id: 'dynamic',
+			name: 'Free use',
+			stats: [{ name: 'uses', kind: 'count', value: 0, max: 12, description: '' }]
+		};
+		const path = [passage('p1', 'You take her. <set dynamic.uses="+1"/>')];
+		const rewritten: DreamElement = {
+			...tally,
+			fields: [{ name: 'description', text: 'Whenever you want.', shown: true }],
+			stats: [
+				{ name: 'uses', kind: 'count', value: 2, max: 12, description: '' },
+				{ name: 'days', kind: 'count', value: 1, description: 'New.' }
+			]
+		};
+		const [after] = elementsAt([tally], path, [
+			{ turnId: 'p1', detail: { kind: 'element', element: rewritten } }
+		]);
+		expect(after?.fields).toEqual(rewritten.fields);
+		// A stat it already had stays code's; one it did not is taken.
+		expect(after?.stats.map((stat) => [stat.name, stat.value])).toEqual([
+			['uses', 1],
+			['days', 1]
+		]);
+	});
+
 	it('knows a card that is still only a name and a seed', () => {
 		const [stub] = elementsAt(
 			[],

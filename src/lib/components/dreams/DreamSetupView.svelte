@@ -882,12 +882,17 @@
 		padding: 0;
 		list-style: none;
 
+		/* Web Awesome's native button styles give every <button> one line at the
+		   control's height (nowrap, a fixed height), so a long description ran
+		   out of the row: both are undone for a row of text. */
 		.person {
 			display: grid;
 			grid-template-columns: 1.25rem minmax(0, 1fr);
 			gap: var(--wa-space-xs);
 			align-items: baseline;
 			width: 100%;
+			height: auto;
+			white-space: normal;
 			padding: var(--wa-space-2xs);
 			border: 0;
 			border-radius: var(--wa-border-radius-m);
