@@ -612,20 +612,26 @@ might write next (`{"suggest": [...]}`), in their own voice and varied: one
 going along with the moment, one resisting or turning it, one somewhere
 unexpected. They are never sent back to the model.
 
-**Your turn** is one area pinned under the story, holding the three ways to
-take it, each drawn as what it is:
+**Your turn** is one centred list of chips under the story, the three ways
+to take it each drawn as what it is:
 
-- the newest passage's **suggestions**, under "You could say", as speech
-  bubbles shaped like the user's own turn once sent but outlined, cut to two
-  lines: a tap sends one, and the pencil beside it opens the box with it in,
-  to change first (`DreamTextBox.put`);
-- **Write your own…**, drawn as the empty box it opens into, which grows
-  into the box, focused, with Send and Cancel (a view transition, at once
-  where the browser has none or the device asks for less motion). Cancel
-  puts it away keeping what it holds, which the button then shows as "Your
-  draft"; the box stays mounted while put away, so a draft is restored on
-  load;
-- **Continue**, a plain button with a forward arrow: handing the story on.
+- the newest passage's **suggestions**, solid: a tap sends one. Held (half a
+  second), or its menu opened (a right click, Android's long press, the menu
+  key), it goes into the box instead, to change before sending
+  (`holdToChange`; iOS sends no `contextmenu` for a long press, hence the
+  timer). A long press selects nothing and opens no menu of the browser's;
+- **Continue daydream**, outlined, with a forward icon: handing the story on;
+- **Write your own…**, outlined, with a pen, which grows into the box,
+  focused, with Send and Cancel (a view transition, at once where the
+  browser has none or the device asks for less motion). Cancel puts it away
+  keeping what it holds, which the chip then shows as "Your draft"; the box
+  stays mounted while put away, so a draft is restored on load.
+
+The area is sticky at the bottom of what scrolls, as the kink list's pinned
+bar is at the top: at the story's end it sits on the page with no
+background, and scrolled up it stays in sight with a background, faded in,
+right across the page (`watchStuck`, a sentinel just after it that is out
+of sight below exactly when it is stuck).
 
 While a passage is being written, the area holds only Stop. The box empties
 as its words are sent, not once the answer has finished, and gets them back

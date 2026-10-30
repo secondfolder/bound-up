@@ -130,6 +130,95 @@
 		);
 	}
 
+	/**
+	 * Whether the turn area is stuck to the bottom over the story, rather than
+	 * sitting at its end: it takes a background only then, as the kink list's
+	 * pinned bar does at the top. Watched with a sentinel just after it, which
+	 * is out of sight below exactly when it is stuck; the viewport is the
+	 * root, as the app shell's <main> scrolls inside it.
+	 */
+	let stuck = $state(false);
+	const watchStuck: Attachment<HTMLElement> = (sentinel) => {
+		const observer = new IntersectionObserver(([entry]) => {
+			// Hidden below: clipped by <main>, which may still be inside the viewport.
+			stuck = entry !== undefined && !entry.isIntersecting && entry.boundingClientRect.top > 0;
+		});
+		observer.observe(sentinel);
+		return () => observer.disconnect();
+	};
+
+	/** How long a suggestion is held before it is put in the box rather than sent. */
+	const HOLD_MS = 500;
+	/** How far a finger may drift and still be holding, not scrolling. */
+	const HOLD_SLOP_PX = 10;
+
+	/**
+	 * A suggestion held, rather than tapped, goes into the box to be changed
+	 * before it is sent. A timer, because iOS sends no `contextmenu` for a long
+	 * press; and `contextmenu` itself, which is Android's long press, a right
+	 * click and the keyboard's menu key, so it is not only for touch. The tap
+	 * that ends a hold is swallowed, so the suggestion is not sent as well.
+	 */
+	function holdToChange(suggestion: string): Attachment<HTMLElement> {
+		return (element) => {
+			let timer: ReturnType<typeof setTimeout> | undefined;
+			let held = false;
+			let startX = 0;
+			let startY = 0;
+			const cancel = () => {
+				clearTimeout(timer);
+				timer = undefined;
+			};
+			const change = () => {
+				cancel();
+				held = true;
+				openReply(suggestion);
+			};
+			const down = (event: PointerEvent) => {
+				held = false;
+				startX = event.clientX;
+				startY = event.clientY;
+				timer = setTimeout(change, HOLD_MS);
+			};
+			const move = (event: PointerEvent) => {
+				if (Math.hypot(event.clientX - startX, event.clientY - startY) > HOLD_SLOP_PX) {
+					cancel();
+				}
+			};
+			const menu = (event: Event) => {
+				event.preventDefault();
+				if (!held) {
+					change();
+				}
+			};
+			// Before Svelte's own click handler, which listens at the root.
+			const click = (event: Event) => {
+				if (held) {
+					event.preventDefault();
+					event.stopPropagation();
+					held = false;
+				}
+			};
+			element.addEventListener('pointerdown', down);
+			element.addEventListener('pointermove', move);
+			for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
+				element.addEventListener(type, cancel);
+			}
+			element.addEventListener('contextmenu', menu);
+			element.addEventListener('click', click);
+			return () => {
+				cancel();
+				element.removeEventListener('pointerdown', down);
+				element.removeEventListener('pointermove', move);
+				for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
+					element.removeEventListener(type, cancel);
+				}
+				element.removeEventListener('contextmenu', menu);
+				element.removeEventListener('click', click);
+			};
+		};
+	}
+
 	/** Puts the box away; what it holds stays as a draft, shown on the button. */
 	function closeReply() {
 		morph(() => {
@@ -841,7 +930,7 @@
 	     their own words, or Continue. Each is drawn as what it is: suggestions
 	     as the speech bubbles a sent turn becomes, their own words as the box
 	     they will be, Continue as handing the story on. -->
-	<div class="compose" data-writing={writing}>
+	<div class="compose" class:stuck={stuck} data-writing={writing}>
 		{#if session.busy}
 			<div class="turn-row">
 				<wa-button appearance="outlined" onclick={() => session.stop()}>
@@ -850,43 +939,48 @@
 				</wa-button>
 			</div>
 		{:else if !writing}
-			{#if suggested.length > 0}
-				<p class="suggestions-label" aria-hidden="true">You could say</p>
-				<ul class="suggestions" aria-label="You could say">
-					{#each suggested as suggestion (suggestion)}
-						<li>
-							<wa-button size="s" appearance="plain" onclick={() => openReply(suggestion)}>
-								<wa-icon name="pen" label={`Change “${suggestion}” first`}></wa-icon>
-							</wa-button>
-							<!-- Native: a reply bubble, drawn as the user's own turn is. -->
-							<button type="button" class="suggestion" onclick={() => session.send(suggestion)}
-								><span>{suggestion}</span></button
-							>
-						</li>
-					{/each}
-				</ul>
-			{/if}
-			<div class="turn-row">
-				<!-- Native: a disclosure, which opens into the box it is drawn as. -->
-				<button
-					type="button"
-					class="write"
-					aria-expanded="false"
-					aria-controls="dream-turn-box"
-					onclick={() => openReply()}
-				>
-					<wa-icon name="pen" aria-hidden="true"></wa-icon>
-					{#if drafted}
-						<span class="write-text" data-draft><span class="wa-visually-hidden">Your draft: </span>{drafted}</span>
-					{:else}
-						<span class="write-text">Write your own…</span>
-					{/if}
-				</button>
-				<wa-button class="continue" appearance="plain" onclick={() => session.send('')}>
-					Continue
-					<wa-icon slot="end" name="forward" aria-hidden="true"></wa-icon>
-				</wa-button>
-			</div>
+			<!-- One list of chips: the suggestions, solid, as words to send; then
+			     Continue and writing your own, outlined, as the other ways to take
+			     the turn. Native buttons: a chip is a sentence, and wraps. -->
+			<p id="dream-hold-hint" class="wa-visually-hidden">Hold it, or open its menu, to change it before sending.</p>
+			<ul class="turn-chips" aria-label="Your turn">
+				{#each suggested as suggestion (suggestion)}
+					<li>
+						<button
+							type="button"
+							class="chip suggestion"
+							aria-describedby="dream-hold-hint"
+							onclick={() => session.send(suggestion)}
+							{@attach holdToChange(suggestion)}
+						>
+							{suggestion}
+						</button>
+					</li>
+				{/each}
+				<li>
+					<button type="button" class="chip other continue" onclick={() => session.send('')}>
+						<wa-icon name="forward" aria-hidden="true"></wa-icon>
+						Continue daydream
+					</button>
+				</li>
+				<li>
+					<!-- A disclosure, which opens into the box. -->
+					<button
+						type="button"
+						class="chip other write"
+						aria-expanded="false"
+						aria-controls="dream-turn-box"
+						onclick={() => openReply()}
+					>
+						<wa-icon name="pen" aria-hidden="true"></wa-icon>
+						{#if drafted}
+							<span class="write-text" data-draft><span class="wa-visually-hidden">Your draft: </span>{drafted}</span>
+						{:else}
+							<span class="write-text">Write your own…</span>
+						{/if}
+					</button>
+				</li>
+			</ul>
 		{/if}
 		<!-- Kept while put away, so a draft is restored and a suggestion can be put in it. -->
 		<div id="dream-turn-box" class="reply" hidden={!writing || session.busy}>
@@ -911,6 +1005,8 @@
 			</DreamTextBox>
 		</div>
 	</div>
+	<!-- In sight exactly when the page is scrolled to its end (`watchStuck`). -->
+	<div class="compose-end" aria-hidden="true" {@attach watchStuck}></div>
 </div>
 
 {#if about?.kind === 'passage' && aboutId}
@@ -1291,47 +1387,112 @@
 		gap: var(--wa-space-xs);
 	}
 
+	/* Stuck to the bottom of what scrolls while the story runs on under it,
+	   and sitting at the story's end once scrolled there, as the kink list's
+	   pinned bar does at the top. */
 	.compose {
 		position: sticky;
 		bottom: 0;
+		z-index: 1;
 		display: flex;
 		flex-direction: column;
 		gap: var(--wa-space-xs);
 		padding-block: var(--wa-space-s);
-		background: var(--wa-color-surface-default);
 
-		/* Drawn as the empty box it opens into: a field's shape and quiet text.
-		   Web Awesome's native button styles are undone (centred, one fixed line). */
-		.write {
-			view-transition-name: dream-reply;
-			flex: 1 1 auto;
-			justify-content: flex-start;
+		/* The background it takes only while stuck, from one edge of the page
+		   to the other rather than the column's width, so the story is hidden
+		   under it right across. A border-image outset reaches that far without
+		   widening what the page scrolls over, which a wide box would. Faded in
+		   quickly. */
+		&::before {
+			content: '';
+			position: absolute;
+			inset: 0;
+			z-index: -1;
+			border-image-source: linear-gradient(var(--wa-color-surface-lowered) 0 0);
+			border-image-slice: 0 fill;
+			border-image-outset: 0 100vw;
+			opacity: 0;
+			transition: opacity 150ms ease-out;
+			pointer-events: none;
+		}
+
+		&.stuck::before {
+			opacity: 1;
+		}
+
+		@media (prefers-reduced-motion: reduce) {
+			&::before {
+				transition: none;
+			}
+		}
+
+		/* A chip is a sentence, not a control's label: Web Awesome's native
+		   button styles (one line at a fixed height, centred) are undone. */
+		.chip {
+			display: inline-flex;
+			align-items: center;
 			gap: var(--wa-space-xs);
-			min-width: 0;
-			height: var(--wa-form-control-height);
-			padding-inline: var(--wa-form-control-padding-inline);
-			border: var(--wa-form-control-border-width) var(--wa-form-control-border-style)
-				var(--wa-form-control-border-color);
-			border-radius: var(--wa-form-control-border-radius);
-			background: var(--wa-form-control-background-color);
-			color: var(--wa-color-text-quiet);
+			max-width: 100%;
+			height: auto;
+			min-height: var(--wa-form-control-height);
+			padding: var(--wa-space-2xs) var(--wa-space-m);
+			border: 1px solid transparent;
+			border-radius: var(--wa-border-radius-pill);
 			font: inherit;
 			font-weight: normal;
-			text-align: start;
-			cursor: text;
-
-			&:hover {
-				border-color: var(--wa-color-brand-border-normal);
-			}
+			white-space: normal;
+			overflow-wrap: anywhere;
+			text-align: center;
+			cursor: pointer;
 
 			&:focus-visible {
 				outline: var(--wa-focus-ring);
 			}
 		}
+
+		/* Words to send as they are: solid. Held, it is changed first, so a long
+		   press must not select its words or open the browser's own menu. */
+		.suggestion {
+			-webkit-touch-callout: none;
+			user-select: none;
+			background: var(--wa-color-brand-fill-quiet);
+			color: var(--wa-color-text-normal);
+
+			&:hover {
+				background: var(--wa-color-brand-fill-normal);
+			}
+		}
+
+		/* The other ways to take the turn: outlined, with an icon. */
+		.other {
+			border-color: var(--wa-color-brand-border-normal);
+			background: transparent;
+			color: var(--wa-color-brand-on-quiet);
+
+			&:hover {
+				background: var(--wa-color-brand-fill-quiet);
+			}
+		}
+	}
+
+	.turn-chips {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: var(--wa-space-xs);
+		margin: 0;
+		padding: 0;
+		list-style: none;
+
+		li {
+			max-width: 100%;
+		}
 	}
 
 	/* The button and the box it opens into are one thing to the view
 	   transition, so the one grows into the other. */
+	.write,
 	.reply {
 		view-transition-name: dream-reply;
 	}
@@ -1339,83 +1500,22 @@
 	.turn-row {
 		display: flex;
 		align-items: center;
+		justify-content: center;
 		gap: var(--wa-space-xs);
 	}
 
+	/* A draft on the chip is cut to a line. */
 	.write-text {
 		min-width: 0;
+		max-width: 16rem;
 		overflow: hidden;
 		white-space: nowrap;
 		text-overflow: ellipsis;
-
-		/* A draft is words already written, not a placeholder. */
-		&[data-draft] {
-			color: var(--wa-color-text-normal);
-		}
 	}
 
-	.continue {
-		flex: none;
-	}
-
-	.suggestions-label {
-		margin: 0;
-		color: var(--wa-color-text-quiet);
-		font-size: var(--wa-font-size-xs);
-		text-align: end;
-	}
-
-	.suggestions {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-end;
-		gap: var(--wa-space-2xs);
-		margin: 0;
-		padding: 0;
-		list-style: none;
-
-		li {
-			display: flex;
-			align-items: center;
-			gap: var(--wa-space-3xs);
-			max-width: 85%;
-		}
-
-		/* Shaped like the user's own turn once sent, a speech bubble with its
-		   tail at the corner, outlined where a sent one is filled. A sentence,
-		   not a control's label: Web Awesome's native button styles (one line,
-		   a fixed height) are undone, and a long one is cut to two lines. */
-		.suggestion {
-			height: auto;
-			white-space: normal;
-			overflow-wrap: anywhere;
-			padding: var(--wa-space-xs) var(--wa-space-s);
-			border: 1px solid var(--wa-color-brand-border-normal);
-			border-radius: var(--wa-border-radius-l);
-			border-end-end-radius: var(--wa-border-radius-s);
-			background: transparent;
-			color: inherit;
-			font: inherit;
-			font-weight: normal;
-			text-align: start;
-			cursor: pointer;
-
-			span {
-				display: -webkit-box;
-				overflow: hidden;
-				-webkit-box-orient: vertical;
-				-webkit-line-clamp: 2;
-				line-clamp: 2;
-			}
-
-			&:hover {
-				background: var(--wa-color-brand-fill-quiet);
-			}
-
-			&:focus-visible {
-				outline: var(--wa-focus-ring);
-			}
-		}
+	/* Zero height, only where it is matters (`watchStuck`). */
+	.compose-end {
+		block-size: 0;
 	}
 
 	.pull {

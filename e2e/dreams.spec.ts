@@ -277,32 +277,61 @@ test.describe('daydreams, the new engine', () => {
 		await expect(page.locator('ul.dreams li').first()).toContainText('1 passage');
 	});
 
-	test('a suggestion is sent with a tap, or put in the box to change first', async ({ page }) => {
+	test('the turn is a list of chips: suggestions, held to change first, Continue, and your own', async ({
+		page
+	}) => {
 		await dreamer(page);
 		await start(page, 'A quiet evening');
 		await play(page);
 		await saved(page);
 
-		const suggestions = page.getByRole('list', { name: 'You could say' });
-		await expect(
-			suggestions.getByRole('button', { name: 'I take the key.', exact: true })
-		).toBeVisible();
-		await suggestions
-			.getByRole('button', { name: 'Change “I leave it in her hand.” first' })
-			.click();
-		// The pencil opens the box, focused, with the suggestion in it to change.
+		// Suggestions first, then Continue, then writing your own, in one list.
+		const chips = page.getByRole('list', { name: 'Your turn' });
+		await expect(chips.getByRole('button')).toHaveText([
+			'I take the key.',
+			'I leave it in her hand.',
+			'Continue daydream',
+			'Write your own…'
+		]);
+		// Centred in the column.
+		await expect(chips).toHaveCSS('justify-content', 'center');
+
+		// Held rather than tapped, a suggestion goes into the box to change first,
+		// focused, and is not sent.
 		const turn = box(page, 'Your turn');
+		const leave = chips.getByRole('button', { name: 'I leave it in her hand.' });
+		const at = await leave.boundingBox();
+		if (!at) {
+			throw new Error('The suggestion has no box to hold');
+		}
+		await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
+		// Still held when the box opens: the hold, not letting go, is what opens it.
+		await page.mouse.down();
+		await expect(turn).toBeVisible();
+		await page.mouse.up();
 		await expect(turn).toHaveValue('I leave it in her hand.');
 		await expect(turn).toBeFocused();
-		await expect(suggestions).toHaveCount(0);
+		await expect(chips).toHaveCount(0);
+		await expect(page.locator('li.you')).toHaveCount(0);
+		await clickWaButton(page, 'Cancel');
+		// Its menu does the same: a right click, a long press on Android.
+		await chips.getByRole('button', { name: 'I take the key.', exact: true }).click({
+			button: 'right'
+		});
+		await expect(turn).toHaveValue('I take the key.');
+		await clickWaButton(page, 'Cancel');
 
-		// Put away, what it holds is kept, and shown on the button it went back into.
+		// Put away, what the box holds is kept, and shown on the chip it went back into.
+		await chips.getByRole('button', { name: 'Your draft: I take the key.' }).click();
+		await expect(turn).toBeFocused();
+		await turn.fill('I pocket it');
 		await clickWaButton(page, 'Cancel');
 		await expect(turn).toBeHidden();
-		const draft = page.getByRole('button', { name: 'Your draft: I leave it in her hand.' });
+		const draft = page.getByRole('button', { name: 'Your draft: I pocket it' });
 		await expect(draft).toBeVisible();
 
-		await suggestions.getByRole('button', { name: 'I take the key.', exact: true }).click();
+		// A suggestion is sent with a tap.
+		await chips.getByRole('button', { name: 'I take the key.', exact: true }).click();
 		await expect(page.getByText('You say "I take the key.", and Ottilie smiles.')).toBeVisible();
 		await saved(page);
 		// Only the newest passage offers any.
@@ -310,12 +339,32 @@ test.describe('daydreams, the new engine', () => {
 
 		// The draft is still there to send, and the box is empty once it is sent.
 		await draft.click();
-		await expect(turn).toHaveValue('I leave it in her hand.');
+		await expect(turn).toHaveValue('I pocket it');
 		await clickWaButton(page, 'Send');
 		await expect(turn).toBeHidden();
 		await saved(page);
 		await page.getByRole('button', { name: 'Write your own…' }).click();
 		await expect(turn).toHaveValue('');
+	});
+
+	test('the turn sits at the story’s end, and stays in sight with a background above it', async ({
+		page
+	}) => {
+		await page.setViewportSize({ width: 390, height: 480 });
+		await dreamer(page);
+		await start(page, 'A quiet evening');
+		await play(page);
+		await saved(page);
+		const turn = page.locator('.compose');
+		const main = page.locator('main');
+
+		// At the end of the story: no background of its own.
+		await main.evaluate((element) => element.scrollTo(0, element.scrollHeight));
+		await expect(turn).not.toHaveClass(/stuck/);
+		// Scrolled up, the story runs on under it, so it takes one.
+		await main.evaluate((element) => element.scrollTo(0, 0));
+		await expect(turn).toHaveClass(/stuck/);
+		await expect(turn.getByRole('button', { name: 'Continue daydream' })).toBeInViewport();
 	});
 
 	test('a turn is drawn as it was read, written out for you, and can be read differently', async ({
