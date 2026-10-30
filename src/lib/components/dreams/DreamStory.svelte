@@ -15,6 +15,7 @@
 	import DreamMarkup, { type MarkupInputs } from './DreamMarkup.svelte';
 	import DreamNotices from './DreamNotices.svelte';
 	import DreamTextBox from './DreamTextBox.svelte';
+	import { elementIcon } from './element-icons';
 
 	/**
 	 * Playing a daydream (docs/dreams.md, "Playing"): the branch being read,
@@ -126,6 +127,25 @@
 			: '';
 		inputsDraft?.save({ text, tagIds: [] });
 	});
+
+	// ── a passage's menu ─────────────────────────────────────────────────────
+
+	type WaSelectEvent = CustomEvent<{ item: HTMLElement & { value?: string } }>;
+
+	/** What the menu at a passage's end does: its items' values. */
+	function act(event: WaSelectEvent, turnId: string, source: string) {
+		// The property, not the attribute: Lit does not reflect what Svelte sets (AGENTS.md).
+		const choice = event.detail.item.value;
+		if (choice === 'listen') {
+			listen(turnId);
+		} else if (choice === 'take') {
+			void session.anotherTake(turnId);
+		} else if (choice === 'different') {
+			void session.differentDirection(turnId);
+		} else if (choice === 'edit') {
+			editing = { turnId, source };
+		}
+	}
 
 	// ── read aloud ───────────────────────────────────────────────────────────
 
@@ -305,7 +325,10 @@
 					{#if elements.length > 0}
 						<div class="chips">
 							{#each elements.filter((element) => element.shown) as element (element.id)}
-								<wa-button size="s" appearance="outlined" onclick={() => openCard(element.id)}>{elementLabel(element)}</wa-button>
+								<wa-button size="s" appearance="outlined" onclick={() => openCard(element.id)}>
+									<wa-icon slot="start" name={elementIcon(element.type)} aria-hidden="true"></wa-icon>
+									{elementLabel(element)}
+								</wa-button>
 							{/each}
 						</div>
 					{/if}
@@ -397,13 +420,9 @@
 							{/each}
 						</fieldset>
 					{/if}
-					<div class="passage-actions">
-						{#if reader && session.listening}
-							<wa-button size="s" appearance="plain" onclick={() => listen(entry.id)}>
-								<wa-icon slot="start" name="play" aria-hidden="true"></wa-icon>
-								Listen
-							</wa-button>
-						{/if}
+					<!-- Where one passage ends: a rule with what can be done to it in the
+					     middle. Versions and Retry stay in sight; the rest is in the menu. -->
+					<div class="passage-end">
 						{#if versions.ids.length > 1}
 							<span class="versions">
 								<wa-button
@@ -430,27 +449,29 @@
 								Retry
 							</wa-button>
 						{/if}
-						<wa-button size="s" appearance="plain" disabled={session.busy} onclick={() => session.anotherTake(entry.id)}>
-							Another take
-						</wa-button>
-						<wa-button
-							size="s"
-							appearance="plain"
-							disabled={session.busy}
-							onclick={() => session.differentDirection(entry.id)}
-						>
-							Different direction
-						</wa-button>
-						<wa-button
-							size="s"
-							appearance="plain"
-							disabled={session.busy}
-							onclick={() => {
-								editing = { turnId: entry.id, source: passage.source };
-							}}
-						>
-							Edit
-						</wa-button>
+						<wa-dropdown placement="bottom" onwa-select={(event: WaSelectEvent) => act(event, entry.id, passage.source)}>
+							<wa-button slot="trigger" size="s" appearance="plain" pill>
+								<wa-icon name="ellipsis" variant="solid" label="More for this passage"></wa-icon>
+							</wa-button>
+							{#if reader && session.listening}
+								<wa-dropdown-item value="listen">
+									<wa-icon slot="icon" name="play" aria-hidden="true"></wa-icon>
+									Listen
+								</wa-dropdown-item>
+							{/if}
+							<wa-dropdown-item value="take" disabled={session.busy}>
+								<wa-icon slot="icon" name="rotate" aria-hidden="true"></wa-icon>
+								Another take
+							</wa-dropdown-item>
+							<wa-dropdown-item value="different" disabled={session.busy}>
+								<wa-icon slot="icon" name="signs-post" aria-hidden="true"></wa-icon>
+								Different direction
+							</wa-dropdown-item>
+							<wa-dropdown-item value="edit" disabled={session.busy}>
+								<wa-icon slot="icon" name="pen" aria-hidden="true"></wa-icon>
+								Edit
+							</wa-dropdown-item>
+						</wa-dropdown>
 					</div>
 				</li>
 			{/if}
@@ -854,12 +875,20 @@
 		font-size: var(--wa-font-size-s);
 	}
 
-	.passage-actions {
+	.passage-end {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
+		justify-content: center;
 		gap: var(--wa-space-2xs);
-		margin-top: var(--wa-space-xs);
+		margin-top: var(--wa-space-s);
+
+		&::before,
+		&::after {
+			content: '';
+			flex: 1 1 2rem;
+			border-top: 1px solid var(--wa-color-surface-border);
+		}
 	}
 
 	.versions {

@@ -38,7 +38,7 @@
 </script>
 
 <script lang="ts">
-	import { splitBeats } from '$lib/dream/beats';
+	import { splitBeats, tidyBreaks } from '$lib/dream/beats';
 	import {
 		fieldKey,
 		outcomeFor,
@@ -93,7 +93,8 @@
 		onmore: (key: string, phrase: string) => void;
 	} = $props();
 
-	const nodes = $derived(parseMarkup(source, { final: !streaming }));
+	// Breaks made even: a paragraph break and a beat are the same space.
+	const nodes = $derived(tidyBreaks(parseMarkup(source, { final: !streaming })));
 	const live = $derived(inputs.live && !streaming);
 
 	/** Each `<more>` keyed by its order in the passage, so its expansion is found again. */
@@ -146,6 +147,8 @@
 	}
 
 	const TONES = new Set(['whisper', 'loud', 'slow']);
+	/** A paragraph break, after `tidyBreaks` has made them all one. */
+	const PARAGRAPH_BREAK = '\n\n';
 	const BLOCK_TAGS = new Set(['block', 'texts', 'letter']);
 	/** Kinds with a layout of their own; any other is the generic labelled card. */
 	const LAYOUTS = new Set([
@@ -362,7 +365,8 @@
 {#snippet tree(list: readonly MarkupNode[])}
 	{#each list as node, index (index)}
 		{#if node.type === 'text'}
-			{@render inline(inlineSegments(node.text, names))}
+			<!-- On one line: whitespace between them would draw as a space before each paragraph. -->
+			{#each node.text.split(PARAGRAPH_BREAK) as paragraph, at (at)}{#if at > 0}<span class="beat" aria-hidden="true"></span>{/if}{@render inline(inlineSegments(paragraph, names))}{/each}
 		{:else if node.type === 'ref'}
 			<button type="button" class="name" onclick={() => onref(node.id)}>{node.text}</button>
 		{:else if node.name === 'after'}

@@ -427,12 +427,29 @@ is running and is kept with the brief (`withAmendment`): before a direction is
 chosen, step 1 reads the brief again with it; after, the build runs again from
 the previous build plus the change, keeping the reading and the direction.
 
+### Reading a passage
+
+**Breaks are made even** (`tidyBreaks` in `src/lib/dream/beats.ts`). Models
+write `\n\n<beat/>\n\n` between paragraphs, which drawn as written (the
+passage is `white-space: pre-line`) was a blank line, the beat's space and
+another blank line: three times a plain paragraph break, and it varied from
+passage to passage. Now any run of blank lines is one paragraph break, the
+line breaks beside a beat or a block go, and a paragraph break is drawn as
+the same space a beat is. Read aloud, both end a sentence.
+
+**Cards say what they are**: each known element type has an icon
+(`element-icons.ts`: a person, you, a place, a thing, a pressure; a tag for
+any other), on its card, its chips and the setup's cast.
+
 ### Playing
 
 `DreamStory` shows the branch being read: each passage drawn by `DreamMarkup`,
-the user's turns between, and under each passage its versions (`‹ 2 / 3 ›`,
-hidden with one) and what can be done to it. None of them throws anything
-away; each adds a turn beside the passage:
+the user's turns between, and where each passage ends, a rule across the page
+with its versions (`‹ 2 / 3 ›`, hidden with one), Retry when it needs one, and
+a `⋯` menu in the middle (More for this passage) with what else can be done
+to it: Listen when reading aloud, Another take, Different direction, Edit. The
+rule is what tells one passage from the next when two come in a row. None of
+them throws anything away; each adds a turn beside the passage:
 
 - **Retry**, only on a passage that stopped short, was refused or failed part
   way: writes it again for the same turn.

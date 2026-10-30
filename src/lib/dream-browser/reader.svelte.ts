@@ -95,7 +95,15 @@ export function passageRuns(root: HTMLElement): Passage {
 				}
 				continue;
 			}
-			if (!(child instanceof HTMLElement) || child.matches(UNSPOKEN)) {
+			if (!(child instanceof HTMLElement)) {
+				continue;
+			}
+			// A beat or a paragraph's gap says nothing, but ends a sentence.
+			if (child.classList.contains('beat')) {
+				push('\n', context, null);
+				continue;
+			}
+			if (child.matches(UNSPOKEN)) {
 				continue;
 			}
 			const { who, how, tone } = child.dataset;

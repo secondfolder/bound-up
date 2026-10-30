@@ -62,6 +62,13 @@ async function play(page: Page, title = 'The Keeper') {
 	await expect(page.locator('ol.turns')).toBeVisible();
 }
 
+/** Chooses from the menu at the end of the newest passage. */
+async function passageMenu(page: Page, item: string) {
+	const passage = page.locator('li.passage').last();
+	await passage.getByRole('button', { name: 'More for this passage' }).click();
+	await passage.getByRole('menuitem', { name: item }).click();
+}
+
 /** Waits for the newest passage to be saved, not just shown. */
 async function saved(page: Page) {
 	await expect(page.locator('li.passage[aria-busy]')).toHaveCount(0);
@@ -128,7 +135,7 @@ test.describe('daydreams, the new engine', () => {
 		await saved(page);
 
 		// Another take is a version beside it, not in its place.
-		await page.locator('li.passage').last().getByRole('button', { name: 'Another take' }).click();
+		await passageMenu(page, 'Another take');
 		await expect(page.getByText(/^Again, differently:/)).toBeVisible();
 		await saved(page);
 		await expect(page.locator('li.passage').last()).toContainText('2 / 2');
@@ -201,11 +208,7 @@ test.describe('daydreams, the new engine', () => {
 		await expect(page.getByText(/and Ottilie smiles/)).toBeVisible();
 		await saved(page);
 
-		await page
-			.locator('li.passage')
-			.last()
-			.getByRole('button', { name: 'Different direction' })
-			.click();
+		await passageMenu(page, 'Different direction');
 		await expect(page.getByText(/^Instead: /)).toBeVisible();
 		await saved(page);
 		await expect(page.locator('li.passage').last()).toContainText('2 / 2');
@@ -353,7 +356,7 @@ test.describe('daydreams, the new engine', () => {
 		await expect(composure).toContainText('35 / 100');
 
 		// Another take, without the change: that branch is back to 30.
-		await page.locator('li.passage').last().getByRole('button', { name: 'Another take' }).click();
+		await passageMenu(page, 'Another take');
 		await expect(page.getByText(/^Again, differently:/)).toBeVisible();
 		await saved(page);
 		await expect(composure).toContainText('30 / 100');
@@ -427,7 +430,7 @@ test.describe('daydreams, the new engine', () => {
 		await expect(player).toContainText('Tap Listen on a passage');
 
 		const spoken = page.waitForRequest((request) => request.url().endsWith('/api/dreams/speak'));
-		await page.locator('li.passage').last().locator('wa-button', { hasText: 'Listen' }).click();
+		await passageMenu(page, 'Listen');
 		const sent = (await spoken).postDataJSON();
 		expect(sent.text.length).toBeGreaterThan(0);
 		expect(sent.voice).toMatch(/^[a-z-]+$/);

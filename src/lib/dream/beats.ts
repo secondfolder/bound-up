@@ -43,3 +43,50 @@ export function splitBeats(nodes: readonly MarkupNode[]): MarkupNode[][] {
 	close();
 	return beats;
 }
+
+/** Tags drawn as blocks of their own, whose edges are already a break. */
+const BLOCK_TAGS = new Set(['beat', 'block', 'texts', 'letter', 'roll', 'ask', 'picture']);
+const EDGE_START = /^\s*\n/;
+const EDGE_END = /\n\s*$/;
+const BLANK_LINES = /\n\s*\n\s*/g;
+const LEADING = /^\s+/;
+const TRAILING = /\s+$/;
+
+function isBlock(node: MarkupNode | undefined): boolean {
+	return node?.type === 'tag' && BLOCK_TAGS.has(node.name);
+}
+
+/**
+ * A passage's breaks made even, for drawing (docs/dreams.md, "Reading a
+ * passage"). A model writes `\n\n<beat/>\n\n` between paragraphs, which
+ * drawn as it stands was a blank line, the beat's space and another blank
+ * line: three times the space of a plain paragraph break. So any run of blank
+ * lines becomes exactly one paragraph break, and the line breaks beside a
+ * block or a beat go, since its edge is the break. Inside tags too.
+ */
+export function tidyBreaks(nodes: readonly MarkupNode[], root = true): MarkupNode[] {
+	const tidied: MarkupNode[] = [];
+	for (const [index, node] of nodes.entries()) {
+		if (node.type === 'tag') {
+			tidied.push({ ...node, children: tidyBreaks(node.children, false) });
+			continue;
+		}
+		if (node.type !== 'text') {
+			tidied.push(node);
+			continue;
+		}
+		let text = node.text.replace(BLANK_LINES, '\n\n');
+		const first = index === 0;
+		const last = index === nodes.length - 1;
+		if ((root && first) || isBlock(nodes[index - 1])) {
+			text = EDGE_START.test(text) ? text.replace(LEADING, '') : text;
+		}
+		if ((root && last) || isBlock(nodes[index + 1])) {
+			text = EDGE_END.test(text) ? text.replace(TRAILING, '') : text;
+		}
+		if (text) {
+			tidied.push({ type: 'text', text });
+		}
+	}
+	return tidied;
+}

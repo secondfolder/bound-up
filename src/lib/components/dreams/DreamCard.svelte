@@ -1,6 +1,7 @@
 <script lang="ts">
 	import ResponsiveDialog from '$lib/components/ResponsiveDialog.svelte';
 	import type { DreamElement } from '$lib/dream/elements';
+	import { elementIcon } from './element-icons';
 
 	/**
 	 * An element's card (docs/dreams.md, "Detail on tap"): what the story
@@ -58,7 +59,10 @@
 
 <ResponsiveDialog label={element.name} {onclose}>
 	<div class="card">
-		<p class="type">{heading(element.type)}{element.also.length > 0 ? ` · also ${element.also.join(', ')}` : ''}</p>
+		<p class="type">
+			<wa-icon name={elementIcon(element.type)} aria-hidden="true"></wa-icon>
+			{heading(element.type)}{element.also.length > 0 ? ` · also ${element.also.join(', ')}` : ''}
+		</p>
 		{#if shown.length === 0 && seed}
 			<p class="seed">{seed}</p>
 		{/if}
