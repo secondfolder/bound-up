@@ -900,7 +900,11 @@ test.describe('daydreams, the new engine', () => {
 		// A voice chosen for Ottilie, kept with the daydream.
 		await player.getByRole('button', { name: 'Voices' }).click();
 		const dialog = page.locator('wa-dialog[open]');
-		const row = dialog.locator('.row', { hasText: 'Ottilie' });
+		// The user's own lines have a voice to choose too.
+		const yours = dialog.locator('.row').nth(1);
+		await expect(yours.locator('.who')).toHaveText('You');
+		await expect(yours.locator('wa-button[slot="trigger"]')).toHaveText('Same as the narrator');
+		const row = dialog.locator('.row', { has: page.locator('.who', { hasText: 'Ottilie' }) });
 		const trigger = row.locator('wa-button[slot="trigger"]');
 		await expect(trigger).toHaveText('Same as the narrator');
 		await trigger.click();
@@ -923,6 +927,35 @@ test.describe('daydreams, the new engine', () => {
 			})
 			.toBe('smoky');
 		expect(asked.find((entry) => entry.text.includes('lamp turns'))?.voice).toBe('narrator');
+	});
+
+	test('Keep going turned on after the end asks for the next passage at once', async ({ page }) => {
+		const who = await dreamer(page);
+		await grantFeature(who.email, 'dreamVoice');
+		await start(page, 'A quiet evening');
+		await play(page);
+		await saved(page);
+
+		const read: string[] = [];
+		page.on('request', (request) => {
+			if (request.url().endsWith('/api/dreams/speak')) {
+				read.push(String(request.postDataJSON()?.text ?? ''));
+			}
+		});
+		await page.getByRole('button', { name: 'Read aloud' }).click();
+		const player = page.getByRole('region', { name: 'Reading aloud' });
+		await passageMenu(page, 'Listen');
+		await expect(player).toContainText('Tap Listen on a passage', { timeout: 20_000 });
+		// Read to its end with Keep going off: nothing more was asked for.
+		await expect(page.locator('li.passage')).toHaveCount(1);
+
+		await player.getByRole('button', { name: 'Keep going' }).click();
+		await expect(page.locator('li.passage')).toHaveCount(2, { timeout: 20_000 });
+		await expect
+			.poll(() => read.some((text) => text.includes('waits for you to go on')), {
+				timeout: 30_000
+			})
+			.toBe(true);
 	});
 
 	test('reading aloud does not pull the page back once it is scrolled away', async ({ page }) => {

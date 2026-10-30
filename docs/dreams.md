@@ -1163,7 +1163,10 @@ passage ends that.
 play falls under 20 seconds (`NEAR_END_SECONDS`, at the speed it plays),
 the story carries on as Continue would, so the next passage is being
 written while this one finishes, and is read once it is there. Not while
-the user is writing or anything else is running. It is checked on the
+the user is writing or anything else is running. Turned on past that point,
+it asks at once: the moment is only counted while it is on, and turned on
+once the newest passage has been read to its end, it asks for the next
+then (`setKeepGoing`, `toggleKeepGoing`). It is checked on the
 audio's `timeupdate`, which goes on firing with the screen locked, where an
 animation frame does not: listening with the phone in a pocket is the case
 it is for.
@@ -1192,10 +1195,12 @@ are dropped, so nothing becomes a cue by accident.
 **Voices** (`src/lib/dream/voices.ts`): the narration and the user's own
 lines are in the narrator's voice, the server's (a setting) unless the user
 chose another of the curated voices (`FISH_VOICE_PRESETS`) for this
-daydream; and every character speaks in the narrator's voice until the user
-chooses one for them. Both are chosen from **Voices** in the player, a menu
-for the narrator and one for each character, in their colour, and kept with
-the daydream (`voices` in the sealed setup, `session.setVoice`).
+daydream; and the user's own lines (`who="you"`, kept under `you`) and every
+character speak in the narrator's voice until the user chooses one for
+them. All are chosen from **Voices** in the player, a menu for the
+narrator, one for the user and one for each character, each in their
+colour, and kept with the daydream (`voices` in the sealed setup,
+`session.setVoice`).
 
 A voice that suits each character is still worked out, but only marked in
 their menu ("suits them"), never chosen for them: a voice of code's choosing

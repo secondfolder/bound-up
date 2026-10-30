@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ResponsiveDialog from '$lib/components/ResponsiveDialog.svelte';
+	import { YOU_ID } from '$lib/dream/colours';
 	import { type DreamElement, elementLabel } from '$lib/dream/elements';
 	import { type ChosenVoices, voiceFor } from '$lib/dream/voices';
 	import type { DreamSession } from '$lib/dream-browser/session.svelte';
@@ -8,8 +9,8 @@
 
 	/**
 	 * The voices a daydream is read in (docs/dreams.md, "Voices"): the
-	 * narrator's, and each character's, which is the narrator's until one is
-	 * chosen. Kept with the daydream. The voice that suits a character, from
+	 * narrator's, and the user's own lines' and each character's, which are
+	 * the narrator's until one is chosen. Kept with the daydream. The voice that suits a character, from
 	 * how they were described, is marked, but never chosen for them.
 	 */
 	let {
@@ -76,37 +77,40 @@
 				{/each}
 			</wa-dropdown>
 		</div>
+		{@render speaker(YOU_ID, 'You', 'you', null)}
 		{#each characters as character (character.id)}
-			{const suits = $derived(voiceFor(character, session.id, narrator ?? serverNarrator))}
-			{const own = $derived(chosen.characters?.[character.id] ?? null)}
-			<div class="row">
-				<span class="who">
-					<wa-icon name={elementIcon(character.type)} style:color={colours.get(character.id)} aria-hidden="true"
-					></wa-icon>
-					{elementLabel(character)}
-				</span>
-				<wa-dropdown
-					placement="bottom-end"
-					onwa-select={(event: WaSelectEvent) => choose(character.id, event)}
-				>
-					<wa-button slot="trigger" size="s" appearance="outlined" with-caret
-						>{characterVoice(character.id)}</wa-button
-					>
-					<wa-dropdown-item type="checkbox" value={DEFAULT} checked={own === null}>Same as the narrator</wa-dropdown-item>
-					{#each FISH_VOICE_PRESETS as preset (preset.id)}
-						<wa-dropdown-item type="checkbox" value={preset.id} checked={own === preset.id}>
-							{preset.label}{preset.id === suits ? ' · suits them' : ''}
-							<small class="line">{preset.description}</small>
-						</wa-dropdown-item>
-					{/each}
-				</wa-dropdown>
-			</div>
+			{@render speaker(
+				character.id,
+				elementLabel(character),
+				character.type,
+				voiceFor(character, session.id, narrator ?? serverNarrator)
+			)}
 		{/each}
 		{#if characters.length === 0}
-			<p class="quiet">Nobody in this daydream speaks but the narrator.</p>
+			<p class="quiet">Nobody else in this daydream speaks.</p>
 		{/if}
 	</div>
 </ResponsiveDialog>
+
+{#snippet speaker(id: string, name: string, type: string, suits: FishVoicePresetId | null)}
+	{const own = $derived(chosen.characters?.[id] ?? null)}
+	<div class="row">
+		<span class="who">
+			<wa-icon name={elementIcon(type)} style:color={colours.get(id)} aria-hidden="true"></wa-icon>
+			{name}
+		</span>
+		<wa-dropdown placement="bottom-end" onwa-select={(event: WaSelectEvent) => choose(id, event)}>
+			<wa-button slot="trigger" size="s" appearance="outlined" with-caret>{characterVoice(id)}</wa-button>
+			<wa-dropdown-item type="checkbox" value={DEFAULT} checked={own === null}>Same as the narrator</wa-dropdown-item>
+			{#each FISH_VOICE_PRESETS as preset (preset.id)}
+				<wa-dropdown-item type="checkbox" value={preset.id} checked={own === preset.id}>
+					{preset.label}{preset.id === suits ? ' · suits them' : ''}
+					<small class="line">{preset.description}</small>
+				</wa-dropdown-item>
+			{/each}
+		</wa-dropdown>
+	</div>
+{/snippet}
 
 <style>
 	.voices {

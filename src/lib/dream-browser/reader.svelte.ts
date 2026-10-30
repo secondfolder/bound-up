@@ -351,6 +351,16 @@ export class ReadAloud {
 		this.#lookAhead();
 	}
 
+	/**
+	 * "Keep going" on or off. Turned on already past the point it would have
+	 * asked for the next passage, it asks now: the moment is only counted
+	 * while it is on.
+	 */
+	setKeepGoing(on: boolean): void {
+		this.keepGoing = on;
+		this.#checkNearEnd();
+	}
+
 	setHighlight(on: boolean): void {
 		this.highlight = on;
 		if (!on) {
@@ -527,6 +537,7 @@ export class ReadAloud {
 	 */
 	#checkNearEnd(): void {
 		if (
+			!this.keepGoing ||
 			this.#nearEnd.said ||
 			!this.turnId ||
 			!this.playing ||

@@ -496,6 +496,21 @@
 		}
 	}
 
+	/**
+	 * Keep going on or off. Turned on once the newest passage has already
+	 * been read to its end, the next is asked for now, as it would have been
+	 * near the end; the reader does the same for one still playing.
+	 */
+	function toggleKeepGoing() {
+		if (!reader) {
+			return;
+		}
+		reader.setKeepGoing(!reader.keepGoing);
+		if (reader.keepGoing && reader.finishedTurn) {
+			keepGoing(reader.finishedTurn);
+		}
+	}
+
 	/** A clip's reply, for debug mode: how much audio came, and each word's timing. */
 	function spokenReply(spoken: SpokenReport): string {
 		const timings = spoken.words.map(
@@ -1183,7 +1198,7 @@
 						class="toggle"
 						aria-pressed={reader.keepGoing}
 						onclick={() => {
-							reader.keepGoing = !reader.keepGoing;
+							toggleKeepGoing();
 						}}>{reader.keepGoing ? '✓ ' : ''}Keep going</button
 					>
 				</span>

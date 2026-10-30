@@ -88,9 +88,10 @@ export function narratorVoice(chosen: ChosenVoices | undefined): VoiceName {
 
 /**
  * The voice a line is read in: its speaker's, if one was chosen for them,
- * else the narrator's. The user's own lines are the narrator's.
+ * else the narrator's. The user's own lines (`who="you"`) are a speaker like
+ * any other, kept under `you`.
  */
 export function voiceForSpeaker(who: string | null, chosen: ChosenVoices | undefined): VoiceName {
-	const own = who === null || who === 'you' ? undefined : chosen?.characters?.[who];
+	const own = who === null ? undefined : chosen?.characters?.[who];
 	return own ?? narratorVoice(chosen);
 }
