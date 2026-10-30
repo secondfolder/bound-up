@@ -64,7 +64,7 @@ async function play(page: Page, title = 'The Keeper') {
 
 /** Writes a turn in the user's own words: opens the box, fills it and sends it. */
 async function reply(page: Page, text: string) {
-	await page.getByRole('button', { name: 'Write your own…' }).click();
+	await page.getByRole('button', { name: 'Write response…' }).click();
 	await box(page, 'Your turn').fill(text);
 	await clickWaButton(page, 'Send');
 }
@@ -291,7 +291,7 @@ test.describe('daydreams, the new engine', () => {
 			'I take the key.',
 			'I leave it in her hand.',
 			'Continue daydream',
-			'Write your own…'
+			'Write response…'
 		]);
 		// Centred in the column.
 		await expect(chips).toHaveCSS('justify-content', 'center');
@@ -321,14 +321,14 @@ test.describe('daydreams, the new engine', () => {
 		await expect(turn).toHaveValue('I take the key.');
 		await clickWaButton(page, 'Cancel');
 
-		// Put away, what the box holds is kept, and shown on the chip it went back into.
-		await chips.getByRole('button', { name: 'Your draft: I take the key.' }).click();
+		// Put away, what the box holds is kept for when it is opened again.
+		const write = chips.getByRole('button', { name: 'Write response…' });
+		await write.click();
+		await expect(turn).toHaveValue('I take the key.');
 		await expect(turn).toBeFocused();
 		await turn.fill('I pocket it');
 		await clickWaButton(page, 'Cancel');
 		await expect(turn).toBeHidden();
-		const draft = page.getByRole('button', { name: 'Your draft: I pocket it' });
-		await expect(draft).toBeVisible();
 
 		// A suggestion is sent with a tap.
 		await chips.getByRole('button', { name: 'I take the key.', exact: true }).click();
@@ -338,12 +338,12 @@ test.describe('daydreams, the new engine', () => {
 		await expect(page.getByRole('button', { name: 'I take the key.', exact: true })).toHaveCount(0);
 
 		// The draft is still there to send, and the box is empty once it is sent.
-		await draft.click();
+		await page.getByRole('button', { name: 'Write response…' }).click();
 		await expect(turn).toHaveValue('I pocket it');
 		await clickWaButton(page, 'Send');
 		await expect(turn).toBeHidden();
 		await saved(page);
-		await page.getByRole('button', { name: 'Write your own…' }).click();
+		await page.getByRole('button', { name: 'Write response…' }).click();
 		await expect(turn).toHaveValue('');
 	});
 
@@ -365,6 +365,21 @@ test.describe('daydreams, the new engine', () => {
 		await main.evaluate((element) => element.scrollTo(0, 0));
 		await expect(turn).toHaveClass(/stuck/);
 		await expect(turn.getByRole('button', { name: 'Continue daydream' })).toBeInViewport();
+
+		// Never more than half the screen: what does not fit scrolls, from its end.
+		await page.setViewportSize({ width: 320, height: 300 });
+		const scroller = page.locator('.compose-scroll');
+		await expect
+			.poll(() => scroller.evaluate((element) => element.getBoundingClientRect().height))
+			.toBeLessThanOrEqual(150);
+		await expect
+			.poll(() =>
+				scroller.evaluate(
+					(element) => element.scrollHeight - element.clientHeight - element.scrollTop
+				)
+			)
+			.toBeLessThanOrEqual(1);
+		await expect(turn.getByRole('button', { name: 'Write response…' })).toBeInViewport();
 	});
 
 	test('a turn is drawn as it was read, written out for you, and can be read differently', async ({

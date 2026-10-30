@@ -91,9 +91,6 @@
 	let turnBox = $state<ReturnType<typeof DreamTextBox> | null>(null);
 	/** Whether the turn box is open: put away, it is a button drawn as the box it opens into. */
 	let writing = $state(false);
-	/** What the turn box holds, shown on the button while it is put away. */
-	let turnText = $state('');
-	const drafted = $derived(turnText.trim());
 	const suggested = $derived(
 		session.lastPassage ? suggestionsIn(footerOf(session.lastPassage.turn.source)) : []
 	);
@@ -144,6 +141,23 @@
 			stuck = entry !== undefined && !entry.isIntersecting && entry.boundingClientRect.top > 0;
 		});
 		observer.observe(sentinel);
+		return () => observer.disconnect();
+	};
+
+	/**
+	 * Keeps the turn area scrolled to its end whenever what it holds changes
+	 * size: when it is too tall for its half of the screen, the box and the
+	 * last chips are what should be in sight, as they are nearest the thumb.
+	 */
+	const startAtEnd: Attachment<HTMLElement> = (scroller) => {
+		const toEnd = () => {
+			scroller.scrollTop = scroller.scrollHeight;
+		};
+		const observer = new ResizeObserver(toEnd);
+		for (const child of scroller.children) {
+			observer.observe(child);
+		}
+		toEnd();
 		return () => observer.disconnect();
 	};
 
@@ -931,78 +945,79 @@
 	     as the speech bubbles a sent turn becomes, their own words as the box
 	     they will be, Continue as handing the story on. -->
 	<div class="compose" class:stuck={stuck} data-writing={writing}>
-		{#if session.busy}
-			<div class="turn-row">
-				<wa-button appearance="outlined" onclick={() => session.stop()}>
-					<wa-icon slot="start" name="stop" variant="solid"></wa-icon>
-					Stop
-				</wa-button>
-			</div>
-		{:else if !writing}
-			<!-- One list of chips: the suggestions, solid, as words to send; then
-			     Continue and writing your own, outlined, as the other ways to take
-			     the turn. Native buttons: a chip is a sentence, and wraps. -->
-			<p id="dream-hold-hint" class="wa-visually-hidden">Hold it, or open its menu, to change it before sending.</p>
-			<ul class="turn-chips" aria-label="Your turn">
-				{#each suggested as suggestion (suggestion)}
-					<li>
-						<button
-							type="button"
-							class="chip suggestion"
-							aria-describedby="dream-hold-hint"
-							onclick={() => session.send(suggestion)}
-							{@attach holdToChange(suggestion)}
-						>
-							{suggestion}
-						</button>
-					</li>
-				{/each}
-				<li>
-					<button type="button" class="chip other continue" onclick={() => session.send('')}>
-						<wa-icon name="forward" aria-hidden="true"></wa-icon>
-						Continue daydream
-					</button>
-				</li>
-				<li>
-					<!-- A disclosure, which opens into the box. -->
-					<button
-						type="button"
-						class="chip other write"
-						aria-expanded="false"
-						aria-controls="dream-turn-box"
-						onclick={() => openReply()}
+		<!-- Never more than half the screen, so the story stays in sight; what
+		     does not fit scrolls, starting at its end (`startAtEnd`). -->
+		<div class="compose-scroll" {@attach startAtEnd}>
+			<div class="compose-inner">
+				{#if session.busy}
+					<div class="turn-row">
+						<wa-button appearance="outlined" onclick={() => session.stop()}>
+							<wa-icon slot="start" name="stop" variant="solid"></wa-icon>
+							Stop
+						</wa-button>
+					</div>
+				{:else if !writing}
+					<!-- One list of chips: the suggestions, solid, as words to send; then
+					     Continue and writing your own, outlined, as the other ways to take
+					     the turn. Native buttons: a chip is a sentence, and wraps. -->
+					<p id="dream-hold-hint" class="wa-visually-hidden">Hold it, or open its menu, to change it before sending.</p>
+					<ul class="turn-chips" aria-label="Your turn">
+						{#each suggested as suggestion (suggestion)}
+							<li>
+								<button
+									type="button"
+									class="chip suggestion"
+									aria-describedby="dream-hold-hint"
+									onclick={() => session.send(suggestion)}
+									{@attach holdToChange(suggestion)}
+								>
+									{suggestion}
+								</button>
+							</li>
+						{/each}
+						<li>
+							<button type="button" class="chip other continue" onclick={() => session.send('')}>
+								<wa-icon name="forward" aria-hidden="true"></wa-icon>
+								Continue daydream
+							</button>
+						</li>
+						<li>
+							<!-- A disclosure, which opens into the box. -->
+							<button
+								type="button"
+								class="chip other write"
+								aria-expanded="false"
+								aria-controls="dream-turn-box"
+								onclick={() => openReply()}
+							>
+								<wa-icon name="pen" aria-hidden="true"></wa-icon>
+								Write response…
+							</button>
+						</li>
+					</ul>
+				{/if}
+				<!-- Kept while put away, so a draft is restored and a suggestion can be put in it. -->
+				<div id="dream-turn-box" class="reply" hidden={!writing || session.busy}>
+					<DreamTextBox
+						bind:this={turnBox}
+						id="dream-turn"
+						label="Your turn"
+						max={MAX_INPUT_CHARS}
+						draft={{ kind: 'dream', dreamId: session.id }}
+						submitLabel="Send"
+						disabled={session.busy}
+						onsend={async (text) => {
+							writing = false;
+							await session.send(text);
+							return session.problem === null;
+						}}
 					>
-						<wa-icon name="pen" aria-hidden="true"></wa-icon>
-						{#if drafted}
-							<span class="write-text" data-draft><span class="wa-visually-hidden">Your draft: </span>{drafted}</span>
-						{:else}
-							<span class="write-text">Write your own…</span>
-						{/if}
-					</button>
-				</li>
-			</ul>
-		{/if}
-		<!-- Kept while put away, so a draft is restored and a suggestion can be put in it. -->
-		<div id="dream-turn-box" class="reply" hidden={!writing || session.busy}>
-			<DreamTextBox
-				bind:this={turnBox}
-				bind:text={turnText}
-				id="dream-turn"
-				label="Your turn"
-				max={MAX_INPUT_CHARS}
-				draft={{ kind: 'dream', dreamId: session.id }}
-				submitLabel="Send"
-				disabled={session.busy}
-				onsend={async (text) => {
-					writing = false;
-					await session.send(text);
-					return session.problem === null;
-				}}
-			>
-				{#snippet actions()}
-					<wa-button appearance="plain" onclick={closeReply}>Cancel</wa-button>
-				{/snippet}
-			</DreamTextBox>
+						{#snippet actions()}
+							<wa-button appearance="plain" onclick={closeReply}>Cancel</wa-button>
+						{/snippet}
+					</DreamTextBox>
+				</div>
+			</div>
 		</div>
 	</div>
 	<!-- In sight exactly when the page is scrolled to its end (`watchStuck`). -->
@@ -1394,9 +1409,6 @@
 		position: sticky;
 		bottom: 0;
 		z-index: 1;
-		display: flex;
-		flex-direction: column;
-		gap: var(--wa-space-xs);
 		padding-block: var(--wa-space-s);
 
 		/* The background it takes only while stuck, from one edge of the page
@@ -1435,7 +1447,6 @@
 			gap: var(--wa-space-xs);
 			max-width: 100%;
 			height: auto;
-			min-height: var(--wa-form-control-height);
 			padding: var(--wa-space-2xs) var(--wa-space-m);
 			border: 1px solid transparent;
 			border-radius: var(--wa-border-radius-pill);
@@ -1504,13 +1515,21 @@
 		gap: var(--wa-space-xs);
 	}
 
-	/* A draft on the chip is cut to a line. */
-	.write-text {
-		min-width: 0;
-		max-width: 16rem;
-		overflow: hidden;
-		white-space: nowrap;
-		text-overflow: ellipsis;
+	/* At most half the screen. The scroller is inside the sticky box rather
+	   than the box itself: a scroller clips what is drawn beyond it, and the
+	   stuck background reaches right across the page. */
+	.compose-scroll {
+		max-height: 50dvh;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+	}
+
+	/* A little room inside the scroller, so a focus ring is not clipped. */
+	.compose-inner {
+		display: flex;
+		flex-direction: column;
+		gap: var(--wa-space-xs);
+		padding: var(--wa-space-3xs);
 	}
 
 	/* Zero height, only where it is matters (`watchStuck`). */
