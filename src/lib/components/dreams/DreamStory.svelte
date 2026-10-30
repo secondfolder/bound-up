@@ -141,10 +141,10 @@
 	let optionsOpen = $state(false);
 
 	/**
-	 * Whether the suggestions, in the page after the newest passage, are in
-	 * sight: while they are not, "Your turn" in the floating row says how
-	 * many are waiting there. Watched against what scrolls (the app shell's
-	 * <main>), less the row floating over its bottom.
+	 * Whether the end of the story, where the suggestions are, is in sight:
+	 * while it is not, "Your turn" in the floating row says how many are
+	 * waiting there, none included. Watched against what scrolls (the app
+	 * shell's <main>), less the row floating over its bottom.
 	 */
 	let suggestionsInSight = $state(false);
 	let suggestionsList = $state<HTMLElement | null>(null);
@@ -165,6 +165,13 @@
 	};
 	/** About how much of the bottom of the page the floating row covers. */
 	const FLOATING_ROW_PX = 72;
+
+	function suggestionCount(count: number): string {
+		if (count === 0) {
+			return 'no suggestions';
+		}
+		return count === 1 ? '1 suggestion' : `${count} suggestions`;
+	}
 
 	function toSuggestions() {
 		const still = globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1283,9 +1290,12 @@
 	     floating, so they are seen at the end of the story; scrolled up, the
 	     floating row's "Your turn" says how many wait here (docs/dreams.md,
 	     "Your turn"). Native buttons: a chip is a sentence, and wraps. -->
+	<!-- Where the turn is, watched whether or not there are suggestions in it
+	     (`watchSuggestions`): Your turn is offered while it is out of sight. -->
+	<div class="turn-end" {@attach watchSuggestions}>
 	{#if !(writing || session.busy) && suggested.length > 0}
 		<p id="dream-hold-hint" class="wa-visually-hidden">Hold it, or open its menu, to change it before sending.</p>
-		<ul class="suggestions" aria-label="Suggestions" {@attach watchSuggestions}>
+		<ul class="suggestions" aria-label="Suggestions">
 			{#each suggested as suggestion (suggestion)}
 				<li>
 					<button
@@ -1301,6 +1311,7 @@
 			{/each}
 		</ul>
 	{/if}
+	</div>
 
 	<!-- The dock (docs/dreams.md, "Your turn"): a row floating over the
 	     bottom of the story with no background of its own, each thing in it
@@ -1337,16 +1348,18 @@
 						<span class="long" aria-hidden="true">Write response…</span>
 						<span class="short" aria-hidden="true">Write…</span>
 					</button>
-					{#if suggested.length > 0 && !suggestionsInSight}
+					{#if !suggestionsInSight}
+						<!-- With how many suggestions wait at the end: none is said too,
+						     quietly, so the count is never mistaken for missing. -->
 						<button
 							type="button"
 							class="chip floating fits your-turn"
-							aria-label={`Your turn: ${suggested.length} ${suggested.length === 1 ? 'suggestion' : 'suggestions'} below`}
+							aria-label={`Your turn: ${suggestionCount(suggested.length)} below`}
 							onclick={toSuggestions}
 						>
 							<wa-icon name="arrow-down" aria-hidden="true"></wa-icon>
 							<span class="words" aria-hidden="true">Your turn</span>
-							<span class="count" aria-hidden="true">{suggested.length}</span>
+							<span class="count" class:none={suggested.length === 0} aria-hidden="true">{suggested.length}</span>
 						</button>
 					{/if}
 				{/if}
@@ -1355,7 +1368,7 @@
 				<!-- Read aloud, as a bubble: play and pause, with how far through the
 				     passage it is around it in the speaker's colour; the rest behind ⋯. -->
 				{#if reader && session.listening}
-					{const around = reader.count > 0 ? reader.index / reader.count : 0}
+					{const around = reader.progress}
 					<section
 						class="player"
 						aria-label="Reading aloud"
@@ -1402,7 +1415,7 @@
 								}}
 							>
 								{@render ring(around)}
-								<wa-icon name="play" variant="solid" aria-hidden="true"></wa-icon>
+								<wa-icon class="play" name="play" variant="solid" aria-hidden="true"></wa-icon>
 							</button>
 						{/if}
 					</section>
@@ -1739,6 +1752,18 @@
 			font-size: var(--wa-font-size-m);
 			--indicator-color: var(--speaker-colour);
 		}
+
+		/* A box of its own, in the middle of the button, not a line's worth of
+		   inline space with room left under it for descenders. */
+		wa-icon {
+			display: block;
+		}
+
+		/* A triangle looks left of centre when its box is centred: its weight
+		   is to the left. Nudged right, as players do. */
+		.play {
+			translate: 0.08em 0;
+		}
 	}
 
 	.ring {
@@ -1755,7 +1780,8 @@
 		.done {
 			stroke: var(--speaker-colour);
 			stroke-linecap: round;
-			transition: stroke-dasharray 300ms ease-out;
+			/* Moved on each timeupdate, about four times a second: eased between. */
+			transition: stroke-dasharray 250ms linear;
 		}
 
 		@media (prefers-reduced-motion: reduce) {
@@ -2015,8 +2041,13 @@
 			}
 		}
 
-		/* Over the story, so each has a background of its own. */
-		.floating {
+		/* Over the story, so each has a background of its own. A wa-button's
+		   on its drawn part: on the host, a round one cast a square shadow. */
+		.floating:not(wa-button) {
+			box-shadow: var(--wa-shadow-m);
+		}
+
+		wa-button.floating::part(base) {
 			box-shadow: var(--wa-shadow-m);
 		}
 
@@ -2025,9 +2056,15 @@
 			border-color: var(--wa-color-brand-border-normal);
 			background: var(--wa-color-surface-raised);
 			color: var(--wa-color-brand-on-quiet);
+		}
 
+		/* Hovered, tinted, over their own solid background: the tint alone is
+		   see-through, and the story showed through them. */
+		.other,
+		.your-turn {
 			&:hover {
-				background: var(--wa-color-brand-fill-quiet);
+				background: linear-gradient(var(--wa-color-brand-fill-quiet) 0 0)
+					var(--wa-color-surface-raised);
 			}
 		}
 
@@ -2035,10 +2072,6 @@
 			background: var(--wa-color-surface-raised);
 			color: var(--wa-color-text-normal);
 			font-weight: var(--wa-font-weight-semibold);
-
-			&:hover {
-				background: var(--wa-color-brand-fill-quiet);
-			}
 
 			.count {
 				display: inline-grid;
@@ -2052,6 +2085,11 @@
 				color: var(--wa-color-brand-on-loud);
 				font-size: var(--wa-font-size-xs);
 				font-weight: var(--wa-font-weight-bold);
+
+				&.none {
+					background: var(--wa-color-neutral-fill-normal);
+					color: var(--wa-color-neutral-on-normal);
+				}
 			}
 		}
 
@@ -2183,10 +2221,20 @@
 			}
 		}
 
+		/* Their icons alone: square, the icon in the middle. Padding round an
+		   icon left more room on its right, where the label's gap had been. */
 		&[data-fit='3'] {
 			.long,
 			.short {
 				display: none;
+			}
+
+			.continue,
+			.write {
+				justify-content: center;
+				inline-size: 2.5rem;
+				block-size: 2.5rem;
+				padding: 0;
 			}
 		}
 	}

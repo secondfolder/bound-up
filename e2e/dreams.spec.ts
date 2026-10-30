@@ -411,6 +411,10 @@ test.describe('daydreams, the new engine', () => {
 		await expect(suggestions).not.toBeInViewport();
 		await expect(yourTurn).toBeInViewport();
 		await expect(yourTurn).toContainText('2');
+		// Hovered, it stays solid over the story: the tint goes over its own background.
+		await yourTurn.hover();
+		await expect(yourTurn).not.toHaveCSS('background-color', /rgba\(.*, 0\.\d+\)|transparent/);
+		await expect(yourTurn).toHaveCSS('background-image', /gradient/);
 		await expect(dock.getByRole('button', { name: 'Continue daydream' })).toBeInViewport();
 		// To the right of Continue and Write.
 		const writeBox = await dock.getByRole('button', { name: 'Write response…' }).boundingBox();

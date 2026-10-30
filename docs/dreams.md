@@ -642,9 +642,13 @@ Continue and Write are in the **dock**: one row floating over the bottom of
 what scrolls (sticky), with no background of its own, so the story shows
 between what is in it; each thing in it is drawn on its own background with
 a shadow, and taps between them go through to the story. After them, while
-the suggestions are out of sight, comes **Your turn ↓** with how many there
-are, which scrolls to them (`watchSuggestions`, against `<main>` less the
-row's height). At the row's end is the read-aloud bubble (see "Read aloud").
+the end of the story is out of sight, comes **Your turn ↓** with how many
+suggestions wait there, in a badge (amber; grey and "0" when there are none,
+so none is said rather than left to be guessed), which scrolls to them
+(`watchSuggestions`, on the turn's place at the end, against `<main>` less
+the row's height). Hovered, Continue, Write and Your turn are tinted over
+their own solid background: the tint alone is see-through, and the story
+showed through. At the row's end is the read-aloud bubble (see "Read aloud").
 
 The row never pushes the player off the screen. Its labels step down as room
 runs out (`fitLabels`): "Continue daydream" and "Write response…" become
@@ -1149,7 +1153,10 @@ the reader's habits, not a story's. Being on only shows the player; it still
 waits for play. It adds a Listen button
 to each passage and a player at the end of the dock's row (see "Your
 turn"): a round play and pause button, ringed with how far through the
-passage reading is in the speaker's colour, the speaker announced to a
+passage reading is in the speaker's colour (`progress`: by time, the
+sentences before and how far into this one the audio is, each by its
+measured or guessed length, kept on `timeupdate` so it moves as it plays;
+empty as a passage starts, full once it is read), the speaker announced to a
 screen reader as it changes; and ⋯, which opens **Reading options**: who is
 speaking, back a sentence, speed (0.75× to 2×, tapping cycles), "Keep
 going", "Read new passages" (reading that stopped at the end of a passage

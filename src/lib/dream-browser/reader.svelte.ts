@@ -198,6 +198,14 @@ export class ReadAloud {
 	index = $state(0);
 	count = $state(0);
 	/**
+	 * How far through the passage reading is, 0 to 1, by time rather than by
+	 * sentence: the sentences before this one and how far into this one the
+	 * audio is, each by its length (measured once its clip came, guessed from
+	 * its words until then). Kept on the audio's `timeupdate`, so it moves as
+	 * it plays rather than jumping a sentence at a time.
+	 */
+	progress = $state(0);
+	/**
 	 * Paused by the user, while playing or still loading: a clip that
 	 * arrives then waits for play rather than starting by itself.
 	 */
@@ -316,6 +324,7 @@ export class ReadAloud {
 		this.#passage = passage;
 		this.#utterances = said;
 		this.count = said.length;
+		this.progress = 0;
 		this.#scrolled.away = false;
 		this.#watchScrolling(root);
 		// Before the first clip is fetched, so headphones are awake for its first word.
@@ -395,6 +404,7 @@ export class ReadAloud {
 		this.loading = false;
 		this.paused = false;
 		this.finishedTurn = null;
+		this.progress = 0;
 		this.turnId = null;
 		this.speaker = '';
 		this.speakerId = null;
@@ -469,6 +479,7 @@ export class ReadAloud {
 			audio.currentTime = word ? Math.max(0, word.start - 0.05) : 0;
 			this.#startWord = word ?? null;
 		}
+		this.#measureProgress();
 		this.loading = false;
 		this.#lookAhead();
 		if (this.paused) {
@@ -631,9 +642,26 @@ export class ReadAloud {
 		this.problem = 'This browser would not play it. Tap play to try again.';
 	};
 
+	#measureProgress(): void {
+		const before = this.#utterances
+			.slice(0, this.index)
+			.reduce((sum, utterance) => sum + this.#seconds(utterance), 0);
+		const rest = this.#utterances
+			.slice(this.index)
+			.reduce((sum, utterance) => sum + this.#seconds(utterance), 0);
+		const current = this.#utterances[this.index];
+		const into = Math.min(
+			(this.#audio?.currentTime ?? 0) / this.rate,
+			current ? this.#seconds(current) : 0
+		);
+		const total = before + rest;
+		this.progress = total > 0 ? Math.min(1, (before + into) / total) : 0;
+	}
+
 	#finish(): void {
 		const finished = this.turnId;
 		this.finishedTurn = finished;
+		this.progress = 1;
 		this.#generation += 1;
 		this.#releaseOutput();
 		cancelAnimationFrame(this.#frame);
@@ -718,6 +746,7 @@ export class ReadAloud {
 				void this.#playAt(this.index + 1);
 			});
 			audio.addEventListener('timeupdate', () => {
+				this.#measureProgress();
 				this.#checkNearEnd();
 				// Also from here, not only the highlight's frames: those stop in a
 				// background tab, and the next passage may come in while the last
