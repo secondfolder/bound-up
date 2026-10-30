@@ -376,7 +376,9 @@ Until the daydream is built and the user has pressed Start, the page is the
 setup, live (`DreamSetupView`). It lists every step it really takes, in the
 order they happen (`setupProgress` in `src/lib/dream/setup-progress.ts`), each
 marked as the plan's mockup marks them: a ring to come, a turning ring while it
-works, a filled tick when done. While a step is being written, the latest of
+works, a filled tick when done, and for a step waiting on the user (a question,
+choosing an idea) a still ring with a beating dot, never the spinner, so
+waiting on the model and waiting on you look different. While a step is being written, the latest of
 what the model is writing shows under it, cleaned of tags; once it is done,
 what came of it does. Within one streamed reply a step is done as its tag
 closes, so they tick off as the model moves on.
@@ -389,7 +391,7 @@ closes, so they tick off as the model moves on.
    it, and what was found opens under "What it found". The lookups are kept
    with the reading (`reading.lookups`), so they are still there after a
    reload.
-2. **Reading what you asked for**: the musts, as chips.
+2. **Analysing what you asked for**: the musts, as chips.
 3. **Thinking of directions** ("Thinking of 7 directions" once the spread is
    written): the ideas as they arrive; once one is picked, "7 ideas · See
    them all", each with "Use this one".
@@ -399,7 +401,8 @@ closes, so they tick off as the model moves on.
 5. **Picking one**: code picks, leaning towards the less likely
    (`codePick`), with the build's nudges drawn from the same seed; "Picked:
    …" with "Try another idea". When the brief asked to choose, it is
-   **Choose an idea** and waits, with "Surprise me".
+   **Choose an idea** and waits, with the ideas listed under it rather than
+   under "Thinking of directions", and "Surprise me".
 6. **Building it**: the title, how sexual, how it is shown, and the cast with
    an icon for each known type (`element-icons.ts`) and its short name.
 7. **Writing the opening**: the build's `<passage>`, in the same reply; done,
@@ -414,6 +417,20 @@ again from the same ideas and builds that. The setup records that it is
 waiting (`awaitingStart`, set when the build is kept, cleared by Start), so a
 reload still shows the summary. A daydream from before it has no such field,
 and is played.
+
+### Changing what was made
+
+Every element on the setup page, in the summary and the build's cast, opens
+its card, and the card's **Change** opens a form (`DreamElementForm`) for its
+name, short name and every field, the ones behind the scenes too, kept as an
+encrypted draft while it is typed. A change is kept in the build at once
+(`withElementChange`) and noted in words ("Ines's manner is now: …",
+`describeElementChange`) in the setup's `pendingEdits`. Since a change can
+reach further than the element (the telling notes, how others are written,
+the opening), **Update** then takes Start's place, with the changes listed:
+it asks the build again from the build as changed, with the changes as one
+change asked for, keeping them exactly and following them through
+(`withEditsApplied`), and the result waits on Start like any build.
 
 **Going back.** "How it was set up" beside the story's title shows the same
 page with "Back to the story". Choosing another idea or changing it from

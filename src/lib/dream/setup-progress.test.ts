@@ -78,6 +78,8 @@ describe('setupProgress', () => {
 		const asked = setup({
 			reading: { ...reading, ask: { id: 'q', text: 'Who?', options: [], keep: 'story' } }
 		});
-		expect(progress({ setup: asked })).toMatchObject({ ask: 'active', pick: 'waiting' });
+		expect(progress({ setup: asked })).toMatchObject({ ask: 'yours', pick: 'waiting' });
+		const byUser = setup({ reading: { ...reading, pick: { by: 'user', reason: '' } } });
+		expect(progress({ setup: byUser })).toMatchObject({ directions: 'done', pick: 'yours' });
 	});
 });

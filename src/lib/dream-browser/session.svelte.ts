@@ -20,7 +20,7 @@ import {
 	wordPreferences
 } from '$lib/dream/assemble';
 import { parseBuild } from '$lib/dream/build';
-import { parseElements } from '$lib/dream/elements';
+import { type DreamElement, parseElements } from '$lib/dream/elements';
 import { turnInputs } from '$lib/dream/fields';
 import { findTag, parseMarkup } from '$lib/dream/markup';
 import { drawNudges } from '$lib/dream/nudges';
@@ -43,6 +43,8 @@ import {
 	userPick,
 	withAmendment,
 	withAnswer,
+	withEditsApplied,
+	withElementChange,
 	withReading
 } from '$lib/dream/setup-flow';
 import {
@@ -690,6 +692,29 @@ export class DreamSession {
 			return Promise.resolve();
 		}
 		return this.#attempt(() => this.#saveSetup({ ...setup, awaitingStart: false }));
+	}
+
+	/** Saves an element changed by hand on the setup page; Update has the build follow it. */
+	async editElement(changed: DreamElement): Promise<boolean> {
+		const { setup } = this;
+		if (!setup?.build) {
+			return false;
+		}
+		await this.#attempt(() => this.#saveSetup(withElementChange(setup, changed)));
+		return this.problem === null;
+	}
+
+	/** Update: the build follows what was changed by hand, and waits on Start again. */
+	applyEdits(): Promise<void> {
+		const { setup } = this;
+		if (!setup?.pendingEdits?.length) {
+			return Promise.resolve();
+		}
+		this.stop();
+		this.#previousBuild = setup.build ?? this.#previousBuild;
+		return this.#attempt(() => this.#saveSetup(withEditsApplied(setup))).then(() =>
+			this.runSetup()
+		);
 	}
 
 	/** Whether it is built and waiting on Start. */

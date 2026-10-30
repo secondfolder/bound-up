@@ -11,6 +11,8 @@ import {
 	userPick,
 	withAmendment,
 	withAnswer,
+	withEditsApplied,
+	withElementChange,
 	withReading
 } from './setup-flow';
 
@@ -114,5 +116,52 @@ describe('serializeBuild', () => {
 			presentation: build.presentation,
 			capabilities: build.capabilities
 		});
+	});
+});
+
+describe('changing an element by hand', () => {
+	const ines = {
+		id: 'ines',
+		type: 'character',
+		name: 'Ines Varga',
+		also: [],
+		shown: true,
+		fields: [
+			{ name: 'manner', text: 'Clipped.', shown: true },
+			{ name: 'with-you', text: 'Your trainer.', shown: true }
+		],
+		stats: []
+	};
+	const built = {
+		...codePick(withReading(newSetup('x'), reading()), 1),
+		build: { ...build, elements: [ines] }
+	};
+
+	it('keeps the change at once and notes it in words, until Update follows it through', () => {
+		const changed = withElementChange(built, {
+			...ines,
+			name: 'Ines Vogt',
+			fields: [{ name: 'manner', text: 'Warm, then cold.', shown: true }]
+		});
+		expect(changed.build?.elements[0]?.name).toBe('Ines Vogt');
+		expect(changed.pendingEdits).toEqual([
+			'Ines Varga is now called Ines Vogt; Ines Vogt\'s manner is now: "Warm, then cold."; Ines Vogt no longer has a with you'
+		]);
+		expect(withElementChange(built, ines)).toBe(built);
+
+		const updated = withEditsApplied(changed);
+		expect(updated.pendingEdits).toBeUndefined();
+		expect(updated.build).toBeNull();
+		expect(updated.chosen).toEqual(built.chosen);
+		expect(updated.amendments.at(-1)).toMatch(/^I changed these by hand\. Keep them exactly/);
+	});
+
+	it('keeps only the latest changes asked for, as many as the record holds', () => {
+		let setup = built;
+		for (let index = 0; index < 15; index += 1) {
+			setup = withAmendment(setup, `change ${index}`);
+		}
+		expect(setup.amendments).toHaveLength(12);
+		expect(setup.amendments.at(-1)).toBe('change 14');
 	});
 });

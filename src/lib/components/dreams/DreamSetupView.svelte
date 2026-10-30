@@ -13,6 +13,7 @@
 	} from '$lib/dream/setup-progress';
 	import type { DreamSession } from '$lib/dream-browser/session.svelte';
 	import { MAX_AMENDMENT_CHARS } from '$lib/sealed-kinds/dreams';
+	import DreamCard from './DreamCard.svelte';
 	import DreamNotices from './DreamNotices.svelte';
 	import DreamTextBox from './DreamTextBox.svelte';
 	import { elementIcon } from './element-icons';
@@ -97,6 +98,7 @@
 	const STATUS_WORDS: Record<StepStatus, string> = {
 		done: 'done',
 		active: 'in progress',
+		yours: 'waiting for you',
 		waiting: 'to come'
 	};
 
@@ -143,6 +145,14 @@
 	let remember = $state<'story' | 'general' | 'none'>('story');
 	const worded = $derived(session.worded);
 	let starting = $state(false);
+	/** The element whose card is open. */
+	let cardId = $state<string | null>(null);
+	const card = $derived(setup?.build?.elements.find((element) => element.id === cardId) ?? null);
+	function openCard(id: string) {
+		cardId = id;
+	}
+	/** Changed by hand and not yet followed through: Update takes Start's place. */
+	const edits = $derived(setup?.pendingEdits ?? []);
 
 	async function start() {
 		starting = true;
@@ -191,9 +201,29 @@
 	{/if}
 {/snippet}
 
+{#snippet ideaList()}
+	{#if reading}
+		<ul class="directions">
+			{#each reading.directions as direction (direction.id)}
+				<li class:current={direction.id === chosen?.id}>
+					<span>{direction.text}</span>
+					{#if setup?.reading && direction.id !== chosen?.id && streaming?.what !== 'read'}
+						<wa-button size="s" appearance="outlined" onclick={() => session.choose(direction.id)}>
+							Use this one
+						</wa-button>
+					{/if}
+				</li>
+			{/each}
+		</ul>
+	{/if}
+{/snippet}
+
 {#snippet directions()}
 	{#if reading && reading.directions.length > 0}
-		{#if chosen && !showIdeas}
+		{#if step === 'pick'}
+			<!-- The user is choosing: the ideas are under that step. -->
+			<p class="result">{reading.directions.length} {reading.directions.length === 1 ? 'idea' : 'ideas'}</p>
+		{:else if chosen && !showIdeas}
 			<p class="result">
 				{reading.directions.length}
 				{reading.directions.length === 1 ? 'idea' : 'ideas'} ·
@@ -208,18 +238,7 @@
 				>
 			</p>
 		{:else}
-			<ul class="directions">
-				{#each reading.directions as direction (direction.id)}
-					<li class:current={direction.id === chosen?.id}>
-						<span>{direction.text}</span>
-						{#if setup?.reading && direction.id !== chosen?.id && streaming?.what !== 'read'}
-							<wa-button size="s" appearance="outlined" onclick={() => session.choose(direction.id)}>
-								Use this one
-							</wa-button>
-						{/if}
-					</li>
-				{/each}
-			</ul>
+			{@render ideaList()}
 			{#if chosen}
 				<button
 					type="button"
@@ -274,7 +293,8 @@
 			<wa-button size="s" appearance="plain" onclick={() => session.tryAnother()}>Try another idea</wa-button>
 		{/if}
 	{:else if step === 'pick'}
-		<p class="result">You asked to choose: pick one of the ideas above, or</p>
+		<p class="result">You asked to choose. Pick one, or let it choose for you.</p>
+		{@render ideaList()}
 		<wa-button size="s" appearance="outlined" onclick={() => session.surprise()}>Surprise me</wa-button>
 	{/if}
 {/snippet}
@@ -290,8 +310,17 @@
 			<ul class="chips cast" aria-label="Who and what is in it">
 				{#each build.elements as element (element.id)}
 					<li>
-						<wa-icon name={elementIcon(element.type)} aria-hidden="true"></wa-icon>
-						{elementLabel(element)}
+						{#if setup?.build && !streamedBuild}
+							<button type="button" class="chip" onclick={() => openCard(element.id)}>
+								<wa-icon name={elementIcon(element.type)} aria-hidden="true"></wa-icon>
+								{elementLabel(element)}
+							</button>
+						{:else}
+							<span class="chip">
+								<wa-icon name={elementIcon(element.type)} aria-hidden="true"></wa-icon>
+								{elementLabel(element)}
+							</span>
+						{/if}
 					</li>
 				{/each}
 			</ul>
@@ -366,11 +395,14 @@
 				<ul class="people">
 					{#each made.elements as element (element.id)}
 						<li>
-							<wa-icon name={elementIcon(element.type)} aria-hidden="true"></wa-icon>
-							<span>
-								<strong>{elementLabel(element)}</strong>
-								{#if lineOf(element)}<small>{lineOf(element)}</small>{/if}
-							</span>
+							<!-- Native: a row of the summary that opens its card. -->
+							<button type="button" class="person" onclick={() => openCard(element.id)}>
+								<wa-icon name={elementIcon(element.type)} aria-hidden="true"></wa-icon>
+								<span>
+									<strong>{elementLabel(element)}</strong>
+									{#if lineOf(element)}<small>{lineOf(element)}</small>{/if}
+								</span>
+							</button>
 						</li>
 					{/each}
 				</ul>
@@ -397,8 +429,18 @@
 					{#if researchText}<p class="research">{researchText}</p>{/if}
 				</wa-details>
 			{/if}
+			{#if edits.length > 0}
+				<div class="edits">
+					<p><strong>Changed by hand</strong>, not yet followed through the rest:</p>
+					<ul>
+						{#each edits as change, index (index)}<li>{change}</li>{/each}
+					</ul>
+				</div>
+			{/if}
 			<div class="start">
-				{#if onback}
+				{#if edits.length > 0}
+					<wa-button appearance="accent" variant="brand" onclick={() => session.applyEdits()}>Update</wa-button>
+				{:else if onback}
 					<wa-button appearance="accent" variant="brand" onclick={() => onback?.()}>Back to the story</wa-button>
 					<wa-button appearance="outlined" onclick={() => session.tryAnother()}
 						>Start again with another idea</wa-button
@@ -419,6 +461,18 @@
 				{#each worded.preferences as preference (preference)}<li>{preference}</li>{/each}
 			</ul>
 		</wa-details>
+	{/if}
+
+	{#if card}
+		<DreamCard
+			element={card}
+			filling={false}
+			dreamId={session.id}
+			onedit={(changed) => session.editElement(changed)}
+			onclose={() => {
+				cardId = null;
+			}}
+		/>
 	{/if}
 
 	<DreamNotices {session} />
@@ -508,9 +562,29 @@
 		border-top-color: transparent;
 	}
 
+	/* Waiting on the user, not the model: a still ring with a beating dot, never the spinner. */
+	li[data-status='yours'] > .mark::after {
+		content: '';
+		position: absolute;
+		inset: 0.2rem;
+		border-radius: 50%;
+		background: var(--wa-color-brand-fill-loud);
+	}
+
 	@media (prefers-reduced-motion: no-preference) {
 		li[data-status='active'] > .mark {
 			animation: turn 0.8s linear infinite;
+		}
+
+		li[data-status='yours'] > .mark::after {
+			animation: beat 1.6s ease-in-out infinite;
+		}
+	}
+
+	@keyframes beat {
+		50% {
+			transform: scale(0.55);
+			opacity: 0.5;
 		}
 	}
 
@@ -559,14 +633,28 @@
 		list-style: none;
 	}
 
-	.cast li {
+	.cast .chip {
 		display: inline-flex;
 		align-items: center;
 		gap: var(--wa-space-3xs);
 		padding: var(--wa-space-3xs) var(--wa-space-xs);
 		border: 1px solid var(--wa-color-brand-border-normal);
 		border-radius: var(--wa-border-radius-pill);
+		background: transparent;
+		color: inherit;
+		font: inherit;
 		font-size: var(--wa-font-size-s);
+	}
+
+	.edits {
+		padding: var(--wa-space-xs) var(--wa-space-s);
+		border-left: 3px solid var(--wa-color-brand-border-loud);
+		font-size: var(--wa-font-size-s);
+
+		p,
+		ul {
+			margin: 0;
+		}
 	}
 
 	.substeps {
@@ -683,11 +771,28 @@
 		padding: 0;
 		list-style: none;
 
-		li {
+		.person {
 			display: grid;
 			grid-template-columns: 1.25rem 1fr;
 			gap: var(--wa-space-xs);
 			align-items: baseline;
+			width: 100%;
+			padding: var(--wa-space-2xs);
+			border: 0;
+			border-radius: var(--wa-border-radius-m);
+			background: transparent;
+			color: inherit;
+			font: inherit;
+			text-align: start;
+			cursor: pointer;
+
+			&:hover {
+				background: var(--wa-color-brand-fill-quiet);
+			}
+
+			&:focus-visible {
+				outline: var(--wa-focus-ring);
+			}
 		}
 
 		span {
@@ -736,5 +841,17 @@
 		bottom: 0;
 		padding-block: var(--wa-space-s);
 		background: var(--wa-color-surface-default);
+	}
+
+	.cast button.chip {
+		cursor: pointer;
+
+		&:hover {
+			background: var(--wa-color-brand-fill-quiet);
+		}
+
+		&:focus-visible {
+			outline: var(--wa-focus-ring);
+		}
 	}
 </style>

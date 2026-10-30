@@ -7,7 +7,7 @@
  *   research, on a server that can (`research`). It comes first however it is
  *   done: a separate research model runs before the reading, and a story
  *   model with tools calls them before it writes a word.
- * - **Reading what you asked for**: the musts.
+ * - **Analysing what you asked for**: the musts.
  * - **Thinking of directions**: the spread and the directions.
  * - **A question**, only when step 1 asked one.
  * - **Picking one**, or **Choose an idea** when the brief asked to choose.
@@ -24,7 +24,11 @@ import type { DreamSetup } from '../sealed-kinds/dreams';
 import { asksForResearch } from './links';
 import { setupStep } from './setup-flow';
 
-export type StepStatus = 'done' | 'active' | 'waiting';
+/**
+ * `yours` is waiting on the user (a question, choosing an idea), marked
+ * differently from `active`, which is the model at work.
+ */
+export type StepStatus = 'done' | 'active' | 'yours' | 'waiting';
 
 export type SetupStepKey =
 	| 'research'
@@ -93,7 +97,7 @@ export function setupProgress(input: ProgressInput): SetupProgressStep[] {
 	const readingStarted = readingText !== null && (readingText.trim() !== '' || !looksUp);
 	steps.push({
 		key: 'read',
-		label: 'Reading what you asked for',
+		label: 'Analysing what you asked for',
 		status: statusOf(readDone, readingStarted)
 	});
 
@@ -109,7 +113,10 @@ export function setupProgress(input: ProgressInput): SetupProgressStep[] {
 		steps.push({
 			key: 'ask',
 			label: 'A question for you',
-			status: statusOf(reading.answer !== null, step === 'ask')
+			status:
+				reading.answer === null && step === 'ask'
+					? 'yours'
+					: statusOf(reading.answer !== null, false)
 		});
 	}
 
@@ -117,7 +124,7 @@ export function setupProgress(input: ProgressInput): SetupProgressStep[] {
 	steps.push({
 		key: 'pick',
 		label: byUser && !setup.chosen ? 'Choose an idea' : 'Picking one',
-		status: statusOf(setup.chosen !== null, step === 'pick')
+		status: step === 'pick' ? 'yours' : statusOf(setup.chosen !== null, false)
 	});
 
 	const built = setup.build !== null && buildText === null;

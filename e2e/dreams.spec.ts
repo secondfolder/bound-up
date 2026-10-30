@@ -300,12 +300,36 @@ test.describe('daydreams, the new engine', () => {
 		await expect(turn).toContainText('as you asked');
 	});
 
+	test('an element changed before Start is followed through with Update', async ({ page }) => {
+		await dreamer(page);
+		await start(page, 'A quiet evening');
+		const ready = page.getByRole('region', { name: 'The Keeper' });
+		await expect(ready).toBeVisible();
+
+		// Every element opens its card, and its card can be changed.
+		await ready.getByRole('button', { name: /Ottilie/ }).click();
+		const card = page.locator('wa-dialog[open]');
+		await card.locator('wa-button', { hasText: 'Change' }).click();
+		await card.locator('wa-textarea[name="fields[1].text"] textarea').fill('Warm, then cold.');
+		await card.getByRole('button', { name: 'Save', exact: true }).click();
+		await expect(card.getByText('Warm, then cold.')).toBeVisible();
+		await page.keyboard.press('Escape');
+
+		// Start waits until the change is followed through the rest.
+		await expect(ready).toContainText('Changed by hand');
+		await expect(ready.getByRole('button', { name: 'Start', exact: true })).toHaveCount(0);
+		await ready.getByRole('button', { name: 'Update', exact: true }).click();
+		await play(page, 'The Keeper (changed)');
+	});
+
 	test('choosing first, Surprise me, and Try another idea', async ({ page }) => {
 		await dreamer(page);
 		await start(page, 'A quiet evening [pick]');
-		await expect(
-			page.getByText('You asked to choose: pick one of the ideas above, or')
-		).toBeVisible();
+		// The ideas are under the step that waits on the user, marked as waiting on them.
+		const choose = page.locator('li[data-step="pick"]');
+		await expect(choose).toHaveAttribute('data-status', 'yours');
+		await expect(choose).toContainText('Choose an idea');
+		await expect(choose.getByRole('button', { name: 'Use this one' })).toHaveCount(3);
 		// Nothing is built until the user chooses.
 		await expect(page.getByRole('heading', { name: 'The Keeper' })).toHaveCount(0);
 		await clickWaButton(page, 'Surprise me');

@@ -173,7 +173,13 @@ export const dreamSetupKind = defineSealedKind({
 				 * none. Added in place before the engine was deployed
 				 * (sealed-fixtures/README.md).
 				 */
-				awaitingStart: z.boolean().optional()
+				awaitingStart: z.boolean().optional(),
+				/**
+				 * Elements changed by hand since the build, worded, waiting on
+				 * Update to have the build follow them (docs/dreams.md, "Changing
+				 * what was made"). Added in place before the engine was deployed.
+				 */
+				pendingEdits: z.array(required(400)).max(24).optional()
 			})
 		}
 	]

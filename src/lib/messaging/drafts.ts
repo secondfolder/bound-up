@@ -54,6 +54,8 @@ export type DraftScope =
 	/** What was set and filled in on a passage, as JSON: half-filled fields survive a reload. */
 	| { kind: 'dream-inputs'; dreamId: string }
 	| { kind: 'dream-edit'; turnId: string }
+	/** An element being changed on the setup page, as JSON, one per element. */
+	| { kind: 'dream-element'; dreamId: string; elementId: string }
 	| { kind: 'dream-brief' }
 	| { kind: 'dream-limit' };
 
@@ -102,6 +104,8 @@ function scopeId(scope: DraftScope): string {
 			return scope.dreamId;
 		case 'dream-edit':
 			return scope.turnId;
+		case 'dream-element':
+			return `${scope.dreamId}:${scope.elementId}`;
 		case 'dream-brief':
 		case 'dream-limit':
 			return 'new';
@@ -123,6 +127,7 @@ function isPlainScope(scope: DraftScope): boolean {
 		scope.kind === 'dream-answer' ||
 		scope.kind === 'dream-inputs' ||
 		scope.kind === 'dream-edit' ||
+		scope.kind === 'dream-element' ||
 		scope.kind === 'dream-brief' ||
 		scope.kind === 'dream-limit'
 	);

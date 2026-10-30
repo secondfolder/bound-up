@@ -7,8 +7,13 @@
  * Pure and alias-free.
  */
 
-import type { DreamSetup, DreamSetupBuild, DreamSetupReading } from '../sealed-kinds/dreams';
-import { serializeElements } from './elements';
+import {
+	type DreamSetup,
+	type DreamSetupBuild,
+	type DreamSetupReading,
+	MAX_AMENDMENTS
+} from '../sealed-kinds/dreams';
+import { type DreamElement, serializeElements } from './elements';
 import { escapeMarkup } from './markup';
 import { drawNudges, type Nudge } from './nudges';
 import { pickDirection } from './pick';
@@ -124,7 +129,8 @@ function choose(
  * previous build plus the change, keeping the reading and the direction.
  */
 export function withAmendment(setup: DreamSetup, amendment: string): DreamSetup {
-	const amendments = [...setup.amendments, amendment];
+	// The record holds so many; past that, the oldest go, as the latest win anyway.
+	const amendments = [...setup.amendments, amendment].slice(-MAX_AMENDMENTS);
 	if (!setup.chosen) {
 		return { ...setup, amendments, reading: null };
 	}
@@ -150,4 +156,76 @@ export function serializeBuild(build: DreamSetupBuild): string {
 		`<capabilities>${build.capabilities.join(', ')}</capabilities>`,
 		`<elements>\n${serializeElements(build.elements)}\n</elements>`
 	].join('\n\n');
+}
+
+const MAX_EDIT_WORDS = 160;
+
+function clip(text: string): string {
+	return text.length > MAX_EDIT_WORDS ? `${text.slice(0, MAX_EDIT_WORDS)}…` : text;
+}
+
+/** What changed in an element, worded for the build: null when nothing did. */
+export function describeElementChange(before: DreamElement, after: DreamElement): string | null {
+	const changes: string[] = [];
+	if (before.name !== after.name) {
+		changes.push(`${before.name} is now called ${after.name}`);
+	}
+	if ((before.short ?? '') !== (after.short ?? '') && after.short) {
+		changes.push(`${after.name} is called ${after.short} for short`);
+	}
+	for (const field of after.fields) {
+		const was = before.fields.find((entry) => entry.name === field.name);
+		if (was?.text !== field.text) {
+			changes.push(
+				`${after.name}'s ${field.name.replaceAll('-', ' ')} is now: "${clip(field.text)}"`
+			);
+		}
+	}
+	for (const field of before.fields) {
+		if (!after.fields.some((entry) => entry.name === field.name)) {
+			changes.push(`${after.name} no longer has a ${field.name.replaceAll('-', ' ')}`);
+		}
+	}
+	return changes.length > 0 ? changes.join('; ').slice(0, 400) : null;
+}
+
+/**
+ * An element changed by hand on the setup page (docs/dreams.md, "Changing
+ * what was made"): kept in the build at once, and noted, so Update can have
+ * the build follow it everywhere else it matters.
+ */
+export function withElementChange(setup: DreamSetup, changed: DreamElement): DreamSetup {
+	const { build } = setup;
+	const before = build?.elements.find((element) => element.id === changed.id);
+	if (!(build && before)) {
+		return setup;
+	}
+	const change = describeElementChange(before, changed);
+	if (!change) {
+		return setup;
+	}
+	return {
+		...setup,
+		build: {
+			...build,
+			elements: build.elements.map((element) => (element.id === changed.id ? changed : element))
+		},
+		pendingEdits: [...(setup.pendingEdits ?? []), change].slice(-24)
+	};
+}
+
+/**
+ * Update: the changes made by hand go to the build as one change asked for,
+ * which rebuilds from the build as changed, keeping what was changed and
+ * following it through everything else (the telling notes, the others, the
+ * opening).
+ */
+export function withEditsApplied(setup: DreamSetup): DreamSetup {
+	const edits = setup.pendingEdits ?? [];
+	if (edits.length === 0) {
+		return setup;
+	}
+	const amendment = `I changed these by hand. Keep them exactly, and change anything else they affect: ${edits.join('; ')}`;
+	const { pendingEdits: _done, ...rest } = setup;
+	return withAmendment(rest, amendment.slice(0, 500));
 }

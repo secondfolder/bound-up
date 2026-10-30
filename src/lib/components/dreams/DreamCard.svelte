@@ -1,6 +1,7 @@
 <script lang="ts">
 	import ResponsiveDialog from '$lib/components/ResponsiveDialog.svelte';
 	import type { DreamElement } from '$lib/dream/elements';
+	import DreamElementForm from './DreamElementForm.svelte';
 	import { elementIcon } from './element-icons';
 
 	/**
@@ -15,10 +16,16 @@
 		filling,
 		ondraw,
 		onrename,
+		onedit,
+		dreamId = '',
 		onclose
 	}: {
 		element: DreamElement;
 		filling: boolean;
+		/** Saves a changed element, on the setup page (docs/dreams.md, "Changing what was made"). */
+		onedit?: (changed: DreamElement) => Promise<boolean>;
+		/** The daydream, which keys the changes' draft. */
+		dreamId?: string;
 		/** Names drawn for this element's description, or null when none could be. */
 		ondraw?: () => Promise<{ given: string[]; family: string[] } | null>;
 		onrename?: (name: string) => Promise<void>;
@@ -26,6 +33,7 @@
 	} = $props();
 
 	let drawn = $state<{ given: string[]; family: string[] } | null>(null);
+	let editing = $state(false);
 	let drawing = $state(false);
 	/** A person keeps a family name in the new one when they had one. */
 	const keepsFamily = $derived(element.name.includes(' '));
@@ -58,6 +66,22 @@
 </script>
 
 <ResponsiveDialog label={element.name} {onclose}>
+	{#if editing && onedit}
+		<DreamElementForm
+			{element}
+			{dreamId}
+			onsave={async (changed) => {
+				const saved = await onedit(changed);
+				if (saved) {
+					editing = false;
+				}
+				return saved;
+			}}
+			oncancel={() => {
+				editing = false;
+			}}
+		/>
+	{:else}
 	<div class="card">
 		<p class="type">
 			<wa-icon name={elementIcon(element.type)} aria-hidden="true"></wa-icon>
@@ -127,7 +151,21 @@
 				{/each}
 			</wa-details>
 		{/if}
+		{#if onedit}
+			<div class="change">
+				<wa-button
+					appearance="outlined"
+					onclick={() => {
+						editing = true;
+					}}
+				>
+					<wa-icon slot="start" name="pen" aria-hidden="true"></wa-icon>
+					Change
+				</wa-button>
+			</div>
+		{/if}
 	</div>
+	{/if}
 </ResponsiveDialog>
 
 <style>
@@ -155,6 +193,11 @@
 	.type,
 	.seed {
 		color: var(--wa-color-text-quiet);
+	}
+
+	.change {
+		display: flex;
+		justify-content: flex-end;
 	}
 
 	.choices {
