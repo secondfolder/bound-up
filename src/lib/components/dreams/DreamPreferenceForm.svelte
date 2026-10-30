@@ -36,8 +36,12 @@
 			validators: zod4Client(dreamPreferenceFormSchema),
 			async onUpdate({ form: submitted }) {
 				if (submitted.valid && (await onadd(submitted.data))) {
+					// `submitted` too: superforms writes it back into the form once
+					// this returns, which put the words straight back.
 					$form.text = '';
 					$form.appliesTo = '';
+					submitted.data.text = '';
+					submitted.data.appliesTo = '';
 					draft?.clear();
 				}
 			}

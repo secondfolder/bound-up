@@ -130,8 +130,12 @@ test.describe('daydreams, the new engine', () => {
 		await page.getByRole('link', { name: 'What I keep in mind' }).click();
 		await waitForHydration(page);
 		await box(page, 'Add a preference').fill('Nothing about feet');
+		await box(page, 'Only for (optional)').fill('any story');
 		await clickWaButton(page, 'Add');
 		await expect(page.getByRole('region', { name: 'Never' })).toContainText('Nothing about feet');
+		// Added, the form is empty again for the next.
+		await expect(box(page, 'Add a preference')).toHaveValue('');
+		await expect(box(page, 'Only for (optional)')).toHaveValue('');
 		await page.goto('/dreams');
 		await waitForHydration(page);
 
