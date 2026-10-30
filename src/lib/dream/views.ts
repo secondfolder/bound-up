@@ -14,6 +14,8 @@ export type DreamListItemView = {
 	setup: SealedRefView;
 	lastTurnAt: Date | null;
 	createdAt: Date;
+	/** How many passages it has, every branch counted: how much there is to it at a glance. */
+	passages: number;
 };
 
 /** A turn's place in the tree, without its content. */

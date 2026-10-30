@@ -19,6 +19,17 @@
 
 	const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
 
+	/** A rough size, drawn as a thicker or thinner stack of pages. */
+	function sizeOf(passages: number): 'short' | 'medium' | 'long' | 'epic' {
+		if (passages <= 3) {
+			return 'short';
+		}
+		if (passages <= 20) {
+			return 'medium';
+		}
+		return passages <= 100 ? 'long' : 'epic';
+	}
+
 	async function start(brief: string): Promise<boolean> {
 		const id = crypto.randomUUID();
 		try {
@@ -71,13 +82,29 @@
 				<ul class="dreams">
 					{#each data.dreams as dream (dream.id)}
 						{const setup = $derived(openedDreamSetup(dream.setup))}
-						<li>
+						<!-- Still being set up, or built and not yet started: a draft. -->
+						{const draft = $derived(
+							!dream.lastTurnAt || Boolean(setup?.awaitingStart)
+						)}
+						<li class:draft>
 							<a href={resolve('/(auth-required)/(app)/dreams/[id]', { id: dream.id })}>
 								<span class="title">
 									{shownText(openedPart(setup, (value) => value.build?.title ?? value.brief))}
 								</span>
 								<span class="detail">
-									{dream.lastTurnAt ? `played ${dateFormat.format(dream.lastTurnAt)}` : 'being set up'}
+									{#if draft}
+										<span class="draft-mark"
+											><wa-icon name="pen-ruler" aria-hidden="true"></wa-icon> Draft, still being set up</span
+										>
+									{:else}
+										<span>played {dateFormat.format(dream.lastTurnAt ?? dream.createdAt)}</span>
+										<!-- How much there is to it, at a glance. -->
+										<span class="size" data-size={sizeOf(dream.passages)}>
+											<span class="pages" aria-hidden="true"></span>
+											{dream.passages}
+											{dream.passages === 1 ? 'passage' : 'passages'}
+										</span>
+									{/if}
 								</span>
 							</a>
 						</li>
@@ -133,8 +160,64 @@
 		}
 
 		.detail {
+			display: flex;
+			flex-wrap: wrap;
+			align-items: center;
+			gap: var(--wa-space-2xs) var(--wa-space-s);
 			font-size: var(--wa-font-size-s);
 			color: var(--wa-color-text-quiet);
+		}
+
+		/* A draft looks unfinished: dashed, quieter, its brief in italics. */
+		li.draft a {
+			border-style: dashed;
+			background: transparent;
+
+			.title {
+				font-style: italic;
+				color: var(--wa-color-text-quiet);
+			}
+		}
+
+		.draft-mark {
+			display: inline-flex;
+			align-items: center;
+			gap: var(--wa-space-3xs);
+		}
+
+		.size {
+			display: inline-flex;
+			align-items: center;
+			gap: var(--wa-space-2xs);
+		}
+
+		/* A stack of pages, thicker the more there is. */
+		.pages {
+			width: 0.9rem;
+			height: 0.25rem;
+			border-radius: 1px;
+			background: var(--wa-color-text-quiet);
+			box-shadow: none;
+		}
+
+		.size[data-size='medium'] .pages {
+			box-shadow: 0 -0.35rem 0 var(--wa-color-text-quiet);
+			margin-top: 0.35rem;
+		}
+
+		.size[data-size='long'] .pages {
+			box-shadow:
+				0 -0.35rem 0 var(--wa-color-text-quiet),
+				0 -0.7rem 0 var(--wa-color-text-quiet);
+			margin-top: 0.7rem;
+		}
+
+		.size[data-size='epic'] .pages {
+			box-shadow:
+				0 -0.35rem 0 var(--wa-color-text-quiet),
+				0 -0.7rem 0 var(--wa-color-text-quiet),
+				0 -1.05rem 0 var(--wa-color-text-quiet);
+			margin-top: 1.05rem;
 		}
 	}
 </style>

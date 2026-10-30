@@ -125,6 +125,13 @@ async function inChunks<T>(
 
 /** The user's daydreams, most recently played first; one never played sorts by when it was made. */
 export async function listDreams(db: Db, userId: string): Promise<DreamListItemView[]> {
+	// The passages a daydream has, every branch counted, in the one query.
+	const passages = db
+		.select({ dreamId: dreamTurns.dreamId, count: sql<number>`count(*)`.as('count') })
+		.from(dreamTurns)
+		.where(eq(dreamTurns.role, 'model'))
+		.groupBy(dreamTurns.dreamId)
+		.as('passages');
 	const rows = await db
 		.select({
 			id: dreams.id,
@@ -132,9 +139,11 @@ export async function listDreams(db: Db, userId: string): Promise<DreamListItemV
 			vaultId: dreams.vaultId,
 			payloadVersion: dreams.payloadVersion,
 			lastTurnAt: dreams.lastTurnAt,
-			createdAt: dreams.createdAt
+			createdAt: dreams.createdAt,
+			passages: sql<number>`coalesce(${passages.count}, 0)`
 		})
 		.from(dreams)
+		.leftJoin(passages, eq(passages.dreamId, dreams.id))
 		.where(eq(dreams.ownerId, userId))
 		// `coalesce` rather than NULLS LAST, which older D1 SQLite did not all parse.
 		.orderBy(desc(sql`coalesce(${dreams.lastTurnAt}, ${dreams.createdAt})`), asc(dreams.id));
@@ -142,7 +151,8 @@ export async function listDreams(db: Db, userId: string): Promise<DreamListItemV
 		id: row.id,
 		setup: ref(row),
 		lastTurnAt: row.lastTurnAt,
-		createdAt: row.createdAt
+		createdAt: row.createdAt,
+		passages: Number(row.passages)
 	}));
 }
 

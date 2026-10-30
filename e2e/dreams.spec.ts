@@ -235,6 +235,14 @@ test.describe('daydreams, the new engine', () => {
 		await expect(ready).toContainText('Ottilie');
 		await expect(page.locator('ol.turns')).toHaveCount(0);
 
+		// In the list it is a draft until it is started.
+		const dreamUrl = page.url();
+		await page.goto('/dreams');
+		await waitForHydration(page);
+		await expect(page.locator('ul.dreams li.draft')).toContainText('Draft, still being set up');
+		await page.goto(dreamUrl);
+		await waitForHydration(page);
+
 		// Still waiting on Start after a reload.
 		await page.reload();
 		await waitForHydration(page);
@@ -248,6 +256,12 @@ test.describe('daydreams, the new engine', () => {
 		await expect(page.locator('li[data-step="pick"]')).toContainText('Picked:');
 		await clickWaButton(page, 'Back to the story');
 		await expect(page.locator('ol.turns')).toContainText('"You came,"');
+
+		// Started, it is listed with how much there is to it.
+		await page.goto('/dreams');
+		await waitForHydration(page);
+		await expect(page.locator('ul.dreams li.draft')).toHaveCount(0);
+		await expect(page.locator('ul.dreams li').first()).toContainText('1 passage');
 	});
 
 	test('a suggestion is sent with a tap, or put in the box to change first', async ({ page }) => {

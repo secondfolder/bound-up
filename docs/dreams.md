@@ -434,7 +434,12 @@ Playroom's "Daydreams (new)" tile for an account with the feature:
   the brief, sealed, and goes to its page.
 - **What I keep in mind**: a link to the preferences page, where limits
   live (phase 5).
-- The daydreams so far, titled once built, "being set up" before.
+- The daydreams so far, titled once built. One still being set up, or built
+  and not yet started, is a **draft**: dashed, quieter, its brief in italics,
+  "Draft, still being set up". One started shows when it was last played and
+  how much there is to it: its passages, every branch counted (`passages`,
+  counted in the list's own query), with a stack of pages drawn thicker the
+  more there is (up to 3, 20, 100, and past).
 
 `/dreams/[id]` opens the setup and the branch in the browser and hands them to
 a `DreamSession` (`src/lib/dream-browser/session.svelte.ts`), which does the

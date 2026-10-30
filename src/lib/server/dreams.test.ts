@@ -123,6 +123,18 @@ describe('daydreams', () => {
 		expect((await listDreams(db, ada.id)).map((item) => item.id)).toEqual([older, newer]);
 	});
 
+	it('counts each daydream’s passages, every branch, and none of the user’s turns', async () => {
+		const id = await newDream();
+		const opening = await append(id, null);
+		const turn = await append(id, opening, { role: 'user' });
+		await append(id, turn);
+		await append(id, turn);
+		const empty = await newDream();
+		const listed = await listDreams(db, ada.id);
+		expect(listed.find((item) => item.id === id)?.passages).toBe(3);
+		expect(listed.find((item) => item.id === empty)?.passages).toBe(0);
+	});
+
 	it('deletes with everything in it, and only the owner’s', async () => {
 		const id = await newDream();
 		const turn = await append(id, null);
