@@ -319,6 +319,9 @@
 				// The bench-vote page's reader of dream-bench/; imported only behind
 				// `dev`, so likewise dead code in every build.
 				"src/lib/server/dream/ab.ts",
+				// Every model request a dev server makes, written to dream-log/;
+				// behind `dev`, so dead code in every build.
+				"src/lib/server/dream-capture.ts",
 				"src/lib/testing/**",
 				"**/*.test.ts"
 			],

@@ -50,6 +50,8 @@ local-media/
 # The new daydream engine's bench output (`npm run dreams:bench`, docs/dreams.md):
 # every prompt and generated passage in plain text, so it stays on this machine.
 /dream-bench/
+# Every model request and reply a dev server made (src/lib/server/dream-capture.ts).
+/dream-log/
 
 # Miscellaneous
 .local

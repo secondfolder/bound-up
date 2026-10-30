@@ -9,6 +9,7 @@ import type { ModelMessage } from '$lib/server/dream/prompts/core';
 import { researchMessages } from '$lib/server/dream/prompts/research';
 import { relay, toolEvent } from '$lib/server/dream/relay';
 import { SAMPLING, type Sampling } from '$lib/server/dream/sampling';
+import { capture } from '$lib/server/dream-capture';
 import { requireFeature, userHasFeature } from '$lib/server/features';
 import { recordOutcome, routeToBest } from '$lib/server/model-providers/store';
 import { rateLimitMessage } from '$lib/server/rate-limit';
@@ -206,6 +207,16 @@ export async function streamStory(
 			providers: routing.providers,
 			record: routing.record,
 			debug,
+			observe: ({ request: sent, completion, thinking, error: problem }) =>
+				void capture({
+					step: stepOf(event.request),
+					request: { ...sent },
+					reply: completion?.text,
+					thinking,
+					provider: completion?.provider ?? null,
+					usage: completion?.usage,
+					error: problem
+				}),
 			...(lookups && looksUp(lookups)
 				? {
 						hosts: lookups.fetch?.hosts ?? [],
@@ -320,6 +331,13 @@ export async function researchFirst(
 			() => undefined,
 			(used) => send(toolEvent(used, lookups.fetch?.hosts ?? []))
 		);
+		void capture({
+			step: 'research',
+			request: { ...request },
+			reply: reply.text,
+			provider: reply.provider,
+			usage: reply.usage
+		});
 		const outcome = classifyReply(reply.text, reply.finishReason);
 		if (provider) {
 			await routing.record(provider, outcome).catch(() => undefined);
@@ -374,6 +392,13 @@ export async function askOnce(
 			signal: event.request.signal,
 			...request
 		});
+		void capture({
+			step: stepOf(event.request),
+			request: { ...request },
+			reply: reply.text,
+			provider: reply.provider,
+			usage: reply.usage
+		});
 		const about = {
 			model: routing.listed,
 			provider: provider ?? reply.provider ?? '',
@@ -402,11 +427,18 @@ export async function askOnce(
 		}
 		// Not the error: an upstream message can quote the request back.
 		console.error('[dreams] a fill call failed');
-		return failure(debug, cause instanceof Error ? cause.message : String(cause));
+		const detail = cause instanceof Error ? cause.message : String(cause);
+		void capture({ step: stepOf(event.request), request: { ...request }, error: detail });
+		return failure(debug, detail);
 	}
 }
 
 const FILL_FAILED = 'That could not be filled in just now. Try again in a moment.';
+
+/** Which step a request is, for capturing in development: its route's last part. */
+function stepOf(request: Request): string {
+	return new URL(request.url).pathname.split('/').filter(Boolean).at(-1) ?? 'dream';
+}
 
 /**
  * A small call that could not be answered: a 502 the page can retry, saying

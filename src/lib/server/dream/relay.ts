@@ -53,6 +53,16 @@ export type RelayOptions = {
 	 * is sent, and a failure says what it was (docs/dreams.md, "Debug mode").
 	 */
 	debug?: boolean;
+	/**
+	 * Hears every attempt, its request and what came of it: the reply and the
+	 * model's thinking, or the error. For capturing in development.
+	 */
+	observe?: (attempt: {
+		request: CompletionRequest;
+		completion?: Completion;
+		thinking: string;
+		error?: string;
+	}) => void;
 };
 
 function endedFor(outcome: ReplyOutcome, finishReason: string | null): Ended {
@@ -99,6 +109,7 @@ export function relay(options: RelayOptions): ReadableStream<Uint8Array> {
 				const last = index === plan.length - 1;
 				let wrote = false;
 				let completion: Completion;
+				let thinking = '';
 				const attempt = {
 					...options.request,
 					model: provider ? options.listedModel : options.configuredModel,
@@ -110,7 +121,13 @@ export function relay(options: RelayOptions): ReadableStream<Uint8Array> {
 				}
 				try {
 					completion = await call(
-						{ ...attempt, onReasoning: (text) => send({ type: 'thinking', text }) },
+						{
+							...attempt,
+							onReasoning: (text) => {
+								thinking += text;
+								send({ type: 'thinking', text });
+							}
+						},
 						(text) => {
 							wrote = true;
 							send({ type: 'text', text });
@@ -118,6 +135,11 @@ export function relay(options: RelayOptions): ReadableStream<Uint8Array> {
 						(used) => send(toolEvent(used, options.hosts ?? []))
 					);
 				} catch (cause) {
+					options.observe?.({
+						request: attempt,
+						thinking,
+						error: cause instanceof Error ? cause.message : String(cause)
+					});
 					// Stopped by the user: nobody's fault, and nothing to send.
 					if (options.request.signal?.aborted || cancelled) {
 						close();
@@ -140,6 +162,7 @@ export function relay(options: RelayOptions): ReadableStream<Uint8Array> {
 					send({ type: 'restart', reason: 'failed' });
 					continue;
 				}
+				options.observe?.({ request: attempt, completion, thinking });
 				const outcome = classifyReply(completion.text, completion.finishReason);
 				if (provider) {
 					await options.record(provider, outcome).catch(() => undefined);

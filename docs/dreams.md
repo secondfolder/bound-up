@@ -157,6 +157,18 @@ With debug mode on, each passage's end shows "N% cached" and an info button
 that opens the request (`DreamExchange`): provider, model, tokens, cost,
 time, and the full transcript when this page sent it.
 
+### Capturing in development
+
+On `vite dev`, every request the engine makes of a model, and what came of
+it, is written to `dream-log/<day>/` (gitignored) as one Markdown file a
+request (`src/lib/server/dream-capture.ts`): the settings, every message
+sent, the thinking, the reply or the error, the provider and the usage,
+never the key. Readings, builds, passages, the small calls, designs and a
+research model's step are all there, so a daydream played on a dev server
+can be read back in full. It is inside `if (dev)`, a build-time constant,
+so no build has it or the `node:fs` it uses; what a user wrote is in these
+files, which is fine on a developer's own machine and nowhere else.
+
 ### Prompt caching
 
 The providers cache a prompt's opening by themselves; no request asks for
