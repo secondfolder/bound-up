@@ -23,6 +23,7 @@
 	import { ReadAloud, SPEEDS, type SpokenReport } from '$lib/dream-browser/reader.svelte';
 	import { loadReadingOptions, saveReadingOptions } from '$lib/dream-browser/reading-options';
 	import type { DreamSession } from '$lib/dream-browser/session.svelte';
+	import { chime, StillListening } from '$lib/dream-browser/still-listening.svelte';
 	import { type DraftSession, openDraft } from '$lib/messaging/drafts';
 	import { MAX_INPUT_CHARS, MAX_PASSAGE_CHARS } from '$lib/sealed-kinds/dreams';
 	import type { FishVoicePresetId } from '$lib/server-settings';
@@ -448,6 +449,7 @@
 				nameOf: (who) => speakerName(who),
 				onNearEnd: keepGoing,
 				onFinished: carryOn,
+				onControl: () => stillListening.active(),
 				upNext: (turnId) => {
 					const next = readOnInto(turnId);
 					const root = next ? passageRoot(next) : null;
@@ -470,6 +472,50 @@
 			})
 		: null;
 	onDestroy(() => reader?.dispose());
+
+	// "Still listening?": with Keep going on, once nobody has touched the page
+	// for a while it asks, and pauses unanswered, so a phone left playing in
+	// an empty room does not write and read all night (docs/dreams.md, "Keep
+	// going"). Every sign of someone there counts: a tap, a key, the mouse,
+	// a scroll of their own, and a media key or headphone button (the reader's
+	// `onControl`). Checked every second; a page playing audio is not
+	// throttled in the background, which is where this matters most.
+	const stillListening = new StillListening();
+	onMount(() => {
+		const active = () => stillListening.active();
+		const signs = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart'] as const;
+		for (const sign of signs) {
+			document.addEventListener(sign, active, { capture: true, passive: true });
+		}
+		const timer = setInterval(() => {
+			if (!reader) {
+				return;
+			}
+			const running = reader.keepGoing && !reader.paused && (reader.playing || reader.loading);
+			const step = stillListening.tick(running);
+			if (step === 'warn') {
+				chime();
+			} else if (step === 'pause') {
+				reader.pause();
+			}
+		}, 1000);
+		return () => {
+			clearInterval(timer);
+			for (const sign of signs) {
+				document.removeEventListener(sign, active, { capture: true });
+			}
+		};
+	});
+
+	function answerStillListening(keepPlaying: boolean) {
+		if (!stillListening.asking) {
+			return;
+		}
+		stillListening.answer(keepPlaying);
+		if (!keepPlaying) {
+			reader?.pause();
+		}
+	}
 
 	// Read aloud and the player's options are as the user left them, on this
 	// device, for every daydream. Restored before anything is saved, so the
@@ -1263,6 +1309,23 @@
 	<!-- In sight exactly when the page is scrolled to its end (`watchStuck`). -->
 	<div class="dock-end" aria-hidden="true" {@attach watchStuck}></div>
 </div>
+
+{#if stillListening.asking}
+	<ResponsiveDialog
+		label="Still listening?"
+		lightDismiss={false}
+		onclose={() => answerStillListening(false)}
+	>
+		<p>
+			Keep going is writing and reading the story by itself. It pauses in {stillListening.secondsLeft}
+			seconds unless you choose to keep playing.
+		</p>
+		{#snippet footer()}
+			<wa-button appearance="outlined" onclick={() => answerStillListening(false)}>Pause</wa-button>
+			<wa-button variant="brand" onclick={() => answerStillListening(true)}>Keep playing</wa-button>
+		{/snippet}
+	</ResponsiveDialog>
+{/if}
 
 {#if voicesOpen && voice}
 	<DreamVoices

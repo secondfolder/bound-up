@@ -1067,6 +1067,60 @@ test.describe('daydreams, the new engine', () => {
 		expect(read.slice(asked).some((text) => text.includes('Ottilie smiles'))).toBe(false);
 	});
 
+	test('Keep going asks whether anyone is still listening, warns, and pauses unanswered', async ({
+		page
+	}) => {
+		const who = await dreamer(page);
+		await grantFeature(who.email, 'dreamVoice');
+		await page.clock.install();
+		await start(page, 'A quiet evening');
+		await play(page);
+		await saved(page);
+
+		// Each chime is two notes: counted, since a test cannot hear it. On this
+		// page, which the daydream was reached in without loading a new one.
+		await page.evaluate(() => {
+			const Real = OscillatorNode;
+			const counted = globalThis as unknown as { notes: number };
+			counted.notes = 0;
+			globalThis.OscillatorNode = class extends Real {
+				constructor(...args: ConstructorParameters<typeof OscillatorNode>) {
+					super(...args);
+					counted.notes += 1;
+				}
+			};
+		});
+		await page.getByRole('button', { name: 'Read aloud' }).click();
+		const player = page.getByRole('region', { name: 'Reading aloud' });
+		await player.getByRole('button', { name: 'Keep going' }).click();
+		await passageMenu(page, 'Listen');
+		await expect(player.getByRole('button', { name: 'Pause' })).toBeVisible();
+		const notes = () => page.evaluate(() => (globalThis as unknown as { notes: number }).notes);
+
+		// Two minutes with nobody touching anything.
+		await page.clock.fastForward('02:01');
+		// Its words: the wa-dialog host has no box of its own to be visible.
+		const asking = page.getByText(/Keep going is writing and reading the story by itself/);
+		await expect(asking).toBeVisible();
+		expect(await notes()).toBe(0);
+		// Half way, a chime, for a phone in a pocket.
+		await page.clock.fastForward('00:16');
+		await expect.poll(notes).toBe(2);
+		// Unanswered, it pauses.
+		await page.clock.fastForward('00:15');
+		await expect(asking).toBeHidden();
+		await expect(player.getByRole('button', { name: 'Play' })).toBeVisible();
+
+		// Answered, it keeps playing.
+		await player.getByRole('button', { name: 'Play' }).click();
+		await expect(player.getByRole('button', { name: 'Pause' })).toBeVisible();
+		await page.clock.fastForward('02:01');
+		await expect(asking).toBeVisible();
+		await clickWaButton(page, 'Keep playing');
+		await expect(asking).toBeHidden();
+		await expect(player.getByRole('button', { name: 'Pause' })).toBeVisible();
+	});
+
 	test('reading aloud does not pull the page back once it is scrolled away', async ({ page }) => {
 		await page.setViewportSize({ width: 390, height: 520 });
 		const who = await dreamer(page);

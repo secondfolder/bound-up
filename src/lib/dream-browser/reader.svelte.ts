@@ -246,6 +246,7 @@ export class ReadAloud {
 	readonly #onFinished: ((turnId: string) => void) | undefined;
 	readonly #onPosition: ((turnId: string, index: number, done: boolean) => void) | undefined;
 	readonly #upNext: ((turnId: string) => { turnId: string; root: HTMLElement } | null) | undefined;
+	readonly #onControl: (() => void) | undefined;
 	/** The passage read after this one, read from the page once (`#following`). */
 	#next: { turnId: string; root: HTMLElement; passage: Passage; said: Utterance[] } | null = null;
 
@@ -271,6 +272,8 @@ export class ReadAloud {
 		 * ends, so there is no wait between the two.
 		 */
 		upNext?: (turnId: string) => { turnId: string; root: HTMLElement } | null;
+		/** A media key or headphone button was pressed: the user is there. */
+		onControl?: () => void;
 	}) {
 		this.#voiceOf = options.voiceOf;
 		this.#nameOf = options.nameOf;
@@ -280,6 +283,7 @@ export class ReadAloud {
 		this.#onFinished = options.onFinished;
 		this.#onPosition = options.onPosition;
 		this.#upNext = options.upNext;
+		this.#onControl = options.onControl;
 	}
 
 	/**
@@ -834,10 +838,27 @@ export class ReadAloud {
 		}
 		navigator.mediaSession.metadata = new MediaMetadata({ title: 'Bound Up' });
 		navigator.mediaSession.playbackState = 'playing';
-		navigator.mediaSession.setActionHandler('play', () => this.resume());
-		navigator.mediaSession.setActionHandler('pause', () => this.pause());
-		navigator.mediaSession.setActionHandler('previoustrack', () => this.back());
-		navigator.mediaSession.setActionHandler('nexttrack', () => this.next());
+		// A press of a media key or a headphone button is the user, there.
+		const pressed = (action: () => void) => () => {
+			this.#onControl?.();
+			action();
+		};
+		navigator.mediaSession.setActionHandler(
+			'play',
+			pressed(() => this.resume())
+		);
+		navigator.mediaSession.setActionHandler(
+			'pause',
+			pressed(() => this.pause())
+		);
+		navigator.mediaSession.setActionHandler(
+			'previoustrack',
+			pressed(() => this.back())
+		);
+		navigator.mediaSession.setActionHandler(
+			'nexttrack',
+			pressed(() => this.next())
+		);
 	}
 
 	/** The root of the passage being read, for the page to know which is lit. */

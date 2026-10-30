@@ -1176,6 +1176,21 @@ audio's `timeupdate`, which goes on firing with the screen locked, where an
 animation frame does not: listening with the phone in a pocket is the case
 it is for.
 
+**Still listening?** Keep going writes and reads passage after passage with
+nobody touching anything, so a phone left playing in an empty room would run
+up the model's bill and the voice's all night. While it is on and reading
+plays, the page watches for someone there: a tap, a key, the mouse, a scroll
+of their own, a media key or headphone button (the reader's `onControl`).
+After two minutes with none it asks "Still listening?"; fifteen seconds
+unanswered, a soft chime (made with Web Audio, nothing to fetch) says it is
+about to pause; thirty, or "Pause", or closing it, and it pauses. Each "Keep
+playing" says the user listens without touching anything, so the next ask
+waits longer: five minutes after the first, then ten, and ten from then on.
+The rules are `StillListening` in
+`src/lib/dream-browser/still-listening.svelte.ts`, with the clock passed in;
+the page ticks it every second, which a page playing audio is not throttled
+out of in the background.
+
 **What is read is what is drawn** (`passageRuns` in
 `src/lib/dream-browser/reader.svelte.ts`). The reader walks the passage's
 element on the page, so a spoiler is read only once it is open, an expansion
