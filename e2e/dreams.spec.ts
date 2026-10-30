@@ -546,7 +546,9 @@ test.describe('daydreams, the new engine', () => {
 
 		await box(page, 'Not quite? Tell it what to change.').fill('Make it winter');
 		await clickWaButton(page, 'Change it');
-		await expect(page.getByText('Then: “Make it winter”')).toBeVisible();
+		await expect(page.getByRole('region', { name: 'What you asked for' })).toContainText(
+			'Then: Make it winter'
+		);
 		await expect(page.getByRole('heading', { name: 'Who is in charge?' })).toBeVisible();
 		await clickWaButton(page, 'You are');
 		await expect(page.getByRole('heading', { name: 'The Keeper (changed)' })).toBeVisible();

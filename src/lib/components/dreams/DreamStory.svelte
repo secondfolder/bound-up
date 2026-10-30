@@ -597,27 +597,6 @@
 					<!-- Where one passage ends: a rule with what can be done to it in the
 					     middle. Versions and Retry stay in sight; the rest is in the menu. -->
 					<div class="passage-end">
-						{#if versions.ids.length > 1}
-							<span class="versions">
-								<wa-button
-									size="s"
-									appearance="plain"
-									disabled={versions.at <= 0 || session.busy}
-									onclick={() => session.switchTo(versions.ids[versions.at - 1] ?? entry.id)}
-								>
-									<wa-icon name="chevron-left" label="Previous version"></wa-icon>
-								</wa-button>
-								<span>{versions.at + 1} / {versions.ids.length}</span>
-								<wa-button
-									size="s"
-									appearance="plain"
-									disabled={versions.at >= versions.ids.length - 1 || session.busy}
-									onclick={() => session.switchTo(versions.ids[versions.at + 1] ?? entry.id)}
-								>
-									<wa-icon name="chevron-right" label="Next version"></wa-icon>
-								</wa-button>
-							</span>
-						{/if}
 						{#if passage.ended !== 'complete'}
 							<wa-button size="s" appearance="outlined" disabled={session.busy} onclick={() => session.retry(entry.id)}>
 								Retry
@@ -646,6 +625,27 @@
 								Edit
 							</wa-dropdown-item>
 						</wa-dropdown>
+						{#if versions.ids.length > 1}
+							<span class="versions">
+								<wa-button
+									size="s"
+									appearance="plain"
+									disabled={versions.at <= 0 || session.busy}
+									onclick={() => session.switchTo(versions.ids[versions.at - 1] ?? entry.id)}
+								>
+									<wa-icon name="chevron-left" label="Previous version"></wa-icon>
+								</wa-button>
+								<span>{versions.at + 1} / {versions.ids.length}</span>
+								<wa-button
+									size="s"
+									appearance="plain"
+									disabled={versions.at >= versions.ids.length - 1 || session.busy}
+									onclick={() => session.switchTo(versions.ids[versions.at + 1] ?? entry.id)}
+								>
+									<wa-icon name="chevron-right" label="Next version"></wa-icon>
+								</wa-button>
+							</span>
+						{/if}
 					</div>
 				</li>
 			{/if}

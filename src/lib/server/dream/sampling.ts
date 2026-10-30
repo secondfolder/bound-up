@@ -21,7 +21,11 @@ export const SAMPLING = {
 	/** Step 1: listing directions, where the unlikely ones are wanted. */
 	reading: { temperature: 1, minP: 0.05, maxTokens: 4000 },
 	/** The build and its opening. */
-	build: { temperature: 0.9, minP: 0.05, maxTokens: 9000 },
+	/**
+	 * The build and its opening. Room for a model to think at length first:
+	 * with research to work from, a build ran out of tokens at 9,000.
+	 */
+	build: { temperature: 0.9, minP: 0.05, maxTokens: 16_000 },
 	passage: { temperature: 0.9, minP: 0.05, maxTokens: 6000 },
 	/** Another take: a little hotter, so its words go somewhere new. */
 	take: { temperature: 1, minP: 0.05, maxTokens: 6000 },

@@ -220,7 +220,11 @@
 
 {#snippet directions()}
 	{#if reading && reading.directions.length > 0}
-		{#if step === 'pick'}
+		{#if streaming?.what === 'read' && reading.pick.by !== 'user'}
+			<!-- Not drawn as they arrive: code picks one, and a list appearing and
+			     going again is noise. Only a brief that asks to choose shows them. -->
+			<p class="result quiet">{reading.directions.length} {reading.directions.length === 1 ? 'idea' : 'ideas'} so far</p>
+		{:else if step === 'pick'}
 			<!-- The user is choosing: the ideas are under that step. -->
 			<p class="result">{reading.directions.length} {reading.directions.length === 1 ? 'idea' : 'ideas'}</p>
 		{:else if chosen && !showIdeas}
@@ -333,10 +337,8 @@
 		{@render lookups()}
 	{:else if key === 'read'}
 		{#if reading && reading.musts.length > 0}
-			<ul class="chips" aria-label="What it must have">
-				{#each reading.musts as must (must)}
-					<li><wa-badge variant="neutral" appearance="outlined">{must}</wa-badge></li>
-				{/each}
+			<ul class="musts" aria-label="What it must have">
+				{#each reading.musts as must (must)}<li>{must}</li>{/each}
 			</ul>
 		{/if}
 	{:else if key === 'directions'}
@@ -353,10 +355,13 @@
 {/snippet}
 
 <div class="setup">
-	<p class="brief">“{setup?.brief}”</p>
-	{#each setup?.amendments ?? [] as amendment, index (index)}
-		<p class="amendment">Then: “{amendment}”</p>
-	{/each}
+	<!-- The brief in a box of its own, as the plan's mockup has it. -->
+	<section class="brief" aria-label="What you asked for">
+		<p>{setup?.brief}</p>
+		{#each setup?.amendments ?? [] as amendment, index (index)}
+			<p class="amendment">Then: {amendment}</p>
+		{/each}
+	</section>
 
 	<ol class="steps">
 		{#each progress as entry (entry.key)}
@@ -501,8 +506,19 @@
 	}
 
 	.brief {
-		margin: 0;
-		font-size: var(--wa-font-size-l);
+		display: flex;
+		flex-direction: column;
+		gap: var(--wa-space-2xs);
+		padding: var(--wa-space-s) var(--wa-space-m);
+		border: 1px solid var(--wa-color-surface-border);
+		border-radius: var(--wa-border-radius-m);
+		background: var(--wa-color-surface-raised);
+
+		p {
+			margin: 0;
+			white-space: pre-line;
+			overflow-wrap: anywhere;
+		}
 	}
 
 	.amendment {
@@ -562,13 +578,9 @@
 		border-top-color: transparent;
 	}
 
-	/* Waiting on the user, not the model: a still ring with a beating dot, never the spinner. */
-	li[data-status='yours'] > .mark::after {
-		content: '';
-		position: absolute;
-		inset: 0.2rem;
-		border-radius: 50%;
-		background: var(--wa-color-brand-fill-loud);
+	/* Waiting on the user, not the model: the whole ring breathes, never the spinner. */
+	li[data-status='yours'] > .mark {
+		border-width: 3px;
 	}
 
 	@media (prefers-reduced-motion: no-preference) {
@@ -576,15 +588,15 @@
 			animation: turn 0.8s linear infinite;
 		}
 
-		li[data-status='yours'] > .mark::after {
+		li[data-status='yours'] > .mark {
 			animation: beat 1.6s ease-in-out infinite;
 		}
 	}
 
 	@keyframes beat {
 		50% {
-			transform: scale(0.55);
-			opacity: 0.5;
+			transform: scale(0.7);
+			opacity: 0.55;
 		}
 	}
 
@@ -773,7 +785,7 @@
 
 		.person {
 			display: grid;
-			grid-template-columns: 1.25rem 1fr;
+			grid-template-columns: 1.25rem minmax(0, 1fr);
 			gap: var(--wa-space-xs);
 			align-items: baseline;
 			width: 100%;
@@ -798,6 +810,8 @@
 		span {
 			display: flex;
 			flex-direction: column;
+			min-width: 0;
+			overflow-wrap: anywhere;
 		}
 
 		small {
@@ -853,5 +867,13 @@
 		&:focus-visible {
 			outline: var(--wa-focus-ring);
 		}
+	}
+
+	/* Plain lines, not chips: they are what was read, nothing to press. */
+	.musts {
+		margin: 0;
+		padding-left: 1.25em;
+		font-size: var(--wa-font-size-s);
+		overflow-wrap: anywhere;
 	}
 </style>
