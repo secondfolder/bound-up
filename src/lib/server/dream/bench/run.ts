@@ -209,6 +209,7 @@ async function runSteps(
 				setup: {
 					heat: build.heat,
 					telling: build.telling,
+					style: build.style,
 					capabilities: passageCapabilities(false),
 					elements: build.elements,
 					presentation: build.presentation,
