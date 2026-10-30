@@ -808,12 +808,18 @@ const server = createServer(async (request, response) => {
 	const event = (fields) =>
 		`data: ${JSON.stringify({ id: 'gen-stub', model: body.model, provider: 'Stub', ...fields })}\n\n`;
 	response.write(event({ choices: [{ delta: { reasoning: 'The stub thinks it over.' } }] }));
+	// A build for a brief with `[slow build]` takes seconds, so a spec can act
+	// while it is still being written.
+	const system = body.messages?.find((message) => message.role === 'system')?.content ?? '';
+	const slow =
+		String(system).includes('This step builds the daydream') &&
+		JSON.stringify(body.messages).includes('[slow build]');
 	for (const piece of chunks(dream ?? replyFor(body.messages))) {
 		if (response.destroyed) {
 			return;
 		}
 		response.write(event({ choices: [{ delta: { content: piece } }] }));
-		await sleep(20);
+		await sleep(slow ? 120 : 20);
 	}
 	response.write(event({ choices: [{ delta: {}, finish_reason: 'stop' }] }));
 	if (body.usage?.include) {

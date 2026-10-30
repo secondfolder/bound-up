@@ -764,6 +764,49 @@ test.describe('daydreams, the new engine', () => {
 			.toBe(true);
 	});
 
+	test('a passage that arrives mid-read waits for the one being read to finish', async ({
+		page
+	}) => {
+		const who = await dreamer(page);
+		await grantFeature(who.email, 'dreamVoice');
+		await start(page, 'A quiet evening');
+		await play(page);
+		await saved(page);
+
+		const read: string[] = [];
+		page.on('request', (request) => {
+			if (request.url().endsWith('/api/dreams/speak')) {
+				read.push(String(request.postDataJSON()?.text ?? ''));
+			}
+		});
+		await page.getByRole('button', { name: 'Read aloud' }).click();
+		const player = page.getByRole('region', { name: 'Reading aloud' });
+		// On, it used to start each new passage the moment it came.
+		await player.getByRole('button', { name: /Read new passages/ }).click();
+		await passageMenu(page, 'Listen');
+		await expect
+			.poll(() => page.evaluate(() => CSS.highlights.has('dream-reading')), { timeout: 10_000 })
+			.toBe(true);
+
+		// A turn taken while the opening is read: the next passage comes, and
+		// the opening is still the one being read.
+		await page.getByRole('button', { name: 'I take the key.', exact: true }).click();
+		await expect(page.locator('li.passage')).toHaveCount(2);
+		await saved(page);
+		const litIn = () =>
+			page.evaluate(() => {
+				const lit = CSS.highlights.get('dream-reading');
+				const range = lit ? [...lit][0] : undefined;
+				const passage = range?.startContainer.parentElement?.closest('li.passage');
+				return passage ? [...document.querySelectorAll('li.passage')].indexOf(passage) : -1;
+			});
+		expect(await litIn()).toBe(0);
+		// Once it has been read, the new one is read after it.
+		await expect
+			.poll(() => read.some((text) => text.includes('Ottilie smiles')), { timeout: 30_000 })
+			.toBe(true);
+	});
+
 	test('reading aloud does not pull the page back once it is scrolled away', async ({ page }) => {
 		await page.setViewportSize({ width: 390, height: 520 });
 		const who = await dreamer(page);
@@ -807,6 +850,32 @@ test.describe('daydreams, the new engine', () => {
 		await page.reload();
 		await waitForHydration(page);
 		await expect(page.locator('ol.turns')).toHaveAttribute('data-view', 'texts');
+	});
+
+	test('choosing another idea while one is being built builds that one instead', async ({
+		page
+	}) => {
+		await dreamer(page);
+		await start(page, 'A quiet evening [pick] [slow build]');
+		await page.getByRole('button', { name: 'Use this one' }).first().click();
+		// Still being built: the first idea's opening has not finished.
+		await expect(page.locator('li[data-step="build"][data-status="active"]')).toBeVisible();
+		// The ideas stay open while one is built, so another is a tap away.
+		const letters = page.locator('ul.directions li', { hasText: 'Letters left under a door.' });
+		await letters.getByRole('button', { name: 'Use this one' }).click();
+
+		// The build is for the idea chosen last, and the first left no trace.
+		const ready = page.getByRole('region', { name: 'The Keeper' });
+		await expect(ready).toBeVisible({ timeout: 30_000 });
+		await expect(page.locator('li[data-step="pick"]').last()).toContainText(
+			'Letters left under a door.'
+		);
+		await play(page);
+		await expect(page.locator('li.passage').first()).toContainText('(Letters left under a door.)');
+		await page.reload();
+		await waitForHydration(page);
+		await expect(page.locator('li.passage').first()).toContainText('(Letters left under a door.)');
+		await expect(page.locator('li.passage')).toHaveCount(1);
 	});
 
 	test('choosing first, Surprise me, and Try another idea', async ({ page }) => {

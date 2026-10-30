@@ -256,7 +256,10 @@
 		{:else if step === 'pick'}
 			<!-- The user is choosing: the ideas are under that step. -->
 			<p class="result">{reading.directions.length} {reading.directions.length === 1 ? 'idea' : 'ideas'}</p>
-		{:else if chosen && !showIdeas}
+		{:else if chosen && !showIdeas && streaming?.what !== 'build'}
+			<!-- Folded once built. While the chosen one is being built they stay
+			     open, so another can be chosen instead in a tap: that stops the
+			     build and starts one for it. -->
 			<p class="result">
 				{reading.directions.length}
 				{reading.directions.length === 1 ? 'idea' : 'ideas'} ·
@@ -272,7 +275,7 @@
 			</p>
 		{:else}
 			{@render ideaList()}
-			{#if chosen}
+			{#if chosen && streaming?.what !== 'build'}
 				<button
 					type="button"
 					class="link"

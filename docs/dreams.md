@@ -494,7 +494,10 @@ With debug mode on, each step has a button for its request and the reply.
   and searches are kept with the reading (`reading.lookups`).
 - **Analysing what you asked for**: the musts, as plain lines, and the
   ideas: while they stream only a count ("5 ideas so far"), never cards
-  appearing and going, unless the brief asked to choose.
+  appearing and going, unless the brief asked to choose. Once one is chosen
+  they fold behind "See them all", except while it is being built: then they
+  stay open, so another can be chosen instead in a tap, which stops the build
+  and starts one for that idea, leaving nothing of the first.
 - **A question for you**, when step 1 asked one, waiting on the user (an
   option or their own words); then **You answered**.
 - **Picking one** (code, leaning towards the less likely, `codePick`), or
