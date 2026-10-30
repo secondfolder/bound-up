@@ -1090,6 +1090,23 @@ test.describe('daydreams, the new engine', () => {
 				}
 			};
 		});
+		// What a media key or headphone button would call, kept to press by hand.
+		await page.evaluate(() => {
+			const kept = globalThis as unknown as { media: Record<string, () => void> };
+			kept.media = {};
+			const set = navigator.mediaSession.setActionHandler.bind(navigator.mediaSession);
+			navigator.mediaSession.setActionHandler = (action, handler) => {
+				if (handler) {
+					kept.media[action] = () => handler({ action });
+				}
+				set(action, handler);
+			};
+		});
+		const press = (action: string) =>
+			page.evaluate(
+				(name) => (globalThis as unknown as { media: Record<string, () => void> }).media[name]?.(),
+				action
+			);
 		await page.getByRole('button', { name: 'Read aloud' }).click();
 		const player = page.getByRole('region', { name: 'Reading aloud' });
 		await player.getByRole('button', { name: 'Keep going' }).click();
@@ -1119,6 +1136,23 @@ test.describe('daydreams, the new engine', () => {
 		await clickWaButton(page, 'Keep playing');
 		await expect(asking).toBeHidden();
 		await expect(player.getByRole('button', { name: 'Pause' })).toBeVisible();
+
+		// After a yes it waits five minutes; then the headphones' pause answers it.
+		await page.clock.fastForward('02:01');
+		await expect(asking).toBeHidden();
+		await page.clock.fastForward('03:00');
+		await expect(asking).toBeVisible();
+		await press('pause');
+		await expect(asking).toBeHidden();
+		await expect(player.getByRole('button', { name: 'Play' })).toBeVisible();
+
+		// Played again, it counts as keep playing: the next ask waits ten.
+		await press('play');
+		await expect(player.getByRole('button', { name: 'Pause' })).toBeVisible();
+		await page.clock.fastForward('05:01');
+		await expect(asking).toBeHidden();
+		await page.clock.fastForward('05:00');
+		await expect(asking).toBeVisible();
 	});
 
 	test('reading aloud does not pull the page back once it is scrolled away', async ({ page }) => {

@@ -1183,9 +1183,13 @@ plays, the page watches for someone there: a tap, a key, the mouse, a scroll
 of their own, a media key or headphone button (the reader's `onControl`).
 After two minutes with none it asks "Still listening?"; fifteen seconds
 unanswered, a soft chime (made with Web Audio, nothing to fetch) says it is
-about to pause; thirty, or "Pause", or closing it, and it pauses. Each "Keep
-playing" says the user listens without touching anything, so the next ask
-waits longer: five minutes after the first, then ten, and ten from then on.
+about to pause; thirty, or "Pause", or closing it, and it pauses. A media
+key or headphone button answers it too: play as "Keep playing", pause as
+"Pause". Each "Keep playing" says the user listens without touching
+anything, so the next ask waits longer: five minutes after the first, then
+ten, and ten from then on. Pausing from it and then playing again counts
+the same, since whoever did that was there; a pause nobody answered does
+not.
 The rules are `StillListening` in
 `src/lib/dream-browser/still-listening.svelte.ts`, with the clock passed in;
 the page ticks it every second, which a page playing audio is not throttled

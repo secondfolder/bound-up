@@ -6,8 +6,8 @@
  *
  * Each "keep playing" means the user is listening without touching
  * anything, so the next ask waits longer: two minutes, then five, then
- * every ten. The wait only counts time with nobody there: any activity
- * starts it again.
+ * every ten; so does pausing from it and playing again. The wait only
+ * counts time with nobody there: any activity starts it again.
  *
  * The clock is passed in, so the steps are tested without waiting for them.
  */
@@ -32,6 +32,14 @@ export class StillListening {
 	#yeses = 0;
 	#askedAt = 0;
 	#warned = false;
+	/**
+	 * Paused by an answer: playing again after it counts as a "keep playing",
+	 * since someone who paused and came back was there all along. A pause
+	 * because nobody answered does not. Typed by hand, as the reader's
+	 * `#scrolled` is: Biome cannot see `answer` set it, and otherwise reads
+	 * it as always false.
+	 */
+	readonly #paused: { byAnswer: boolean } = { byAnswer: false };
 
 	constructor(now: () => number = Date.now) {
 		this.#now = now;
@@ -64,6 +72,10 @@ export class StillListening {
 			this.asking = false;
 			return null;
 		}
+		if (this.#paused.byAnswer) {
+			this.#paused.byAnswer = false;
+			this.#yeses += 1;
+		}
 		if (this.asking) {
 			const waited = now - this.#askedAt;
 			this.secondsLeft = Math.max(0, Math.ceil((ANSWER_MS - waited) / 1000));
@@ -94,6 +106,8 @@ export class StillListening {
 		this.#lastActive = this.#now();
 		if (keepPlaying) {
 			this.#yeses += 1;
+		} else {
+			this.#paused.byAnswer = true;
 		}
 	}
 }

@@ -449,7 +449,15 @@
 				nameOf: (who) => speakerName(who),
 				onNearEnd: keepGoing,
 				onFinished: carryOn,
-				onControl: () => stillListening.active(),
+				// A press of play or pause answers "Still listening?" if it is up,
+				// as its buttons would: the user is plainly there.
+				onControl: (control) => {
+					if (stillListening.asking) {
+						stillListening.answer(control !== 'pause');
+					} else {
+						stillListening.active();
+					}
+				},
 				upNext: (turnId) => {
 					const next = readOnInto(turnId);
 					const root = next ? passageRoot(next) : null;

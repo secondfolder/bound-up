@@ -85,12 +85,27 @@ describe('StillListening', () => {
 		expect(still.tick(true)).toBe('pause');
 	});
 
-	it('does not lengthen the wait for a no', () => {
+	it('lengthens the wait for a pause only once it plays again', () => {
 		const { now, pass } = clock();
 		const still = new StillListening(now);
 		pass(2 * MINUTE);
 		still.tick(true);
 		still.answer(false);
+		expect(still.tick(false)).toBe(null);
+		expect(still.quietFor).toBe(2 * MINUTE);
+		still.tick(true);
+		expect(still.quietFor).toBe(5 * MINUTE);
+	});
+
+	it('does not lengthen the wait for a pause nobody answered', () => {
+		const { now, pass } = clock();
+		const still = new StillListening(now);
+		pass(2 * MINUTE);
+		still.tick(true);
+		pass(ANSWER_MS);
+		expect(still.tick(true)).toBe('pause');
+		still.tick(false);
+		still.tick(true);
 		expect(still.quietFor).toBe(2 * MINUTE);
 	});
 });

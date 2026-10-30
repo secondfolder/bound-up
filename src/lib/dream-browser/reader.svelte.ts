@@ -163,6 +163,9 @@ export type SpokenReport = {
 
 export const SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const;
 
+/** A media key or headphone button, as the reader reports it (`onControl`). */
+export type MediaControl = 'play' | 'pause' | 'back' | 'next';
+
 export class ReadAloud {
 	/** The passage being read, by turn. */
 	turnId = $state<string | null>(null);
@@ -246,7 +249,7 @@ export class ReadAloud {
 	readonly #onFinished: ((turnId: string) => void) | undefined;
 	readonly #onPosition: ((turnId: string, index: number, done: boolean) => void) | undefined;
 	readonly #upNext: ((turnId: string) => { turnId: string; root: HTMLElement } | null) | undefined;
-	readonly #onControl: (() => void) | undefined;
+	readonly #onControl: ((control: MediaControl) => void) | undefined;
 	/** The passage read after this one, read from the page once (`#following`). */
 	#next: { turnId: string; root: HTMLElement; passage: Passage; said: Utterance[] } | null = null;
 
@@ -273,7 +276,7 @@ export class ReadAloud {
 		 */
 		upNext?: (turnId: string) => { turnId: string; root: HTMLElement } | null;
 		/** A media key or headphone button was pressed: the user is there. */
-		onControl?: () => void;
+		onControl?: (control: MediaControl) => void;
 	}) {
 		this.#voiceOf = options.voiceOf;
 		this.#nameOf = options.nameOf;
@@ -839,25 +842,25 @@ export class ReadAloud {
 		navigator.mediaSession.metadata = new MediaMetadata({ title: 'Bound Up' });
 		navigator.mediaSession.playbackState = 'playing';
 		// A press of a media key or a headphone button is the user, there.
-		const pressed = (action: () => void) => () => {
-			this.#onControl?.();
+		const pressed = (control: MediaControl, action: () => void) => () => {
+			this.#onControl?.(control);
 			action();
 		};
 		navigator.mediaSession.setActionHandler(
 			'play',
-			pressed(() => this.resume())
+			pressed('play', () => this.resume())
 		);
 		navigator.mediaSession.setActionHandler(
 			'pause',
-			pressed(() => this.pause())
+			pressed('pause', () => this.pause())
 		);
 		navigator.mediaSession.setActionHandler(
 			'previoustrack',
-			pressed(() => this.back())
+			pressed('back', () => this.back())
 		);
 		navigator.mediaSession.setActionHandler(
 			'nexttrack',
-			pressed(() => this.next())
+			pressed('next', () => this.next())
 		);
 	}
 
