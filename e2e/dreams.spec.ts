@@ -322,6 +322,36 @@ test.describe('daydreams, the new engine', () => {
 		await play(page, 'The Keeper (changed)');
 	});
 
+	test('pulling the story up past its end, and letting go, is Continue', async ({ page }) => {
+		await dreamer(page);
+		await start(page, 'A quiet evening');
+		await play(page);
+		await saved(page);
+
+		// A touch dragged up from the end of the page, as a finger would.
+		const touch = (type: string, y: number) =>
+			page.evaluate(
+				([kind, at]) => {
+					const area = document.querySelector('main') as HTMLElement;
+					area.scrollTop = area.scrollHeight;
+					const point = new Touch({ identifier: 1, target: area, clientX: 100, clientY: at });
+					const touches = kind === 'touchend' ? [] : [point];
+					area.dispatchEvent(
+						new TouchEvent(kind, { touches, changedTouches: [point], bubbles: true })
+					);
+				},
+				[type, y] as const
+			);
+		await touch('touchstart', 600);
+		await touch('touchmove', 380);
+		await expect(page.getByText('Release to continue')).toBeVisible();
+		const next = page.waitForRequest((request) => request.url().endsWith('/api/dreams/passage'));
+		await touch('touchend', 380);
+		await next;
+		await expect(page.getByText('Ottilie waits for you to go on.')).toBeVisible();
+		await saved(page);
+	});
+
 	test('choosing first, Surprise me, and Try another idea', async ({ page }) => {
 		await dreamer(page);
 		await start(page, 'A quiet evening [pick]');

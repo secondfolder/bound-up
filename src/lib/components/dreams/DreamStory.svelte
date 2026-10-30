@@ -182,6 +182,60 @@
 		}
 	}
 
+	// ── pull to continue ─────────────────────────────────────────────────────
+
+	/** How far the page is pulled past its end, in pixels, damped. */
+	let pulled = $state(0);
+	const PULL_TO_CONTINUE = 72;
+	const PULL_MOST = 120;
+	const SCROLLS = /auto|scroll/;
+
+	/**
+	 * Pulling the page up past its end on a touch screen, and letting go,
+	 * is Continue (docs/dreams.md, "Pull to continue"), with the pull drawn
+	 * as it stretches. Touch only: a trackpad's fling runs on past the end by
+	 * itself and would continue by accident. Only when the newest turn is a
+	 * passage and nothing is being written; the Continue button stays for
+	 * everyone else.
+	 */
+	const pullToContinue: Attachment<HTMLElement> = (element) => {
+		let scroller: HTMLElement | null = element.parentElement;
+		while (scroller && !SCROLLS.test(getComputedStyle(scroller).overflowY)) {
+			scroller = scroller.parentElement;
+		}
+		const area = scroller ?? document.documentElement;
+		let startY: number | null = null;
+		const atEnd = () => area.scrollTop + area.clientHeight >= area.scrollHeight - 2;
+		const ready = () => !session.busy && session.path.at(-1)?.turn?.kind === 'passage';
+		const onStart = (event: TouchEvent) => {
+			startY = atEnd() && ready() ? (event.touches[0]?.clientY ?? null) : null;
+		};
+		const onMove = (event: TouchEvent) => {
+			if (startY === null) {
+				return;
+			}
+			const distance = startY - (event.touches[0]?.clientY ?? startY);
+			pulled = distance > 0 ? Math.min(PULL_MOST, distance * 0.5) : 0;
+		};
+		const onEnd = () => {
+			if (pulled >= PULL_TO_CONTINUE && ready()) {
+				void session.send('');
+			}
+			pulled = 0;
+			startY = null;
+		};
+		area.addEventListener('touchstart', onStart, { passive: true });
+		area.addEventListener('touchmove', onMove, { passive: true });
+		area.addEventListener('touchend', onEnd);
+		area.addEventListener('touchcancel', onEnd);
+		return () => {
+			area.removeEventListener('touchstart', onStart);
+			area.removeEventListener('touchmove', onMove);
+			area.removeEventListener('touchend', onEnd);
+			area.removeEventListener('touchcancel', onEnd);
+		};
+	};
+
 	// ── a passage's menu ─────────────────────────────────────────────────────
 
 	type WaSelectEvent = CustomEvent<{ item: HTMLElement & { value?: string } }>;
@@ -346,6 +400,8 @@
 	style:--dream-ink={`var(--dream-${theme}-ink)`}
 	style:--dream-accent={`var(--dream-${theme}-accent)`}
 	style:--dream-face={`var(--dream-${theme}-face)`}
+
+	{@attach pullToContinue}
 >
 	{#if build}
 		<header class="title">
@@ -610,6 +666,14 @@
 			</li>
 		{/if}
 	</ol>
+
+	{#if pulled > 0}
+		<!-- Pull to continue: shown as the page is pulled past its end on a touch screen. -->
+		<div class="pull" style:height={`${pulled}px`} aria-hidden="true">
+			<wa-icon name={pulled >= PULL_TO_CONTINUE ? 'circle-arrow-down' : 'arrow-down'}></wa-icon>
+			{pulled >= PULL_TO_CONTINUE ? 'Release to continue' : 'Pull to continue'}
+		</div>
+	{/if}
 
 	<DreamNotices {session} />
 
@@ -1107,5 +1171,15 @@
 				outline: var(--wa-focus-ring);
 			}
 		}
+	}
+
+	.pull {
+		display: flex;
+		align-items: flex-end;
+		justify-content: center;
+		gap: var(--wa-space-xs);
+		overflow: hidden;
+		color: var(--wa-color-text-quiet);
+		font-size: var(--wa-font-size-s);
 	}
 </style>

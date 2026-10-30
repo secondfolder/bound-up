@@ -513,6 +513,14 @@ reading chosen, as a version beside the passage (`reread`): the reading is
 kept on the new passage (`readAs`) and sent with the turn from then on, as a
 note before the user's words, and the turn says "as you asked".
 
+**Pull to continue.** On a touch screen, pulling the page up past the end of
+the story and letting go is Continue, with "Pull to continue" stretching
+into view as it is pulled and "Release to continue" past the point where it
+will (`pullToContinue` in `DreamStory`). Only when the newest turn is a
+passage and nothing is being written, and only for touch: a trackpad's fling
+runs on past the end by itself and would continue by accident. The Continue
+button is still there for everyone.
+
 **Suggestions.** Each passage's footer offers two to four things the user
 might write next (`{"suggest": [...]}`), in their own voice and varied: one
 going along with the moment, one resisting or turning it, one somewhere

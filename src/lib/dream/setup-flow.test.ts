@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DreamSetupBuild } from '../sealed-kinds/dreams';
+import type { DreamSetup, DreamSetupBuild } from '../sealed-kinds/dreams';
 import { parseBuild } from './build';
 import type { BriefReading } from './reading';
 import {
@@ -157,7 +157,7 @@ describe('changing an element by hand', () => {
 	});
 
 	it('keeps only the latest changes asked for, as many as the record holds', () => {
-		let setup = built;
+		let setup: DreamSetup = built;
 		for (let index = 0; index < 15; index += 1) {
 			setup = withAmendment(setup, `change ${index}`);
 		}
