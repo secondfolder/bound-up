@@ -89,21 +89,22 @@ describe('runwareTask', () => {
 		expect(task.positivePrompt).toContain('at least 20 years old');
 		expect(task.positivePrompt).not.toContain('masterpiece');
 		expect(task.steps).toBeLessThanOrEqual(12);
-		// Above 1, or Runware drops the negative prompt and its guard with it.
-		expect(task.CFGScale).toBeGreaterThan(1);
-		expect(task.CFGScale).toBeLessThan(2.5);
+		// Runware's default guidance for the model.
+		expect(task).not.toHaveProperty('CFGScale');
 		const drawn = runwareTask({ prompt: 'x', style: 'illustrated', heat: 4 }, zImage, 't');
 		expect(drawn.positivePrompt).toMatch(/^A detailed digital illustration/);
 	});
 
-	it('prompts a FLUX.2 Klein model subject first, on its 4-step schedule', () => {
+	it('prompts a FLUX.2 Klein model subject first, on Runware’s default steps', () => {
 		const task = runwareTask({ prompt: 'A man in a suit.', style: 'photo', heat: 4 }, flux, 't');
 		// FLUX weighs words by where they come: the subject before the style.
 		expect(task.positivePrompt).toMatch(
 			/^A man in a suit\. A candid, realistic personal photograph/
 		);
 		expect(task.positivePrompt).toContain('at least 20 years old');
-		expect(task).toMatchObject({ steps: 4, CFGScale: 1.5 });
+		// Runware's default steps for the model.
+		expect(task).not.toHaveProperty('steps');
+		expect(task).toMatchObject({ CFGScale: 1.5 });
 		const sfw = runwareTask({ prompt: 'x', style: 'photo', heat: 1 }, flux, 't');
 		expect(sfw.positivePrompt).toContain('fully clothed, in an everyday, non-sexual moment');
 	});

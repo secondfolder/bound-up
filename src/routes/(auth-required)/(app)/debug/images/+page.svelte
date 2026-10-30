@@ -439,8 +439,8 @@
 					</wa-dropdown>
 				</div>
 				<div class="grid">
-					<InputField {superform} field="steps" type="text" inputmode="numeric" title="Steps" placeholder={String(recipeDefaults.steps)} required={false} />
-					<InputField {superform} field="CFGScale" type="text" inputmode="decimal" title="Guidance (CFG)" placeholder={String(recipeDefaults.CFGScale)} required={false} />
+					<InputField {superform} field="steps" type="text" inputmode="numeric" title="Steps" placeholder={recipeDefaults.steps === null ? 'Runware’s default' : String(recipeDefaults.steps)} required={false} />
+					<InputField {superform} field="CFGScale" type="text" inputmode="decimal" title="Guidance (CFG)" placeholder={recipeDefaults.CFGScale === null ? 'Runware’s default' : String(recipeDefaults.CFGScale)} required={false} />
 					<SelectField {superform} field="scheduler" title="Scheduler" options={SCHEDULER_OPTIONS} />
 					<SelectField {superform} field="clipSkip" title="Clip skip" options={CLIP_SKIP_OPTIONS} />
 					<InputField {superform} field="seed" type="text" inputmode="numeric" title="Seed" placeholder="Random" required={false} />
@@ -513,7 +513,7 @@
 		</p>
 	{/each}
 	<p class="meta">
-		{entry.task.width}×{entry.task.height} · {entry.task.steps} steps · CFG {entry.task.CFGScale}
+		{entry.task.width}×{entry.task.height} · {entry.task.steps ?? 'default'} steps · CFG {entry.task.CFGScale ?? 'default'}
 		{entry.task.scheduler ? ` · ${entry.task.scheduler}` : ''} · {(entry.ms / 1000).toFixed(1)}s{cost(entry) ? ` · ${cost(entry)}` : ''}
 	</p>
 	<wa-details summary="What was sent">

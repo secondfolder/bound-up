@@ -171,8 +171,9 @@ export function playgroundTask(run: PlaygroundRun, taskUUID: string) {
 		negativePrompt,
 		width: run.width ?? schedule.width,
 		height: run.height ?? schedule.height,
-		steps: run.steps ?? schedule.steps,
-		CFGScale: run.CFGScale ?? schedule.CFGScale,
+		// Null on both sides is Runware's default, so it is not sent.
+		...optional('steps', run.steps ?? schedule.steps),
+		...optional('CFGScale', run.CFGScale ?? schedule.CFGScale),
 		...(run.scheduler === null ? {} : { scheduler: run.scheduler }),
 		...(run.seed === null ? {} : { seed: run.seed }),
 		...(run.clipSkip === null ? {} : { clipSkip: run.clipSkip }),
@@ -184,13 +185,17 @@ export function playgroundTask(run: PlaygroundRun, taskUUID: string) {
 	} as const;
 }
 
+function optional<K extends string>(key: K, value: number | null): { [P in K]?: number } {
+	return (value === null ? {} : { [key]: value }) as { [P in K]?: number };
+}
+
 export type PlaygroundTask = ReturnType<typeof playgroundTask>;
 
-/** The schedule a model would be drawn with, for the form's placeholders. */
+/** The schedule a model would be drawn with, for the form's placeholders. Null is Runware's default. */
 export function playgroundDefaults(
 	style: PictureStyle,
 	architecture: PictureArchitecture
-): { steps: number; CFGScale: number; width: number; height: number } {
+): { steps: number | null; CFGScale: number | null; width: number; height: number } {
 	const { steps, CFGScale, width, height } = pictureWorkload(style, {
 		runwareModelAir: '',
 		architecture

@@ -1685,7 +1685,9 @@ export const daydreamPictureTimings = sqliteTable(
 			.primaryKey()
 			.$defaultFn(() => crypto.randomUUID()),
 		model: text('model').notNull(),
+		/** 0 for Runware's default, which the request leaves to it. */
 		steps: integer('steps').notNull(),
+		/** 0 for Runware's default, as `steps`. */
 		cfgScale: real('cfg_scale').notNull(),
 		width: integer('width').notNull(),
 		height: integer('height').notNull(),

@@ -144,13 +144,9 @@ export function adultNouns(prompt: string): string {
  *   through a full language model, distilled to ~8 steps. It follows long,
  *   literal sentences closely, so the style and the safety words are said as
  *   sentences rather than tags, and "masterpiece, best quality" tags only
- *   add noise. Its own pipeline runs without guidance (CFG 1), where Runware
- *   ignores the negative prompt altogether; measured on Dark Beast 9 that
- *   way, it drew a woman described as 35 looking barely out of her teens. A
- *   little guidance (`CFGScale` 1.5) brings the negative prompt back and
- *   her age with it, without the burnt look Z-Image gets past ~2.5.
+ *   add noise. Its guidance is left at Runware's default for the model.
  * - `flux-2` (FLUX.2 Klein, the distilled 4B and 9B): read through a language
- *   model too, and distilled to 4 steps. FLUX has no negative prompts in its
+ *   model too, and distilled to a few steps. FLUX has no negative prompts in its
  *   own terms, so everything it is told is said as what is wanted, and word
  *   order weighs: the description comes first, the style after it. Runware
  *   still honours a negative prompt above CFG 1, so one is sent anyway.
@@ -269,11 +265,14 @@ export const MAX_PICTURE_REQUEST_PROMPT = DAYDREAM_LIMITS.imagePrompt + 400;
  * what is drawn but not how much drawing there is. The key the server
  * averages making times under (`picture-timings.ts`), so a change to any of
  * these starts a fresh average rather than skewing an old one.
+ *
+ * A null `steps` or `CFGScale` is left out of the request, for Runware's own
+ * default for the model.
  */
 export type PictureWorkload = {
 	model: string;
-	steps: number;
-	CFGScale: number;
+	steps: number | null;
+	CFGScale: number | null;
 	width: number;
 	height: number;
 };
@@ -293,15 +292,16 @@ function scheduleFor(
 ): Pick<PictureWorkload, 'steps' | 'CFGScale'> {
 	switch (architecture) {
 		case 'z-image-turbo':
-			// Its distilled schedule: more steps cost time and buy nothing.
-			return { steps: 9, CFGScale: 1.5 };
+			// Its distilled schedule: more steps cost time and buy nothing. Its
+			// guidance is Runware's default for the model.
+			return { steps: 9, CFGScale: null };
 		case 'flux-2':
-			// Klein is distilled to 4 steps, Runware's default for it. Some
-			// guidance, because Runware drops the negative prompt at CFG 1; and
-			// measured on Klein 9B (2026-10-20, one seed), CFG 1 garbled a quoted
-			// sign ("Open 24 Hour Hours") and left out where people were, while
-			// 1.5 and 3.5 drew the same picture to the pixel, both right.
-			return { steps: 4, CFGScale: 1.5 };
+			// Klein's steps are Runware's default for it. Some guidance, because
+			// Runware drops the negative prompt at CFG 1; and measured on Klein
+			// 9B (2026-10-20, one seed), CFG 1 garbled a quoted sign ("Open 24
+			// Hour Hours") and left out where people were, while 1.5 and 3.5
+			// drew the same picture to the pixel, both right.
+			return { steps: null, CFGScale: 1.5 };
 		case 'sdxl':
 			return { steps: 30, CFGScale: style === 'photo' ? 4.5 : 6 };
 		default:
@@ -362,8 +362,8 @@ export function runwareTask(
 		].join(', '),
 		width,
 		height,
-		steps,
-		CFGScale,
+		...(steps === null ? {} : { steps }),
+		...(CFGScale === null ? {} : { CFGScale }),
 		numberResults: 1,
 		outputType: 'base64Data',
 		outputFormat: 'WEBP',

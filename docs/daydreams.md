@@ -1532,11 +1532,10 @@ image model tuned for adult imagery, through Runware.
   nudity. How it says those follows the model's architecture
   (`PictureArchitecture`), because what suits one family is poor for the
   others: an SDXL-family model gets tags, ~30 steps and real guidance; a
-  Z-Image Turbo model gets sentences, its distilled 9 steps and `CFGScale`
-  1.5. Not Z-Image's usual 1: there Runware drops the negative prompt, and
-  Dark Beast drew a woman described as 35 barely out of her teens. A
-  FLUX.2 Klein model gets the description first and the style sentences
-  after it, 4 steps and `CFGScale` 1.5: at 1 it garbled a quoted sign and
+  Z-Image Turbo model gets sentences, its distilled 9 steps and Runware's
+  default guidance (`CFGScale` is not sent). A FLUX.2 Klein model gets the
+  description first and the style sentences after it, Runware's default
+  steps (not sent) and `CFGScale` 1.5: at 1 it garbled a quoted sign and
   lost who sat where, and 1.5 and 3.5 drew the same picture. Every
   sentence round a description says what is wanted, never what is not
   ("fully clothed, in an everyday, non-sexual moment"), and the photo
@@ -1588,9 +1587,9 @@ image model tuned for adult imagery, through Runware.
   times each picture that comes back (failures do not count: they are often
   fast refusals) and folds it into a weighted moving average
   (`daydream_picture_timings`, `server/daydream/picture-timings.ts`), one
-  row per **workload** — model, steps, guidance, size
-  (`pictureWorkload`) — so changing the model or recipe starts a fresh
-  average. No user, daydream or prompt is stored with it. The first runs are
+  row per **workload** — model, steps, guidance (0 for either one left to
+  Runware's default), size (`pictureWorkload`) — so changing the model or
+  recipe starts a fresh average. No user, daydream or prompt is stored with it. The first runs are
   averaged evenly, then each new one weighs a fifth, and a run counts for
   at most three times the average so far, so a cold start cannot drag it.
   The page asks for it (`GET /api/daydreams/[id]/image?style=…`) alongside

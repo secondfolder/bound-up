@@ -25,11 +25,18 @@ export const TIMING_WEIGHT = 0.2;
  */
 export const TIMING_OUTLIER_CAP = 3;
 
+/**
+ * Runware's default steps or guidance, stored as 0, which no request sends:
+ * the columns are NOT NULL, and a null would not match itself in the unique
+ * index anyway, so every run would start a row of its own.
+ */
+const RUNWARE_DEFAULT = 0;
+
 function workloadIs(workload: PictureWorkload) {
 	return and(
 		eq(daydreamPictureTimings.model, workload.model),
-		eq(daydreamPictureTimings.steps, workload.steps),
-		eq(daydreamPictureTimings.cfgScale, workload.CFGScale),
+		eq(daydreamPictureTimings.steps, workload.steps ?? RUNWARE_DEFAULT),
+		eq(daydreamPictureTimings.cfgScale, workload.CFGScale ?? RUNWARE_DEFAULT),
 		eq(daydreamPictureTimings.width, workload.width),
 		eq(daydreamPictureTimings.height, workload.height)
 	);
@@ -48,8 +55,8 @@ export async function recordPictureTiming(
 		.insert(daydreamPictureTimings)
 		.values({
 			model: workload.model,
-			steps: workload.steps,
-			cfgScale: workload.CFGScale,
+			steps: workload.steps ?? RUNWARE_DEFAULT,
+			cfgScale: workload.CFGScale ?? RUNWARE_DEFAULT,
 			width: workload.width,
 			height: workload.height,
 			averageMs: ms,
