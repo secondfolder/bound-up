@@ -60,7 +60,7 @@ const MAX_LIST_ITEMS = 20;
 
 /** Types and fields the app does something with (docs/dreams.md, "Known types"). */
 export const KNOWN_FIELDS: Readonly<Record<string, readonly string[]>> = {
-	character: ['appearance', 'manner', 'voice', 'background', 'with-you', 'knows'],
+	character: ['appearance', 'manner', 'voice', 'background', 'relationship-with-you', 'knows'],
 	you: ['name', 'pronouns', 'role'],
 	place: ['appearance', 'feel'],
 	thing: ['appearance', 'significance']

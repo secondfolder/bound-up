@@ -91,7 +91,7 @@
 		draft?.save({ text, tagIds: [] });
 	});
 
-	/** A field's tag as a label: `with-you` reads "With you". */
+	/** A field's tag as a label: `relationship-with-you` reads "Relationship with you". */
 	function heading(name: string): string {
 		const words = name.replaceAll('-', ' ');
 		return words.charAt(0).toUpperCase() + words.slice(1);

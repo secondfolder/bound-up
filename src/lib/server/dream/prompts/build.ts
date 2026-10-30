@@ -71,7 +71,7 @@ Anything worth keeping a record of, as tags. The tag is the element's type, and 
   <appearance>what they look like (used for pictures)</appearance>
   <manner>how they behave and speak</manner>
   <background>a little of their history, where it shapes how they act</background>
-  <with-you>who they are to the user</with-you>
+  <relationship-with-you>who they are to the user, and what is between you</relationship-with-you>
   <unspoken shown="no">something they want or hide; shown="no" keeps it off their card</unspoken>
 </character>
 <you> for the user's own role, and any stats about them.

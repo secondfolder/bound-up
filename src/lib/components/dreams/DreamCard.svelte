@@ -54,7 +54,7 @@
 	const seed = $derived(element.fields.find((field) => field.name === 'seed')?.text ?? '');
 	const hidden = $derived(element.fields.filter((field) => !field.shown));
 
-	/** A field's tag as a heading: `with-you` reads "With you". */
+	/** A field's tag as a heading: `relationship-with-you` reads "Relationship with you". */
 	function heading(name: string): string {
 		const words = name.replaceAll('-', ' ');
 		return words.charAt(0).toUpperCase() + words.slice(1);
