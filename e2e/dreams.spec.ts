@@ -391,6 +391,37 @@ test.describe('daydreams, the new engine', () => {
 		await expect(turn).toHaveValue('');
 	});
 
+	test('Enter sends what a box holds, and Shift+Enter is a new line', async ({ page }) => {
+		await dreamer(page);
+		// The brief: Enter starts it.
+		await box(page, 'What do you feel like?').fill('A quiet evening');
+		await box(page, 'What do you feel like?').press('Enter');
+		await page.waitForURL(/\/dreams\/[0-9a-f-]{36}$/);
+		await waitForHydration(page);
+		await play(page);
+		await saved(page);
+
+		// Your turn: a new line with Shift, sent with Enter.
+		await page.getByRole('button', { name: 'Write response…' }).click();
+		const turn = box(page, 'Your turn');
+		await turn.fill('I wait');
+		await turn.press('Shift+Enter');
+		await turn.pressSequentially('and watch');
+		await expect(turn).toHaveValue('I wait\nand watch');
+		await turn.press('Enter');
+		await expect(turn).toBeHidden();
+		await expect(page.locator('li.you').last()).toContainText('and watch');
+		await saved(page);
+
+		// A passage being edited is paragraphs: Enter is a new one, not Keep my version.
+		await passageMenu(page, 'Edit');
+		const edit = box(page, 'The passage');
+		await edit.press('End');
+		await edit.press('Enter');
+		await expect(edit).toBeVisible();
+		await expect(edit).toHaveValue(/\n$/);
+	});
+
 	test('the turn floats over the story, says how many suggestions wait below, and fits its labels', async ({
 		page
 	}) => {

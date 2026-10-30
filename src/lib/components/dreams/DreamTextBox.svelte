@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { onMount, untrack } from 'svelte';
+	import type { Attachment } from 'svelte/attachments';
 	import { defaults } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import InputField from '$lib/components/InputField.svelte';
@@ -27,6 +28,7 @@
 		initial = '',
 		onsend,
 		actions,
+		enterSends = true,
 		text = $bindable('')
 	}: {
 		id: string;
@@ -44,6 +46,12 @@
 		actions?: Snippet;
 		/** What the box holds, read only: a draft in a box that is put away. */
 		text?: string;
+		/**
+		 * Whether Enter sends what the box holds, Shift+Enter making a new line.
+		 * Off for a box for whole paragraphs (a passage being edited), where
+		 * Enter is a new paragraph.
+		 */
+		enterSends?: boolean;
 	} = $props();
 
 	let formElement = $state<HTMLFormElement | null>(null);
@@ -108,10 +116,44 @@
 		$form.text = words;
 	}
 
+	/**
+	 * Enter sends, Shift+Enter is a new line, as in a chat. Not on a touch
+	 * screen, whose keyboard has no Shift+Enter to reach for: Enter is its
+	 * only way to a new line, and Send is right there. Not while an input
+	 * method is composing either, where Enter picks the characters. Listened
+	 * for on the form itself, not through Svelte's delegation, which does not
+	 * reliably see a key pressed inside the textarea's shadow root.
+	 */
+	const sendOnEnter: Attachment<HTMLFormElement> = (element) => {
+		element.addEventListener('keydown', onKey);
+		return () => element.removeEventListener('keydown', onKey);
+	};
+
+	function onKey(event: KeyboardEvent) {
+		const touch = globalThis.matchMedia('(hover: none) and (pointer: coarse)').matches;
+		if (
+			!enterSends ||
+			touch ||
+			event.key !== 'Enter' ||
+			event.shiftKey ||
+			event.isComposing ||
+			event.altKey ||
+			event.ctrlKey ||
+			event.metaKey ||
+			!(event.target instanceof Element && event.target.closest('wa-textarea'))
+		) {
+			return;
+		}
+		event.preventDefault();
+		if (!(disabled || $submitting)) {
+			formElement?.requestSubmit();
+		}
+	}
+
 	const ready = $derived(Boolean($tainted) && $form.text.trim() !== '' && $allErrors.length === 0);
 </script>
 
-<form method="POST" use:enhance class="text-box" bind:this={formElement}>
+<form method="POST" use:enhance class="text-box" bind:this={formElement} {@attach sendOnEnter}>
 	<InputField {superform} field="text" type="textarea" title={label} {placeholder} {rows} maxlength={max} />
 	<div class="actions">
 		{@render actions?.()}

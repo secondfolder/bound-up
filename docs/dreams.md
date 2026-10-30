@@ -638,6 +638,16 @@ unexpected. They are never sent back to the model.
   keeping what it holds for when it is opened again; the box stays mounted
   while put away, so a draft is restored on load.
 
+In every one of the engine's text boxes (`DreamTextBox`: the brief, Your
+turn, an answer in the user's own words, "Not quite? Tell it what to
+change.") **Enter sends** and Shift+Enter makes a new line, as in a chat.
+Not on a touch screen, whose keyboard has no Shift+Enter to reach for, so
+Enter stays its way to a new line beside the Send button; not while an
+input method is composing, where Enter picks the characters; and not in a
+passage being edited, which is paragraphs (`enterSends={false}`). The key is
+listened for on the form itself: Svelte's delegation does not reliably see
+a key pressed inside the textarea's shadow root.
+
 Continue and Write are in the **dock**: one row floating over the bottom of
 what scrolls (sticky), with no background of its own, so the story shows
 between what is in it; each thing in it is drawn on its own background with

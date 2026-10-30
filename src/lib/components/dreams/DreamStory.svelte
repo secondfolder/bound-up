@@ -1604,6 +1604,7 @@
 			initial={target.source}
 			submitLabel="Keep my version"
 			rows={10}
+			enterSends={false}
 			onsend={async (text) => {
 				await session.edit(target.turnId, text);
 				editing = null;
