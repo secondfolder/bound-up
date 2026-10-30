@@ -448,6 +448,11 @@
 				nameOf: (who) => speakerName(who),
 				onNearEnd: keepGoing,
 				onFinished: carryOn,
+				upNext: (turnId) => {
+					const next = readOnInto(turnId);
+					const root = next ? passageRoot(next) : null;
+					return next && root ? { turnId: next, root } : null;
+				},
 				onPosition: (turnId, index, done) => savePosition({ turnId, index, done }),
 				coveredFrom: () => dock?.getBoundingClientRect().top ?? null,
 				onSpoken: (turnId, spoken) =>
@@ -686,17 +691,28 @@
 	 * never a pause the user asked for.
 	 */
 	function carryOn(turnId: string) {
-		const next = passageAfter(turnId);
-		// The newest while it is still being written is not there yet.
-		const stillComing = session.streaming !== null && next === session.lastPassage?.id;
-		if (next && !stillComing && session.listening) {
+		const next = readOnInto(turnId);
+		if (next) {
 			void tick().then(() => listen(next));
 		}
 	}
 
+	/**
+	 * The passage reading carries on into at the end of this one, or null:
+	 * the next on the path, once it is there and finished. The reader
+	 * fetches its first clips ahead by the same rule (`upNext`).
+	 */
+	function readOnInto(turnId: string): string | null {
+		const next = passageAfter(turnId);
+		// The newest while it is still being written is not there yet.
+		const stillComing = session.streaming !== null && next === session.lastPassage?.id;
+		return next && !stillComing && session.listening ? next : null;
+	}
+
 	// Stopped at the end of a passage, with the next not there yet: once it
 	// comes and is finished, reading starts again, if the user asked for that
-	// ("Read new passages"), or asked for it to be written ("Keep going").
+	// ("Read new passages"), or asked for it to be written ("Keep going");
+	// otherwise its first clips are fetched, for when play is pressed.
 	$effect(() => {
 		const done = reader?.finishedTurn ?? null;
 		const latest = session.lastPassage?.id ?? null;
@@ -704,9 +720,20 @@
 		if (!(reader && done && latest) || latest === done || streaming || !session.listening) {
 			return;
 		}
-		if ((reader.readNew || reader.keepGoing) && passageBefore(latest) === done) {
+		if (passageBefore(latest) !== done) {
+			return;
+		}
+		if (reader.readNew || reader.keepGoing) {
 			reader.finishedTurn = null;
 			void tick().then(() => listen(latest));
+		} else {
+			// Not read until play is pressed, but ready for it: play starts at once.
+			void tick().then(() => {
+				const root = passageRoot(latest);
+				if (root) {
+					reader.prefetch(latest, root);
+				}
+			});
 		}
 	});
 

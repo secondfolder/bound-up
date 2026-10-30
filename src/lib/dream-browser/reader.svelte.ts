@@ -245,6 +245,9 @@ export class ReadAloud {
 	readonly #coveredFrom: (() => number | null) | undefined;
 	readonly #onFinished: ((turnId: string) => void) | undefined;
 	readonly #onPosition: ((turnId: string, index: number, done: boolean) => void) | undefined;
+	readonly #upNext: ((turnId: string) => { turnId: string; root: HTMLElement } | null) | undefined;
+	/** The passage read after this one, read from the page once (`#following`). */
+	#next: { turnId: string; root: HTMLElement; passage: Passage; said: Utterance[] } | null = null;
 
 	constructor(options: {
 		voiceOf: (who: string | null) => VoiceName;
@@ -262,6 +265,12 @@ export class ReadAloud {
 		onFinished?: (turnId: string) => void;
 		/** Where reading has got to: each sentence started, and the end, for carrying on after a reload. */
 		onPosition?: (turnId: string, index: number, done: boolean) => void;
+		/**
+		 * The passage reading carries on into at the end of this one, if it is
+		 * there and finished: its first clips are fetched before this one
+		 * ends, so there is no wait between the two.
+		 */
+		upNext?: (turnId: string) => { turnId: string; root: HTMLElement } | null;
 	}) {
 		this.#voiceOf = options.voiceOf;
 		this.#nameOf = options.nameOf;
@@ -270,6 +279,7 @@ export class ReadAloud {
 		this.#coveredFrom = options.coveredFrom;
 		this.#onFinished = options.onFinished;
 		this.#onPosition = options.onPosition;
+		this.#upNext = options.upNext;
 	}
 
 	/**
@@ -478,10 +488,9 @@ export class ReadAloud {
 	static readonly AHEAD = 4;
 
 	/** How long an utterance plays at the current speed: measured once its clip came, else guessed. */
-	#seconds(utterance: Utterance): number {
+	#seconds(utterance: Utterance, passage = this.#passage): number {
 		const known = this.#lengths.get(this.#keyOf(utterance));
-		const words =
-			this.#passage?.text.slice(utterance.from, utterance.to).split(WHITESPACE).length ?? 1;
+		const words = passage?.text.slice(utterance.from, utterance.to).split(WHITESPACE).length ?? 1;
 		return (known ?? words * ReadAloud.SECONDS_PER_WORD + 0.5) / this.rate;
 	}
 
@@ -490,24 +499,77 @@ export class ReadAloud {
 	 * hand to hide the next fetch: what is left of this clip, then each
 	 * following utterance by its length at this speed. A short line, a quote
 	 * of a few words, plays out in a second at 2×, so one clip ahead was not
-	 * always enough; a long passage needs no more than a few.
+	 * always enough; a long passage needs no more than a few. Near the end
+	 * of a passage it goes on into the next one, when there is one: otherwise
+	 * the next passage's first clip was only asked for once this one ended,
+	 * and there was a wait between every two.
 	 */
 	#lookAhead(): void {
 		const audio = this.#audio;
-		let ahead =
-			audio && Number.isFinite(audio.duration)
-				? Math.max(0, audio.duration - audio.currentTime) / this.rate
-				: 0;
-		let fetched = 0;
-		for (let index = this.index + 1; index < this.#utterances.length; index += 1) {
-			const utterance = this.#utterances[index];
-			if (!utterance || ahead >= ReadAloud.LEAD_SECONDS || fetched >= ReadAloud.AHEAD) {
-				return;
-			}
-			this.#clipFor(utterance).catch(() => undefined);
-			fetched += 1;
-			ahead += this.#seconds(utterance);
+		const inHand = {
+			ahead:
+				audio && Number.isFinite(audio.duration)
+					? Math.max(0, audio.duration - audio.currentTime) / this.rate
+					: 0,
+			fetched: 0
+		};
+		if (
+			!this.#fetchAhead(this.#utterances.slice(this.index + 1), this.#passage, this.turnId, inHand)
+		) {
+			return;
 		}
+		const next = this.#following();
+		if (next) {
+			this.#fetchAhead(next.said, next.passage, next.turnId, inHand);
+		}
+	}
+
+	/**
+	 * Fetches clips in order until `inHand` is enough; false once it is, so
+	 * nothing after them is fetched.
+	 */
+	#fetchAhead(
+		said: Utterance[],
+		passage: Passage | null,
+		turnId: string | null,
+		inHand: { ahead: number; fetched: number }
+	): boolean {
+		for (const utterance of said) {
+			if (inHand.ahead >= ReadAloud.LEAD_SECONDS || inHand.fetched >= ReadAloud.AHEAD) {
+				return false;
+			}
+			this.#clipFor(utterance, passage, turnId).catch(() => undefined);
+			inHand.fetched += 1;
+			inHand.ahead += this.#seconds(utterance, passage);
+		}
+		return true;
+	}
+
+	/**
+	 * Fetches the opening clips of a passage that is not playing: one that
+	 * came after reading stopped at the end of the one before, and will not
+	 * be read until play is pressed. Play then starts at once.
+	 */
+	prefetch(turnId: string, root: HTMLElement): void {
+		const passage = passageRuns(root);
+		this.#fetchAhead(utterances(passage.runs), passage, turnId, { ahead: 0, fetched: 0 });
+	}
+
+	/**
+	 * The passage after this one, if there is one and it is finished. Read
+	 * from the page again only when it is another passage or has been drawn
+	 * again, so asking on every `timeupdate` costs nothing.
+	 */
+	#following(): { turnId: string; passage: Passage; said: Utterance[] } | null {
+		const up = this.turnId ? (this.#upNext?.(this.turnId) ?? null) : null;
+		if (!up) {
+			return null;
+		}
+		if (this.#next?.turnId !== up.turnId || this.#next.root !== up.root) {
+			const passage = passageRuns(up.root);
+			this.#next = { ...up, passage, said: utterances(passage.runs) };
+		}
+		return this.#next;
 	}
 
 	/**
@@ -608,13 +670,13 @@ export class ReadAloud {
 		void this.#keepAlive?.suspend().catch(() => undefined);
 	}
 
-	#clipFor(utterance: Utterance): Promise<Clip> {
+	/** An utterance's clip, fetched once; of the passage playing, unless another is named. */
+	#clipFor(utterance: Utterance, passage = this.#passage, forTurn = this.turnId): Promise<Clip> {
 		const voice = this.#voiceOf(utterance.who);
 		const key = this.#keyOf(utterance);
 		let clip = this.#clips.get(key);
 		if (!clip) {
-			const visible = this.#passage?.text.slice(utterance.from, utterance.to) ?? '';
-			const forTurn = this.turnId;
+			const visible = passage?.text.slice(utterance.from, utterance.to) ?? '';
 			clip = speak({ text: utterance.spoken, voice }, this.#controller.signal).then((spoken) => {
 				if (spoken.debug && forTurn) {
 					this.#onSpoken?.(forTurn, {
@@ -648,7 +710,13 @@ export class ReadAloud {
 			audio.addEventListener('ended', () => {
 				void this.#playAt(this.index + 1);
 			});
-			audio.addEventListener('timeupdate', () => this.#checkNearEnd());
+			audio.addEventListener('timeupdate', () => {
+				this.#checkNearEnd();
+				// Also from here, not only the highlight's frames: those stop in a
+				// background tab, and the next passage may come in while the last
+				// sentence of this one plays.
+				this.#lookAhead();
+			});
 			this.#audio = audio;
 		}
 		return this.#audio;

@@ -218,9 +218,13 @@ test.describe('daydreams, the new engine', () => {
 		await expect(page.locator('li.passage').last()).toContainText('2 / 2');
 		const chips = page.getByRole('group', { name: 'Or steer it' });
 		await expect(chips.getByRole('button')).toHaveCount(2);
-		const [chip] = await chips.getByRole('button').allInnerTexts();
+		// From the wa-button itself: the inner button's own text is empty (the
+		// label is slotted), which left only "Instead: " to look for, and that
+		// matched the passage before this one too while this one was written.
+		const chip = (await chips.locator('wa-button').first().textContent())?.trim() ?? '';
+		expect(chip).not.toBe('');
 		await chips.getByRole('button').first().click();
-		await expect(page.getByText(`Instead: ${chip?.trim()}`)).toBeVisible();
+		await expect(page.getByText(`Instead: ${chip}`)).toBeVisible();
 		await saved(page);
 		await expect(page.locator('li.passage').last()).toContainText('3 / 3');
 	});
@@ -805,6 +809,36 @@ test.describe('daydreams, the new engine', () => {
 			.toBe(true);
 	});
 
+	test('the next passage’s first clips are fetched before this one ends', async ({ page }) => {
+		const who = await dreamer(page);
+		await grantFeature(who.email, 'dreamVoice');
+		await start(page, 'A quiet evening');
+		await play(page);
+		await saved(page);
+		await reply(page, 'I wait');
+		await saved(page);
+
+		const read: string[] = [];
+		page.on('request', (request) => {
+			if (request.url().endsWith('/api/dreams/speak')) {
+				read.push(String(request.postDataJSON()?.text ?? ''));
+			}
+		});
+		await page.getByRole('button', { name: 'Read aloud' }).click();
+		const player = page.getByRole('region', { name: 'Reading aloud' });
+		const opening = page.locator('li.passage').first();
+		await opening.getByRole('button', { name: 'More for this passage' }).click();
+		await opening.getByRole('menuitem', { name: 'Listen' }).click();
+		// Paused in the opening's first sentence: the opening is short, so what
+		// is fetched ahead already reaches into the passage after it, and the
+		// carrying on has no clip to wait for.
+		await player.getByRole('button', { name: 'Pause' }).click();
+		await expect
+			.poll(() => read.some((text) => text.includes('Ottilie smiles')), { timeout: 15_000 })
+			.toBe(true);
+		await expect(player.getByRole('button', { name: 'Play' })).toBeVisible();
+	});
+
 	test('a passage that arrives mid-read waits for the one being read to finish', async ({
 		page
 	}) => {
@@ -996,6 +1030,41 @@ test.describe('daydreams, the new engine', () => {
 				timeout: 30_000
 			})
 			.toBe(true);
+	});
+
+	test('a passage that comes after reading stopped is fetched, and plays at once', async ({
+		page
+	}) => {
+		const who = await dreamer(page);
+		await grantFeature(who.email, 'dreamVoice');
+		await start(page, 'A quiet evening');
+		await play(page);
+		await saved(page);
+
+		const read: string[] = [];
+		page.on('request', (request) => {
+			if (request.url().endsWith('/api/dreams/speak')) {
+				read.push(String(request.postDataJSON()?.text ?? ''));
+			}
+		});
+		await page.getByRole('button', { name: 'Read aloud' }).click();
+		const player = page.getByRole('region', { name: 'Reading aloud' });
+		await passageMenu(page, 'Listen');
+		await expect(player).toContainText('Tap Listen on a passage', { timeout: 20_000 });
+
+		// Read new passages and Keep going are off: it is not read by itself,
+		// but its first clip is fetched before play is pressed.
+		await reply(page, 'I wait');
+		await saved(page);
+		await expect
+			.poll(() => read.some((text) => text.includes('Ottilie smiles')), { timeout: 15_000 })
+			.toBe(true);
+		await expect(player.getByRole('button', { name: 'Play' })).toBeVisible();
+		const asked = read.length;
+		await player.getByRole('button', { name: 'Play' }).click();
+		await expect(player.getByRole('button', { name: 'Pause' })).toBeVisible();
+		// Its opening clip was the one fetched: play asked for none again.
+		expect(read.slice(asked).some((text) => text.includes('Ottilie smiles'))).toBe(false);
 	});
 
 	test('reading aloud does not pull the page back once it is scrolled away', async ({ page }) => {

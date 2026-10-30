@@ -1228,7 +1228,14 @@ the one playing until about twelve seconds of playback are in hand at the
 speed it plays (`#lookAhead`): what is left of this clip, then each next
 utterance by its length, measured once its clip has come and guessed from
 its words until then, four fetches at most. A short line played at 2× is
-over in a second, so one clip ahead was not always enough. The route checks the
+over in a second, so one clip ahead was not always enough. Near a passage's
+end it goes on into the next passage on the path, once that is there and
+finished (`upNext`, by the rule `carryOn` reads on by), so there is no wait
+between two passages; checked on the audio's `timeupdate` as well as the
+highlight's frames, which stop in a background tab. A passage that comes
+after reading stopped at the end of the one before has its first clips
+fetched too (`prefetch`), even when it will not be read by itself, so play
+starts it at once. The route checks the
 feature, the disclosure and the daily limit (`spendVoice`, counted before the
 request, in UTF-8 bytes as Fish bills; a day is a UTC date), then relays
 Fish's stream (`/v1/tts/stream/with-timestamp`, S2.1 Pro at `balanced`
