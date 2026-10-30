@@ -636,7 +636,7 @@ function modelSearch(task) {
 	};
 }
 
-/** Runware's `imageInference`, answered with `PICTURE` whatever was asked, and its `modelSearch`. */
+/** Runware's `imageInference`, answered with `PICTURE` however many are asked for, and its `modelSearch`. */
 async function picture(request, response) {
 	if (request.headers.authorization !== `Bearer ${RUNWARE_KEY}`) {
 		response.writeHead(401, { 'content-type': 'application/json' });
@@ -648,14 +648,29 @@ async function picture(request, response) {
 		raw += piece;
 	}
 	const [task] = JSON.parse(raw);
-	response.writeHead(200, { 'content-type': 'application/json' });
 	if (task.taskType === 'modelSearch') {
+		response.writeHead(200, { 'content-type': 'application/json' });
 		response.end(JSON.stringify(modelSearch(task)));
 		return;
 	}
+	// A setting Runware refuses, for the picture playground's error path.
+	if (task.scheduler === 'LCM') {
+		response.writeHead(400, { 'content-type': 'application/json' });
+		response.end(JSON.stringify({ errors: [{ message: 'The stub refuses the LCM scheduler.' }] }));
+		return;
+	}
+	response.writeHead(200, { 'content-type': 'application/json' });
+	// As many as asked, each with the seed it was drawn from and a cost, as Runware answers.
+	const count = task.numberResults ?? 1;
 	response.end(
 		JSON.stringify({
-			data: [{ taskType: 'imageInference', taskUUID: task.taskUUID, imageBase64Data: PICTURE }]
+			data: Array.from({ length: count }, (_, index) => ({
+				taskType: 'imageInference',
+				taskUUID: task.taskUUID,
+				imageBase64Data: PICTURE,
+				seed: (task.seed ?? 1000) + index,
+				cost: 0.0013
+			}))
 		})
 	);
 }

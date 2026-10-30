@@ -451,11 +451,59 @@ spread across levels. Never saved. See
 ## Debug tools
 
 Settings, in debug mode, links to `/debug`: whole pages of tooling rather
-than an aid on a page that already exists. There is one so far, the
-[prompt review](prompt-review.md#the-debug-page) at `/debug/prompts`. Every
-load and endpoint behind them calls `requireFeature(…, 'debugMode')`. The link
-is display-only, like everything else here: an account without the feature
-gets a 403 however it arrives. A new tool goes in `/debug`'s list.
+than an aid on a page that already exists: the
+[prompt review](prompt-review.md#the-debug-page) at `/debug/prompts`, the
+bench votes at `/debug/dreams` (a dev server only), and the picture
+playground at `/debug/images` (below). Every load and endpoint behind them
+calls `requireFeature(…, 'debugMode')`. The link is display-only, like
+everything else here: an account without the feature gets a 403 however it
+arrives. A new tool goes in `/debug`'s list.
+
+### Picture playground
+
+`/debug/images` draws one prompt with one or more Runware models side by
+side, to compare models and tune the recipe the daydreams' pictures use
+([dreams.md](dreams.md), "Pictures"). It is for **admins** with debug mode
+(`requirePlayground` in `server/image-playground.ts`), since every picture is
+drawn on the server's own Runware key; anyone else gets a 404, as the admin
+pages do, and `/debug` does not list it for them.
+
+- **Models**: every picture preset, whatever this server draws daydreams with
+  if that is not a preset, and any Runware model found with the admin
+  screen's search (`ModelSearch`). Each has a base family (SDXL, Z-Image
+  Turbo, FLUX.2), which decides the recipe it gets; it can be changed per
+  model. Up to eight are ticked at once (`MAX_PLAYGROUND_MODELS`).
+- **Recipe**: _As the daydreams draw_ takes the prompt as a daydream's
+  description and builds exactly the task a daydream would
+  (`runwareTask`), for the chosen style and heat; _Raw_ sends the prompt and
+  negative prompt as typed. Either way, anything set below overrides the
+  recipe: size (with the usual shapes in a menu), steps, guidance, scheduler,
+  seed, clip skip, pictures per model (up to four) and format. Empty is the
+  recipe's own value, shown as the placeholder.
+- **One seed for the comparison**: unless unticked, a seed is chosen when
+  none is typed and sent to every model, so the pictures differ by model, not
+  luck.
+- **Minors, never**: the same line as the daydreams. A prompt or negative
+  prompt that mentions anyone under 18 is refused before anything is sent
+  (`playgroundProblem`, over `mentionsMinor`), a raw prompt still has "girl"
+  read as "woman" (`adultNouns`), and every task's negative prompt starts
+  with `NEGATIVE_MINORS`, whatever was typed.
+
+The page sends one request per model (`POST /api/debug/images`), all at once,
+so each column fills as its model finishes; a run Runware refuses (a
+scheduler a model does not take, say) shows Runware's reason in its column.
+Each column shows the pictures, their seeds, the size, schedule, time and
+cost, and the exact task that was sent.
+
+**History.** Where the server has a disk (dev, self-hosted), each model's run
+is written to the OS temp directory (`bound-up-image-playground/`, or
+`PLAYGROUND_DIR`): its settings and the task as JSON, and its pictures beside
+it, served back through `/api/debug/images/<file>`. The page lists them
+grouped by comparison, newest first; _Use these settings_ puts one back in
+the form, models and all, and the bin forgets it. The history is the
+server's, not an admin's, and the OS clears it in its own time. On Workers
+nothing is kept (`node:fs` is behind `dev || __SELF_HOSTED__`): pictures come
+back inline and last as long as the page.
 
 ## Adding a debug aid
 
@@ -470,6 +518,11 @@ gets a 403 however it arrives. A new tool goes in `/debug`'s list.
 - Document it in this file.
 
 ## Tests
+
+- **Picture playground:** `src/lib/image-playground.test.ts` (the task each
+  recipe builds, overrides, the minors terms and refusals) and
+  `e2e/image-playground.spec.ts` (two models side by side, kept, reused and
+  forgotten; a refused setting and a refused prompt; admins only).
 
 - **Pure:**
   - `src/lib/debug.test.ts`: the rule;

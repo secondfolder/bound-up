@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 
 	const backHref = resolve('/(auth-required)/(app)/settings');
@@ -27,6 +28,17 @@
 				<wa-icon name="chevron-right" variant="solid"></wa-icon>
 			</a>
 		</li>
+		{#if page.data.isAdmin}
+		<li>
+			<a href={resolve('/(auth-required)/(app)/debug/images')}>
+				<span class="what">
+					<span>Picture playground</span>
+					<small>Draw one prompt with several picture models side by side, with every setting open.</small>
+				</span>
+				<wa-icon name="chevron-right" variant="solid"></wa-icon>
+			</a>
+		</li>
+		{/if}
 		<li>
 			<a href={resolve('/(auth-required)/(app)/debug/dreams')}>
 				<span class="what">

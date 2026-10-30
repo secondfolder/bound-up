@@ -111,17 +111,22 @@ export function imagePromptProblem(prompt: string): 'empty' | 'too-long' | 'mino
 	if (text.length > DAYDREAM_LIMITS.imagePrompt) {
 		return 'too-long';
 	}
-	if (MINOR_PATTERN.test(text) || YOUNG_AGE.test(text)) {
+	if (mentionsMinor(text)) {
 		return 'minor';
 	}
 	return null;
+}
+
+/** Whether words put a minor in a picture: `imagePromptProblem`'s check, alone, for the picture playground's longer prompts. */
+export function mentionsMinor(text: string): boolean {
+	return MINOR_PATTERN.test(text) || YOUNG_AGE.test(text);
 }
 
 /**
  * "Girl" and "boy" are how erotica often says "woman" and "man", and an
  * image model reads them literally. Said as what is meant before sending.
  */
-function adultNouns(prompt: string): string {
+export function adultNouns(prompt: string): string {
 	return prompt
 		.replace(/\bgirls\b/gi, 'women')
 		.replace(/\bgirl\b/gi, 'woman')
@@ -207,7 +212,12 @@ const ADULT_SENTENCE =
  */
 const SFW_SENTENCE = 'Everyone is fully clothed, in an everyday, non-sexual moment.';
 
-const NEGATIVE_ALWAYS = [
+/**
+ * What keeps anyone young out of a picture, in its negative prompt. Exported
+ * for the picture playground (docs/debug-mode.md), whose raw prompts still
+ * carry these, whatever else is asked.
+ */
+export const NEGATIVE_MINORS = [
 	'child',
 	'minor',
 	'teenager',
@@ -215,7 +225,11 @@ const NEGATIVE_ALWAYS = [
 	'childlike body',
 	'baby face',
 	'loli',
-	'shota',
+	'shota'
+] as const;
+
+const NEGATIVE_ALWAYS = [
+	...NEGATIVE_MINORS,
 	'deformed',
 	'extra limbs',
 	'bad hands',

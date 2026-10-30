@@ -322,6 +322,9 @@
 				// Every model request a dev server makes, written to dream-log/;
 				// behind `dev`, so dead code in every build.
 				"src/lib/server/dream-capture.ts",
+				// The picture playground's history in the temp directory; imported
+				// only behind `dev || __SELF_HOSTED__`, so dead code on Workers.
+				"src/lib/server/image-playground-history.ts",
 				"src/lib/testing/**",
 				"**/*.test.ts"
 			],
