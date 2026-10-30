@@ -25,6 +25,7 @@
 	const STILL: MarkupInputs = { live: false, choices: {}, values: {} };
 	const NO_DESIGNS: ReadonlyMap<string, BlockDesign> = new Map();
 	const NOTHING: ReadonlySet<string> = new Set();
+	const NO_COLOURS: ReadonlyMap<string, string> = new Map();
 
 	/** Pictures on a passage (docs/dreams.md, "Pictures"), by marker key. */
 	export type MarkupPictures = {
@@ -82,6 +83,7 @@
 		pictures,
 		designs = NO_DESIGNS,
 		designing = NOTHING,
+		colours = NO_COLOURS,
 		onref,
 		onmore
 	}: {
@@ -100,6 +102,8 @@
 		designs?: ReadonlyMap<string, BlockDesign>;
 		/** Kinds being designed now. */
 		designing?: ReadonlySet<string>;
+		/** Each person's colour as CSS, by element id (`colourValues`): their speech and their name. */
+		colours?: ReadonlyMap<string, string>;
 		onref: (id: string) => void;
 		onmore: (key: string, phrase: string) => void;
 	} = $props();
@@ -239,7 +243,9 @@
 		{:else if segment.kind === 'link'}
 			<!-- A native button: a name in running prose, which a wa-button would
 			     break out of its line. Keyboard and role come with it. -->
-			<button type="button" class="name" onclick={() => onref(segment.id)}>{segment.text}</button>
+			<button type="button" class="name" style:--person={colours.get(segment.id)} onclick={() => onref(segment.id)}
+				>{segment.text}</button
+			>
 		{:else}
 			{segment.text}
 		{/if}
@@ -393,7 +399,15 @@
 		{:else if node.name === 'say'}
 			{const who = $derived(node.attrs.who ?? '')}
 			<!-- `data-who` and `data-how` are for reading aloud: who says it, and how. -->
-			<span class="say" data-shade={speakerShade(who)} data-you={who === 'you'} data-who={who} data-how={node.attrs.how}>
+			<!-- In the speaker's own colour; one the elements do not know keeps a shade of its id. -->
+			<span
+				class="say"
+				data-shade={colours.has(who) ? undefined : speakerShade(who)}
+				style:--speaker={colours.get(who)}
+				data-you={who === 'you'}
+				data-who={who}
+				data-how={node.attrs.how}
+			>
 				<span class="speaker" data-unspoken>{who === 'you' ? 'You' : (nameOf.get(who) ?? who)}</span>
 				{@render tree(node.children)}
 			</span>
@@ -568,11 +582,13 @@
 		color: var(--wa-color-text-quiet);
 	}
 
+	/* A person's name in their colour; anything else's in the passage's own. */
 	.name {
 		all: unset;
+		color: var(--person, inherit);
 		cursor: pointer;
 		text-decoration: underline;
-		text-decoration-color: var(--dream-accent, var(--wa-color-brand-on-quiet));
+		text-decoration-color: var(--person, var(--dream-accent, var(--wa-color-brand-on-quiet)));
 		text-underline-offset: 0.2em;
 
 		&:focus-visible {
@@ -889,18 +905,23 @@
 			white-space: normal;
 		}
 
+		/* A message is a bubble tinted with its sender's colour, the words
+		   themselves left plain so a whole bubble reads easily. */
 		.say {
 			align-self: flex-start;
 			max-width: 80%;
 			padding: var(--wa-space-2xs) var(--wa-space-s);
 			border-radius: var(--wa-border-radius-l);
-			background: var(--wa-color-surface-raised);
+			background: color-mix(
+				in oklab,
+				var(--speaker, transparent) 22%,
+				var(--wa-color-surface-raised)
+			);
 			color: inherit;
 		}
 
 		.say[data-you='true'] {
 			align-self: flex-end;
-			background: var(--wa-color-brand-fill-normal);
 		}
 	}
 

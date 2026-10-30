@@ -168,6 +168,8 @@ export class ReadAloud {
 	turnId = $state<string | null>(null);
 	/** Who is speaking, for the player. */
 	speaker = $state('');
+	/** Their element's id, for their colour; null for the narrator. */
+	speakerId = $state<string | null>(null);
 	playing = $state(false);
 	loading = $state(false);
 	problem = $state<string | null>(null);
@@ -343,6 +345,7 @@ export class ReadAloud {
 		this.finishedTurn = null;
 		this.turnId = null;
 		this.speaker = '';
+		this.speakerId = null;
 		this.problem = null;
 		this.#scroller?.removeEventListener('wheel', this.#onUserScroll);
 		this.#scroller?.removeEventListener('touchmove', this.#onUserScroll);
@@ -374,6 +377,7 @@ export class ReadAloud {
 		this.#audio?.pause();
 		this.index = index;
 		this.speaker = this.#nameOf(utterance.who);
+		this.speakerId = utterance.who;
 		this.loading = true;
 		this.problem = null;
 		let clip: Clip;
@@ -527,6 +531,7 @@ export class ReadAloud {
 		this.loading = false;
 		this.turnId = null;
 		this.speaker = '';
+		this.speakerId = null;
 	}
 
 	/**

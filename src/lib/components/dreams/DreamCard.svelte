@@ -18,9 +18,12 @@
 		onrename,
 		onedit,
 		dreamId = '',
+		colour,
 		onclose
 	}: {
 		element: DreamElement;
+		/** Its person's colour as CSS (`colourValues`), for a character or the user. */
+		colour?: string | undefined;
 		filling: boolean;
 		/** Saves a changed element, on the setup page (docs/dreams.md, "Changing what was made"). */
 		onedit?: (changed: DreamElement) => Promise<boolean>;
@@ -84,7 +87,7 @@
 	{:else}
 	<div class="card">
 		<p class="type">
-			<wa-icon name={elementIcon(element.type)} aria-hidden="true"></wa-icon>
+			<wa-icon name={elementIcon(element.type)} style:color={colour} aria-hidden="true"></wa-icon>
 			{heading(element.type)}{element.also.length > 0 ? ` · also ${element.also.join(', ')}` : ''}
 		</p>
 		{#if shown.length === 0 && seed}

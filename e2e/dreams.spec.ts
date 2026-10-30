@@ -679,6 +679,51 @@ test.describe('daydreams, the new engine', () => {
 			.toBe(true);
 	});
 
+	test('each character has a colour of their own, and the user the Me blue', async ({ page }) => {
+		await dreamer(page);
+		await start(page, 'A quiet evening');
+		// The setup page's chips are in their people's colours: the user's own
+		// is the blue of the Me context.
+		const cast = page.locator('ul.cast');
+		await expect(cast.locator('li', { hasText: 'Ottilie' }).locator('wa-icon')).toHaveAttribute(
+			'style',
+			/--space-colour-green/
+		);
+		await expect(cast.locator('li', { hasText: 'You' }).locator('wa-icon')).toHaveAttribute(
+			'style',
+			/--space-colour-me/
+		);
+		await play(page);
+		await saved(page);
+
+		// Ottilie, the first character in, has the first colour: her speech,
+		// her name where it links to her card, and the card itself.
+		const passage = page.locator('li.passage').last();
+		await expect(passage.locator('.say[data-who="ottilie"]')).toHaveAttribute(
+			'style',
+			/--speaker: var\(--space-colour-green\)/
+		);
+		await expect(passage.locator('button.name', { hasText: 'Ottilie' })).toHaveAttribute(
+			'style',
+			/--person: var\(--space-colour-green\)/
+		);
+		await passage.locator('button.name', { hasText: 'Ottilie' }).click();
+		await expect(page.locator('wa-dialog[open] .type wa-icon')).toHaveAttribute(
+			'style',
+			/--space-colour-green/
+		);
+		// The colour the speech is drawn in is the token's own.
+		const [spoken, token] = await passage.locator('.say[data-who="ottilie"]').evaluate((say) => {
+			const probe = document.createElement('span');
+			probe.style.color = 'var(--space-colour-green)';
+			say.append(probe);
+			const colours = [getComputedStyle(say).color, getComputedStyle(probe).color];
+			probe.remove();
+			return colours;
+		});
+		expect(spoken).toBe(token);
+	});
+
 	test('how the story is shown can be changed from the reading settings, and is kept', async ({
 		page
 	}) => {

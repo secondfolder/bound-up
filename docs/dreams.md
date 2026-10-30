@@ -790,6 +790,24 @@ the passages' area; blocks, which give a part of a passage the style of what
 it is, do that better, so themes went (2026-10-30). An older setup's stored
 theme is read and ignored.
 
+### Colours
+
+Each person in a daydream has a colour, so who is speaking shows at a
+glance (`src/lib/dream/colours.ts`). The user is always the blue of the
+"Me" context (`--space-colour-me`), the blue that is theirs everywhere
+else, whether or not the daydream has a `<you>` element; each character is
+given one of the contexts' colours (`SPACE_COLOURS`), in the order they came
+into the story, so two never share one until there are more characters
+than colours, and a character keeps theirs when others join. Code assigns
+them, never the model, and nothing is stored: the order of the elements
+decides, and it only ever grows. Places, things and pressures have none.
+
+A person's colour is used for their speech (`<say>`, and a message's bubble
+in a texts or group-chat block, tinted with it), their name where it links
+to their card, the icon on their chip and on their card, and the player's
+"who is speaking" line. A `<say>` for an id the elements do not know keeps
+the shade of the theme its id hashes to, as all speech used to.
+
 ### Writing styles
 
 Left to itself a model writes the same ornate prose for everything, so how a

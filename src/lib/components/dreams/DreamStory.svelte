@@ -5,6 +5,7 @@
 	import ResponsiveDialog from '$lib/components/ResponsiveDialog.svelte';
 	import { unlockedIdentity } from '$lib/crypto/session.svelte';
 	import type { View } from '$lib/dream/build';
+	import { colourValues } from '$lib/dream/colours';
 	import { elementLabel, linkableNames } from '$lib/dream/elements';
 	import { fieldKey } from '$lib/dream/fields';
 	import { suggestionsIn } from '$lib/dream/footer';
@@ -64,6 +65,8 @@
 	});
 
 	const elements = $derived(session.elements);
+	/** Each person's colour (docs/dreams.md, "Colours"): their speech, name, card and chip. */
+	const colours = $derived(colourValues(elements));
 	const names = $derived(linkableNames(elements));
 	const expansions = $derived(session.expansions);
 	/** Blocks designed for this daydream, by kind (docs/dreams.md, "Designed blocks"). */
@@ -706,7 +709,12 @@
 						<div class="chips">
 							{#each elements.filter((element) => element.shown) as element (element.id)}
 								<wa-button size="s" appearance="outlined" onclick={() => openCard(element.id)}>
-									<wa-icon slot="start" name={elementIcon(element.type)} aria-hidden="true"></wa-icon>
+									<wa-icon
+										slot="start"
+										name={elementIcon(element.type)}
+										style:color={colours.get(element.id)}
+										aria-hidden="true"
+									></wa-icon>
 									{elementLabel(element)}
 								</wa-button>
 							{/each}
@@ -814,6 +822,7 @@
 				{const passage = $derived(entry.turn)}
 				<li class="passage" data-turn={entry.id} {@attach tapToListen(entry.id)}>
 					<DreamMarkup
+						{colours}
 						source={passage.source}
 						turnId={entry.id}
 						{names}
@@ -913,6 +922,7 @@
 			<li class="passage" aria-busy="true">
 				{#if session.streaming.text}
 					<DreamMarkup
+						{colours}
 						source={session.streaming.text}
 						turnId={null}
 						{names}
@@ -1030,7 +1040,7 @@
 		     sight however many chips there are. -->
 		{#if reader && session.listening}
 			<section class="player" aria-label="Reading aloud">
-				<span class="speaker" aria-live="polite">
+				<span class="speaker" style:color={reader.speakerId ? colours.get(reader.speakerId) : undefined} aria-live="polite">
 					{#if reader.loading}
 						Getting the voice ready…
 					{:else if reader.turnId}
@@ -1124,6 +1134,7 @@
 {#if card}
 	<DreamCard
 		element={card}
+		colour={colours.get(card.id)}
 		filling={session.filling.has(`card:${card.id}`)}
 		ondraw={() => session.namesFor(card.id)}
 		onrename={(name) => session.rename(card.id, name)}

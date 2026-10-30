@@ -3,6 +3,7 @@
 	import RadioButton from '$lib/components/segmented/RadioButton.svelte';
 	import RadioButtonGroup from '$lib/components/segmented/RadioButtonGroup.svelte';
 	import { type Build, parseBuild } from '$lib/dream/build';
+	import { colourValues } from '$lib/dream/colours';
 	import { type DreamElement, elementLabel } from '$lib/dream/elements';
 	import { parseMarkup, plainText } from '$lib/dream/markup';
 	import { parseBriefReading } from '$lib/dream/reading';
@@ -62,6 +63,8 @@
 	const build = $derived<(Omit<Build, 'passage' | 'style'> & Partial<Pick<Build, 'style'>>) | null>(
 		streamedBuild ?? setup?.build ?? null
 	);
+	/** Each person's colour (docs/dreams.md, "Colours"), on their chip and card. */
+	const colours = $derived(colourValues(build?.elements ?? []));
 	const opening = $derived(session.path[0]?.turn);
 	const openingText = $derived(
 		streamedBuild?.passage ?? (opening?.kind === 'passage' ? opening.source : '')
@@ -341,12 +344,12 @@
 					<li>
 						{#if setup?.build && !streamedBuild}
 							<button type="button" class="chip" onclick={() => openCard(element.id)}>
-								<wa-icon name={elementIcon(element.type)} aria-hidden="true"></wa-icon>
+								<wa-icon name={elementIcon(element.type)} style:color={colours.get(element.id)} aria-hidden="true"></wa-icon>
 								{elementLabel(element)}
 							</button>
 						{:else}
 							<span class="chip">
-								<wa-icon name={elementIcon(element.type)} aria-hidden="true"></wa-icon>
+								<wa-icon name={elementIcon(element.type)} style:color={colours.get(element.id)} aria-hidden="true"></wa-icon>
 								{elementLabel(element)}
 							</span>
 						{/if}
@@ -444,7 +447,7 @@
 						<li>
 							<!-- Native: a row of the summary that opens its card. -->
 							<button type="button" class="person" onclick={() => openCard(element.id)}>
-								<wa-icon name={elementIcon(element.type)} aria-hidden="true"></wa-icon>
+								<wa-icon name={elementIcon(element.type)} style:color={colours.get(element.id)} aria-hidden="true"></wa-icon>
 								<span>
 									<strong>{elementLabel(element)}</strong>
 									{#if lineOf(element)}<small>{lineOf(element)}</small>{/if}
@@ -554,6 +557,7 @@
 	{#if card}
 		<DreamCard
 			element={card}
+		colour={colours.get(card.id)}
 			filling={false}
 			dreamId={session.id}
 			onedit={(changed) => session.editElement(changed)}
