@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseBuild } from './build';
 import { allowedTags, parseCapabilities } from './capabilities';
-import { parseElements, serializeElements } from './elements';
+import { elementLabel, parseElements, serializeElements } from './elements';
 import { nextNote, parseFooter } from './footer';
 import { parseMarkup } from './markup';
 import { drawNudges } from './nudges';
@@ -144,6 +144,36 @@ describe('parseBuild', () => {
 
 	it('has no passage when the model never started one', () => {
 		expect(parseBuild('<title>x</title>').passage).toBeNull();
+	});
+});
+
+describe('element names', () => {
+	const read = (text: string) => parseElements(parseMarkup(text, { final: true }));
+
+	it('keeps a short name for a long one, and links and writes it back', () => {
+		const [ines] = read(
+			'<character id="ines" name="Ines Varga, Head of Intake" short="Ines"><manner>Clipped.</manner></character>'
+		);
+		expect(ines && elementLabel(ines)).toBe('Ines');
+		expect(serializeElements(ines ? [ines] : [])).toContain('short="Ines"');
+	});
+
+	it('names an unnamed element from its type and the start of its description', () => {
+		const [pressure] = read(
+			'<pressure>The inspection on Friday decides whether she keeps the studio. Everything leans on it.</pressure>'
+		);
+		expect(pressure?.name).toBe('Pressure: The inspection on Friday decides whether…');
+		expect(pressure?.id).toMatch(/^pressure-the-inspection/);
+	});
+
+	it('names one with nothing to go on by which of its type it is', () => {
+		const elements = read('<pressure></pressure><place></place><pressure></pressure><you></you>');
+		expect(elements.map((element) => element.name)).toEqual([
+			'First Pressure',
+			'Place',
+			'Second Pressure',
+			'You'
+		]);
 	});
 });
 

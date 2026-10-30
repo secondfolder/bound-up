@@ -75,6 +75,10 @@ export function historyPassage(source: string, allowed?: ReadonlySet<string>): s
 	return next ? `${body}\n<after>\n${JSON.stringify({ next })}\n</after>` : body;
 }
 
+/** What Continue asks for: whatever moves the story on most interestingly, by the story's choice. */
+export const CONTINUE =
+	'The user pressed Continue without writing anything. That is not their character staying silent or doing nothing: it hands the next step to you. Decide what happens next, the most interesting way forward from here. Their character may go along with what is being asked of them, or push back, or something else may happen; choose what the story is most alive for, and write their part in it.';
+
 /**
  * The user's turn as the model reads it. Choices and fields go as plain
  * structured lines after the words, and a field left empty is reported as
@@ -91,7 +95,10 @@ export function describeTurn(turn: UserTurn): string {
 	if (turn.kind === 'words') {
 		parts.push(wrap('user', turn.text));
 	} else if (!filled) {
-		parts.push('The user pressed Continue, without writing anything: carry the story on.');
+		// Not silence from the user's character, which a character then
+		// reacted to, and not their going along either: what happens next is
+		// the story's to decide (docs/dreams.md, "Continue").
+		parts.push(CONTINUE);
 	}
 	for (const roll of turn.rolls ?? []) {
 		parts.push(

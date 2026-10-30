@@ -30,7 +30,11 @@ data would simply stop showing. So:
   Daydreams first shipped, and setup v4 (a monologue, and the scene renamed
   the idea) before it was deployed. The kink list's v1 and its partner copy's
   v1 were re-sealed without people's own kinks when those were removed,
-  before the kink list was first deployed. Once a version has been
+  before the kink list was first deployed. The new daydream engine's
+  `dream-setup` v1 and `dream-detail` v1 and v2 gained optional fields in
+  place (an element's `short` name, the reading's `lookups`, the setup's
+  `awaitingStart`) before the engine was first deployed; being optional, the
+  fixtures still open unchanged. Once a version has been
   deployed, it is frozen like the rest.
 - **All fixtures share one vault**: the key is bytes 0–31, and the vault id is
   the one at the top of `fixtures.json`.

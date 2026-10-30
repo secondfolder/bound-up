@@ -73,6 +73,8 @@ export const dreamElementSchema = z.object({
 	id: slug,
 	type: required(40),
 	name: required(80),
+	/** Added before any build that writes it was deployed, so in place (sealed-fixtures/README.md). */
+	short: required(40).optional(),
 	also: z.array(required(80)).max(12),
 	shown: z.boolean(),
 	nameFrom: text(400).optional(),

@@ -59,6 +59,7 @@ How sexual it is. Read it from the brief and the user's preferences; if they do 
 <telling>
 Notes for whoever writes every passage: what this daydream is, its form, its rhythm, how the user takes part, what to avoid. Under 250 words. Write what would make this daydream itself, not general advice about writing.
 </telling>
+Pacing: when the brief explicitly asks for a kink, a sexual act or a particular scene, get to it soon, in the opening or the passage after, rather than holding it back as a payoff. Build up to it only when something says to: the brief or the user's preferences ask for a slow burn, a tease or a build-up, or the chosen direction is about the anticipation itself. Say which in the telling notes.
 
 <presentation view="…" theme="…">a sentence on what passages should look like</presentation>
 view: ${VIEWS.join(', ')}. scroll is ordinary reading; tap shows one beat at a time, for slow, heavy scenes; texts is for a daydream told as messages; monologue is one voice in short lines.
@@ -69,7 +70,7 @@ From: ${CAPABILITIES.filter((name) => name !== 'research' && name !== 'voice').j
 
 <elements>
 Anything worth keeping a record of, as tags. The tag is the element's type, and any type is allowed. Known types the app does more with:
-<character id="short-id" name="Their name" also="nicknames, other names" name-from="German woman born in the 1970s, uncommon">
+<character id="short-id" name="Their name" short="what to call them" also="nicknames, other names" name-from="German woman born in the 1970s, uncommon">
   <appearance>what they look like (used for pictures)</appearance>
   <manner>how they behave and speak</manner>
   <background>a little of their history, where it shapes how they act</background>
@@ -78,6 +79,7 @@ Anything worth keeping a record of, as tags. The tag is the element's type, and 
 </character>
 <you> for the user's own role, and any stats about them.
 <place>, <thing>, <pressure> (a tension that pushes on every scene), or any other type.
+Every element has a name, a pressure or a place as much as a person: the words the user will see it called by ("The Friday inspection", "The studio"). When a name is longer than about three words, add short="…", a word or two to call it by.
 Fields are free: use the ones above where they fit and invent others.
 Stats, only where the daydream is a progression (a training, a debt, days kept): <stat name="poise" kind="meter|count|list|line" value="20" max="100">what moves it</stat>, inside the element it belongs to.
 Write profiles, not plans: who people are, how they talk, what they want. Never plan events that only happen if something else does. The story is written one passage at a time.

@@ -81,6 +81,22 @@ reads what it writes. Their type and fields are free; `<stat>` is the one child
 with a fixed shape, because code applies its changes. At most 12 elements and
 1,200 characters each; past that, whole fields are dropped, never cut.
 
+**Every element has something to be called on screen.** The build asks for a
+name on every element, a pressure or a place as much as a person, and for
+`short="…"` when the name runs past about three words; screens use
+`elementLabel` (the short name, else the name), and the short name is linked
+in passages like any other. One left unnamed anyway is named by code
+(`fallbackName`): its type and the start of its description ("Pressure: The
+inspection on Friday decides whether…"), or with nothing to go on, which of
+its type it is ("Second Pressure"; just "Pressure" when it is the only one).
+Unnamed ones used to be "pressure 5", the type and its place in the list.
+
+**Pacing.** A brief that explicitly asks for a kink, a sexual act or a
+particular scene gets to it in the opening or the passage after, rather than
+holding it back as a payoff, unless the brief, the user's preferences or the
+chosen direction call for a build-up; the build says which in the telling
+notes (`prompts/build.ts`).
+
 ## The pipeline, as the prompts have it
 
 1. **Reading the brief** (`readingMessages`): musts, research, spread (1–8),
@@ -396,6 +412,11 @@ away; each adds a turn beside the passage:
 - **Edit**: the user's own version of the passage, which later passages build
   on. For now it edits the passage's source, markup included.
 - **Continue** (beside Send): the next passage with no turn from the user.
+  It reaches the model as handing it the next step (`CONTINUE` in
+  `prompts/passage.ts`), not as the user's character staying silent, which
+  the characters then reacted to, nor as their going along: the model
+  decides the most interesting way on, which may be the character going
+  along with what is asked of them or pushing back.
 - **Stop**: what had arrived is kept as a version, marked stopped.
 
 Switching versions moves `activeTurnId` to the newest end of that version's

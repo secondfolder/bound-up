@@ -1123,10 +1123,12 @@ export class DreamSession {
 		if (!(element && turnId) || element.name === name) {
 			return;
 		}
+		// The short name went with the old name: the new one is shown whole.
+		const { short: _short, ...rest } = element;
 		const detail: DreamDetail = {
 			kind: 'element',
 			element: {
-				...element,
+				...rest,
 				name,
 				also: [element.name, ...element.also.filter((other) => other !== name)].slice(0, 12)
 			}

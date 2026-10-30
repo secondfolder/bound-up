@@ -3,7 +3,7 @@
 	import type { Attachment } from 'svelte/attachments';
 	import ResponsiveDialog from '$lib/components/ResponsiveDialog.svelte';
 	import { unlockedIdentity } from '$lib/crypto/session.svelte';
-	import { linkableNames } from '$lib/dream/elements';
+	import { elementLabel, linkableNames } from '$lib/dream/elements';
 	import { fieldKey } from '$lib/dream/fields';
 	import { voiceForSpeaker } from '$lib/dream/voices';
 	import { ReadAloud, SPEEDS } from '$lib/dream-browser/reader.svelte';
@@ -141,7 +141,8 @@
 		if (who === 'you') {
 			return 'You';
 		}
-		return session.elements.find((element) => element.id === who)?.name ?? 'Narrator';
+		const element = session.elements.find((candidate) => candidate.id === who);
+		return element ? elementLabel(element) : 'Narrator';
 	}
 
 	/** The passage's drawn text, which is what is read. */
@@ -295,7 +296,7 @@
 					{#if elements.length > 0}
 						<div class="chips">
 							{#each elements.filter((element) => element.shown) as element (element.id)}
-								<wa-button size="s" appearance="outlined" onclick={() => openCard(element.id)}>{element.name}</wa-button>
+								<wa-button size="s" appearance="outlined" onclick={() => openCard(element.id)}>{elementLabel(element)}</wa-button>
 							{/each}
 						</div>
 					{/if}

@@ -37,6 +37,12 @@ export type DreamElement = {
 	/** The tag the model used: `character`, `place`, `contract`, anything. */
 	type: string;
 	name: string;
+	/**
+	 * What to call it on screen when its name is long ("Ines" for "Ines
+	 * Varga, Head of Intake"): asked of the model for any long name. Read
+	 * through `elementLabel`.
+	 */
+	short?: string;
 	/** Other names and nicknames, so code can link them in passages. */
 	also: string[];
 	shown: boolean;
@@ -100,12 +106,82 @@ function readStat(tag: MarkupTag): ElementStat | null {
 	return { name, kind, value: raw, description };
 }
 
-function readElement(tag: MarkupTag, index: number): DreamElement {
-	const name = tag.attrs.name?.trim() || (tag.name === 'you' ? 'You' : `${tag.name} ${index + 1}`);
+const ORDINALS = [
+	'First',
+	'Second',
+	'Third',
+	'Fourth',
+	'Fifth',
+	'Sixth',
+	'Seventh',
+	'Eighth',
+	'Ninth',
+	'Tenth',
+	'Eleventh',
+	'Twelfth'
+];
+const DASHES = /[-_]+/g;
+const CLAUSE_END = /[.;:!?\n]/;
+const TRAILING_PUNCTUATION = /[\s,–—-]+$/;
+const WORDS = /\s+/;
+/** Words from a description an unnamed element is labelled with. */
+const LABEL_WORDS = 6;
+const MAX_SHORT = 40;
+
+/** A type as words: `voice-note` is "Voice note". */
+function typeLabel(type: string): string {
+	const words = type.replace(DASHES, ' ').trim();
+	return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** The start of a description, its first clause and a few words at most. */
+function opening(text: string): string {
+	const clause = text.split(CLAUSE_END)[0]?.trim() ?? '';
+	const words = clause.split(WORDS).filter(Boolean);
+	const start = words.slice(0, LABEL_WORDS).join(' ').replace(TRAILING_PUNCTUATION, '');
+	return words.length > LABEL_WORDS ? `${start}…` : start;
+}
+
+/**
+ * A name for an element the model left unnamed, so there is always
+ * something to call it on screen: its type and the start of what describes
+ * it ("Pressure: the deadline on Friday"), or with nothing to go on, which
+ * of its type it is ("Second Pressure"; just the type when it is the only
+ * one). A `<you>` is "You".
+ */
+function fallbackName(element: DreamElement, nth: number, ofType: number): string {
+	if (element.type === 'you') {
+		return 'You';
+	}
+	const described = element.fields.find((field) => field.shown && field.text.trim());
+	const start = described ? opening(described.text) : '';
+	if (start) {
+		return `${typeLabel(element.type)}: ${start}`;
+	}
+	const ordinal = ORDINALS[nth - 1];
+	if (ofType > 1 && ordinal) {
+		const titled = element.type
+			.replace(DASHES, ' ')
+			.trim()
+			.split(' ')
+			.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+			.join(' ');
+		return `${ordinal} ${titled}`;
+	}
+	return typeLabel(element.type);
+}
+
+/** What to call an element on screen: its short name, or its name. */
+export function elementLabel(element: Pick<DreamElement, 'name' | 'short'>): string {
+	return element.short ?? element.name;
+}
+
+function readElement(tag: MarkupTag, index: number, nth: number, ofType: number): DreamElement {
+	const given = tag.attrs.name?.trim() ?? '';
 	const element: DreamElement = {
-		id: tag.attrs.id?.trim() || slug(name) || `${tag.name}-${index + 1}`,
+		id: tag.attrs.id?.trim() ?? '',
 		type: tag.name,
-		name,
+		name: given,
 		also: (tag.attrs.also ?? '').split(ALSO_SEPARATOR).filter(Boolean),
 		shown: tag.attrs.shown !== 'no',
 		fields: [],
@@ -141,6 +217,12 @@ function readElement(tag: MarkupTag, index: number): DreamElement {
 	if (description && description.length <= budget) {
 		element.fields.unshift({ name: 'description', text: description, shown: true });
 	}
+	element.name = (given || fallbackName(element, nth, ofType)).slice(0, 80);
+	element.id ||= slug(element.name) || `${tag.name}-${index + 1}`;
+	const short = tag.attrs.short?.trim();
+	if (short && short !== element.name) {
+		element.short = short.slice(0, MAX_SHORT);
+	}
 	return element;
 }
 
@@ -148,11 +230,15 @@ function readElement(tag: MarkupTag, index: number): DreamElement {
 export function parseElements(nodes: readonly MarkupNode[]): DreamElement[] {
 	const elements: DreamElement[] = [];
 	const ids = new Set<string>();
-	for (const node of nodes) {
-		if (node.type !== 'tag' || elements.length >= MAX_ELEMENTS) {
-			continue;
-		}
-		const element = readElement(node, elements.length);
+	const tags = nodes
+		.filter((node): node is MarkupTag => node.type === 'tag')
+		.slice(0, MAX_ELEMENTS);
+	const ofType = (type: string) => tags.filter((tag) => tag.name === type).length;
+	const seen = new Map<string, number>();
+	for (const node of tags) {
+		const nth = (seen.get(node.name) ?? 0) + 1;
+		seen.set(node.name, nth);
+		const element = readElement(node, elements.length, nth, ofType(node.name));
 		// Two elements with one id would make every reference to it ambiguous.
 		while (ids.has(element.id)) {
 			element.id = `${element.id}-${elements.length + 1}`;
@@ -173,6 +259,9 @@ function statValue(stat: ElementStat): string {
 
 function serializeElement(element: DreamElement): string {
 	let open = `<${element.type}${attribute('id', element.id)}${attribute('name', element.name)}`;
+	if (element.short) {
+		open += attribute('short', element.short);
+	}
 	if (element.also.length > 0) {
 		open += attribute('also', element.also.join(', '));
 	}
@@ -206,7 +295,12 @@ export function serializeElements(elements: readonly DreamElement[]): string {
 export function linkableNames(elements: readonly DreamElement[]): { id: string; name: string }[] {
 	return elements
 		.filter((element) => element.shown && element.type !== 'you')
-		.flatMap((element) => [element.name, ...element.also].map((name) => ({ id: element.id, name })))
+		.flatMap((element) =>
+			[element.name, ...(element.short ? [element.short] : []), ...element.also].map((name) => ({
+				id: element.id,
+				name
+			}))
+		)
 		.filter((entry) => entry.name.length > 1)
 		.sort((a, b) => b.name.length - a.name.length);
 }
