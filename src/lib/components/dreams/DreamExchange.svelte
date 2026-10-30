@@ -67,17 +67,35 @@
 			<div><dt>Provider</dt><dd>{about.provider || exchange?.provider || 'unknown'}</dd></div>
 			{#if about.model}<div><dt>Model</dt><dd>{about.model}</dd></div>{/if}
 			{#if about.ended}<div><dt>Ended</dt><dd>{about.ended}</dd></div>{/if}
-			{#if usage}
+			{#if usage || maxTokens !== null}
+				<!-- The max is the reply's alone: a provider counts the prompt apart,
+				     and a reasoning model's thinking in the reply. -->
 				<div>
-					<dt>Prompt</dt>
-					<dd>{usage.promptTokens} tokens, {usage.cachedTokens} from cache{cached === null ? '' : ` (${cached}%)`}</dd>
+					<dt>Tokens</dt>
+					<dd>
+						<dl class="tokens">
+							{#if usage}
+								<div>
+									<dt>Prompt</dt>
+									<dd>{usage.promptTokens}, {usage.cachedTokens} from cache{cached === null ? '' : ` (${cached}%)`}</dd>
+								</div>
+							{/if}
+							<div>
+								<dt>Reply</dt>
+								<dd>
+									{usage ? `${usage.completionTokens}, thinking included` : 'not known'}{maxTokens === null
+										? ''
+										: ` (max ${maxTokens})`}
+								</dd>
+							</div>
+							{#if usage}
+								<div><dt>Total</dt><dd>{usage.promptTokens + usage.completionTokens}</dd></div>
+							{/if}
+						</dl>
+					</dd>
 				</div>
-				<div><dt>Reply</dt><dd>{usage.completionTokens} tokens</dd></div>
-				{#if usage.cost !== null}<div><dt>Cost</dt><dd>${usage.cost.toFixed(5)}</dd></div>{/if}
 			{/if}
-			{#if maxTokens !== null}
-				<div><dt>Max tokens</dt><dd>{maxTokens}</dd></div>
-			{/if}
+			{#if usage && usage.cost !== null}<div><dt>Cost</dt><dd>${usage.cost.toFixed(5)}</dd></div>{/if}
 			{#if took}
 				<div><dt>Took</dt><dd>{(took / 1000).toFixed(1)} s</dd></div>
 			{/if}
@@ -135,6 +153,11 @@
 			dt {
 				min-width: 6rem;
 				color: var(--wa-color-text-quiet);
+			}
+
+			/* Tokens' own parts, under it. */
+			.tokens {
+				gap: 0;
 			}
 
 			dd {

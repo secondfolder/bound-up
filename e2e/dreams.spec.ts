@@ -525,7 +525,8 @@ test.describe('daydreams, the new engine', () => {
 		const dialog = page.locator('wa-dialog[open]');
 		await expect(dialog.getByText('Provider', { exact: true })).toBeVisible();
 		// The opening came with the build, which may write up to its whole budget.
-		await expect(dialog.locator('dl')).toContainText('Max tokens16000');
+		await expect(dialog.locator('dl.tokens')).toContainText('(max 16000)');
+		await expect(dialog.locator('dl.tokens')).toContainText('Total');
 		// Kept on this page: the messages sent, and the reply.
 		await expect(dialog.getByText('Sent', { exact: true })).toBeVisible();
 		await expect(dialog.getByText('system', { exact: true })).toBeVisible();
