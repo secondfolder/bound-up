@@ -13,6 +13,7 @@
 		type StepStatus,
 		setupProgress
 	} from '$lib/dream/setup-progress';
+	import { isPreset, OWN_STYLE, readStyle, STYLE_PRESETS, styleName } from '$lib/dream/styles';
 	import type { DreamSession } from '$lib/dream-browser/session.svelte';
 	import { MAX_AMENDMENT_CHARS } from '$lib/sealed-kinds/dreams';
 	import DreamCard from './DreamCard.svelte';
@@ -58,7 +59,9 @@
 		streaming?.what === 'build' ? parseBuild(streaming.text, { final: false }) : null
 	);
 	/** The build, as it streams or as kept. */
-	const build = $derived<Omit<Build, 'passage'> | null>(streamedBuild ?? setup?.build ?? null);
+	const build = $derived<(Omit<Build, 'passage' | 'style'> & Partial<Pick<Build, 'style'>>) | null>(
+		streamedBuild ?? setup?.build ?? null
+	);
 	const opening = $derived(session.path[0]?.turn);
 	const openingText = $derived(
 		streamedBuild?.passage ?? (opening?.kind === 'passage' ? opening.source : '')
@@ -163,6 +166,14 @@
 	/** The element whose card is open. */
 	let cardId = $state<string | null>(null);
 	const card = $derived(setup?.build?.elements.find((element) => element.id === cardId) ?? null);
+	/** A writing style chosen from the summary: a change by hand, which Update follows. */
+	function chooseStyle(event: CustomEvent<{ item: HTMLElement & { value?: string } }>) {
+		const preset = event.detail.item.value ?? '';
+		if (isPreset(preset)) {
+			void session.setStyle({ preset, notes: '', by: 'user' });
+		}
+	}
+
 	function openCard(id: string) {
 		cardId = id;
 	}
@@ -451,6 +462,28 @@
 				<div>
 					<dt>How sexual</dt>
 					<dd>{HEAT_WORDS[made.heat]}</dd>
+				</div>
+				<div>
+					<dt>Written</dt>
+					<dd>
+						{const style = $derived(made.style ?? readStyle(undefined, ''))}
+						<!-- The writing style the build chose, which the user can change: Update writes the opening again in it. -->
+						<wa-dropdown placement="bottom-start" onwa-select={chooseStyle}>
+							<wa-button slot="trigger" size="s" appearance="outlined" with-caret>{styleName(style)}</wa-button>
+							{#if style.preset === OWN_STYLE}
+								<wa-dropdown-item type="checkbox" value={OWN_STYLE} checked>
+									In its own style
+									<small class="style-line">{style.notes}</small>
+								</wa-dropdown-item>
+							{/if}
+							{#each STYLE_PRESETS as preset (preset.id)}
+								<wa-dropdown-item type="checkbox" value={preset.id} checked={style.preset === preset.id}>
+									{preset.name}
+									<small class="style-line">{preset.summary}</small>
+								</wa-dropdown-item>
+							{/each}
+						</wa-dropdown>
+					</dd>
 				</div>
 				{#if tracked.length > 0}
 					<div>
@@ -893,6 +926,7 @@
 		div {
 			display: flex;
 			flex-wrap: wrap;
+			align-items: center;
 			gap: var(--wa-space-xs);
 		}
 
@@ -903,6 +937,14 @@
 		dd {
 			margin: 0;
 		}
+	}
+
+	/* A style's line under its name in the menu. */
+	.style-line {
+		display: block;
+		max-width: 22rem;
+		color: var(--wa-color-text-quiet);
+		white-space: normal;
 	}
 
 	.start {

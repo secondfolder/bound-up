@@ -17,6 +17,7 @@
 		turnReading
 	} from '$lib/dream/readings';
 	import { footerOf } from '$lib/dream/story';
+	import { DEFAULT_STYLE, isPreset, OWN_STYLE, STYLE_PRESETS } from '$lib/dream/styles';
 	import { voiceForSpeaker } from '$lib/dream/voices';
 	import { ReadAloud, SPEEDS } from '$lib/dream-browser/reader.svelte';
 	import type { DreamSession } from '$lib/dream-browser/session.svelte';
@@ -400,8 +401,18 @@
 		{ value: 'monologue', label: 'As a monologue' }
 	];
 
+	const style = $derived(build?.style);
+
+	/** Reading settings: a view, or a writing style, which applies from the next passage. */
 	function chooseView(event: WaSelectEvent) {
-		const choice = event.detail.item.value;
+		const choice = event.detail.item.value ?? '';
+		if (choice.startsWith('style:')) {
+			const preset = choice.slice('style:'.length);
+			if (isPreset(preset)) {
+				void session.setStyle({ preset, notes: '', by: 'user' });
+			}
+			return;
+		}
 		const picked = VIEW_CHOICES.find((option) => option.value === choice);
 		if (picked) {
 			void session.setView(picked.value);
@@ -439,7 +450,7 @@
 							Read aloud
 						</button>
 					{/if}
-					<!-- Reading settings: how the story is shown, which the build chose. -->
+					<!-- Reading settings: how the story is shown and written, which the build chose. -->
 					<wa-dropdown placement="bottom-end" onwa-select={chooseView}>
 						<wa-button slot="trigger" size="s" appearance="outlined" pill>
 							<wa-icon slot="start" name="sliders" aria-hidden="true"></wa-icon>
@@ -449,6 +460,19 @@
 						{#each VIEW_CHOICES as option (option.value)}
 							<wa-dropdown-item type="checkbox" value={option.value} checked={view === option.value}>
 								{option.label}
+							</wa-dropdown-item>
+						{/each}
+						<h3 class="menu-heading">Write it</h3>
+						{#if style?.preset === OWN_STYLE}
+							<wa-dropdown-item type="checkbox" value="style:own" checked>In its own style</wa-dropdown-item>
+						{/if}
+						{#each STYLE_PRESETS as preset (preset.id)}
+							<wa-dropdown-item
+								type="checkbox"
+								value={`style:${preset.id}`}
+								checked={(style?.preset ?? DEFAULT_STYLE) === preset.id}
+							>
+								{preset.name}
 							</wa-dropdown-item>
 						{/each}
 					</wa-dropdown>

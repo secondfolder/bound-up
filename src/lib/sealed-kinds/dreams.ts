@@ -17,6 +17,7 @@ import { blockDesignSchema, MAX_DESIGNS } from '../dream/designs';
 import { MAX_ELEMENT_CHARS, MAX_ELEMENTS } from '../dream/elements';
 import { MAX_DIRECTIONS } from '../dream/reading';
 import { READINGS } from '../dream/readings';
+import { writingStyleSchema } from '../dream/styles';
 import { defineSealedKind } from '../sealed';
 import { isClientId } from '../vault';
 
@@ -151,10 +152,24 @@ const chosenSchema = z.object({
 	seed: z.number().int()
 });
 
+/**
+ * What a change made by hand changed from: an element as it was, or the
+ * writing style it had.
+ */
+const editedFromSchema = z.union([
+	dreamElementSchema,
+	z.object({ kind: z.literal('style'), style: writingStyleSchema.optional() })
+]);
+
 const buildSchema = z.object({
 	title: required(120),
 	heat: z.enum(HEAT_LEVELS),
 	telling: text(MAX_TELLING_CHARS),
+	/**
+	 * How its prose reads (docs/dreams.md, "Writing styles"). Added in place
+	 * before the engine was deployed (sealed-fixtures/README.md).
+	 */
+	style: writingStyleSchema.optional(),
 	presentation: z.object({
 		view: z.enum(VIEWS),
 		/**
@@ -206,7 +221,7 @@ export const dreamSetupKind = defineSealedKind({
 				 * so an edit can be undone. Added in place before the engine was
 				 * deployed.
 				 */
-				editedFrom: z.array(dreamElementSchema).max(24).optional(),
+				editedFrom: z.array(editedFromSchema).max(24).optional(),
 				/**
 				 * Blocks designed for this daydream (docs/dreams.md, "Designed
 				 * blocks"), offered to the story model by kind from then on.

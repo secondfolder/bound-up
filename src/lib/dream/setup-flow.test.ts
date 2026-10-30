@@ -14,7 +14,8 @@ import {
 	withEditsApplied,
 	withElementChange,
 	withoutEdit,
-	withReading
+	withReading,
+	withStyleChange
 } from './setup-flow';
 
 const reading = (overrides: Partial<BriefReading> = {}): BriefReading => ({
@@ -117,6 +118,19 @@ describe('serializeBuild', () => {
 			presentation: build.presentation
 		});
 	});
+
+	it('writes the style back, and says when the user chose it', () => {
+		const chosen = {
+			...build,
+			style: { preset: 'clipped' as const, notes: 'Lists.', by: 'user' as const }
+		};
+		expect(serializeBuild(chosen)).toContain('<style preset="clipped" by="user">Lists.</style>');
+		expect(parseBuild(serializeBuild(chosen)).style).toEqual({
+			preset: 'clipped',
+			notes: 'Lists.',
+			by: 'model'
+		});
+	});
 });
 
 describe('changing an element by hand', () => {
@@ -174,6 +188,46 @@ describe('changing an element by hand', () => {
 		const undone = withoutEdit(third, 0);
 		expect(undone.build?.elements.map((element) => element.name)).toEqual(['Ines Varga', 'Anna']);
 		expect(undone.pendingEdits).toEqual(['Ana is now called Anna']);
-		expect(undone.editedFrom?.map((element) => element.id)).toEqual(['ana']);
+		expect(undone.editedFrom?.map((element) => ('id' in element ? element.id : 'style'))).toEqual([
+			'ana'
+		]);
+	});
+});
+
+describe('choosing the writing style by hand', () => {
+	const ines = {
+		id: 'ines',
+		type: 'character',
+		name: 'Ines Varga',
+		also: [],
+		shown: true,
+		fields: [],
+		stats: []
+	};
+	const built: DreamSetup = {
+		...codePick(withReading(newSetup('x'), reading()), 1),
+		build: {
+			...build,
+			elements: [ines],
+			style: { preset: 'lush', notes: 'Slow.', by: 'model' }
+		}
+	};
+
+	it('keeps it at once as the user’s, and notes it for Update', () => {
+		const changed = withStyleChange(built, { preset: 'filthy', notes: '', by: 'model' });
+		expect(changed.build?.style).toEqual({ preset: 'filthy', notes: '', by: 'user' });
+		expect(changed.pendingEdits).toEqual(['The writing style is now Raw and filthy']);
+		expect(withStyleChange(built, { preset: 'lush', notes: 'Slow.', by: 'user' })).toBe(built);
+		expect(withEditsApplied(changed).amendments.at(-1)).toContain('Raw and filthy');
+	});
+
+	it('undoes it back to the style before, leaving element changes alone', () => {
+		const renamed = withElementChange(built, { ...ines, name: 'Ines Vogt' });
+		const first = withStyleChange(renamed, { preset: 'filthy', notes: '', by: 'user' });
+		const second = withStyleChange(first, { preset: 'pulp', notes: '', by: 'user' });
+		const undone = withoutEdit(second, 1);
+		expect(undone.build?.style).toEqual({ preset: 'lush', notes: 'Slow.', by: 'model' });
+		expect(undone.build?.elements[0]?.name).toBe('Ines Vogt');
+		expect(undone.pendingEdits).toEqual(['Ines Varga is now called Ines Vogt']);
 	});
 });

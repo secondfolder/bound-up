@@ -73,7 +73,7 @@ at the end is held back, so it never flashes up as text. The test splits a
 passage at every character to check this.
 
 The **footer** is one JSON object per line (`next`, `new`, `pref`, `set`,
-`telling`), each checked against its own schema, so a malformed line is
+`telling`, `style`, `suggest`), each checked against its own schema, so a malformed line is
 dropped on its own.
 
 **Elements** are read into `DreamElement` JSON and written back in the same tag
@@ -120,11 +120,11 @@ that scene on, which is the user asking it to.
    raised to a power set by the spread (`tiltFor`), so a wide brief leans
    towards the unlikely directions.
 3. **Building and opening** (`buildMessages`): title, heat, telling notes,
-   presentation (the view), elements, and the
+   writing style, presentation (the view), elements, and the
    opening passage in the same reply.
 4. **Passages** (`passageMessages`): the fixed core and every capability's
-   block first, then what stays the same in the setup (telling notes, musts,
-   research), the story so far (footers cut to their `next` line), and last
+   block first, then what stays the same in the setup (telling notes, the
+   writing style, musts, research), the story so far (footers cut to their `next` line), and last
    what changes as it goes (the elements as they stand, the designed blocks,
    the preferences) with what is happening now, including the phrases
    repeated in recent passages as "don't reuse". See "Prompt caching".
@@ -346,7 +346,7 @@ the owner's vault, and the tree's shape, and never reads content.
 
 | Table | Sealed kind | Holds |
 | --- | --- | --- |
-| `dreams` | `dream-setup` | The brief, changes asked for while setting up, step 1's reading, the direction taken and code's draws, the build (title, heat, telling notes, presentation, capabilities, elements), this story's preferences |
+| `dreams` | `dream-setup` | The brief, changes asked for while setting up, step 1's reading, the direction taken and code's draws, the build (title, heat, telling notes, writing style, presentation, capabilities, elements), this story's preferences |
 | `dream_turns` | `dream-turn` | A passage (its source with markup and footer, what asked for it, how it ended, model and provider) or the user's turn (words, cycle settings, answers, rolls, filled-in fields) |
 | `dream_details` | `dream-detail` | An element as it now stands (a card filled in, facts added), or a `<more>` expanded, on the turn it was written after |
 | `dream_summaries` | `dream-summary` | A finished scene condensed, on its last turn |
@@ -499,7 +499,8 @@ under it.
 **Then a summary, which waits on Start** (the plan's "a surprise, with a
 quick look first"; it offered straight in as well, which this replaced):
 the title, the first line of the telling notes, who and what is in it with a
-line each, how it is shown, how sexual, what it keeps track of, and the
+line each, how it is shown, how sexual, how it is written (see "Writing
+styles"), what it keeps track of, and the
 telling notes and research in full. **Start** plays it; **Pick another** picks
 again from the same ideas and builds that. The setup records that it is
 waiting (`awaitingStart`, set when the build is kept, cleared by Start), so a
@@ -521,7 +522,9 @@ change asked for, keeping them exactly and following them through
 (`withEditsApplied`), and the result waits on Start like any build. Each
 change listed can be undone (`withoutEdit`): the element goes back to how it
 was before it (`editedFrom`, kept beside each change), and a later change to
-the same element, made on top of it, goes too.
+the same element, made on top of it, goes too. Choosing another writing style
+from the summary is a change of the same kind (`withStyleChange`), undone
+the same way, and Update writes the opening again in it.
 
 **Going back.** "How it was set up" beside the story's title shows the same
 page with "Back to the story". Choosing another idea or changing it from
@@ -743,6 +746,60 @@ the passages' area; blocks, which give a part of a passage the style of what
 it is, do that better, so themes went (2026-10-30). An older setup's stored
 theme is read and ignored.
 
+### Writing styles
+
+Left to itself a model writes the same ornate prose for everything, so how a
+daydream reads is chosen apart from what happens in it
+(`src/lib/dream/styles.ts`). There are seven presets, each a short set of
+concrete instructions:
+
+| Preset | Suits |
+| ------ | ----- |
+| Plain and close (`plain`) | almost anything; the default |
+| Raw and filthy (`filthy`) | explicit daydreams about the sex itself; crude or degrading dynamics |
+| Lush and slow (`lush`) | slow burns, romance, sensual daydreams about anticipation |
+| Cold and clipped (`clipped`) | strict or cold dominance, clinical or procedural settings |
+| Light and teasing (`playful`) | flirtation, romantic comedy, bratty or playful dynamics |
+| Pulpy and breathless (`pulp`) | adventure, thrillers, heists, plot-driven romps |
+| Dark and heavy (`dark`) | horror, noir, captivity and menace |
+
+They follow the craft advice on prose that is too ornate: concrete nouns and
+strong verbs, little imagery and only fresh imagery, no atmosphere for its
+own sake, the failure modes named (stock phrases like "a shiver ran down"),
+and telling allowed where it gets from one moment to the next. `filthy` is
+the user's own prompt for explicit roleplay, with everything but its style
+and tone taken out (crude words over clinical ones, concrete physical detail
+over metaphor, bodies specific to the scene, the feel of two people sexting).
+
+**The build chooses** one, as `<style preset="…">notes</style>`, for the
+brief's tone and the chosen direction; what the user's preferences say about
+how things are written decides it over the tone. Notes adjust a preset for
+this daydream. When the brief calls for a particular style and none fits,
+the build writes `preset="own"` and describes the style itself. The build is
+given every preset in full, since it writes the opening in the one it
+chooses; a missing or unreadable tag is `plain`.
+
+**Every passage is written in it**: `<writing-style>` in the system prompt,
+the preset's instructions then the notes, and expanding a `<more>` gets it
+too. A setup from before there were styles is sent `plain`, which is what its
+menu shows.
+
+**The story can change it** with a footer line, `{"style": "dark", "notes":
+"…"}` or `{"style": "own", "notes": "…"}`, when the story has moved
+somewhere another style would serve better. Unlike telling notes, the change
+applies at once, with a notice saying so and an **Undo**; undoing makes the
+style before it the user's choice. A line naming no preset and no notes is
+dropped.
+
+**The user can choose another**: from the summary before Start (a change by
+hand, see "Changing what was made"), or from **Reading settings** while
+playing, where it applies from the next passage. A style the user chose is
+marked `by: 'user'`. Passages are told never to change it unless the user
+asks; only the prompt can tell whether they did, so code does not refuse a
+change, and every change can be undone. A rebuild is told to keep it, and
+keeps it (`keptStyle`) while the build keeps its preset; a different preset
+is the build following a change the user asked for.
+
 ## Variety (phase 4)
 
 Every source of randomness is code's, never the model's habits:
@@ -884,7 +941,8 @@ was answered.
 
 When the story's shape changes, a passage's footer may propose new telling
 notes (`{"telling": …}`). They are shown in a notice with "Use these" and
-"Keep as it is", and applied only if accepted.
+"Keep as it is", and applied only if accepted. A new writing style is applied
+at once instead, and can be undone (see "Writing styles").
 
 ## Research (phase 6)
 

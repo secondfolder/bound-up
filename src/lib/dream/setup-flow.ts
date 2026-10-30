@@ -19,6 +19,7 @@ import { drawNudges, type Nudge } from './nudges';
 import { pickDirection } from './pick';
 import { type Random, seededRandom } from './random';
 import type { BriefReading } from './reading';
+import { sameStyle, styleName, type WritingStyle } from './styles';
 
 export type SetupStep =
 	/** Step 1 has not been read yet, or must be read again. */
@@ -152,6 +153,11 @@ export function serializeBuild(build: DreamSetupBuild): string {
 		`<title>${escapeMarkup(build.title)}</title>`,
 		`<heat level="${build.heat}"/>`,
 		`<telling>\n${escapeMarkup(build.telling)}\n</telling>`,
+		...(build.style
+			? [
+					`<style preset="${build.style.preset}"${build.style.by === 'user' ? ' by="user"' : ''}>${escapeMarkup(build.style.notes)}</style>`
+				]
+			: []),
 		`<presentation view="${build.presentation.view}">${escapeMarkup(build.presentation.notes)}</presentation>`,
 		`<elements>\n${serializeElements(build.elements)}\n</elements>`
 	].join('\n\n');
@@ -215,9 +221,49 @@ export function withElementChange(setup: DreamSetup, changed: DreamElement): Dre
 }
 
 /**
+ * The writing style chosen by hand on the setup page (docs/dreams.md,
+ * "Writing styles"): kept at once, and noted like an element's change, so
+ * Update writes the opening again in it.
+ */
+export function withStyleChange(setup: DreamSetup, style: WritingStyle): DreamSetup {
+	const { build } = setup;
+	if (!build || sameStyle(build.style, style)) {
+		return setup;
+	}
+	const chosen: WritingStyle = { ...style, by: 'user' };
+	return {
+		...setup,
+		build: { ...build, style: chosen },
+		pendingEdits: [
+			...(setup.pendingEdits ?? []),
+			`The writing style is now ${styleName(chosen)}`
+		].slice(-24),
+		editedFrom: [...(setup.editedFrom ?? []), { kind: 'style' as const, style: build.style }].slice(
+			-24
+		)
+	};
+}
+
+type EditedFrom = NonNullable<DreamSetup['editedFrom']>[number];
+
+function isStyleEdit(
+	entry: EditedFrom | undefined
+): entry is Extract<EditedFrom, { kind: 'style' }> {
+	return entry !== undefined && 'kind' in entry;
+}
+
+/** Whether two edits change the same thing, so a later one was made on top of an earlier. */
+function sameTarget(a: EditedFrom | undefined, b: EditedFrom): boolean {
+	if (isStyleEdit(b)) {
+		return isStyleEdit(a);
+	}
+	return !isStyleEdit(a) && a?.id === b.id;
+}
+
+/**
  * Undoes a change made by hand (docs/dreams.md, "Changing what was made"):
- * the element goes back to how it was before it. A later change to the
- * same element was made on top of this one, so it goes too.
+ * the element, or the writing style, goes back to how it was before it. A
+ * later change to the same thing was made on top of this one, so it goes too.
  */
 export function withoutEdit(setup: DreamSetup, index: number): DreamSetup {
 	const edits = setup.pendingEdits ?? [];
@@ -227,13 +273,18 @@ export function withoutEdit(setup: DreamSetup, index: number): DreamSetup {
 	}
 	const keep = edits
 		.map((_, at) => at)
-		.filter((at) => at < index || setup.editedFrom?.[at]?.id !== before.id);
+		.filter((at) => at < index || !sameTarget(setup.editedFrom?.[at], before));
+	const build = isStyleEdit(before)
+		? { ...setup.build, style: before.style }
+		: {
+				...setup.build,
+				elements: setup.build.elements.map((element) =>
+					element.id === before.id ? before : element
+				)
+			};
 	return {
 		...setup,
-		build: {
-			...setup.build,
-			elements: setup.build.elements.map((element) => (element.id === before.id ? before : element))
-		},
+		build,
 		pendingEdits: keep.map((at) => edits[at] ?? '').filter(Boolean),
 		editedFrom: keep.map((at) => setup.editedFrom?.[at]).filter((entry) => entry !== undefined)
 	};
@@ -243,7 +294,7 @@ export function withoutEdit(setup: DreamSetup, index: number): DreamSetup {
  * Update: the changes made by hand go to the build as one change asked for,
  * which rebuilds from the build as changed, keeping what was changed and
  * following it through everything else (the telling notes, the others, the
- * opening).
+ * opening, written in the style chosen).
  */
 export function withEditsApplied(setup: DreamSetup): DreamSetup {
 	const edits = setup.pendingEdits ?? [];

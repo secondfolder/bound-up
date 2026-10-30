@@ -14,6 +14,7 @@ import type { Nudge } from './nudges';
 import type { BuildRequest, PassageRequest, ReadRequest } from './requests';
 import { chosenDirection, serializeBuild } from './setup-flow';
 import { type HistoryEntry, similarity } from './story';
+import { readStyle } from './styles';
 
 export type Worded = { limits: string[]; preferences: string[] };
 
@@ -147,6 +148,8 @@ export function passageRequestFor(
 		setup: {
 			heat: build.heat,
 			telling: build.telling,
+			// A build from before there were styles is written plainly, as its menu says.
+			style: build.style ?? readStyle(undefined, ''),
 			capabilities: passageCapabilities(Boolean(story.listening)),
 			elements: story.elements,
 			presentation: build.presentation,

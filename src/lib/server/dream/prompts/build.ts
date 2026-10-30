@@ -13,6 +13,7 @@ import { VIEWS } from '../../../dream/build';
 import { passageCapabilities } from '../../../dream/capabilities';
 import type { Nudge } from '../../../dream/nudges';
 import { OVERUSED_NAMES } from '../../../dream/repetition';
+import { presetList } from '../../../dream/styles';
 import {
 	amendmentParts,
 	bulletList,
@@ -61,6 +62,10 @@ Notes for whoever writes every passage: what this daydream is, its form, its rhy
 </telling>
 Form: when the brief asks for a form, every passage is written in it, and the telling notes say so, with how long a passage is. Vignettes, snippets or moments: each passage one short, self-contained moment of about 60 to 150 words, a new scene each time, joined by the brief's theme rather than a plot, never carrying on from the last unless the user asks. Without a form asked for, say in the telling notes what length suits this daydream.
 Pacing: when the brief explicitly asks for a kink, a sexual act or a particular scene, get to it soon, in the opening or the passage after: the act itself, written as what it is, rather than hints of it or a build-up held back as a payoff. Build up to it only when something says to: the brief or the user's preferences ask for a slow burn, a tease or a build-up, or the chosen direction is about the anticipation itself. Say which in the telling notes.
+
+<style preset="…">adjustments for this daydream, if any</style>
+How the prose reads, apart from what happens: one of the styles below, the one that best suits the brief's tone and the chosen direction. What the user's preferences say about how things are written decides it over the brief's tone. Notes on a preset adjust it for this daydream, in a sentence or two; leave them out when it fits as it is. When the brief calls for a particular style and none of these fits, write preset="own" and describe the style in a few concrete sentences: sentence length, vocabulary, how much imagery, point of view on the action, what to avoid. Write the opening in the style chosen.
+${presetList({ full: true })}
 
 <presentation view="…">a sentence on what passages should look like</presentation>
 view: ${VIEWS.join(', ')}. scroll is ordinary reading; tap shows one beat at a time, for slow, heavy scenes; texts is for a daydream told as messages; monologue is one voice in short lines.
@@ -124,7 +129,7 @@ export function buildMessages(input: BuildInput): ModelMessage[] {
 	}
 	if (input.previous) {
 		parts.push(
-			`The daydream was already built as below. Build it again with the changes that follow, keeping everything they do not touch, and write a new opening.\n${wrap('previous', input.previous)}`
+			`The daydream was already built as below. Build it again with the changes that follow, keeping everything they do not touch, and write a new opening. A style marked by="user" is the user's choice: keep it exactly unless the changes ask for another.\n${wrap('previous', input.previous)}`
 		);
 	}
 	parts.push(...amendmentParts(input.amendments ?? []));

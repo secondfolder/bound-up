@@ -111,4 +111,28 @@ describe('history', () => {
 		expect(after.at(-1)?.content).toContain('slower');
 		expect(before[0]?.content).not.toContain('<elements>');
 	});
+
+	it('sends the writing style with the setup, and lists the others to change to', () => {
+		const [system] = passageMessages({
+			setup: {
+				heat: 'explicit',
+				telling: 'Reports.',
+				style: { preset: 'filthy', notes: 'Lots of dirty talk.', by: 'user' },
+				capabilities: [],
+				elements: [],
+				presentation: { view: 'scroll', notes: '' },
+				musts: [],
+				research: ''
+			},
+			limits: [],
+			preferences: [],
+			history: [{ passage: 'One.', turn: { kind: 'continue' } }],
+			repeated: []
+		});
+		expect(system?.content).toMatch(
+			/<writing-style>\nWrite like two people sexting[\s\S]*For this daydream: Lots of dirty talk\.\nThe user chose this style\.\n<\/writing-style>/
+		);
+		expect(system?.content).toContain('- dark (Dark and heavy)');
+		expect(system?.content).toContain('Never change a style the user chose unless they ask');
+	});
 });

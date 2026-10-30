@@ -1,5 +1,5 @@
 /**
- * The build's reply: title, telling notes, presentation, capabilities,
+ * The build's reply: title, telling notes, writing style, presentation, capabilities,
  * elements, and the opening passage streamed after them (docs/dreams.md,
  * "Building the daydream").
  *
@@ -18,6 +18,7 @@ import {
 	plainText,
 	tagText
 } from './markup';
+import { readStyle, type WritingStyle } from './styles';
 
 export const VIEWS = ['scroll', 'tap', 'texts', 'monologue'] as const;
 export type View = (typeof VIEWS)[number];
@@ -41,6 +42,8 @@ export type Build = {
 	title: string;
 	heat: Heat;
 	telling: string;
+	/** How its prose reads (docs/dreams.md, "Writing styles"). */
+	style: WritingStyle;
 	presentation: Presentation;
 	capabilities: Capability[];
 	elements: DreamElement[];
@@ -65,6 +68,11 @@ function readPresentation(nodes: readonly MarkupNode[]): Presentation {
 	};
 }
 
+function readStyleTag(nodes: readonly MarkupNode[]): WritingStyle {
+	const tag = findTag(nodes, 'style');
+	return readStyle(tag?.attrs.preset, tag ? plainText(tag.children) : '');
+}
+
 export function parseBuild(text: string, options: { final?: boolean } = {}): Build {
 	const nodes = parseMarkup(text, { final: options.final ?? true, rawTags: BUILD_RAW_TAGS });
 	const telling = tagText(nodes, 'telling');
@@ -74,6 +82,7 @@ export function parseBuild(text: string, options: { final?: boolean } = {}): Bui
 		heat: isHeat(heat) ? heat : 'steamy',
 		// Too long to send with every passage: keep it whole, but only up to the cap.
 		telling: telling.length > MAX_TELLING_CHARS ? telling.slice(0, MAX_TELLING_CHARS) : telling,
+		style: readStyleTag(nodes),
 		presentation: readPresentation(nodes),
 		capabilities: parseCapabilities(tagText(nodes, 'capabilities')),
 		elements: parseElements(findTag(nodes, 'elements')?.children ?? []),

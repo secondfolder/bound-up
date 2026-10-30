@@ -25,6 +25,7 @@ const READING = `<musts>
 
 const BUILD = `<title>Week by week</title>
 <telling>Ines Varga's weekly reports on the user.</telling>
+<style preset="clipped">Reports in the passive voice.</style>
 <presentation view="scroll" theme="paper">Reports as document blocks.</presentation>
 <capabilities>blocks, stats, reveals, teleportation</capabilities>
 <elements>
@@ -87,6 +88,20 @@ describe('parseBuild', () => {
 		// A theme a model still writes is ignored: themes are gone.
 		expect(build.presentation).toEqual({ view: 'scroll', notes: 'Reports as document blocks.' });
 		expect(build.capabilities).toEqual(['blocks', 'stats', 'reveals']);
+	});
+
+	it('reads the writing style, defaulting to plain without one', () => {
+		expect(build.style).toEqual({
+			preset: 'clipped',
+			notes: 'Reports in the passive voice.',
+			by: 'model'
+		});
+		expect(parseBuild('<title>x</title>').style).toEqual({
+			preset: 'plain',
+			notes: '',
+			by: 'model'
+		});
+		expect(parseBuild('<style preset="own">Short diary entries.</style>').style.preset).toBe('own');
 	});
 
 	it('reads elements of any type, with hidden fields and stats', () => {
@@ -190,6 +205,22 @@ describe('parseFooter', () => {
 		expect(footer.entries.map((entry) => entry.kind)).toEqual(['next', 'pref', 'new', 'set']);
 		expect(footer.dropped).toBe(2);
 		expect(nextNote(footer)).toBe('She tests the first position.');
+	});
+
+	it('reads a change of writing style, and drops one that names nothing', () => {
+		const footer = parseFooter(
+			[
+				'{"style": "dark", "notes": "Heavier now."}',
+				'{"style": "own", "notes": "Clipped radio chatter."}',
+				'{"style": "own"}',
+				'{"style": "gothic"}'
+			].join('\n')
+		);
+		expect(footer.entries).toEqual([
+			{ kind: 'style', style: { preset: 'dark', notes: 'Heavier now.', by: 'model' } },
+			{ kind: 'style', style: { preset: 'own', notes: 'Clipped radio chatter.', by: 'model' } }
+		]);
+		expect(footer.dropped).toBe(2);
 	});
 
 	it('reads the suggestions, each once, and drops a line of none', () => {

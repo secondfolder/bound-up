@@ -24,6 +24,7 @@ import { MAX_DESIGNS } from './designs';
 import { MAX_ELEMENTS } from './elements';
 import { READINGS } from './readings';
 import { MAX_SPOKEN_CHARS } from './speech';
+import { writingStyleSchema } from './styles';
 
 const required = (max: number) => z.string().trim().min(1).max(max);
 const strings = (max: number, count: number) => z.array(required(max)).max(count);
@@ -107,6 +108,7 @@ const userTurnSchema = z.discriminatedUnion('kind', [
 const setupSchema = z.object({
 	heat: z.enum(HEAT_LEVELS),
 	telling: z.string().max(MAX_TELLING_CHARS),
+	style: writingStyleSchema.optional(),
 	capabilities: z.array(z.enum(CAPABILITIES)),
 	elements: z.array(dreamElementSchema).max(MAX_ELEMENTS),
 	presentation: z.object({
@@ -149,6 +151,7 @@ export type PassageRequest = z.output<typeof passageRequestSchema>;
 
 const shared = {
 	telling: z.string().max(MAX_TELLING_CHARS),
+	style: writingStyleSchema.optional(),
 	limits
 };
 

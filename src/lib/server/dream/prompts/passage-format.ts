@@ -8,6 +8,7 @@
  */
 
 import type { Capability } from '../../../dream/capabilities';
+import { presetList } from '../../../dream/styles';
 import { CAPABILITY_BLOCKS } from './capabilities';
 
 const ALWAYS = `How to write a passage:
@@ -27,7 +28,9 @@ The suggestions are offered to the user as replies they can tap, so write each a
 Optionally, also:
 {"new": "character", "id": "short-id", "name": "Their name", "seed": "a line on who they are"} for anyone or anything new who should have a card;
 {"pref": "what the user seems to want", "scope": "story", "firmness": "leaning", "why": "what they said"} when the user says something about what they want;
-{"telling": "replacement telling notes"} only when the story has clearly become a different kind of thing.
+{"telling": "replacement telling notes"} only when the story has clearly become a different kind of thing;
+{"style": "a style's id", "notes": "adjustments, if any"}, or {"style": "own", "notes": "the style, described"}, to change how passages are written, when the story has moved somewhere another style would clearly serve better. Never change a style the user chose unless they ask, and then do it. The styles:
+${presetList()}
 The next passage reads your "next" line; it plans one step ahead, never a plot.`;
 
 export function passageFormat(capabilities: readonly Capability[]): string {

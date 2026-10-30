@@ -14,6 +14,7 @@ import { nextNote, parseFooter } from '../../../dream/footer';
 import { findTag, parseMarkup, plainText } from '../../../dream/markup';
 import { explicitOoc, type Reading, TURN_TAGS } from '../../../dream/readings';
 import type { UserTurn } from '../../../dream/story';
+import { styleInstructions, type WritingStyle } from '../../../dream/styles';
 import { bulletList, CORE_RULES, limitsSection, type ModelMessage, wrap } from './core';
 import { passageFormat } from './passage-format';
 
@@ -21,6 +22,8 @@ export type PassageInput = {
 	setup: Pick<Build, 'heat' | 'telling' | 'capabilities' | 'elements' | 'presentation'> & {
 		musts: readonly string[];
 		research: string;
+		/** How its prose reads (docs/dreams.md, "Writing styles"); absent before there were styles. */
+		style?: WritingStyle;
 		/** Blocks designed for this daydream (docs/dreams.md, "Designed blocks"). */
 		designs?: readonly { kind: string; description: string; slots: readonly string[] }[];
 	};
@@ -168,7 +171,9 @@ export function describeTurn(turn: UserTurn): string {
 
 /**
  * What stays the same from passage to passage, in the system prompt: the
- * telling notes, how it is shown, the musts, the research. Everything that
+ * telling notes, the writing style, how it is shown, the musts, the research.
+ * The style can change as the story goes, but seldom, so it costs the cache
+ * one passage when it does. Everything that
  * changes as the story goes is in `stateSection`, after the history, so the
  * opening of every passage's prompt is the same as the last one's and the
  * provider's cache serves it (docs/dreams.md, "Prompt caching").
@@ -176,6 +181,9 @@ export function describeTurn(turn: UserTurn): string {
 function setupSection(input: PassageInput): string {
 	const { setup } = input;
 	const parts = [wrap('telling', setup.telling || 'No notes: follow the brief.')];
+	if (setup.style) {
+		parts.push(wrap('writing-style', styleInstructions(setup.style)));
+	}
 	parts.push(
 		`How sexual it is: ${setup.heat}. Presentation: ${setup.presentation.view} view. ${setup.presentation.notes}`.trim()
 	);

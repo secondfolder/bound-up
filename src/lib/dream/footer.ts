@@ -9,6 +9,7 @@
  */
 
 import { z } from 'zod';
+import { MAX_STYLE_NOTES_CHARS, OWN_STYLE, readStyle, type WritingStyle } from './styles';
 
 const ID = /^[\w-]{1,40}$/;
 /** At most this many suggestions under a passage. */
@@ -36,6 +37,12 @@ const setLine = z.object({
 
 const tellingLine = z.object({ telling: z.string().trim().min(1).max(2000) });
 
+/** A new writing style (docs/dreams.md, "Writing styles"): a preset's id, or `own` with notes. */
+const styleLine = z.object({
+	style: z.string().trim().min(1).max(40),
+	notes: z.string().trim().max(MAX_STYLE_NOTES_CHARS).default('')
+});
+
 /** Things the user might write next, offered under the newest passage (docs/dreams.md, "Suggestions"). */
 const suggestLine = z.object({
 	suggest: z.array(z.string().trim().min(1).max(200)).min(1).max(MAX_SUGGESTIONS)
@@ -47,6 +54,7 @@ export type FooterEntry =
 	| ({ kind: 'pref' } & z.output<typeof prefLine>)
 	| ({ kind: 'set' } & z.output<typeof setLine>)
 	| ({ kind: 'telling' } & z.output<typeof tellingLine>)
+	| { kind: 'style'; style: WritingStyle }
 	| ({ kind: 'suggest' } & z.output<typeof suggestLine>);
 
 export type Footer = { entries: FooterEntry[]; dropped: number };
@@ -78,6 +86,16 @@ function readLine(value: unknown): FooterEntry | null {
 	if ('telling' in value) {
 		const parsed = tellingLine.safeParse(value);
 		return parsed.success ? { kind: 'telling', ...parsed.data } : null;
+	}
+	if ('style' in value) {
+		const parsed = styleLine.safeParse(value);
+		if (!parsed.success) {
+			return null;
+		}
+		// A preset that does not exist, with nothing to say what it meant, is no change.
+		const style = readStyle(parsed.data.style, parsed.data.notes);
+		const named = parsed.data.style.toLowerCase();
+		return style.preset === named || style.preset === OWN_STYLE ? { kind: 'style', style } : null;
 	}
 	return null;
 }

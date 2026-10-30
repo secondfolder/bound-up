@@ -349,6 +349,57 @@ test.describe('daydreams, the new engine', () => {
 		await play(page, 'The Keeper (changed)');
 	});
 
+	test('the writing style is chosen before Start, kept through Update, and changed by the story', async ({
+		page
+	}) => {
+		await dreamer(page);
+		await start(page, 'A quiet evening');
+		const ready = page.getByRole('region', { name: 'The Keeper' });
+		await expect(ready.locator('wa-button', { hasText: 'Lush and slow' })).toBeVisible();
+
+		// A style chosen by hand is a change, and can be undone.
+		await ready.locator('wa-button', { hasText: 'Lush and slow' }).click();
+		await ready.getByRole('menuitemcheckbox', { name: /Cold and clipped/ }).click();
+		await expect(ready).toContainText('The writing style is now Cold and clipped');
+		await ready.getByRole('button', { name: /^Undo/ }).click();
+		await expect(ready).not.toContainText('Changed by hand');
+		await expect(ready.locator('wa-button', { hasText: 'Lush and slow' })).toBeVisible();
+
+		// Chosen again and followed through, the rebuild keeps it.
+		await ready.locator('wa-button', { hasText: 'Lush and slow' }).click();
+		await ready.getByRole('menuitemcheckbox', { name: /Cold and clipped/ }).click();
+		await ready.getByRole('button', { name: 'Update', exact: true }).click();
+		const rebuilt = page.getByRole('region', { name: 'The Keeper (changed)' });
+		await expect(rebuilt.locator('wa-button', { hasText: 'Cold and clipped' })).toBeVisible();
+		await play(page, 'The Keeper (changed)');
+		await saved(page);
+
+		// Every passage is asked for in it; the story can change it, and that can be undone.
+		await box(page, 'Your turn').fill('[style]');
+		await clickWaButton(page, 'Send');
+		await saved(page);
+		await expect(page.locator('li.passage').last()).toContainText('Written as: Write tersely');
+		const notice = page.locator('.notice', { hasText: 'The story changed how it is written' });
+		await expect(notice).toContainText('Dark and heavy');
+		await notice.getByRole('button', { name: 'Undo' }).click();
+		await expect(notice).toHaveCount(0);
+		await page.getByRole('button', { name: 'Reading settings' }).click();
+		await expect(page.getByRole('menuitemcheckbox', { name: 'Cold and clipped' })).toHaveAttribute(
+			'aria-checked',
+			'true'
+		);
+
+		// Chosen from the reading settings, it applies from the next passage.
+		await page.getByRole('menuitemcheckbox', { name: 'Raw and filthy' }).click();
+		await saved(page);
+		await box(page, 'Your turn').fill('[style] again');
+		await clickWaButton(page, 'Send');
+		await saved(page);
+		await expect(page.locator('li.passage').last()).toContainText(
+			'Written as: Write like two people sexting'
+		);
+	});
+
 	test('pulling the story up past its end, and letting go, is Continue', async ({ page }) => {
 		await dreamer(page);
 		await start(page, 'A quiet evening');

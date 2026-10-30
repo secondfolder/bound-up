@@ -1,10 +1,12 @@
 <script lang="ts">
+	import { OWN_STYLE, styleName } from '$lib/dream/styles';
 	import type { DreamSession } from '$lib/dream-browser/session.svelte';
 
 	/**
 	 * What the daydream just remembered or wants to change, with what the user
 	 * can do about it (docs/dreams.md, "Preferences"): nothing is remembered
-	 * silently, and nothing about how it is told changes without a yes. Shown
+	 * silently, and nothing about how it is told changes without a yes, or,
+	 * for the writing style, which the story may change itself, an undo. Shown
 	 * in place rather than as a floating toast, so its buttons stay put and a
 	 * screen reader hears it as it arrives.
 	 */
@@ -26,6 +28,15 @@
 						>
 					{/if}
 					<wa-button size="s" appearance="plain" onclick={() => session.forget(notice.preference.id)}>Undo</wa-button>
+					<wa-button size="s" appearance="plain" onclick={() => session.dismiss(notice.id)}>OK</wa-button>
+				</div>
+			{:else if notice.kind === 'style'}
+				<p>The story changed how it is written: <strong>{styleName(notice.style)}</strong>.</p>
+				{#if notice.style.preset === OWN_STYLE && notice.style.notes}
+					<blockquote>{notice.style.notes}</blockquote>
+				{/if}
+				<div class="actions">
+					<wa-button size="s" appearance="plain" onclick={() => session.undoStyle(notice.id)}>Undo</wa-button>
 					<wa-button size="s" appearance="plain" onclick={() => session.dismiss(notice.id)}>OK</wa-button>
 				</div>
 			{:else}

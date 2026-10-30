@@ -9,10 +9,11 @@
  */
 
 import { type DreamElement, serializeElements } from '../../../dream/elements';
+import { styleInstructions, type WritingStyle } from '../../../dream/styles';
 import { CORE_RULES, limitsSection, type ModelMessage, wrap } from './core';
 import { historyPassage } from './passage';
 
-type Shared = { telling: string; limits: readonly string[] };
+type Shared = { telling: string; style?: WritingStyle | undefined; limits: readonly string[] };
 
 function system(input: Shared, instructions: string): ModelMessage {
 	return {
@@ -21,6 +22,7 @@ function system(input: Shared, instructions: string): ModelMessage {
 			CORE_RULES,
 			limitsSection(input.limits),
 			wrap('telling', input.telling || 'No notes.'),
+			...(input.style ? [wrap('writing-style', styleInstructions(input.style))] : []),
 			instructions
 		].join('\n\n')
 	};

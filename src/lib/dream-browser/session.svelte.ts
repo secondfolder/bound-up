@@ -48,7 +48,8 @@ import {
 	withEditsApplied,
 	withElementChange,
 	withoutEdit,
-	withReading
+	withReading,
+	withStyleChange
 } from '$lib/dream/setup-flow';
 import type { LiveStep, ResearchMode } from '$lib/dream/setup-progress';
 import {
@@ -64,6 +65,7 @@ import {
 	type UserTurn,
 	userTurnOf
 } from '$lib/dream/story';
+import { keptStyle, readStyle, sameStyle, type WritingStyle } from '$lib/dream/styles';
 import { indexTree, latestLeafUnder, versionsOf } from '$lib/dream/tree';
 import type { DreamTreeNodeView, DreamView } from '$lib/dream/views';
 import {
@@ -165,8 +167,9 @@ export type SessionOptions = {
 /**
  * Something the page tells the user about, with what they can do about it
  * (docs/dreams.md, "Preferences"): a preference just saved, which can be
- * made general or undone, or new telling notes the story proposes, which
- * apply only if accepted.
+ * made general or undone, new telling notes the story proposes, which
+ * apply only if accepted, or a new writing style it chose, which applies at
+ * once and can be undone.
  */
 type DreamNoticeSaved = {
 	id: string;
@@ -175,7 +178,14 @@ type DreamNoticeSaved = {
 	scope: 'story' | 'general';
 };
 type DreamNoticeTelling = { id: string; kind: 'telling'; text: string };
-export type DreamNotice = DreamNoticeSaved | DreamNoticeTelling;
+/** The story changed its writing style, already in force, which can be undone. */
+type DreamNoticeStyle = {
+	id: string;
+	kind: 'style';
+	style: WritingStyle;
+	previous: WritingStyle | undefined;
+};
+export type DreamNotice = DreamNoticeSaved | DreamNoticeTelling | DreamNoticeStyle;
 
 /** What asked for a passage, from what it is written after. */
 function requestFor(
@@ -541,7 +551,8 @@ export class DreamSession {
 			{ signal, ...watch.options }
 		);
 		watch.keep(`setup:${buildId}`, reply);
-		const { passage, ...build } = parseBuild(reply.text);
+		const { passage, ...built } = parseBuild(reply.text);
+		const build = { ...built, style: keptStyle(this.#previousBuild?.style, built.style) };
 		if (!(build.title && passage) || reply.ended === 'refused') {
 			throw new DreamRequestError(
 				'The daydream could not be written just now. Try again, or change the brief.',
@@ -675,7 +686,12 @@ export class DreamSession {
 
 	// ── preferences ───────────────────────────────────────────────────────────
 
-	#notify(notice: Omit<DreamNoticeSaved, 'id'> | Omit<DreamNoticeTelling, 'id'>) {
+	#notify(
+		notice:
+			| Omit<DreamNoticeSaved, 'id'>
+			| Omit<DreamNoticeTelling, 'id'>
+			| Omit<DreamNoticeStyle, 'id'>
+	) {
 		this.notices = [...this.notices, { ...notice, id: crypto.randomUUID() } as DreamNotice];
 	}
 
@@ -767,16 +783,19 @@ export class DreamSession {
 	}
 
 	/**
-	 * What a new passage's footer says about the user: a preference the model
-	 * noticed, kept for this story only and shown so it can be made general or
-	 * undone; and new telling notes, shown to be accepted or not.
+	 * What a new passage's footer says: a preference the model noticed, kept
+	 * for this story only and shown so it can be made general or undone; new
+	 * telling notes, shown to be accepted or not; and a new writing style,
+	 * which the story may choose for itself (docs/dreams.md, "Writing
+	 * styles"). One the user chose it is told to change only when they ask,
+	 * which only the prompt can tell, so every change can be undone.
 	 */
 	async #fromFooter(source: string): Promise<void> {
 		const { setup } = this;
 		if (!setup?.build) {
 			return;
 		}
-		let { preferences } = setup;
+		let { preferences, build } = setup;
 		for (const line of footerOf(source).entries) {
 			if (line.kind === 'pref') {
 				const preference = preferenceFromFooter(line, this.#random);
@@ -788,13 +807,50 @@ export class DreamSession {
 				} else {
 					preferences = preferences.slice(0, before);
 				}
-			} else if (line.kind === 'telling' && line.telling !== setup.build.telling) {
+			} else if (line.kind === 'telling' && line.telling !== build.telling) {
 				this.#notify({ kind: 'telling', text: line.telling });
+			} else if (line.kind === 'style' && !sameStyle(build.style, line.style)) {
+				this.#notify({ kind: 'style', style: line.style, previous: build.style });
+				build = { ...build, style: line.style };
 			}
 		}
-		if (preferences !== setup.preferences) {
-			await this.#saveSetup({ ...setup, preferences });
+		if (preferences !== setup.preferences || build !== setup.build) {
+			await this.#saveSetup({ ...setup, preferences, build });
 		}
+	}
+
+	/**
+	 * Undoes a style the story chose: the one before it comes back, now the
+	 * user's choice, so the story does not change it again unasked.
+	 */
+	undoStyle(noticeId: string): Promise<void> {
+		const notice = this.notices.find((entry) => entry.id === noticeId);
+		const { setup } = this;
+		const build = setup?.build;
+		if (!(notice?.kind === 'style' && setup && build)) {
+			return Promise.resolve();
+		}
+		const style: WritingStyle = { ...(notice.previous ?? readStyle(undefined, '')), by: 'user' };
+		return this.#attempt(async () => {
+			await this.#saveSetup({ ...setup, build: { ...build, style } });
+			this.dismiss(noticeId);
+		});
+	}
+
+	/**
+	 * The writing style chosen by the user. Before Start it is a change made
+	 * by hand, which Update writes the opening again in; once playing, it
+	 * applies from the next passage.
+	 */
+	setStyle(style: WritingStyle): Promise<void> {
+		const { setup } = this;
+		if (!setup?.build || sameStyle(setup.build.style, style)) {
+			return Promise.resolve();
+		}
+		const next = this.awaitingStart
+			? withStyleChange(setup, style)
+			: { ...setup, build: { ...setup.build, style: { ...style, by: 'user' as const } } };
+		return this.#attempt(() => this.#saveSetup(next));
 	}
 
 	/** Chooses a direction, stopping a build of another. */
@@ -1546,6 +1602,7 @@ export class DreamSession {
 				await fill({
 					kind: 'more',
 					telling: setup.build.telling,
+					...(setup.build.style ? { style: setup.build.style } : {}),
 					limits: this.worded.limits,
 					passage: passage.source,
 					phrase
