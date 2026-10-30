@@ -42,7 +42,7 @@ Reply with these parts, in this order, and nothing else:
 <musts>
 - each thing the brief explicitly requires, one per line, keeping exact numbers and words
 </musts>
-Only what the brief actually says, never what you would add. Every direction must meet every must.
+Only what the brief actually says, never what you would add. A form or a length the brief asks for is a must too ("vignettes", "short snippets", "a list", "one long scene"). Every direction must meet every must.
 
 <research needed="no"/> when the brief needs nothing looked up. When it links pages or asks you to research something, write <research needed="yes"> and, inside it, your analysis of what you found: what each page was, the themes, tropes and dynamics, and the exact wording of phrases where the wording is the point. It is for whoever writes the daydream, so keep it in full.
 

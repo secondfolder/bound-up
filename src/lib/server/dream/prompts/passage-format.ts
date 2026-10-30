@@ -13,6 +13,7 @@ import { CAPABILITY_BLOCKS } from './capabilities';
 const ALWAYS = `How to write a passage:
 - Plain prose, with **bold** and *italics* as you like. Code links characters' names to their cards by itself, so just write names; only for a reference code could not match (a description instead of a name) write [[id|the words]].
 - Speech: <say who="id">"Line."</say>, with the speaker's element id, so their words are drawn in their colour. Narration stays outside it.
+- Length: as long as the telling notes say. Without a word on it, a few short paragraphs, ending where the user would want to act.
 - <beat/> marks a pause between beats. Some readers see one beat at a time, so put one wherever a reader would naturally stop for a moment.
 - Write only the tags described here. Anything else is shown as plain text.`;
 

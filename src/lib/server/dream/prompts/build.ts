@@ -54,12 +54,13 @@ Reply with these parts, in this order:
 <title>a short name for this daydream</title>
 
 <heat level="none|suggestive|steamy|explicit"/>
-How sexual it is. Read it from the brief and the user's preferences; if they do not say, choose what the brief most plausibly wants.
+How sexual it is. Read it from the brief and the user's preferences; if they do not say, choose what the brief most plausibly wants. A brief that names a sexual kink or act is explicit unless it says otherwise.
 
 <telling>
 Notes for whoever writes every passage: what this daydream is, its form, its rhythm, how the user takes part, what to avoid. Under 250 words. Write what would make this daydream itself, not general advice about writing.
 </telling>
-Pacing: when the brief explicitly asks for a kink, a sexual act or a particular scene, get to it soon, in the opening or the passage after, rather than holding it back as a payoff. Build up to it only when something says to: the brief or the user's preferences ask for a slow burn, a tease or a build-up, or the chosen direction is about the anticipation itself. Say which in the telling notes.
+Form: when the brief asks for a form, every passage is written in it, and the telling notes say so, with how long a passage is. Vignettes, snippets or moments: each passage one short, self-contained moment of about 60 to 150 words, a new scene each time, joined by the brief's theme rather than a plot, never carrying on from the last unless the user asks. Without a form asked for, say in the telling notes what length suits this daydream.
+Pacing: when the brief explicitly asks for a kink, a sexual act or a particular scene, get to it soon, in the opening or the passage after: the act itself, written as what it is, rather than hints of it or a build-up held back as a payoff. Build up to it only when something says to: the brief or the user's preferences ask for a slow burn, a tease or a build-up, or the chosen direction is about the anticipation itself. Say which in the telling notes.
 
 <presentation view="…" theme="…">a sentence on what passages should look like</presentation>
 view: ${VIEWS.join(', ')}. scroll is ordinary reading; tap shows one beat at a time, for slow, heavy scenes; texts is for a daydream told as messages; monologue is one voice in short lines.

@@ -92,10 +92,22 @@ its type it is ("Second Pressure"; just "Pressure" when it is the only one).
 Unnamed ones used to be "pressure 5", the type and its place in the list.
 
 **Pacing.** A brief that explicitly asks for a kink, a sexual act or a
-particular scene gets to it in the opening or the passage after, rather than
-holding it back as a payoff, unless the brief, the user's preferences or the
-chosen direction call for a build-up; the build says which in the telling
-notes (`prompts/build.ts`).
+particular scene gets to it in the opening or the passage after, the act
+itself rather than hints of it, unless the brief, the user's preferences or
+the chosen direction call for a build-up; the build says which in the telling
+notes, and a brief naming a sexual kink or act is explicit unless it says
+otherwise (`prompts/build.ts`).
+
+**Form and length.** A form or a length the brief asks for is one of its
+musts ("vignettes", "a list", "one long scene"). The build writes it into the
+telling notes with how long a passage is, and every passage keeps to that
+length (a few short paragraphs when nothing is said). Vignettes, snippets or
+moments are each one self-contained moment of about 60 to 150 words, a new
+scene each time, joined by the theme rather than a plot. Measured on the
+bench (`free-use-vignettes`, a user's brief that had come back as one long
+story, 2026-10-30): with Continue, each passage became its own moment of
+110 to 160 words; with a player acting inside the scene, the model carries
+that scene on, which is the user asking it to.
 
 ## The pipeline, as the prompts have it
 

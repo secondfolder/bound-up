@@ -86,6 +86,16 @@ function parseJson(line: string): unknown {
 	try {
 		return JSON.parse(line);
 	} catch {
+		// A line missing only its closing brace, which models leave off a
+		// line ending in a list (seen on GLM, 2026-10-30), is mended rather
+		// than lost; anything else that will not parse is dropped.
+		if (line.startsWith('{') && !line.endsWith('}')) {
+			try {
+				return JSON.parse(`${line}}`);
+			} catch {
+				return null;
+			}
+		}
 		return null;
 	}
 }

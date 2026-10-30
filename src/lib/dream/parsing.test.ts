@@ -200,6 +200,10 @@ describe('parseFooter', () => {
 			['{"suggest": ["I kneel.", "I stay standing.", "I kneel."]}', '{"suggest": []}'].join('\n')
 		);
 		expect(suggestionsIn(footer)).toEqual(['I kneel.', 'I stay standing.']);
+		expect(suggestionsIn(parseFooter('{"suggest": ["Closer.", "Not yet."]'))).toEqual([
+			'Closer.',
+			'Not yet.'
+		]);
 		expect(footer.dropped).toBe(1);
 	});
 });

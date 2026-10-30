@@ -12,7 +12,7 @@ import { allowedTags } from '../../../dream/capabilities';
 import { serializeElements } from '../../../dream/elements';
 import { nextNote, parseFooter } from '../../../dream/footer';
 import { findTag, parseMarkup, plainText } from '../../../dream/markup';
-import { explicitOoc, type Reading } from '../../../dream/readings';
+import { explicitOoc, type Reading, TURN_TAGS } from '../../../dream/readings';
 import type { UserTurn } from '../../../dream/story';
 import { bulletList, CORE_RULES, limitsSection, type ModelMessage, wrap } from './core';
 import { passageFormat } from './passage-format';
@@ -57,9 +57,6 @@ const FOOTER_TAG = /<after>[\s\S]*?(?:<\/after>|$)/;
 
 const TAG = /<\/?(?<name>[a-z][\w-]*)\b[^>]*>/gi;
 
-/** How a turn was read, and the turn written out: kept in every passage's history. */
-const TURN_TAGS = new Set(['reading', 'yours']);
-
 /**
  * How to read the user's words (docs/dreams.md, "How a turn is read"),
  * from the first engine's `READING`. Said first in the reply, before
@@ -67,10 +64,10 @@ const TURN_TAGS = new Set(['reading', 'yours']);
  * passage had already acted on.
  */
 const READING = `The user wrote words this turn. Start your reply by saying how you read them, as <reading as="…"/>, before anything else:
-- action: something they say or do in the story. Write what follows from it.
+- action: something they say or do in the story. Write what follows from it. Anything they write about what they themselves do, say or feel is an action, however much detail and description it has, in the first person or not.
 - direction: a request about where the story should go ("make it slower", "more of her"). Take the story that way; their character does nothing they did not do.
 - instruction: what their own turn should be, said as an instruction ("tell her I'm leaving"). First write their turn out, as <yours>…</yours>: in the first person, as they would have written it, doing exactly what they asked and nothing more. Then write what follows from it.
-- story: part of the story itself, written by them. Carry on from it as if you had written it.
+- story: they wrote the story beyond their own part, as its author: what others do, or what happens next. Carry on from it as if you had written it.
 - ooc: they stepped out of the story to talk to you. Answer briefly, out of the story, and carry the story on only if they ask you to.
 If the user chose how their words are meant, read them that way.`;
 

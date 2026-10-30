@@ -49,6 +49,13 @@ export const BENCH_BRIEFS: readonly BenchBrief[] = [
 		expect: { spread: [3, 7], elements: [2, 5] }
 	},
 	{
+		id: 'free-use-vignettes',
+		// As a user wrote it: it once came back as one long continuous story.
+		brief: 'give me vignettes from a free use dynamic',
+		tags: ['form'],
+		expect: { spread: [3, 7], elements: [0, 4] }
+	},
+	{
 		id: 'texts',
 		brief: "texts from my dom while I'm at work",
 		tags: ['form'],

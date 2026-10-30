@@ -11,6 +11,7 @@ import { allowedTags } from '../../../dream/capabilities';
 import { parseFooter } from '../../../dream/footer';
 import { findTag, findTags, parseMarkup, plainText, tagNames } from '../../../dream/markup';
 import type { BriefReading } from '../../../dream/reading';
+import { TURN_TAGS } from '../../../dream/readings';
 import {
 	CLICHES,
 	countOccurrences,
@@ -98,7 +99,9 @@ function buildChecks({ brief, build }: CheckInput): CheckResult[] {
 function passageChecks(build: Build | null, source: string, index: number): CheckResult[] {
 	const nodes = parseMarkup(source, { final: true });
 	const allowed = allowedTags(build?.capabilities ?? []);
-	const unknown = [...tagNames(nodes)].filter((name) => !allowed.has(name));
+	const unknown = [...tagNames(nodes)].filter(
+		(name) => !(allowed.has(name) || TURN_TAGS.has(name))
+	);
 	const footerTag = findTag(nodes, 'after');
 	const footer = footerTag ? parseFooter(plainText(footerTag.children)) : null;
 	const asks = findTags(nodes, 'ask').length;

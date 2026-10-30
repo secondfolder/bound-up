@@ -22,6 +22,9 @@ export function isReading(value: unknown): value is Reading {
 	return typeof value === 'string' && (READINGS as readonly string[]).includes(value);
 }
 
+/** How a turn was read, and the turn written out: tags any passage may start with. */
+export const TURN_TAGS: ReadonlySet<string> = new Set(['reading', 'yours']);
+
 /** Each reading as the user chooses it ("Read it differently"). */
 export const READING_CHOICES: Readonly<Record<Reading, string>> = {
 	action: 'Something I say or do',
