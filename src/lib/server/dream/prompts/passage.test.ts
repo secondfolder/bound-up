@@ -19,7 +19,9 @@ describe('describeTurn', () => {
 
 	it('is Continue only when nothing was chosen or filled in', () => {
 		expect(describeTurn({ kind: 'continue' })).toContain('pressed Continue');
-		expect(describeTurn({ kind: 'continue' })).toContain('not their character staying silent');
+		expect(describeTurn({ kind: 'continue' })).toContain(
+			'not necessarily their character staying silent'
+		);
 		const filled = describeTurn({
 			kind: 'continue',
 			fields: [{ block: 'b', name: 'f', value: 'signed' }]

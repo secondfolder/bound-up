@@ -49,7 +49,9 @@ export const STYLE_PRESETS = [
 - Vivid, specific bodies, tailored to this scene and these people: skin flushed, hot, slick or goosebumped; how tits, an ass or a cock look, move and sway; lips, piercings, veins, hair, colour and shape, whatever is really there and in play.
 - Moans, gasps and dirty talk in the characters' own voices, written as they sound. The wet sound of a deepthroat is "gluck".
 - Where the scene is degrading, humiliating or crude, the language is cruder still.
-- Tight: a couple of short paragraphs, unless the telling notes say otherwise. Not every passage has to escalate, but none ends flat.`
+- Tight: a couple of short paragraphs, unless the telling notes say otherwise. Not every passage has to escalate, but none ends flat.
+- Prioritise kink and sex acts in the provided suggestions.
+`
 	},
 	{
 		id: 'lush',

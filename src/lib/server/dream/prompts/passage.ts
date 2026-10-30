@@ -116,7 +116,7 @@ export function historyPassage(source: string, allowed?: ReadonlySet<string>): s
 
 /** What Continue asks for: whatever moves the story on most interestingly, by the story's choice. */
 export const CONTINUE =
-	'The user pressed Continue without writing anything. That is not their character staying silent or doing nothing: it hands the next step to you. Decide what happens next, the most interesting way forward from here. Their character may go along with what is being asked of them, or push back, or something else may happen; choose what the story is most alive for, and write their part in it.';
+	'The user pressed Continue without writing anything. That is not necessarily their character staying silent or doing nothing: it hands the next step to you. Decide what happens next, the most interesting way forward from here. Their character may go along with what is being asked of them, or push back, or something else may happen; choose what the story is most alive for, and write their part in it.';
 
 /**
  * The user's turn as the model reads it. Choices and fields go as plain
