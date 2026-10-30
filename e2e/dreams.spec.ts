@@ -591,6 +591,15 @@ test.describe('daydreams, the new engine', () => {
 		// The opening came with the build, which may write up to its whole budget.
 		await expect(dialog.locator('dl.tokens')).toContainText('(max 16000)');
 		await expect(dialog.locator('dl.tokens')).toContainText('Total');
+		// Each part of the tokens has its value on its own line, beside its name.
+		const rows = await dialog.locator('dl.tokens > div').evaluateAll((divs) =>
+			divs.map((div) => {
+				const [name, value] = [...div.children].map((child) => child.getBoundingClientRect().top);
+				return Math.abs((name ?? 0) - (value ?? 0));
+			})
+		);
+		expect(rows.length).toBe(3);
+		expect(Math.max(...rows)).toBeLessThan(4);
 		// Kept on this page: the messages sent, and the reply.
 		await expect(dialog.getByText('Sent', { exact: true })).toBeVisible();
 		await expect(dialog.getByText('system', { exact: true })).toBeVisible();
@@ -722,6 +731,66 @@ test.describe('daydreams, the new engine', () => {
 			return colours;
 		});
 		expect(spoken).toBe(token);
+	});
+
+	test('a passage read to its end carries on into the next one that is there', async ({ page }) => {
+		const who = await dreamer(page);
+		await grantFeature(who.email, 'dreamVoice');
+		await start(page, 'A quiet evening');
+		await play(page);
+		await saved(page);
+		await reply(page, 'I wait');
+		await saved(page);
+
+		const read: string[] = [];
+		page.on('request', (request) => {
+			if (request.url().endsWith('/api/dreams/speak')) {
+				read.push(String(request.postDataJSON()?.text ?? ''));
+			}
+		});
+		await page.getByRole('button', { name: 'Read aloud' }).click();
+		// "Read new passages" is off: it is only for a passage still to come.
+		const player = page.getByRole('region', { name: 'Reading aloud' });
+		await expect(player.getByRole('button', { name: /Read new passages/ })).toHaveAttribute(
+			'aria-pressed',
+			'false'
+		);
+		// The opening, read from its menu, goes on into the passage after it.
+		const opening = page.locator('li.passage').first();
+		await opening.getByRole('button', { name: 'More for this passage' }).click();
+		await opening.getByRole('menuitem', { name: 'Listen' }).click();
+		await expect
+			.poll(() => read.some((text) => text.includes('Ottilie smiles')), { timeout: 30_000 })
+			.toBe(true);
+	});
+
+	test('reading aloud does not pull the page back once it is scrolled away', async ({ page }) => {
+		await page.setViewportSize({ width: 390, height: 520 });
+		const who = await dreamer(page);
+		await grantFeature(who.email, 'dreamVoice');
+		await start(page, 'A quiet evening');
+		await play(page);
+		await saved(page);
+		for (const words of ['I wait', 'I wait again', 'I wait once more']) {
+			await reply(page, words);
+			await saved(page);
+		}
+		await page.getByRole('button', { name: 'Read aloud' }).click();
+		const player = page.getByRole('region', { name: 'Reading aloud' });
+		await passageMenu(page, 'Listen');
+		await expect
+			.poll(() => page.evaluate(() => CSS.highlights.has('dream-reading')), { timeout: 10_000 })
+			.toBe(true);
+
+		// Scrolled to the top, away from the line being read: it stays there
+		// for the rest of the reading.
+		const main = page.locator('main');
+		const area = await main.boundingBox();
+		await page.mouse.move((area?.x ?? 0) + 100, (area?.y ?? 0) + 100);
+		await page.mouse.wheel(0, -10_000);
+		await expect.poll(() => main.evaluate((element) => element.scrollTop)).toBeLessThan(5);
+		await expect(player).toContainText('Tap Listen on a passage', { timeout: 20_000 });
+		expect(await main.evaluate((element) => element.scrollTop)).toBeLessThan(5);
 	});
 
 	test('how the story is shown can be changed from the reading settings, and is kept', async ({

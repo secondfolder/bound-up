@@ -176,7 +176,10 @@ export class ReadAloud {
 	rate = $state(1);
 	/** Whether the words are highlighted as they are read. */
 	highlight = $state(true);
-	/** Whether each new passage is read as it arrives, for the rest of the page's life. */
+	/**
+	 * Whether reading that stopped at the end of a passage starts again when
+	 * the next one comes. A next one already there is read either way.
+	 */
 	readNew = $state(false);
 	/**
 	 * Whether the story carries on by itself as reading nears the end of the
@@ -185,8 +188,8 @@ export class ReadAloud {
 	keepGoing = $state(false);
 	/**
 	 * The passage last read to its very end, until another is played or
-	 * reading stops: the page carries on into the passage after it once that
-	 * is there, whether it came before the end or after.
+	 * reading stops: the page carries on into the passage after it when that
+	 * comes later, if the user asked for that ("Read new passages").
 	 */
 	finishedTurn = $state<string | null>(null);
 	index = $state(0);
@@ -231,12 +234,16 @@ export class ReadAloud {
 	#keepAlive: AudioContext | null = null;
 	#frame = 0;
 	/**
-	 * Set by the user's own scrolling, which stops auto-scroll until play is
-	 * pressed again. Typed by hand: Biome cannot see a listener set it, and
-	 * otherwise reads it as always false.
+	 * `away`: the user scrolled the line being read out of sight, so reading
+	 * does not scroll back to it until it is in sight again (`#keepInView`).
+	 * `at`: when they last scrolled themselves, so reading never scrolls
+	 * while they do. Typed by hand: Biome cannot see a listener set it, and
+	 * otherwise reads it as never changing.
 	 */
-	readonly #scrolled: { byUser: boolean } = { byUser: false };
+	readonly #scrolled: { away: boolean; at: number } = { away: false, at: 0 };
 	#scroller: HTMLElement | null = null;
+	readonly #coveredFrom: (() => number | null) | undefined;
+	readonly #onFinished: ((turnId: string) => void) | undefined;
 
 	constructor(options: {
 		voiceOf: (who: string | null) => VoiceName;
@@ -245,11 +252,20 @@ export class ReadAloud {
 		onNearEnd?: (turnId: string) => void;
 		/** A clip came for a passage, with its request, for debug mode. */
 		onSpoken?: (turnId: string, spoken: SpokenReport) => void;
+		/**
+		 * Where something stuck over the bottom of the page starts (the dock),
+		 * as a viewport y, or null: the line read is kept in sight above it.
+		 */
+		coveredFrom?: () => number | null;
+		/** A passage was read to its very end. */
+		onFinished?: (turnId: string) => void;
 	}) {
 		this.#voiceOf = options.voiceOf;
 		this.#nameOf = options.nameOf;
 		this.#onNearEnd = options.onNearEnd;
 		this.#onSpoken = options.onSpoken;
+		this.#coveredFrom = options.coveredFrom;
+		this.#onFinished = options.onFinished;
 	}
 
 	/** Reads a passage from its element, from the start or from a point tapped on it. */
@@ -274,7 +290,7 @@ export class ReadAloud {
 		this.#passage = passage;
 		this.#utterances = said;
 		this.count = said.length;
-		this.#scrolled.byUser = false;
+		this.#scrolled.away = false;
 		this.#watchScrolling(root);
 		// Before the first clip is fetched, so headphones are awake for its first word.
 		this.#holdOutput();
@@ -297,7 +313,7 @@ export class ReadAloud {
 		if (this.loading || !this.#audio?.src) {
 			return;
 		}
-		this.#scrolled.byUser = false;
+		this.#scrolled.away = false;
 		this.#holdOutput();
 		void this.#audio.play().then(() => {
 			this.playing = true;
@@ -349,6 +365,8 @@ export class ReadAloud {
 		this.problem = null;
 		this.#scroller?.removeEventListener('wheel', this.#onUserScroll);
 		this.#scroller?.removeEventListener('touchmove', this.#onUserScroll);
+		this.#scroller?.removeEventListener('pointerdown', this.#onPress);
+		document.removeEventListener('keydown', this.#onKey);
 		if ('mediaSession' in navigator) {
 			navigator.mediaSession.playbackState = 'none';
 		}
@@ -522,7 +540,8 @@ export class ReadAloud {
 	};
 
 	#finish(): void {
-		this.finishedTurn = this.turnId;
+		const finished = this.turnId;
+		this.finishedTurn = finished;
 		this.#generation += 1;
 		this.#releaseOutput();
 		cancelAnimationFrame(this.#frame);
@@ -532,6 +551,9 @@ export class ReadAloud {
 		this.turnId = null;
 		this.speaker = '';
 		this.speakerId = null;
+		if (finished) {
+			this.#onFinished?.(finished);
+		}
 	}
 
 	/**
@@ -645,21 +667,60 @@ export class ReadAloud {
 		tick();
 	}
 
-	/** Auto-scroll keeps the line being read in view, until the user scrolls themselves. */
+	/** A gesture of the user's own counts as scrolling for this long after its last event. */
+	static readonly USER_SCROLL_MS = 800;
+
+	/**
+	 * Keeps the line being read in sight while it is, and leaves the page
+	 * alone once the user has scrolled it out of sight: never scrolling
+	 * while they scroll, and following again once they scroll back to it.
+	 * Following used to stop for good at the first touch of the page, so a
+	 * small nudge lost it until play was pressed again.
+	 */
 	#keepInView(range: Range): void {
 		const scroller = this.#scroller;
-		if (this.#scrolled.byUser || !scroller) {
+		if (!scroller) {
 			return;
 		}
 		const rect = range.getBoundingClientRect();
 		const view = scroller.getBoundingClientRect();
-		if (rect.top < view.top + 40 || rect.bottom > view.bottom - 120) {
-			scroller.scrollBy({ top: rect.top - view.top - view.height / 3, behavior: 'smooth' });
+		const covered = this.#coveredFrom?.() ?? null;
+		const bottom = covered === null ? view.bottom : Math.min(view.bottom, covered);
+		const inSight = rect.bottom > view.top && rect.top < bottom;
+		if (performance.now() - this.#scrolled.at < ReadAloud.USER_SCROLL_MS) {
+			this.#scrolled.away = !inSight;
+			return;
+		}
+		if (this.#scrolled.away) {
+			if (!inSight) {
+				return;
+			}
+			this.#scrolled.away = false;
+		}
+		if (rect.top < view.top + 40 || rect.bottom > bottom - 60) {
+			scroller.scrollBy({
+				top: rect.top - view.top - (bottom - view.top) / 3,
+				behavior: 'smooth'
+			});
 		}
 	}
 
 	readonly #onUserScroll = () => {
-		this.#scrolled.byUser = true;
+		this.#scrolled.at = performance.now();
+	};
+
+	/** The keys that scroll a page, which count as the user scrolling. */
+	readonly #onKey = (event: KeyboardEvent) => {
+		if (SCROLL_KEYS.has(event.key) && !isTyping(event.target)) {
+			this.#onUserScroll();
+		}
+	};
+
+	/** A press on the scroller itself, not its content, is its scrollbar. */
+	readonly #onPress = (event: PointerEvent) => {
+		if (event.target === this.#scroller) {
+			this.#onUserScroll();
+		}
 	};
 
 	#watchScrolling(root: HTMLElement): void {
@@ -670,6 +731,8 @@ export class ReadAloud {
 		this.#scroller = scroller ?? (document.scrollingElement as HTMLElement | null);
 		this.#scroller?.addEventListener('wheel', this.#onUserScroll, { passive: true });
 		this.#scroller?.addEventListener('touchmove', this.#onUserScroll, { passive: true });
+		this.#scroller?.addEventListener('pointerdown', this.#onPress, { passive: true });
+		document.addEventListener('keydown', this.#onKey);
 	}
 
 	/** The lock screen's controls, with nothing on it but the app's name. */
@@ -689,6 +752,24 @@ export class ReadAloud {
 	get root(): HTMLElement | null {
 		return this.#root;
 	}
+}
+
+const SCROLL_KEYS: ReadonlySet<string> = new Set([
+	'ArrowUp',
+	'ArrowDown',
+	'PageUp',
+	'PageDown',
+	'Home',
+	'End',
+	' '
+]);
+
+/** Whether a key goes to a field being typed in, where it scrolls nothing. */
+function isTyping(target: EventTarget | null): boolean {
+	return (
+		target instanceof HTMLElement &&
+		(target.isContentEditable || Boolean(target.closest('input, textarea, wa-input, wa-textarea')))
+	);
 }
 
 function showHighlight(range: Range): void {

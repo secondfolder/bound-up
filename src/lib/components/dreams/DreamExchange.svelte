@@ -88,7 +88,7 @@
 			{#if usage || maxTokens !== null}
 				<!-- The max is the reply's alone: a provider counts the prompt apart,
 				     and a reasoning model's thinking in the reply. -->
-				<div>
+				<div class="group">
 					<dt>Tokens</dt>
 					<dd>
 						<dl class="tokens">
@@ -202,14 +202,32 @@
 				color: var(--wa-color-text-quiet);
 			}
 
-			/* Tokens' own parts, under it. */
-			.tokens {
-				gap: 0;
-			}
-
 			dd {
 				margin: 0;
 				overflow-wrap: anywhere;
+			}
+
+			/* Tokens' own parts, under it and indented: beside it there is no
+			   room on a phone, and each part's value wrapped under its name. */
+			.group {
+				flex-direction: column;
+				gap: var(--wa-space-3xs);
+
+				> dd {
+					padding-left: var(--wa-space-m);
+				}
+			}
+
+			.tokens {
+				gap: var(--wa-space-3xs);
+
+				dt {
+					min-width: 4.5rem;
+				}
+
+				dd {
+					flex: 1 1 10rem;
+				}
 			}
 		}
 

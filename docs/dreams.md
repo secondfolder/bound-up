@@ -1127,8 +1127,8 @@ place is a privacy risk and browsers block it anyway. It adds a Listen button
 to each passage and a player in the dock, under the turn (see "Your
 turn"): who is speaking, back a
 sentence, play and pause, speed (0.75× to 2×, tapping cycles), "Read new
-passages" (each passage that arrives from then on is read once it is
-finished), "Highlight" and "Keep going". With read aloud on, tapping any word of a
+passages" (reading that stopped at the end of a passage starts again when
+the next comes), "Highlight" and "Keep going". With read aloud on, tapping any word of a
 passage plays from that word, before play has been pressed as much as
 while it reads: the whole utterance it is in is asked for, so the cues
 before the word still shape how it is said, and playback starts at the word
@@ -1139,11 +1139,14 @@ capability on for the passages asked for (`passageRequestFor`), so the story
 model writes delivery cues (`<say how="low, amused">`, `how` on a tone tag)
 and `<sound>`s for them; without listening it never does (see "Tag hygiene").
 
-**Reading carries on.** A passage read to its very end is not a pause the
-user asked for: once the passage after it is there and finished, it is read
-next, whether it came while the last was still being read or after
-(`finishedTurn` on the reader, and the effect beside "Read new passages" in
-`DreamStory`). Pausing, stopping or playing another passage ends that.
+**Reading carries on.** A passage read to its very end, with the passage
+after it already there and finished, goes straight on into it, whatever
+"Read new passages" says (`onFinished` and `carryOn` in `DreamStory`): any
+passage, not only the newest, so listening from an earlier one reads on
+through the rest. **Read new passages** is for the next passage still to
+come: reading that stopped at the end starts again once it arrives
+(`finishedTurn` on the reader). Pausing, stopping or playing another
+passage ends that.
 **Keep going** goes further: when what is left of the newest passage to
 play falls under 20 seconds (`NEAR_END_SECONDS`, at the speed it plays),
 the story carries on as Continue would, so the next passage is being
@@ -1216,8 +1219,12 @@ Fish's timed words in the utterance's visible text, each looked for a few
 words on from the last; one it cannot place (a number Fish spelled out) is
 skipped, and the light stays on the word before. Before its first word is
 said, that word is lit, never the whole utterance, which used to flash up at
-the start of each one; only a clip with no timings at all is lit whole. Nothing is guessed at. Auto-scroll keeps the line in view
-and stops once the user scrolls.
+the start of each one; only a clip with no timings at all is lit whole. Nothing is guessed at. The page follows the line
+being read while it is in sight, kept above the dock (`coveredFrom`), and
+never scrolls while the user does (a wheel, a touch, a scrolling key or the
+scrollbar, for 0.8 s after). Scrolled out of sight, it is left there; scrolled
+back into sight, it is followed again (`#keepInView`). Following used to
+stop for good at the first touch of the page, until play was pressed again.
 
 **The lock screen** shows "Bound Up" and nothing else (Media Session), with
 play, pause, back and next: it is the most public surface the app has.

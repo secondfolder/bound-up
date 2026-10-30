@@ -92,6 +92,8 @@
 		return usage.promptTokens > 0 ? Math.round((usage.cachedTokens / usage.promptTokens) * 100) : 0;
 	}
 	let turnBox = $state<ReturnType<typeof DreamTextBox> | null>(null);
+	/** The dock at the bottom, which the line being read is kept in sight above. */
+	let dock = $state<HTMLElement | null>(null);
 	/** Whether the turn box is open: put away, it is a button drawn as the box it opens into. */
 	let writing = $state(false);
 	const suggested = $derived(
@@ -441,6 +443,8 @@
 				voiceOf: (who) => voiceForSpeaker(who, session.elements, session.id, voice.narratorPreset),
 				nameOf: (who) => speakerName(who),
 				onNearEnd: keepGoing,
+				onFinished: carryOn,
+				coveredFrom: () => dock?.getBoundingClientRect().top ?? null,
 				onSpoken: (turnId, spoken) =>
 					session.noteExtra(turnId, {
 						kind: 'speech',
@@ -496,6 +500,13 @@
 		return [`${spoken.bytes} bytes of audio, ${spoken.words.length} words timed:`, ...timings].join(
 			'\n'
 		);
+	}
+
+	/** The passage after this one on the path the story is on, or null. */
+	function passageAfter(turnId: string): string | null {
+		const passages = session.path.filter((entry) => entry.turn?.kind === 'passage');
+		const at = passages.findIndex((entry) => entry.id === turnId);
+		return at >= 0 ? (passages[at + 1]?.id ?? null) : null;
 	}
 
 	/** The passage before this one on the path the story is on, or null. */
@@ -559,26 +570,24 @@
 		}
 	}
 
-	// "Read new passages": each passage that arrives from here on is read
-	// once it is finished, never one that was already there.
-	let lastHeard: string | null = null;
-	$effect(() => {
-		const latest = session.lastPassage?.id ?? null;
-		const streaming = session.streaming !== null;
-		if (latest === lastHeard || streaming) {
-			return;
+	/**
+	 * A passage read to its very end, with the next already there and
+	 * finished: reading carries on into it, whatever "Read new passages"
+	 * says, since stopping between two passages that are both there was
+	 * never a pause the user asked for.
+	 */
+	function carryOn(turnId: string) {
+		const next = passageAfter(turnId);
+		// The newest while it is still being written is not there yet.
+		const stillComing = session.streaming !== null && next === session.lastPassage?.id;
+		if (next && !stillComing && session.listening) {
+			void tick().then(() => listen(next));
 		}
-		const previous = lastHeard;
-		lastHeard = latest;
-		if (previous !== null && latest !== null && reader?.readNew && session.listening) {
-			void tick().then(() => listen(latest));
-		}
-	});
+	}
 
-	// Read to its end, reading carries on into the next passage once it is
-	// there and finished, whether that came before the end or after: a
-	// passage that ends while the next is still being written was not a
-	// pause the user asked for.
+	// Stopped at the end of a passage, with the next not there yet: once it
+	// comes and is finished, reading starts again, if the user asked for that
+	// ("Read new passages"), or asked for it to be written ("Keep going").
 	$effect(() => {
 		const done = reader?.finishedTurn ?? null;
 		const latest = session.lastPassage?.id ?? null;
@@ -586,7 +595,7 @@
 		if (!(reader && done && latest) || latest === done || streaming || !session.listening) {
 			return;
 		}
-		if (passageBefore(latest) === done) {
+		if ((reader.readNew || reader.keepGoing) && passageBefore(latest) === done) {
 			reader.finishedTurn = null;
 			void tick().then(() => listen(latest));
 		}
@@ -960,7 +969,7 @@
 	<!-- The dock at the bottom (docs/dreams.md, "Your turn"): reading aloud,
 	     and the user's turn, three ways: a suggestion, Continue, or their own
 	     words. -->
-	<div class="dock" class:stuck={stuck} data-writing={writing}>
+	<div class="dock" class:stuck={stuck} data-writing={writing} bind:this={dock}>
 		<!-- The dock is never more than half the screen, so the story stays in
 		     sight; the turn takes what room reading aloud leaves, and what does not fit
 		     scrolls, starting at its end (`startAtEnd`). -->
