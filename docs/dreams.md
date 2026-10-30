@@ -159,6 +159,14 @@ the tokens (the prompt and how much of it was cached; the reply with any
 thinking, and in brackets, when this page sent it, the most it could have
 been, for telling a reply cut off by its budget, which the prompt does not
 count against; the total), and the full transcript when this page sent it.
+A passage's other requests, when this page made any, are in tabs beside its
+own, one a kind: **Speech**, each clip read aloud from it (what went to Fish
+Audio, never the key, with how long it took, and how much audio came back
+with each word's timing; the speak route sends it as an `exchange` event),
+and **More detail**, each phrase expanded and card filled in from a link in
+it (the small call's answer, which the browser used to keep only the text
+of). Each is a section of its own, as one passage read aloud is a dozen
+clips (`session.passageExtras`, kept for the page only).
 
 ### Capturing in development
 
@@ -1102,7 +1110,7 @@ to each passage and a player in the dock, under the turn (see "Your
 turn"): who is speaking, back a
 sentence, play and pause, speed (0.75× to 2×, tapping cycles), "Read new
 passages" (each passage that arrives from then on is read once it is
-finished) and "Highlight". With read aloud on, tapping any word of a
+finished), "Highlight" and "Keep going". With read aloud on, tapping any word of a
 passage plays from that word, before play has been pressed as much as
 while it reads: the whole utterance it is in is asked for, so the cues
 before the word still shape how it is said, and playback starts at the word
@@ -1112,6 +1120,20 @@ waits for play. Listening also turns the `voice`
 capability on for the passages asked for (`passageRequestFor`), so the story
 model writes delivery cues (`<say how="low, amused">`, `how` on a tone tag)
 and `<sound>`s for them; without listening it never does (see "Tag hygiene").
+
+**Reading carries on.** A passage read to its very end is not a pause the
+user asked for: once the passage after it is there and finished, it is read
+next, whether it came while the last was still being read or after
+(`finishedTurn` on the reader, and the effect beside "Read new passages" in
+`DreamStory`). Pausing, stopping or playing another passage ends that.
+**Keep going** goes further: when what is left of the newest passage to
+play falls under 20 seconds (`NEAR_END_SECONDS`, at the speed it plays),
+the story carries on as Continue would, so the next passage is being
+written while this one finishes, and is read once it is there. Not while
+the user is writing or anything else is running. It is checked on the
+audio's `timeupdate`, which goes on firing with the screen locked, where an
+animation frame does not: listening with the phone in a pocket is the case
+it is for.
 
 **What is read is what is drawn** (`passageRuns` in
 `src/lib/dream-browser/reader.svelte.ts`). The reader walks the passage's

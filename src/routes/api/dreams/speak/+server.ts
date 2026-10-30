@@ -4,8 +4,8 @@ import { speakRequestSchema } from '$lib/dream/requests';
 import { speechBytes } from '$lib/dream/speech';
 import { fishVoiceFor, readVoiceConfig } from '$lib/server/daydream/voice-config';
 import { hasAcceptedDisclosure } from '$lib/server/daydreams';
-import { FISH_MODEL, streamSpeech } from '$lib/server/dream/fish';
-import { dreamsGuard } from '$lib/server/dream-api';
+import { FISH_MODEL, speechBody, streamSpeech } from '$lib/server/dream/fish';
+import { canDebug, dreamsGuard } from '$lib/server/dream-api';
 import { spendVoice } from '$lib/server/dream-voice';
 import { requireFeature } from '$lib/server/features';
 import { SSE_HEADERS } from '$lib/server/realtime';
@@ -48,6 +48,9 @@ export const POST: RequestHandler = async ({ locals, platform, request }) => {
 		);
 	}
 
+	// What went to Fish Audio, key aside, for an account that can turn on
+	// debug mode (docs/dreams.md, "Debug mode").
+	const debug = await canDebug(locals, userId);
 	const encoder = new TextEncoder();
 	let cancelled = false;
 	const body = new ReadableStream<Uint8Array>({
@@ -57,6 +60,17 @@ export const POST: RequestHandler = async ({ locals, platform, request }) => {
 					controller.enqueue(encoder.encode(encodeEvent(event)));
 				}
 			};
+			const started = Date.now();
+			if (debug) {
+				send({
+					type: 'exchange',
+					request: {
+						endpoint: '/v1/tts/stream/with-timestamp',
+						model: FISH_MODEL,
+						...speechBody({ text, voice })
+					}
+				});
+			}
 			try {
 				await streamSpeech(
 					{
@@ -73,14 +87,22 @@ export const POST: RequestHandler = async ({ locals, platform, request }) => {
 						}
 					}
 				);
-				send({ type: 'done', ended: 'complete', model: FISH_MODEL, provider: 'Fish Audio' });
-			} catch {
+				send({
+					type: 'done',
+					ended: 'complete',
+					model: FISH_MODEL,
+					provider: 'Fish Audio',
+					latencyMs: Date.now() - started
+				});
+			} catch (cause) {
 				if (!(request.signal.aborted || cancelled)) {
 					// Not the error: it could carry the text back.
 					console.error('[dreams] reading aloud failed');
 					send({
 						type: 'failed',
-						message: 'That could not be read aloud just now. Try again in a moment.'
+						message: 'That could not be read aloud just now. Try again in a moment.',
+						// Fish's status, never the text: the error carries none.
+						...(debug ? { detail: cause instanceof Error ? cause.message : String(cause) } : {})
 					});
 				}
 			}

@@ -457,6 +457,6 @@ function failure(debug: boolean, detail: string): Response {
  * switch, which only decides what the page shows. It decides whether what
  * went wrong, and what was sent, come back with an answer.
  */
-async function canDebug(locals: App.Locals, userId: string): Promise<boolean> {
+export async function canDebug(locals: App.Locals, userId: string): Promise<boolean> {
 	return await userHasFeature(locals.db, userId, 'debugMode');
 }

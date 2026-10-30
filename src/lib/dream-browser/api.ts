@@ -347,6 +347,30 @@ export function fill(body: FillRequest, signal?: AbortSignal): Promise<string> {
 	return askWhole('/api/dreams/fill', body, signal);
 }
 
+/**
+ * A small call's whole answer: the reply, and what the server says about it
+ * (provider, tokens, time, and, for an account that can turn on debug mode,
+ * the request), for debug mode's view of a passage's requests.
+ */
+export type SmallAnswer = {
+	text: string;
+	model?: string;
+	provider?: string;
+	usage?: ReplyUsage;
+	latencyMs?: number;
+	request?: unknown;
+};
+
+export async function fillAnswer(body: FillRequest, signal?: AbortSignal): Promise<SmallAnswer> {
+	const response = await send('/api/dreams/fill', {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(body),
+		signal
+	});
+	return (await response.json()) as SmallAnswer;
+}
+
 /** A block's design, as the designer's reply: `parseDesign` checks it (docs/dreams.md, "Designed blocks"). */
 export function designBlock(body: DesignRequest, signal?: AbortSignal): Promise<string> {
 	return askWhole('/api/dreams/design', body, signal);
@@ -431,7 +455,12 @@ export async function openPicture(
 }
 
 /** A clip read aloud: the audio, and its words' timings as the provider placed them. */
-export type SpokenClip = { audio: Blob; words: TimedWord[] };
+export type SpokenClip = {
+	audio: Blob;
+	words: TimedWord[];
+	/** The request as it went to Fish Audio and how long it took, for debug mode. */
+	debug?: { request: unknown; latencyMs?: number };
+};
 
 /**
  * Reads one utterance aloud (docs/dreams.md, "Read aloud"). The clip comes
@@ -451,9 +480,12 @@ export async function speak(body: SpeakRequest, signal?: AbortSignal): Promise<S
 	const pieces: Uint8Array<ArrayBuffer>[] = [];
 	const timings = new Map<number, TimedWord[]>();
 	let last: DreamEvent | null = null;
+	let request: unknown = null;
 	for await (const event of readEvents(response.body)) {
 		last = event;
-		if (event.type === 'audio') {
+		if (event.type === 'exchange') {
+			({ request } = event);
+		} else if (event.type === 'audio') {
 			pieces.push(Uint8Array.from(atob(event.data), (char) => char.charCodeAt(0)));
 		} else if (event.type === 'words') {
 			timings.set(event.seq, event.words);
@@ -463,5 +495,16 @@ export async function speak(body: SpeakRequest, signal?: AbortSignal): Promise<S
 		throw new DreamRequestError(last?.type === 'failed' ? last.message : SERVER_FAILURE, 502);
 	}
 	const words = [...timings.entries()].sort(([a], [b]) => a - b).flatMap(([, list]) => list);
-	return { audio: new Blob(pieces, { type: 'audio/mpeg' }), words };
+	return {
+		audio: new Blob(pieces, { type: 'audio/mpeg' }),
+		words,
+		...(request === null
+			? {}
+			: {
+					debug: {
+						request,
+						...(last.latencyMs === undefined ? {} : { latencyMs: last.latencyMs })
+					}
+				})
+	};
 }

@@ -55,6 +55,20 @@ const SSE_DATA = 'data:';
  * Fish's status on a refusal before any audio (401 a bad key, 402 no
  * credit), never with the text.
  */
+/** What is sent to Fish Audio for a clip, without the key: debug mode shows it. */
+export function speechBody(request: Pick<SpeechRequest, 'text' | 'voice'>) {
+	return {
+		text: request.text,
+		reference_id: request.voice,
+		format: 'mp3',
+		mp3_bitrate: 64,
+		// The first audio in about half a second, where `normal` takes about
+		// 2.5 s, and with S2.1 Pro no worse to hear (`FISH_MODEL`).
+		latency: 'balanced',
+		normalize: true
+	};
+}
+
 export async function streamSpeech(
 	request: SpeechRequest,
 	onChunk: (chunk: SpeechChunk) => void
@@ -66,16 +80,7 @@ export async function streamSpeech(
 			'content-type': 'application/json',
 			model: FISH_MODEL
 		},
-		body: JSON.stringify({
-			text: request.text,
-			reference_id: request.voice,
-			format: 'mp3',
-			mp3_bitrate: 64,
-			// The first audio in about half a second, where `normal` takes about
-			// 2.5 s, and with S2.1 Pro no worse to hear (`FISH_MODEL`).
-			latency: 'balanced',
-			normalize: true
-		}),
+		body: JSON.stringify(speechBody(request)),
 		signal: request.signal
 	});
 	if (!(response.ok && response.body)) {

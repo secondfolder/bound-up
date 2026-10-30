@@ -2,6 +2,7 @@ import {
 	alignWords,
 	type PlacedWord,
 	type SpeechRun,
+	type TimedWord,
 	type Tone,
 	type Utterance,
 	utterances,
@@ -151,6 +152,15 @@ function offsetAt(passage: Passage, x: number, y: number): number | null {
 
 type Clip = { url: string; placed: PlacedWord[] };
 
+/** A clip's request and what came back, for debug mode. */
+export type SpokenReport = {
+	text: string;
+	request: unknown;
+	latencyMs?: number;
+	bytes: number;
+	words: TimedWord[];
+};
+
 export const SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const;
 
 export class ReadAloud {
@@ -166,6 +176,17 @@ export class ReadAloud {
 	highlight = $state(true);
 	/** Whether each new passage is read as it arrives, for the rest of the page's life. */
 	readNew = $state(false);
+	/**
+	 * Whether the story carries on by itself as reading nears the end of the
+	 * newest passage: `onNearEnd` asks, and the page decides (Continue).
+	 */
+	keepGoing = $state(false);
+	/**
+	 * The passage last read to its very end, until another is played or
+	 * reading stops: the page carries on into the passage after it once that
+	 * is there, whether it came before the end or after.
+	 */
+	finishedTurn = $state<string | null>(null);
 	index = $state(0);
 	count = $state(0);
 	/**
@@ -176,6 +197,14 @@ export class ReadAloud {
 
 	readonly #voiceOf: (who: string | null) => VoiceName;
 	readonly #nameOf: (who: string | null) => string;
+	readonly #onNearEnd: ((turnId: string) => void) | undefined;
+	readonly #onSpoken: ((turnId: string, spoken: SpokenReport) => void) | undefined;
+	/**
+	 * Whether `onNearEnd` has been called for this reading, so it is called
+	 * once. Typed by hand, as `#scrolled` is: Biome cannot see a listener set
+	 * it, and otherwise reads it as always false.
+	 */
+	readonly #nearEnd: { said: boolean } = { said: false };
 	readonly #clips = new Map<string, Promise<Clip>>();
 	readonly #controller = new AbortController();
 	#audio: HTMLAudioElement | null = null;
@@ -210,9 +239,15 @@ export class ReadAloud {
 	constructor(options: {
 		voiceOf: (who: string | null) => VoiceName;
 		nameOf: (who: string | null) => string;
+		/** Reading has nearly reached the end of a passage: `NEAR_END_SECONDS` or less is left. */
+		onNearEnd?: (turnId: string) => void;
+		/** A clip came for a passage, with its request, for debug mode. */
+		onSpoken?: (turnId: string, spoken: SpokenReport) => void;
 	}) {
 		this.#voiceOf = options.voiceOf;
 		this.#nameOf = options.nameOf;
+		this.#onNearEnd = options.onNearEnd;
+		this.#onSpoken = options.onSpoken;
 	}
 
 	/** Reads a passage from its element, from the start or from a point tapped on it. */
@@ -230,6 +265,8 @@ export class ReadAloud {
 		const tapped = said[start];
 		this.#startOffset = offset !== null && tapped ? Math.max(0, offset - tapped.from) : null;
 		this.paused = false;
+		this.finishedTurn = null;
+		this.#nearEnd.said = false;
 		this.turnId = turnId;
 		this.#root = root;
 		this.#passage = passage;
@@ -303,6 +340,7 @@ export class ReadAloud {
 		this.playing = false;
 		this.loading = false;
 		this.paused = false;
+		this.finishedTurn = null;
 		this.turnId = null;
 		this.speaker = '';
 		this.problem = null;
@@ -428,6 +466,44 @@ export class ReadAloud {
 		}
 	}
 
+	/**
+	 * How long the current passage still has to play, at this speed: what is
+	 * left of the clip playing, and every utterance after it.
+	 */
+	#secondsLeft(): number {
+		const audio = this.#audio;
+		let left =
+			audio && Number.isFinite(audio.duration)
+				? Math.max(0, audio.duration - audio.currentTime) / this.rate
+				: 0;
+		for (const utterance of this.#utterances.slice(this.index + 1)) {
+			left += this.#seconds(utterance);
+		}
+		return left;
+	}
+
+	/** With this much or less of a passage left to play, `onNearEnd` is called. */
+	static readonly NEAR_END_SECONDS = 20;
+
+	/**
+	 * Calls `onNearEnd` once a reading, when it is near the end. On the
+	 * audio's `timeupdate`, which goes on firing in a background tab or with
+	 * the screen locked, where an animation frame does not: listening with
+	 * the phone in a pocket is the case this is for.
+	 */
+	#checkNearEnd(): void {
+		if (
+			this.#nearEnd.said ||
+			!this.turnId ||
+			!this.playing ||
+			this.#secondsLeft() > ReadAloud.NEAR_END_SECONDS
+		) {
+			return;
+		}
+		this.#nearEnd.said = true;
+		this.#onNearEnd?.(this.turnId);
+	}
+
 	#keyOf(utterance: Utterance): string {
 		return `${this.#voiceOf(utterance.who)}\u0000${utterance.spoken}`;
 	}
@@ -442,6 +518,7 @@ export class ReadAloud {
 	};
 
 	#finish(): void {
+		this.finishedTurn = this.turnId;
 		this.#generation += 1;
 		this.#releaseOutput();
 		cancelAnimationFrame(this.#frame);
@@ -486,7 +563,17 @@ export class ReadAloud {
 		let clip = this.#clips.get(key);
 		if (!clip) {
 			const visible = this.#passage?.text.slice(utterance.from, utterance.to) ?? '';
+			const forTurn = this.turnId;
 			clip = speak({ text: utterance.spoken, voice }, this.#controller.signal).then((spoken) => {
+				if (spoken.debug && forTurn) {
+					this.#onSpoken?.(forTurn, {
+						text: utterance.spoken,
+						request: spoken.debug.request,
+						...(spoken.debug.latencyMs === undefined ? {} : { latencyMs: spoken.debug.latencyMs }),
+						bytes: spoken.audio.size,
+						words: spoken.words
+					});
+				}
 				const last = spoken.words.at(-1);
 				if (last) {
 					this.#lengths.set(key, last.end + 0.3);
@@ -510,6 +597,7 @@ export class ReadAloud {
 			audio.addEventListener('ended', () => {
 				void this.#playAt(this.index + 1);
 			});
+			audio.addEventListener('timeupdate', () => this.#checkNearEnd());
 			this.#audio = audio;
 		}
 		return this.#audio;

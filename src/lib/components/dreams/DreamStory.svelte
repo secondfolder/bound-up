@@ -19,7 +19,7 @@
 	import { footerOf } from '$lib/dream/story';
 	import { DEFAULT_STYLE, isPreset, OWN_STYLE, STYLE_PRESETS } from '$lib/dream/styles';
 	import { voiceForSpeaker } from '$lib/dream/voices';
-	import { ReadAloud, SPEEDS } from '$lib/dream-browser/reader.svelte';
+	import { ReadAloud, SPEEDS, type SpokenReport } from '$lib/dream-browser/reader.svelte';
 	import type { DreamSession } from '$lib/dream-browser/session.svelte';
 	import { type DraftSession, openDraft } from '$lib/messaging/drafts';
 	import { MAX_INPUT_CHARS, MAX_PASSAGE_CHARS } from '$lib/sealed-kinds/dreams';
@@ -436,7 +436,20 @@
 	const reader = voice
 		? new ReadAloud({
 				voiceOf: (who) => voiceForSpeaker(who, session.elements, session.id, voice.narratorPreset),
-				nameOf: (who) => speakerName(who)
+				nameOf: (who) => speakerName(who),
+				onNearEnd: keepGoing,
+				onSpoken: (turnId, spoken) =>
+					session.noteExtra(turnId, {
+						kind: 'speech',
+						label: spoken.text,
+						exchange: {
+							request: spoken.request,
+							reply: spokenReply(spoken),
+							thinking: '',
+							provider: 'Fish Audio',
+							...(spoken.latencyMs === undefined ? {} : { latencyMs: spoken.latencyMs })
+						}
+					})
 			})
 		: null;
 	onDestroy(() => reader?.dispose());
@@ -454,7 +467,47 @@
 		return document.querySelector<HTMLElement>(`[data-turn="${CSS.escape(turnId)}"] .markup`);
 	}
 
+	/**
+	 * "Keep going": as reading nears the end of the newest passage, the story
+	 * carries on as Continue would, so the next passage is being written while
+	 * this one finishes, and is read once it is there. Not while the user is
+	 * writing, or anything else is running.
+	 */
+	function keepGoing(turnId: string) {
+		if (
+			reader?.keepGoing &&
+			session.listening &&
+			turnId === session.lastPassage?.id &&
+			!session.busy &&
+			!writing
+		) {
+			void session.send('');
+		}
+	}
+
+	/** A clip's reply, for debug mode: how much audio came, and each word's timing. */
+	function spokenReply(spoken: SpokenReport): string {
+		const timings = spoken.words.map(
+			(word) => `${word.start.toFixed(2)}–${word.end.toFixed(2)}  ${word.text}`
+		);
+		return [`${spoken.bytes} bytes of audio, ${spoken.words.length} words timed:`, ...timings].join(
+			'\n'
+		);
+	}
+
+	/** The passage before this one on the path the story is on, or null. */
+	function passageBefore(turnId: string): string | null {
+		const passages = session.path.filter((entry) => entry.turn?.kind === 'passage');
+		const at = passages.findIndex((entry) => entry.id === turnId);
+		return at > 0 ? (passages[at - 1]?.id ?? null) : null;
+	}
+
 	function listen(turnId: string, at?: { x: number; y: number }) {
+		// Asked twice for the same passage (read new passages, and carrying
+		// on from the end, both want the next one): once is enough.
+		if (!at && reader?.turnId === turnId && (reader.playing || reader.loading)) {
+			return;
+		}
 		const root = passageRoot(turnId);
 		if (reader && root) {
 			reader.play(turnId, root, at);
@@ -515,6 +568,23 @@
 		const previous = lastHeard;
 		lastHeard = latest;
 		if (previous !== null && latest !== null && reader?.readNew && session.listening) {
+			void tick().then(() => listen(latest));
+		}
+	});
+
+	// Read to its end, reading carries on into the next passage once it is
+	// there and finished, whether that came before the end or after: a
+	// passage that ends while the next is still being written was not a
+	// pause the user asked for.
+	$effect(() => {
+		const done = reader?.finishedTurn ?? null;
+		const latest = session.lastPassage?.id ?? null;
+		const streaming = session.streaming !== null;
+		if (!(reader && done && latest) || latest === done || streaming || !session.listening) {
+			return;
+		}
+		if (passageBefore(latest) === done) {
+			reader.finishedTurn = null;
 			void tick().then(() => listen(latest));
 		}
 	});
@@ -1016,6 +1086,14 @@
 						onclick={() => reader.setHighlight(!reader.highlight)}
 						>{reader.highlight ? '✓ ' : ''}Highlight</button
 					>
+					<button
+						type="button"
+						class="toggle"
+						aria-pressed={reader.keepGoing}
+						onclick={() => {
+							reader.keepGoing = !reader.keepGoing;
+						}}>{reader.keepGoing ? '✓ ' : ''}Keep going</button
+					>
 				</span>
 				{#if reader.problem}<p class="problem">{reader.problem}</p>{/if}
 			</section>
@@ -1036,6 +1114,7 @@
 			request: about.request
 		}}
 		exchange={session.exchanges.get(aboutId)}
+		extras={session.passageExtras.get(aboutId) ?? []}
 		onclose={() => {
 			aboutId = null;
 		}}

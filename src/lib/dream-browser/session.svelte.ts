@@ -85,6 +85,7 @@ import {
 	designBlock,
 	drawNames,
 	fill,
+	fillAnswer,
 	type Lookup,
 	listDirections,
 	listDreams,
@@ -96,6 +97,7 @@ import {
 	openTurn,
 	readBranch,
 	readPreferences,
+	type SmallAnswer,
 	type StreamResult,
 	saveDetail,
 	savePreferences,
@@ -146,6 +148,21 @@ export type Exchange = {
 	usage?: StreamResult['usage'];
 	latencyMs?: number;
 };
+
+/**
+ * A request made for a passage after it was written, for debug mode
+ * (docs/dreams.md, "Debug mode"): a clip read aloud from it, or detail
+ * loaded from a link in it (a phrase expanded, a card filled in).
+ */
+export type PassageExtra = {
+	kind: 'speech' | 'more';
+	label: string;
+	model?: string;
+	exchange: Exchange;
+};
+
+/** At most this many are kept for a passage, the latest; a long one read twice makes many clips. */
+const MAX_PASSAGE_EXTRAS = 80;
 
 /** How many of the user's other daydreams are read for recent directions and names. */
 const RECENT_DREAMS = 20;
@@ -265,6 +282,8 @@ export class DreamSession {
 	 * can turn it on is sent them, and they are kept for this page only.
 	 */
 	exchanges = $state(new Map<string, Exchange>());
+	/** Each passage's other requests, by turn, for debug mode; kept for the page only. */
+	passageExtras = $state(new Map<string, PassageExtra[]>());
 	/** Notices for the user, newest last. */
 	notices = $state<DreamNotice[]>([]);
 	readonly #seed: () => number;
@@ -634,6 +653,33 @@ export class DreamSession {
 			},
 			keep: (key: string, reply: StreamResult) => this.#record(key, request, reply, thinking)
 		};
+	}
+
+	/** Keeps a request made for a passage after it was written, for debug mode. */
+	noteExtra(turnId: string, extra: PassageExtra): void {
+		const next = new Map(this.passageExtras);
+		next.set(turnId, [...(next.get(turnId) ?? []), extra].slice(-MAX_PASSAGE_EXTRAS));
+		this.passageExtras = next;
+	}
+
+	/** A small call's answer, kept as one of a passage's requests when the server sent the request. */
+	#noteAnswer(turnId: string, label: string, answer: SmallAnswer) {
+		if (answer.request === undefined) {
+			return;
+		}
+		this.noteExtra(turnId, {
+			kind: 'more',
+			label,
+			...(answer.model ? { model: answer.model } : {}),
+			exchange: {
+				request: answer.request,
+				reply: answer.text,
+				thinking: '',
+				provider: answer.provider ?? '',
+				...(answer.usage ? { usage: answer.usage } : {}),
+				...(answer.latencyMs === undefined ? {} : { latencyMs: answer.latencyMs })
+			}
+		});
 	}
 
 	/** Keeps a request and its reply for debug mode, when the server sent the request. */
@@ -1447,7 +1493,7 @@ export class DreamSession {
 				.filter((entry) => entry.turn?.kind === 'passage')
 				.slice(-2)
 				.map((entry) => (entry.turn as DreamPassageTurn).source);
-			const reply = await fill({
+			const answer = await fillAnswer({
 				kind: 'elements',
 				telling: setup.build.telling,
 				limits: this.worded.limits,
@@ -1455,7 +1501,11 @@ export class DreamSession {
 				passages,
 				focus: elementId
 			});
-			await this.#keepElements(turnId, reply);
+			const shown = this.lastPassage?.id;
+			if (shown) {
+				this.#noteAnswer(shown, `Card: ${element.name}`, answer);
+			}
+			await this.#keepElements(turnId, answer.text);
 		} catch (cause) {
 			this.problem =
 				cause instanceof DreamRequestError ? cause.message : 'That card could not be filled in.';
@@ -1598,16 +1648,16 @@ export class DreamSession {
 		}
 		this.filling = new Set([...this.filling, key]);
 		try {
-			const text = (
-				await fill({
-					kind: 'more',
-					telling: setup.build.telling,
-					...(setup.build.style ? { style: setup.build.style } : {}),
-					limits: this.worded.limits,
-					passage: passage.source,
-					phrase
-				})
-			).trim();
+			const answer = await fillAnswer({
+				kind: 'more',
+				telling: setup.build.telling,
+				...(setup.build.style ? { style: setup.build.style } : {}),
+				limits: this.worded.limits,
+				passage: passage.source,
+				phrase
+			});
+			this.#noteAnswer(turnId, `More: ${phrase}`, answer);
+			const text = answer.text.trim();
 			if (text) {
 				const detail: DreamDetail = { kind: 'more', key, text: text.slice(0, 1200) };
 				await saveDetail(this.id, { id: crypto.randomUUID(), turnId, detail });

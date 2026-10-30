@@ -596,6 +596,89 @@ test.describe('daydreams, the new engine', () => {
 		await expect(dialog.getByText('system', { exact: true })).toBeVisible();
 	});
 
+	test('in debug mode, a passage’s clips read aloud and detail loaded from it have tabs of their own', async ({
+		page
+	}) => {
+		const who = await dreamer(page);
+		await grantFeature(who.email, 'debugMode');
+		await grantFeature(who.email, 'dreamVoice');
+		await page
+			.context()
+			.addCookies([{ name: 'debug', value: '1', url: new URL(page.url()).origin }]);
+		await page.reload();
+		await waitForHydration(page);
+		await start(page, 'A quiet evening');
+		await play(page);
+		await saved(page);
+
+		// A phrase expanded, and the passage read aloud.
+		await page.getByRole('button', { name: 'Read more: a brass key' }).click();
+		await expect(page.getByText('It is warm from her hand')).toBeVisible();
+		await page.getByRole('button', { name: 'Read aloud' }).click();
+		const player = page.getByRole('region', { name: 'Reading aloud' });
+		await passageMenu(page, 'Listen');
+		await expect(player).toContainText('Tap Listen on a passage', { timeout: 20_000 });
+
+		const last = page.locator('li.passage').last();
+		await last.getByRole('button', { name: "About this passage's request" }).click();
+		const dialog = page.locator('wa-dialog[open]');
+		const tabs = dialog.getByRole('tablist', { name: "This passage's requests" });
+		await expect(tabs.getByRole('tab')).toHaveText([/Passage/, /Speech/, /More detail/]);
+		// The passage's own request is the first tab, as before.
+		await expect(dialog.locator('dl.tokens').first()).toContainText('(max 16000)');
+
+		// Each clip: what went to Fish Audio, key aside, and the words' timings.
+		await tabs.getByRole('tab', { name: /Speech/ }).click();
+		const speechPanel = dialog.getByRole('tabpanel', { name: /Speech/ });
+		await expect(speechPanel).toContainText('reference_id');
+		await expect(speechPanel).toContainText('bytes of audio');
+		await expect(speechPanel).not.toContainText('apiKey');
+
+		// The phrase expanded: the request, and the reply that became its detail.
+		await tabs.getByRole('tab', { name: /More detail/ }).click();
+		const morePanel = dialog.getByRole('tabpanel', { name: /More detail/ });
+		await expect(morePanel).toContainText('More: a brass key');
+		await expect(morePanel).toContainText('It is warm from her hand');
+	});
+
+	test('reading aloud carries on into the next passage, which Keep going asks for near the end', async ({
+		page
+	}) => {
+		const who = await dreamer(page);
+		await grantFeature(who.email, 'dreamVoice');
+		await start(page, 'A quiet evening');
+		await play(page);
+		await saved(page);
+
+		const read: string[] = [];
+		page.on('request', (request) => {
+			if (request.url().endsWith('/api/dreams/speak')) {
+				read.push(String(request.postDataJSON()?.text ?? ''));
+			}
+		});
+		await page.getByRole('button', { name: 'Read aloud' }).click();
+		const player = page.getByRole('region', { name: 'Reading aloud' });
+		await player.getByRole('button', { name: 'Keep going' }).click();
+		await expect(player.getByRole('button', { name: /Keep going/ })).toHaveAttribute(
+			'aria-pressed',
+			'true'
+		);
+		await passageMenu(page, 'Listen');
+
+		// Near the end of the opening (all of it, here), the story carries on by
+		// itself, as Continue does, with nobody tapping anything.
+		await expect(page.locator('li.passage')).toHaveCount(2, { timeout: 20_000 });
+		await expect(page.locator('li.passage').last()).toContainText(
+			'Ottilie waits for you to go on.'
+		);
+		// And once the opening has been read, the new passage is read next.
+		await expect
+			.poll(() => read.some((text) => text.includes('waits for you to go on')), {
+				timeout: 30_000
+			})
+			.toBe(true);
+	});
+
 	test('how the story is shown can be changed from the reading settings, and is kept', async ({
 		page
 	}) => {
