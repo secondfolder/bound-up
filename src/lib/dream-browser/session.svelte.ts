@@ -102,6 +102,8 @@ import {
 export type Streaming = {
 	what: 'read' | 'build' | 'passage';
 	text: string;
+	/** The model's thinking so far, shown while it works; never kept. */
+	thinking?: string;
 	/** For a passage: the turn it will follow, and what asked for it. */
 	parentId?: string | null;
 	request?: PassageKind;
@@ -400,6 +402,7 @@ export class DreamSession {
 			{
 				signal,
 				onText: (text) => this.#streamed(text),
+				onThinking: (thinking) => this.#thought(thinking),
 				onLookup: (lookup) => {
 					this.lookups = [...this.lookups, lookup];
 				},
@@ -432,7 +435,11 @@ export class DreamSession {
 		const reply = await streamReply(
 			'build',
 			buildRequestFor(setup, this.worded, this.#previousBuild, await this.#recent(setup)),
-			{ signal, onText: (text) => this.#streamed(text) }
+			{
+				signal,
+				onText: (text) => this.#streamed(text),
+				onThinking: (thinking) => this.#thought(thinking)
+			}
 		);
 		const { passage, ...build } = parseBuild(reply.text);
 		if (!(build.title && passage) || reply.ended === 'refused') {
@@ -480,6 +487,12 @@ export class DreamSession {
 	#streamed(text: string) {
 		if (this.streaming) {
 			this.streaming = { ...this.streaming, text };
+		}
+	}
+
+	#thought(thinking: string) {
+		if (this.streaming) {
+			this.streaming = { ...this.streaming, thinking };
 		}
 	}
 
@@ -1029,7 +1042,8 @@ export class DreamSession {
 		try {
 			reply = await streamReply('passage', body, {
 				signal: input.signal,
-				onText: (text) => this.#streamed(text)
+				onText: (text) => this.#streamed(text),
+				onThinking: (thinking) => this.#thought(thinking)
 			});
 		} catch (cause) {
 			// Stopped: what arrived is kept as a version, like a failure part way.

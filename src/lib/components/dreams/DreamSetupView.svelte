@@ -81,14 +81,19 @@
 	const SPACES = /\s+/g;
 	const FIRST_SENTENCE = /^.+?[.!?…](?:\s|$)/;
 
-	/** The latest of what the model is writing, cleaned of tags: so you can watch it think. */
+	/**
+	 * The latest of what the model is writing, cleaned of tags, so you can
+	 * watch it work: its thinking until its words begin, which a model that
+	 * thinks first spends a while on before it writes anything.
+	 */
 	const liveLine = $derived.by(() => {
 		if (!streaming) {
 			return '';
 		}
-		const words = plainText(parseMarkup(streaming.text, { final: false }))
+		const written = plainText(parseMarkup(streaming.text, { final: false }))
 			.replaceAll(SPACES, ' ')
 			.trim();
+		const words = written || (streaming.thinking ?? '').replaceAll(SPACES, ' ').trim();
 		return words.length > 140 ? `…${words.slice(-140)}` : words;
 	});
 

@@ -99,7 +99,8 @@ export function relay(options: RelayOptions): ReadableStream<Uint8Array> {
 						{
 							...options.request,
 							model: provider ? options.listedModel : options.configuredModel,
-							...(provider ? { providers: [provider] } : {})
+							...(provider ? { providers: [provider] } : {}),
+							onReasoning: (text) => send({ type: 'thinking', text })
 						},
 						(text) => {
 							wrote = true;

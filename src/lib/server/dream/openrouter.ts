@@ -43,13 +43,18 @@ export type CompletionRequest = {
 	/** Restrict routing to these providers, in order (OpenRouter's `provider.order`). */
 	providers?: readonly string[];
 	signal?: AbortSignal;
+	/**
+	 * Hears the model's thinking as it streams, before and between its words
+	 * (`delta.reasoning`), so a wait can show what it is working on.
+	 */
+	onReasoning?: (text: string) => void;
 };
 
 type ChatResponse = {
 	provider?: string;
 	choices?: {
 		message?: { content?: string | null };
-		delta?: { content?: string | null };
+		delta?: { content?: string | null; reasoning?: string | null };
 		finish_reason?: string | null;
 	}[];
 	usage?: {
@@ -175,6 +180,10 @@ export async function stream(
 				);
 			}
 			applyChunk(result, chunk, started, onText);
+			const thought = chunk.choices?.[0]?.delta?.reasoning;
+			if (thought) {
+				request.onReasoning?.(thought);
+			}
 		}
 	}
 	result.latencyMs = Date.now() - started;
@@ -289,7 +298,7 @@ export async function streamResponses(
 		for (const line of lines) {
 			const event = parseChunk(line.trim()) as ResponsesEvent | null;
 			if (event) {
-				applyResponsesEvent(result, event, started, onText, onTool);
+				applyResponsesEvent(result, event, started, onText, onTool, request.onReasoning ?? noop);
 			}
 		}
 	}
@@ -311,6 +320,8 @@ function toolUse(item: NonNullable<ResponsesEvent['item']>): ToolUse {
 	return { kind: 'fetch', url: item.url ?? item.type ?? '', ok };
 }
 
+const noop = () => undefined;
+
 /** Output items that are the model itself, rather than a tool at work. */
 const MODEL_ITEMS = new Set(['message', 'reasoning']);
 
@@ -319,13 +330,18 @@ function applyResponsesEvent(
 	event: ResponsesEvent,
 	started: number,
 	onText: (text: string) => void,
-	onTool: (used: ToolUse) => void
+	onTool: (used: ToolUse) => void,
+	onReasoning: (text: string) => void
 ): void {
 	const type = event.type ?? '';
 	if (type === 'error' || type === 'response.error' || type === 'response.failed') {
 		throw new Error(
 			`OpenRouter error mid-stream: ${event.error?.message ?? event.response?.error?.message ?? 'unknown'}`
 		);
+	}
+	if (type.endsWith('.delta') && type.includes('reasoning') && event.delta) {
+		onReasoning(event.delta);
+		return;
 	}
 	const isText = type.includes('output_text') || type.includes('content_part');
 	if (type.endsWith('.delta') && isText && event.delta) {

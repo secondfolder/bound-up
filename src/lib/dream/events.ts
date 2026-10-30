@@ -5,6 +5,8 @@
  * a refusal from a passage and retry it elsewhere.
  *
  * - `text`: more of the reply.
+ * - `thinking`: more of the model's thinking before or between its words,
+ *   shown while it works and never kept.
  * - `restart`: what came so far was refused; drop it, another provider is
  *   writing it again.
  * - `done`: the reply is finished, and how it ended.
@@ -29,6 +31,7 @@ export type Ended = 'complete' | 'stopped' | 'refused' | 'failed';
 
 export type DreamEvent =
 	| { type: 'text'; text: string }
+	| { type: 'thinking'; text: string }
 	| { type: 'restart'; reason: 'refused' | 'failed' }
 	| { type: 'done'; ended: Ended; model: string; provider: string }
 	| { type: 'failed'; message: string }
@@ -59,6 +62,7 @@ function decode(name: string, data: string): DreamEvent | null {
 	const event = { type: name, ...value } as DreamEvent;
 	switch (event.type) {
 		case 'text':
+		case 'thinking':
 		case 'research':
 			return typeof event.text === 'string' ? event : null;
 		case 'audio':

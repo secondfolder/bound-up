@@ -245,6 +245,8 @@ export async function streamReply<Path extends keyof StreamPaths>(
 	options: {
 		signal?: AbortSignal;
 		onText?: (text: string) => void;
+		/** The model's thinking so far, as it streams; reset with the reply on a restart. */
+		onThinking?: (thinking: string) => void;
 		/** A page read or a search made for the brief, as it happens. */
 		onLookup?: (lookup: Lookup) => void;
 		/** What a separate research step found, kept as the daydream's research. */
@@ -261,10 +263,16 @@ export async function streamReply<Path extends keyof StreamPaths>(
 		throw new DreamRequestError(SERVER_FAILURE, response.status);
 	}
 	let text = '';
+	let thinking = '';
 	let last: DreamEvent | null = null;
 	try {
 		for await (const event of readEvents(response.body)) {
 			last = event;
+			if (event.type === 'thinking') {
+				thinking += event.text;
+				options.onThinking?.(thinking);
+				continue;
+			}
 			if (event.type === 'text') {
 				text += event.text;
 				options.onText?.(text);
@@ -274,6 +282,8 @@ export async function streamReply<Path extends keyof StreamPaths>(
 				options.onResearch?.(event.text);
 			} else if (event.type === 'restart') {
 				text = '';
+				thinking = '';
+				options.onThinking?.(thinking);
 				options.onText?.(text);
 			}
 		}

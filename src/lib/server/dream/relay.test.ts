@@ -65,6 +65,7 @@ async function run(providers: string[], script: Script) {
 		fetch: () => '',
 		search: () => '',
 		research: () => '',
+		thinking: () => '',
 		audio: () => '',
 		words: () => ''
 	};
@@ -152,7 +153,8 @@ describe('relay', () => {
 			providers: [],
 			record: () => Promise.resolve(),
 			hosts: ['example.org'],
-			stream: (_request, onText, onTool) => {
+			stream: (request, onText, onTool) => {
+				request.onReasoning?.('Weighing the brief.');
 				onTool({ kind: 'fetch', url: 'https://example.org/a', ok: true });
 				onTool({ kind: 'fetch', url: 'https://evil.test/?q=x', ok: true });
 				onTool({ kind: 'search', query: 'obedience captions', ok: true });
@@ -174,6 +176,10 @@ describe('relay', () => {
 			{ type: 'fetch', url: 'https://example.org/a', ok: true, allowed: true },
 			{ type: 'fetch', url: 'https://evil.test/?q=x', ok: true, allowed: false }
 		]);
+		expect(events.find((event) => event.type === 'thinking')).toEqual({
+			type: 'thinking',
+			text: 'Weighing the brief.'
+		});
 		expect(events.filter((event) => event.type === 'search')).toEqual([
 			{ type: 'search', query: 'obedience captions', ok: true }
 		]);
