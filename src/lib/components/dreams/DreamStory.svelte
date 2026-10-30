@@ -137,21 +137,144 @@
 		);
 	}
 
+	/** Whether the reading options are open (the player's ⋯). */
+	let optionsOpen = $state(false);
+
 	/**
-	 * Whether the turn area is stuck to the bottom over the story, rather than
-	 * sitting at its end: it takes a background only then, as the kink list's
-	 * pinned bar does at the top. Watched with a sentinel just after it, which
-	 * is out of sight below exactly when it is stuck; the viewport is the
-	 * root, as the app shell's <main> scrolls inside it.
+	 * Whether the suggestions, in the page after the newest passage, are in
+	 * sight: while they are not, "Your turn" in the floating row says how
+	 * many are waiting there. Watched against what scrolls (the app shell's
+	 * <main>), less the row floating over its bottom.
 	 */
-	let stuck = $state(false);
-	const watchStuck: Attachment<HTMLElement> = (sentinel) => {
-		const observer = new IntersectionObserver(([entry]) => {
-			// Hidden below: clipped by <main>, which may still be inside the viewport.
-			stuck = entry !== undefined && !entry.isIntersecting && entry.boundingClientRect.top > 0;
+	let suggestionsInSight = $state(false);
+	let suggestionsList = $state<HTMLElement | null>(null);
+	const watchSuggestions: Attachment<HTMLElement> = (list) => {
+		suggestionsList = list;
+		const observer = new IntersectionObserver(
+			([entry]) => {
+				suggestionsInSight = entry?.isIntersecting ?? false;
+			},
+			{ root: list.closest('main'), rootMargin: `0px 0px -${FLOATING_ROW_PX}px 0px` }
+		);
+		observer.observe(list);
+		return () => {
+			observer.disconnect();
+			suggestionsInSight = false;
+			suggestionsList = null;
+		};
+	};
+	/** About how much of the bottom of the page the floating row covers. */
+	const FLOATING_ROW_PX = 72;
+
+	function toSuggestions() {
+		const still = globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		suggestionsList?.scrollIntoView({ block: 'center', behavior: still ? 'instant' : 'smooth' });
+	}
+
+	/**
+	 * How far the floating row's labels have stepped down to fit: 0, all in
+	 * full; 1, "Continue" and "Write…"; 2, "Your turn" only its arrow and
+	 * count; 3, Continue and Write only their icons. Measured, not set by
+	 * breakpoints, so a longer word or a bigger font still fits: each step is
+	 * tried in turn, from the first, until the turn's controls sit on one
+	 * line. When even the last does not, they wrap: a second line is better
+	 * than the player pushed off the screen.
+	 */
+	let fitStep = $state(0);
+	/** While the labels animate to a new step, when the controls are held on one line. */
+	let fitAnimating = $state(false);
+	const FIT_STEPS = 4;
+	/** How long a button takes to grow or shrink to its new label. */
+	const FIT_MS = 180;
+
+	/** Whether the turn's controls all sit on one line, not wrapped onto a second. */
+	function oneLine(row: HTMLElement): boolean {
+		// Wrapped is starting below where the first ends: centred on one line,
+		// a taller one (Your turn, with its count) starts a little higher.
+		const controls = [...(row.querySelector('.turn-controls')?.children ?? [])];
+		const firstEnds = controls[0]?.getBoundingClientRect().bottom ?? 0;
+		return controls.every((control) => control.getBoundingClientRect().top < firstEnds);
+	}
+
+	const fitLabels: Attachment<HTMLElement> = (row) => {
+		let fitted = false;
+		/** Counts each fit's animations, so an older one ending does not let go of a newer. */
+		let animations = 0;
+		const refit = () => {
+			const buttons = [...row.querySelectorAll<HTMLElement>('.fits')];
+			const before = new Map(buttons.map((button) => [button, button.offsetWidth]));
+			// Measured at their own widths, not part way to them: a width still
+			// animating made a step look needed that was not.
+			// And free to wrap, which is what is measured: held on one line for
+			// an animation, nothing ever looked like it needed a step.
+			for (const button of buttons) {
+				for (const animation of button.getAnimations()) {
+					animation.cancel();
+				}
+			}
+			animations += 1;
+			const these = animations;
+			fitAnimating = false;
+			row.removeAttribute('data-animating');
+			const was = row.dataset.fit;
+			let step = 0;
+			for (; step < FIT_STEPS - 1; step += 1) {
+				row.dataset.fit = String(step);
+				if (oneLine(row)) {
+					break;
+				}
+			}
+			row.dataset.fit = String(step);
+			fitStep = step;
+			// The change animated, each button from its width to its new one;
+			// not the first fit, and not where the device asks for less motion.
+			const still = globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
+			if (!fitted || still || was === String(step)) {
+				fitted = true;
+				return;
+			}
+			// Held on one line while they animate: the widths part way between
+			// would otherwise wrap them for a moment, when neither end does.
+			fitAnimating = true;
+			const done: Promise<unknown>[] = [];
+			for (const button of buttons) {
+				const from = before.get(button) ?? 0;
+				const to = button.offsetWidth;
+				if (from > 0 && from !== to) {
+					const animation = button.animate([{ width: `${from}px` }, { width: `${to}px` }], {
+						duration: FIT_MS,
+						easing: 'ease-out'
+					});
+					done.push(animation.finished.catch(() => undefined));
+				}
+			}
+			// Let go when they end, unless a later fit has animated them since.
+			void Promise.all(done).then(() => {
+				if (these === animations) {
+					fitAnimating = false;
+				}
+			});
+		};
+		// The row's width changes with the window; what is in it, as Your turn,
+		// Stop and the player come and go. Setting `data-fit` is neither. Only
+		// its width: its height changes as the controls wrap and unwrap, which
+		// a fit itself does.
+		let width = 0;
+		const resized = new ResizeObserver(([entry]) => {
+			const now = entry?.contentRect.width ?? 0;
+			if (now !== width) {
+				width = now;
+				refit();
+			}
 		});
-		observer.observe(sentinel);
-		return () => observer.disconnect();
+		resized.observe(row);
+		const changed = new MutationObserver(refit);
+		changed.observe(row, { childList: true, subtree: true });
+		refit();
+		return () => {
+			resized.disconnect();
+			changed.disconnect();
+		};
 	};
 
 	/**
@@ -1156,167 +1279,239 @@
 		<wa-callout variant="warning">{session.problem}</wa-callout>
 	{/if}
 
-	<!-- The dock at the bottom (docs/dreams.md, "Your turn"): reading aloud,
-	     and the user's turn, three ways: a suggestion, Continue, or their own
-	     words. -->
-	<div class="dock" class:stuck={stuck} data-writing={writing} bind:this={dock}>
-		<!-- The dock is never more than half the screen, so the story stays in
-		     sight; the turn takes what room reading aloud leaves, and what does not fit
-		     scrolls, starting at its end (`startAtEnd`). -->
-		<div class="dock-scroll" {@attach startAtEnd}>
-			<div class="dock-inner">
+	<!-- The newest passage's suggestions, in the page after it rather than
+	     floating, so they are seen at the end of the story; scrolled up, the
+	     floating row's "Your turn" says how many wait here (docs/dreams.md,
+	     "Your turn"). Native buttons: a chip is a sentence, and wraps. -->
+	{#if !(writing || session.busy) && suggested.length > 0}
+		<p id="dream-hold-hint" class="wa-visually-hidden">Hold it, or open its menu, to change it before sending.</p>
+		<ul class="suggestions" aria-label="Suggestions" {@attach watchSuggestions}>
+			{#each suggested as suggestion (suggestion)}
+				<li>
+					<button
+						type="button"
+						class="chip suggestion"
+						aria-describedby="dream-hold-hint"
+						onclick={() => session.send(suggestion)}
+						{@attach holdToChange(suggestion)}
+					>
+						{suggestion}
+					</button>
+				</li>
+			{/each}
+		</ul>
+	{/if}
+
+	<!-- The dock (docs/dreams.md, "Your turn"): a row floating over the
+	     bottom of the story with no background of its own, each thing in it
+	     drawn on its own: Continue, writing your own, Your turn, and the
+	     read-aloud bubble. Writing, it is the box instead. -->
+	<div class="dock" data-writing={writing} bind:this={dock}>
+		{#if session.busy || !writing}
+			<div class="turn-row" data-fit={fitStep} data-animating={fitAnimating || undefined} {@attach fitLabels}>
+				<!-- The turn's own controls, which wrap rather than push the player
+				     off the screen once even their icons alone do not fit. -->
+				<div class="turn-controls">
 				{#if session.busy}
-					<div class="turn-row">
-						<wa-button appearance="outlined" onclick={() => session.stop()}>
-							<wa-icon slot="start" name="stop" variant="solid"></wa-icon>
-							Stop
+					<wa-button class="floating" appearance="filled-outlined" onclick={() => session.stop()}>
+						<wa-icon slot="start" name="stop" variant="solid"></wa-icon>
+						Stop
+					</wa-button>
+				{:else}
+					<!-- Named in full whatever the label has room for. -->
+					<button type="button" class="chip other floating fits continue" aria-label="Continue daydream" onclick={() => session.send('')}>
+						<wa-icon name="forward" aria-hidden="true"></wa-icon>
+						<span class="long" aria-hidden="true">Continue daydream</span>
+						<span class="short" aria-hidden="true">Continue</span>
+					</button>
+					<!-- A disclosure, which opens into the box. -->
+					<button
+						type="button"
+						class="chip other floating fits write"
+						aria-label="Write response…"
+						aria-expanded="false"
+						aria-controls="dream-turn-box"
+						onclick={() => openReply()}
+					>
+						<wa-icon name="pen" aria-hidden="true"></wa-icon>
+						<span class="long" aria-hidden="true">Write response…</span>
+						<span class="short" aria-hidden="true">Write…</span>
+					</button>
+					{#if suggested.length > 0 && !suggestionsInSight}
+						<button
+							type="button"
+							class="chip floating fits your-turn"
+							aria-label={`Your turn: ${suggested.length} ${suggested.length === 1 ? 'suggestion' : 'suggestions'} below`}
+							onclick={toSuggestions}
+						>
+							<wa-icon name="arrow-down" aria-hidden="true"></wa-icon>
+							<span class="words" aria-hidden="true">Your turn</span>
+							<span class="count" aria-hidden="true">{suggested.length}</span>
+						</button>
+					{/if}
+				{/if}
+				</div>
+				<span class="gap"></span>
+				<!-- Read aloud, as a bubble: play and pause, with how far through the
+				     passage it is around it in the speaker's colour; the rest behind ⋯. -->
+				{#if reader && session.listening}
+					{const around = reader.count > 0 ? reader.index / reader.count : 0}
+					<section
+						class="player"
+						aria-label="Reading aloud"
+						style:--speaker-colour={reader.speakerId ? colours.get(reader.speakerId) : undefined}
+					>
+						<span class="wa-visually-hidden" aria-live="polite">
+							{#if reader.loading}
+								Getting the voice ready…
+							{:else if reader.turnId}
+								{reader.speaker}
+							{:else}
+								Tap Listen on a passage
+							{/if}
+						</span>
+						<wa-button class="floating" appearance="filled-outlined" pill onclick={() => {
+							optionsOpen = true;
+						}}>
+							<wa-icon name="ellipsis" variant="solid" label="Reading options"></wa-icon>
 						</wa-button>
-					</div>
-				{:else if !writing}
-					<!-- One list of chips: the suggestions, solid, as words to send; then
-					     Continue and writing your own, outlined, as the other ways to take
-					     the turn. Native buttons: a chip is a sentence, and wraps. -->
-					<p id="dream-hold-hint" class="wa-visually-hidden">Hold it, or open its menu, to change it before sending.</p>
-					<ul class="turn-chips" aria-label="Your turn">
-						{#each suggested as suggestion (suggestion)}
-							<li>
-								<button
-									type="button"
-									class="chip suggestion"
-									aria-describedby="dream-hold-hint"
-									onclick={() => session.send(suggestion)}
-									{@attach holdToChange(suggestion)}
-								>
-									{suggestion}
-								</button>
-							</li>
-						{/each}
-						<li>
-							<button type="button" class="chip other continue" onclick={() => session.send('')}>
-								<wa-icon name="forward" aria-hidden="true"></wa-icon>
-								Continue daydream
+						<!-- Native: its progress ring is drawn around it, which a wa-button
+						     has nowhere to hold. -->
+						{#if reader.turnId && !reader.paused}
+							<!-- Playing, or loading to play: pausing holds a clip still on its way. -->
+							<button type="button" class="bubble" aria-label="Pause" onclick={() => reader.pause()}>
+								{@render ring(around)}
+								{#if reader.loading}
+									<wa-spinner aria-hidden="true"></wa-spinner>
+								{:else}
+									<wa-icon name="pause" variant="solid" aria-hidden="true"></wa-icon>
+								{/if}
 							</button>
-						</li>
-						<li>
-							<!-- A disclosure, which opens into the box. -->
+						{:else}
 							<button
 								type="button"
-								class="chip other write"
-								aria-expanded="false"
-								aria-controls="dream-turn-box"
-								onclick={() => openReply()}
+								class="bubble"
+								aria-label="Play"
+								disabled={reader.turnId === null && session.lastPassage === null}
+								onclick={() => {
+									if (reader.turnId) {
+										reader.resume();
+									} else {
+										carryOnReading();
+									}
+								}}
 							>
-								<wa-icon name="pen" aria-hidden="true"></wa-icon>
-								Write response…
+								{@render ring(around)}
+								<wa-icon name="play" variant="solid" aria-hidden="true"></wa-icon>
 							</button>
-						</li>
-					</ul>
+						{/if}
+					</section>
 				{/if}
-				<!-- Kept while put away, so a draft is restored and a suggestion can be put in it. -->
-				<div id="dream-turn-box" class="reply" hidden={!writing || session.busy}>
-					<DreamTextBox
-						bind:this={turnBox}
-						id="dream-turn"
-						label="Your turn"
-						max={MAX_INPUT_CHARS}
-						draft={{ kind: 'dream', dreamId: session.id }}
-						submitLabel="Send"
-						disabled={session.busy}
-						onsend={async (text) => {
-							writing = false;
-							await session.send(text);
-							return session.problem === null;
-						}}
-					>
-						{#snippet actions()}
-							<wa-button appearance="plain" onclick={closeReply}>Cancel</wa-button>
-						{/snippet}
-					</DreamTextBox>
-				</div>
+			</div>
+		{/if}
+		{#if reader?.problem && session.listening}<p class="problem floating" role="status">{reader.problem}</p>{/if}
+		<!-- Kept while put away, so a draft is restored and a suggestion can be put
+		     in it. Never more than half the screen: what does not fit scrolls, from
+		     its end (`startAtEnd`). -->
+		<div class="dock-scroll" hidden={!writing || session.busy} {@attach startAtEnd}>
+			<div id="dream-turn-box" class="reply">
+				<DreamTextBox
+					bind:this={turnBox}
+					id="dream-turn"
+					label="Your turn"
+					max={MAX_INPUT_CHARS}
+					draft={{ kind: 'dream', dreamId: session.id }}
+					submitLabel="Send"
+					disabled={session.busy}
+					onsend={async (text) => {
+						writing = false;
+						await session.send(text);
+						return session.problem === null;
+					}}
+				>
+					{#snippet actions()}
+						<wa-button appearance="plain" onclick={closeReply}>Cancel</wa-button>
+					{/snippet}
+				</DreamTextBox>
 			</div>
 		</div>
-		<!-- Read aloud, under the turn and outside its scroller, so it is in
-		     sight however many chips there are. -->
-		{#if reader && session.listening}
-			<section class="player" aria-label="Reading aloud">
-				<span class="speaker" style:color={reader.speakerId ? colours.get(reader.speakerId) : undefined} aria-live="polite">
-					{#if reader.loading}
-						Getting the voice ready…
-					{:else if reader.turnId}
-						{reader.speaker}
-					{:else}
-						Tap Listen on a passage
-					{/if}
-				</span>
-				<span class="controls">
-					<wa-button size="s" appearance="plain" disabled={reader.turnId === null} onclick={() => reader.back()}>
-						<wa-icon name="backward-step" label="Back a sentence"></wa-icon>
-					</wa-button>
-					{#if reader.turnId && !reader.paused}
-						<!-- Playing, or loading to play: pausing holds a clip still on its way. -->
-						<wa-button size="s" appearance="plain" onclick={() => reader.pause()}>
-							<wa-icon name="pause" label="Pause"></wa-icon>
-						</wa-button>
-					{:else}
-						<wa-button
-							size="s"
-							appearance="plain"
-							disabled={reader.turnId === null && session.lastPassage === null}
-							onclick={() => {
-								if (reader.turnId) {
-									reader.resume();
-								} else {
-									carryOnReading();
-								}
-							}}
-						>
-							<wa-icon name="play" label="Play"></wa-icon>
-						</wa-button>
-					{/if}
-					<wa-button size="s" appearance="plain" onclick={nextSpeed}>
-						<span class="wa-visually-hidden">Speed</span>
-						{reader.rate}×
-					</wa-button>
-				</span>
-				<span class="options">
-					<!-- Toggles: native, because wa-button forwards no aria-pressed. -->
-					<button
-						type="button"
-						class="toggle"
-						aria-pressed={reader.readNew}
-						onclick={() => {
-							reader.readNew = !reader.readNew;
-						}}>{reader.readNew ? '✓ ' : ''}Read new passages</button
-					>
-					<button
-						type="button"
-						class="toggle"
-						aria-pressed={reader.highlight}
-						onclick={() => reader.setHighlight(!reader.highlight)}
-						>{reader.highlight ? '✓ ' : ''}Highlight</button
-					>
-					<wa-button size="s" appearance="plain" onclick={() => {
-								voicesOpen = true;
-							}}>
-						<wa-icon slot="start" name="user-gear" aria-hidden="true"></wa-icon>
-						Voices
-					</wa-button>
-					<button
-						type="button"
-						class="toggle"
-						aria-pressed={reader.keepGoing}
-						onclick={() => {
-							toggleKeepGoing();
-						}}>{reader.keepGoing ? '✓ ' : ''}Keep going</button
-					>
-				</span>
-				{#if reader.problem}<p class="problem">{reader.problem}</p>{/if}
-			</section>
-		{/if}
 	</div>
-	<!-- In sight exactly when the page is scrolled to its end (`watchStuck`). -->
-	<div class="dock-end" aria-hidden="true" {@attach watchStuck}></div>
 </div>
+
+{#snippet ring(around: number)}
+	<!-- How far through the passage reading is, round the bubble from the top. -->
+	<svg class="ring" viewBox="0 0 56 56" aria-hidden="true">
+		<circle cx="28" cy="28" r="25"></circle>
+		<!-- Not drawn at all before it starts: a round cap on nothing is a dot. -->
+		{#if around > 0}
+			<circle class="done" cx="28" cy="28" r="25" pathLength="100" stroke-dasharray={`${around * 100} 100`}></circle>
+		{/if}
+	</svg>
+{/snippet}
+
+{#if optionsOpen && reader}
+	<ResponsiveDialog
+		label="Reading options"
+		onclose={() => {
+			optionsOpen = false;
+		}}
+	>
+		<div class="reading-options">
+			<p class="now" style:color={reader.speakerId ? colours.get(reader.speakerId) : undefined}>
+				{#if reader.loading}
+					Getting the voice ready…
+				{:else if reader.turnId}
+					{reader.speaker}
+				{:else}
+					Tap Listen on a passage
+				{/if}
+			</p>
+			<span class="controls">
+				<wa-button appearance="outlined" disabled={reader.turnId === null} onclick={() => reader.back()}>
+					<wa-icon slot="start" name="backward-step" aria-hidden="true"></wa-icon>
+					Back a sentence
+				</wa-button>
+				<wa-button appearance="outlined" onclick={nextSpeed}>
+					<span class="wa-visually-hidden">Speed</span>
+					{reader.rate}×
+				</wa-button>
+			</span>
+			<!-- Toggles: native, because wa-button forwards no aria-pressed. -->
+			<span class="options">
+				<button
+					type="button"
+					class="toggle"
+					aria-pressed={reader.keepGoing}
+					onclick={() => {
+						toggleKeepGoing();
+					}}>{reader.keepGoing ? '✓ ' : ''}Keep going</button
+				>
+				<button
+					type="button"
+					class="toggle"
+					aria-pressed={reader.readNew}
+					onclick={() => {
+						reader.readNew = !reader.readNew;
+					}}>{reader.readNew ? '✓ ' : ''}Read new passages</button
+				>
+				<button
+					type="button"
+					class="toggle"
+					aria-pressed={reader.highlight}
+					onclick={() => reader.setHighlight(!reader.highlight)}
+					>{reader.highlight ? '✓ ' : ''}Highlight</button
+				>
+			</span>
+			<wa-button appearance="plain" onclick={() => {
+				optionsOpen = false;
+				voicesOpen = true;
+			}}>
+				<wa-icon slot="start" name="user-gear" aria-hidden="true"></wa-icon>
+				Voices
+			</wa-button>
+		</div>
+	</ResponsiveDialog>
+{/if}
 
 {#if stillListening.asking}
 	<ResponsiveDialog
@@ -1505,40 +1700,98 @@
 		color: inherit;
 	}
 
-	/* Inside the dock, which is what sticks. */
+	/* Read aloud, at the end of the floating row: ⋯ and the bubble. */
 	.player {
 		display: flex;
-		flex-wrap: wrap;
+		flex: none;
 		align-items: center;
-		justify-content: space-between;
-		gap: var(--wa-space-2xs) var(--wa-space-s);
-		padding: var(--wa-space-xs) var(--wa-space-s);
-		border: 1px solid var(--wa-color-surface-border);
-		border-radius: var(--wa-border-radius-l);
-		background: var(--wa-color-surface-raised);
+		gap: var(--wa-space-xs);
+		--speaker-colour: var(--wa-color-brand-on-quiet);
+	}
 
-		.speaker {
-			flex: 1 1 8rem;
-			min-width: 0;
+	/* Play and pause, round, with the ring of how far through it is. */
+	.bubble {
+		position: relative;
+		display: grid;
+		place-items: center;
+		inline-size: 3.5rem;
+		block-size: 3.5rem;
+		padding: 0;
+		border: none;
+		border-radius: 50%;
+		background: var(--wa-color-surface-raised);
+		box-shadow: var(--wa-shadow-m);
+		color: var(--speaker-colour);
+		font-size: var(--wa-font-size-l);
+		cursor: pointer;
+		pointer-events: auto;
+
+		&:disabled {
+			cursor: default;
+			opacity: 0.6;
+		}
+
+		&:focus-visible {
+			outline: var(--wa-focus-ring);
+		}
+
+		wa-spinner {
+			font-size: var(--wa-font-size-m);
+			--indicator-color: var(--speaker-colour);
+		}
+	}
+
+	.ring {
+		position: absolute;
+		inset: 0;
+		rotate: -90deg;
+
+		circle {
+			fill: none;
+			stroke: color-mix(in srgb, var(--speaker-colour) 25%, transparent);
+			stroke-width: 3;
+		}
+
+		.done {
+			stroke: var(--speaker-colour);
+			stroke-linecap: round;
+			transition: stroke-dasharray 300ms ease-out;
+		}
+
+		@media (prefers-reduced-motion: reduce) {
+			.done {
+				transition: none;
+			}
+		}
+	}
+
+	/* The player's other controls, in their sheet. */
+	.reading-options {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--wa-space-m);
+
+		.now {
+			margin: 0;
 			font-weight: var(--wa-font-weight-semibold);
-			overflow-wrap: anywhere;
 		}
 
 		.controls,
 		.options {
 			display: flex;
+			flex-wrap: wrap;
 			align-items: center;
-			gap: var(--wa-space-2xs);
+			gap: var(--wa-space-xs);
 		}
 
 		.toggle {
-			padding: var(--wa-space-3xs) var(--wa-space-xs);
+			padding: var(--wa-space-xs) var(--wa-space-m);
 			border: 1px solid var(--wa-color-surface-border);
 			border-radius: var(--wa-border-radius-pill);
 			background: transparent;
 			color: inherit;
 			font: inherit;
-			font-size: var(--wa-font-size-xs);
 			cursor: pointer;
 
 			&[aria-pressed='true'] {
@@ -1548,13 +1801,6 @@
 			&:focus-visible {
 				outline: var(--wa-focus-ring);
 			}
-		}
-
-		.problem {
-			flex-basis: 100%;
-			margin: 0;
-			color: var(--wa-color-text-quiet);
-			font-size: var(--wa-font-size-s);
 		}
 	}
 
@@ -1725,9 +1971,10 @@
 		gap: var(--wa-space-xs);
 	}
 
-	/* Stuck to the bottom of what scrolls while the story runs on under it,
-	   and sitting at the story's end once scrolled there, as the kink list's
-	   pinned bar does at the top. */
+	/* Floating over the bottom of what scrolls while the story runs on under
+	   it, and sitting at the story's end once scrolled there. No background:
+	   what is in it is drawn on its own, so the story shows between. Clicks
+	   between them go through to the story. */
 	.dock {
 		position: sticky;
 		bottom: 0;
@@ -1738,33 +1985,11 @@
 		max-height: 50dvh;
 		box-sizing: border-box;
 		padding-block: var(--wa-space-s);
+		pointer-events: none;
 
-		/* The background it takes only while stuck, from one edge of the page
-		   to the other rather than the column's width, so the story is hidden
-		   under it right across. A border-image outset reaches that far without
-		   widening what the page scrolls over, which a wide box would. Faded in
-		   quickly. */
-		&::before {
-			content: '';
-			position: absolute;
-			inset: 0;
-			z-index: -1;
-			border-image-source: linear-gradient(var(--wa-color-surface-lowered) 0 0);
-			border-image-slice: 0 fill;
-			border-image-outset: 0 100vw;
-			opacity: 0;
-			transition: opacity 150ms ease-out;
-			pointer-events: none;
-		}
-
-		&.stuck::before {
-			opacity: 1;
-		}
-
-		@media (prefers-reduced-motion: reduce) {
-			&::before {
-				transition: none;
-			}
+		.floating,
+		.reply {
+			pointer-events: auto;
 		}
 
 		/* A chip is a sentence, not a control's label: Web Awesome's native
@@ -1790,32 +2015,75 @@
 			}
 		}
 
-		/* Words to send as they are: solid. Held, it is changed first, so a long
-		   press must not select its words or open the browser's own menu. */
-		.suggestion {
-			-webkit-touch-callout: none;
-			user-select: none;
-			background: var(--wa-color-brand-fill-quiet);
-			color: var(--wa-color-text-normal);
-
-			&:hover {
-				background: var(--wa-color-brand-fill-normal);
-			}
+		/* Over the story, so each has a background of its own. */
+		.floating {
+			box-shadow: var(--wa-shadow-m);
 		}
 
-		/* The other ways to take the turn: outlined, with an icon. */
+		/* Continue and writing your own: outlined, with an icon. */
 		.other {
 			border-color: var(--wa-color-brand-border-normal);
-			background: transparent;
+			background: var(--wa-color-surface-raised);
 			color: var(--wa-color-brand-on-quiet);
 
 			&:hover {
 				background: var(--wa-color-brand-fill-quiet);
 			}
 		}
+
+		.your-turn {
+			background: var(--wa-color-surface-raised);
+			color: var(--wa-color-text-normal);
+			font-weight: var(--wa-font-weight-semibold);
+
+			&:hover {
+				background: var(--wa-color-brand-fill-quiet);
+			}
+
+			.count {
+				display: inline-grid;
+				place-items: center;
+				min-inline-size: 1.25rem;
+				block-size: 1.25rem;
+				padding-inline: var(--wa-space-3xs);
+				box-sizing: border-box;
+				border-radius: var(--wa-border-radius-pill);
+				background: var(--wa-color-brand-fill-loud);
+				color: var(--wa-color-brand-on-loud);
+				font-size: var(--wa-font-size-xs);
+				font-weight: var(--wa-font-weight-bold);
+			}
+		}
+
+		.problem {
+			align-self: flex-end;
+			margin: 0;
+			padding: var(--wa-space-2xs) var(--wa-space-s);
+			border-radius: var(--wa-border-radius-m);
+			background: var(--wa-color-surface-raised);
+			color: var(--wa-color-text-quiet);
+			font-size: var(--wa-font-size-s);
+		}
+
+		/* The button and the box it opens into are one thing to the view
+		   transition, so the one grows into the other. */
+		.write,
+		.reply {
+			view-transition-name: dream-reply;
+		}
+
+		.reply {
+			padding: var(--wa-space-s);
+			border-radius: var(--wa-border-radius-l);
+			background: var(--wa-color-surface-raised);
+			box-shadow: var(--wa-shadow-m);
+		}
 	}
 
-	.turn-chips {
+	/* The newest passage's suggestions, in the page: words to send as they
+	   are, solid. Held, one is changed first, so a long press must not select
+	   its words or open the browser's own menu. */
+	.suggestions {
 		display: flex;
 		flex-wrap: wrap;
 		justify-content: center;
@@ -1827,43 +2095,110 @@
 		li {
 			max-width: 100%;
 		}
+
+		.chip {
+			display: inline-flex;
+			align-items: center;
+			max-width: 100%;
+			padding: var(--wa-space-2xs) var(--wa-space-m);
+			border: 1px solid transparent;
+			border-radius: var(--wa-border-radius-pill);
+			font: inherit;
+			overflow-wrap: anywhere;
+			text-align: center;
+			cursor: pointer;
+
+			&:focus-visible {
+				outline: var(--wa-focus-ring);
+			}
+		}
+
+		.suggestion {
+			-webkit-touch-callout: none;
+			user-select: none;
+			background: var(--wa-color-brand-fill-quiet);
+			color: var(--wa-color-text-normal);
+
+			&:hover {
+				background: var(--wa-color-brand-fill-normal);
+			}
+		}
 	}
 
-	/* The button and the box it opens into are one thing to the view
-	   transition, so the one grows into the other. */
-	.write,
-	.reply {
-		view-transition-name: dream-reply;
-	}
-
+	/* Continue, Write and Your turn at the start, the player at the end. The
+	   turn's controls take what room the player leaves and wrap within it,
+	   which is what tells `fitLabels` a step is needed; the buttons never
+	   shrink, their labels step down instead. */
 	.turn-row {
 		display: flex;
 		align-items: center;
-		justify-content: center;
 		gap: var(--wa-space-xs);
+
+		.turn-controls {
+			display: flex;
+			flex: 0 1 auto;
+			flex-wrap: wrap;
+			align-items: center;
+			gap: var(--wa-space-xs);
+			min-inline-size: 0;
+
+			> * {
+				flex: none;
+			}
+		}
+
+		&[data-animating] .turn-controls {
+			flex-wrap: nowrap;
+		}
+
+		.gap {
+			flex: 1 1 0;
+			min-inline-size: 0;
+		}
+
+		.fits {
+			overflow: hidden;
+			white-space: nowrap;
+		}
+
+		.short {
+			display: none;
+		}
+
+		&[data-fit='1'],
+		&[data-fit='2'] {
+			.long {
+				display: none;
+			}
+
+			.short {
+				display: inline;
+			}
+		}
+
+		&[data-fit='2'],
+		&[data-fit='3'] {
+			.words {
+				display: none;
+			}
+		}
+
+		&[data-fit='3'] {
+			.long,
+			.short {
+				display: none;
+			}
+		}
 	}
 
-	/* The room the dock has left beside reading aloud. The scroller is inside
-	   the sticky box rather than the box itself: a scroller clips what is
-	   drawn beyond it, and the stuck background reaches right across the page. */
+	/* The room the box has, never more than half the screen. A little room
+	   inside, so a focus ring is not clipped. */
 	.dock-scroll {
 		flex: 0 1 auto;
 		min-height: 0;
 		overflow-y: auto;
 		overscroll-behavior: contain;
-	}
-
-	/* A little room inside the scroller, so a focus ring is not clipped. */
-	.dock-inner {
-		display: flex;
-		flex-direction: column;
-		gap: var(--wa-space-xs);
 		padding: var(--wa-space-3xs);
-	}
-
-	/* Zero height, only where it is matters (`watchStuck`). */
-	.dock-end {
-		block-size: 0;
 	}
 
 	.pull {

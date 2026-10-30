@@ -623,14 +623,14 @@ might write next (`{"suggest": [...]}`), in their own voice and varied: one
 going along with the moment, one resisting or turning it, one somewhere
 unexpected. They are never sent back to the model.
 
-**Your turn** is one centred list of chips under the story, the three ways
-to take it each drawn as what it is:
+**Your turn** is taken three ways, each drawn as what it is:
 
-- the newest passage's **suggestions**, solid: a tap sends one. Held (half a
-  second), or its menu opened (a right click, Android's long press, the menu
-  key), it goes into the box instead, to change before sending
-  (`holdToChange`; iOS sends no `contextmenu` for a long press, hence the
-  timer). A long press selects nothing and opens no menu of the browser's;
+- the newest passage's **suggestions**, solid chips centred in the page
+  after it, not floating: they are seen at the end of the story. A tap sends
+  one. Held (half a second), or its menu opened (a right click, Android's
+  long press, the menu key), it goes into the box instead, to change before
+  sending (`holdToChange`; iOS sends no `contextmenu` for a long press, hence
+  the timer). A long press selects nothing and opens no menu of the browser's;
 - **Continue daydream**, outlined, with a forward icon: handing the story on;
 - **Write response…**, outlined, with a pen, which grows into the box,
   focused, with Send and Cancel (a view transition, at once where the
@@ -638,21 +638,36 @@ to take it each drawn as what it is:
   keeping what it holds for when it is opened again; the box stays mounted
   while put away, so a draft is restored on load.
 
-The turn is in the **dock**, with the read-aloud player under it when
-reading aloud is on. The dock is sticky at the bottom of what scrolls, as
-the kink list's pinned bar is at the top: at the story's end it sits on the
-page with no background, and scrolled up it stays in sight with a
-background, faded in, right across the page (`watchStuck`, a sentinel just
-after it that is out of sight below exactly when it is stuck). It is never
-more than half the screen tall, so the story stays in sight on a phone: the
-player keeps its room, and what of the turn does not fit scrolls inside it,
-kept scrolled to its end, nearest the thumb (`startAtEnd`). The scroller is
-inside the sticky box rather than the box itself, because a scroller clips
-what is drawn beyond it, and the stuck background reaches right across the
-page. The player used to stick on its own, just above the turn, where the
-two could overlap.
+Continue and Write are in the **dock**: one row floating over the bottom of
+what scrolls (sticky), with no background of its own, so the story shows
+between what is in it; each thing in it is drawn on its own background with
+a shadow, and taps between them go through to the story. After them, while
+the suggestions are out of sight, comes **Your turn ↓** with how many there
+are, which scrolls to them (`watchSuggestions`, against `<main>` less the
+row's height). At the row's end is the read-aloud bubble (see "Read aloud").
 
-While a passage is being written, the area holds only Stop. The box empties
+The row never pushes the player off the screen. Its labels step down as room
+runs out (`fitLabels`): "Continue daydream" and "Write response…" become
+"Continue" and "Write…", then Your turn loses its words, keeping the arrow
+and the count, then Continue and Write are their icons alone. Each step is
+measured, not a breakpoint: tried in turn from the first until the turn's
+controls sit on one line, so a longer word or a bigger font still fits, and
+each button is named in full whatever it shows. When even the last step
+does not fit, the controls wrap onto a second line. A change of step
+animates each button from its old width to its new one (not where the
+device asks for less motion), held on one line meanwhile, since the widths
+part way would wrap it for a moment; a fit cancels any animation still
+running before it measures, and only a change of the row's width (not its
+height, which wrapping changes) asks for one.
+
+Writing, the dock is the box instead, on a background of its own, never more
+than half the screen tall so the story stays in sight on a phone: what does
+not fit scrolls, kept scrolled to its end, nearest the thumb (`startAtEnd`).
+The dock used to be a centred list of chips with the player under it, taking
+a background right across the page while stuck; on a phone that was three
+rows of the screen.
+
+While a passage is being written, the row holds only Stop (and the player). The box empties
 as its words are sent, not once the answer has finished, and gets them back
 if sending failed. It used to keep them until the end and then put them
 back: superforms writes the submitted form into the box after `onUpdate`,
@@ -1132,11 +1147,14 @@ speed), are kept on the device for every daydream, as the user left them
 (`dream-reading-options` in local storage, `reading-options.ts`): they are
 the reader's habits, not a story's. Being on only shows the player; it still
 waits for play. It adds a Listen button
-to each passage and a player in the dock, under the turn (see "Your
-turn"): who is speaking, back a
-sentence, play and pause, speed (0.75× to 2×, tapping cycles), "Read new
-passages" (reading that stopped at the end of a passage starts again when
-the next comes), "Highlight" and "Keep going". With read aloud on, tapping any word of a
+to each passage and a player at the end of the dock's row (see "Your
+turn"): a round play and pause button, ringed with how far through the
+passage reading is in the speaker's colour, the speaker announced to a
+screen reader as it changes; and ⋯, which opens **Reading options**: who is
+speaking, back a sentence, speed (0.75× to 2×, tapping cycles), "Keep
+going", "Read new passages" (reading that stopped at the end of a passage
+starts again when the next comes), "Highlight" and Voices. A problem reading
+shows above the row. With read aloud on, tapping any word of a
 passage plays from that word, before play has been pressed as much as
 while it reads: the whole utterance it is in is asked for, so the cues
 before the word still shape how it is said, and playback starts at the word

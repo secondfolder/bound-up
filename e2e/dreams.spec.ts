@@ -2,7 +2,14 @@ import { randomUUID } from 'node:crypto';
 import { expect, type Page } from '@playwright/test';
 import { sql } from './db';
 import { test } from './fixtures';
-import { account, clickWaButton, grantFeature, newAccount, waitForHydration } from './helpers';
+import {
+	account,
+	clickWaButton,
+	grantFeature,
+	newAccount,
+	settle,
+	waitForHydration
+} from './helpers';
 
 /**
  * The new daydream engine, end to end (docs/dreams.md), against the
@@ -74,6 +81,39 @@ async function passageMenu(page: Page, item: string) {
 	const passage = page.locator('li.passage').last();
 	await passage.getByRole('button', { name: 'More for this passage' }).click();
 	await passage.getByRole('menuitem', { name: item }).click();
+}
+
+/** The reading options sheet, opened from the player's ⋯. */
+async function readingOptions(page: Page) {
+	await page
+		.getByRole('region', { name: 'Reading aloud' })
+		.getByRole('button', { name: 'Reading options' })
+		.click();
+	const sheet = page.locator('wa-dialog[open]');
+	await expect(sheet.locator('.reading-options')).toBeVisible();
+	return sheet;
+}
+
+async function closeReadingOptions(page: Page) {
+	await page.keyboard.press('Escape');
+	await expect(page.locator('wa-dialog[open]')).toHaveCount(0);
+}
+
+/** Turns a reading option on or off, in its sheet. */
+async function toggleReadingOption(page: Page, name: string) {
+	const sheet = await readingOptions(page);
+	await sheet.getByRole('button', { name: new RegExp(name) }).click();
+	await closeReadingOptions(page);
+}
+
+/** Whether a reading option is on, as its sheet says. */
+async function expectReadingOption(page: Page, name: string, on: boolean) {
+	const sheet = await readingOptions(page);
+	await expect(sheet.getByRole('button', { name: new RegExp(name) })).toHaveAttribute(
+		'aria-pressed',
+		String(on)
+	);
+	await closeReadingOptions(page);
 }
 
 /** Waits for the newest passage to be saved, not just shown. */
@@ -281,7 +321,7 @@ test.describe('daydreams, the new engine', () => {
 		await expect(page.locator('ul.dreams li').first()).toContainText('1 passage');
 	});
 
-	test('the turn is a list of chips: suggestions, held to change first, Continue, and your own', async ({
+	test('the turn: suggestions in the page, held to change first, Continue, and your own', async ({
 		page
 	}) => {
 		await dreamer(page);
@@ -289,16 +329,16 @@ test.describe('daydreams, the new engine', () => {
 		await play(page);
 		await saved(page);
 
-		// Suggestions first, then Continue, then writing your own, in one list.
-		const chips = page.getByRole('list', { name: 'Your turn' });
+		// The suggestions, centred after the story; Continue and writing your own float.
+		const chips = page.getByRole('list', { name: 'Suggestions' });
 		await expect(chips.getByRole('button')).toHaveText([
 			'I take the key.',
-			'I leave it in her hand.',
-			'Continue daydream',
-			'Write response…'
+			'I leave it in her hand.'
 		]);
-		// Centred in the column.
 		await expect(chips).toHaveCSS('justify-content', 'center');
+		const dock = page.locator('.dock');
+		await expect(dock.getByRole('button', { name: 'Continue daydream' })).toBeVisible();
+		await expect(dock.getByRole('button', { name: 'Write response…' })).toBeVisible();
 
 		// Held rather than tapped, a suggestion goes into the box to change first,
 		// focused, and is not sent.
@@ -326,7 +366,7 @@ test.describe('daydreams, the new engine', () => {
 		await clickWaButton(page, 'Cancel');
 
 		// Put away, what the box holds is kept for when it is opened again.
-		const write = chips.getByRole('button', { name: 'Write response…' });
+		const write = dock.getByRole('button', { name: 'Write response…' });
 		await write.click();
 		await expect(turn).toHaveValue('I take the key.');
 		await expect(turn).toBeFocused();
@@ -351,7 +391,7 @@ test.describe('daydreams, the new engine', () => {
 		await expect(turn).toHaveValue('');
 	});
 
-	test('the turn sits at the story’s end, and stays in sight with a background above it', async ({
+	test('the turn floats over the story, says how many suggestions wait below, and fits its labels', async ({
 		page
 	}) => {
 		await page.setViewportSize({ width: 390, height: 480 });
@@ -359,31 +399,68 @@ test.describe('daydreams, the new engine', () => {
 		await start(page, 'A quiet evening');
 		await play(page);
 		await saved(page);
-		const turn = page.locator('.dock');
+		const dock = page.locator('.dock');
 		const main = page.locator('main');
+		const yourTurn = dock.getByRole('button', { name: 'Your turn: 2 suggestions below' });
+		const suggestions = page.getByRole('list', { name: 'Suggestions' });
 
-		// At the end of the story: no background of its own.
-		await main.evaluate((element) => element.scrollTo(0, element.scrollHeight));
-		await expect(turn).not.toHaveClass(/stuck/);
-		// Scrolled up, the story runs on under it, so it takes one.
+		// No background of its own: only what is in it is drawn.
+		await expect(dock).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+		// Scrolled up, the suggestions are out of sight, and Your turn says so.
 		await main.evaluate((element) => element.scrollTo(0, 0));
-		await expect(turn).toHaveClass(/stuck/);
-		await expect(turn.getByRole('button', { name: 'Continue daydream' })).toBeInViewport();
+		await expect(suggestions).not.toBeInViewport();
+		await expect(yourTurn).toBeInViewport();
+		await expect(yourTurn).toContainText('2');
+		await expect(dock.getByRole('button', { name: 'Continue daydream' })).toBeInViewport();
+		// To the right of Continue and Write.
+		const writeBox = await dock.getByRole('button', { name: 'Write response…' }).boundingBox();
+		const turnBox = await yourTurn.boundingBox();
+		expect(turnBox?.x ?? 0).toBeGreaterThan(writeBox?.x ?? 0);
+		// It takes you to them, and goes once they are in sight.
+		await yourTurn.click();
+		await expect(suggestions).toBeInViewport();
+		await expect(yourTurn).toHaveCount(0);
 
-		// Never more than half the screen: what does not fit scrolls, from its end.
+		// Labels step down as the room runs out, full, then short, then the icon
+		// alone, never back up as it narrows, and the button stays on the screen.
+		const continueButton = dock.getByRole('button', { name: 'Continue daydream' });
+		const labelShown = () =>
+			continueButton.evaluate((button) => {
+				const shown = (name: string) =>
+					getComputedStyle(button.querySelector(name) ?? button).display !== 'none';
+				if (shown('.long')) {
+					return 0;
+				}
+				return shown('.short') ? 1 : 2;
+			});
+		// From the top, so Your turn stays in the row throughout: the suggestions
+		// coming into sight as the page reflows would take it away, and give the
+		// rest its room back.
+		await main.evaluate((element) => element.scrollTo(0, 0));
+		await expect(yourTurn).toBeVisible();
+		const seen: number[] = [];
+		for (let width = 800; width >= 160; width -= 20) {
+			await page.setViewportSize({ width, height: 480 });
+			await settle(page);
+			seen.push(await labelShown());
+			await expect(continueButton).toBeInViewport({ ratio: 1 });
+		}
+		expect(seen).toEqual([...seen].sort((a, b) => a - b));
+		expect(seen).toContain(1);
+		expect(seen).toContain(2);
+		// With the room Your turn took, at the end of the page, every label is in full.
+		await page.setViewportSize({ width: 800, height: 480 });
+		await main.evaluate((element) => element.scrollTo(0, element.scrollHeight));
+		await expect(yourTurn).toHaveCount(0);
+		await expect(continueButton.locator('.long')).toBeVisible();
+
+		// Writing, the box is never more than half the screen.
 		await page.setViewportSize({ width: 320, height: 300 });
-		const scroller = page.locator('.dock-scroll');
+		await dock.getByRole('button', { name: 'Write response…' }).click();
+		await expect(box(page, 'Your turn')).toBeVisible();
 		await expect
-			.poll(() => turn.evaluate((element) => element.getBoundingClientRect().height))
+			.poll(() => dock.evaluate((element) => element.getBoundingClientRect().height))
 			.toBeLessThanOrEqual(150);
-		await expect
-			.poll(() =>
-				scroller.evaluate(
-					(element) => element.scrollHeight - element.clientHeight - element.scrollTop
-				)
-			)
-			.toBeLessThanOrEqual(1);
-		await expect(turn.getByRole('button', { name: 'Write response…' })).toBeInViewport();
 	});
 
 	test('a turn is drawn as it was read, written out for you, and can be read differently', async ({
@@ -663,16 +740,17 @@ test.describe('daydreams, the new engine', () => {
 		await play(page);
 		await saved(page);
 
-		const player = page.getByRole('region', { name: 'Reading aloud' });
-		const option = (name: string) => player.getByRole('button', { name: new RegExp(name) });
 		await page.getByRole('button', { name: 'Read aloud' }).click();
+		const sheet = await readingOptions(page);
+		const option = (name: string) => sheet.getByRole('button', { name: new RegExp(name) });
 		await option('Read new passages').click();
 		await option('Keep going').click();
 		await option('Highlight').click();
 		// A wa-button: its text is the host's, not the inner button's.
-		const speed = player.locator('wa-button', { hasText: 'Speed' });
+		const speed = sheet.locator('wa-button', { hasText: 'Speed' });
 		await speed.click();
 		await expect(speed).toContainText('1.25×');
+		await closeReadingOptions(page);
 
 		await page.reload();
 		await waitForHydration(page);
@@ -680,10 +758,12 @@ test.describe('daydreams, the new engine', () => {
 			'aria-pressed',
 			'true'
 		);
+		await readingOptions(page);
 		await expect(option('Read new passages')).toHaveAttribute('aria-pressed', 'true');
 		await expect(option('Keep going')).toHaveAttribute('aria-pressed', 'true');
 		await expect(option('Highlight')).toHaveAttribute('aria-pressed', 'false');
 		await expect(speed).toContainText('1.25×');
+		await closeReadingOptions(page);
 
 		// Turned off, it stays off.
 		await page.getByRole('button', { name: 'Read aloud' }).click();
@@ -711,12 +791,8 @@ test.describe('daydreams, the new engine', () => {
 			}
 		});
 		await page.getByRole('button', { name: 'Read aloud' }).click();
-		const player = page.getByRole('region', { name: 'Reading aloud' });
-		await player.getByRole('button', { name: 'Keep going' }).click();
-		await expect(player.getByRole('button', { name: /Keep going/ })).toHaveAttribute(
-			'aria-pressed',
-			'true'
-		);
+		await toggleReadingOption(page, 'Keep going');
+		await expectReadingOption(page, 'Keep going', true);
 		await passageMenu(page, 'Listen');
 
 		// Near the end of the opening (all of it, here), the story carries on by
@@ -795,11 +871,7 @@ test.describe('daydreams, the new engine', () => {
 		});
 		await page.getByRole('button', { name: 'Read aloud' }).click();
 		// "Read new passages" is off: it is only for a passage still to come.
-		const player = page.getByRole('region', { name: 'Reading aloud' });
-		await expect(player.getByRole('button', { name: /Read new passages/ })).toHaveAttribute(
-			'aria-pressed',
-			'false'
-		);
+		await expectReadingOption(page, 'Read new passages', false);
 		// The opening, read from its menu, goes on into the passage after it.
 		const opening = page.locator('li.passage').first();
 		await opening.getByRole('button', { name: 'More for this passage' }).click();
@@ -855,9 +927,8 @@ test.describe('daydreams, the new engine', () => {
 			}
 		});
 		await page.getByRole('button', { name: 'Read aloud' }).click();
-		const player = page.getByRole('region', { name: 'Reading aloud' });
 		// On, it used to start each new passage the moment it came.
-		await player.getByRole('button', { name: /Read new passages/ }).click();
+		await toggleReadingOption(page, 'Read new passages');
 		await passageMenu(page, 'Listen');
 		await expect
 			.poll(() => page.evaluate(() => CSS.highlights.has('dream-reading')), { timeout: 10_000 })
@@ -973,7 +1044,7 @@ test.describe('daydreams, the new engine', () => {
 		expect(asked.every((entry) => entry.voice === 'narrator')).toBe(true);
 
 		// A voice chosen for Ottilie, kept with the daydream.
-		await player.getByRole('button', { name: 'Voices' }).click();
+		await (await readingOptions(page)).getByRole('button', { name: 'Voices' }).click();
 		const dialog = page.locator('wa-dialog[open]');
 		// The user's own lines have a voice to choose too.
 		const yours = dialog.locator('.row').nth(1);
@@ -988,7 +1059,7 @@ test.describe('daydreams, the new engine', () => {
 		await page.keyboard.press('Escape');
 		await page.reload();
 		await waitForHydration(page);
-		await player.getByRole('button', { name: 'Voices' }).click();
+		await (await readingOptions(page)).getByRole('button', { name: 'Voices' }).click();
 		await expect(trigger).toHaveText('Smoky');
 		await page.keyboard.press('Escape');
 
@@ -1023,7 +1094,7 @@ test.describe('daydreams, the new engine', () => {
 		// Read to its end with Keep going off: nothing more was asked for.
 		await expect(page.locator('li.passage')).toHaveCount(1);
 
-		await player.getByRole('button', { name: 'Keep going' }).click();
+		await toggleReadingOption(page, 'Keep going');
 		await expect(page.locator('li.passage')).toHaveCount(2, { timeout: 20_000 });
 		await expect
 			.poll(() => read.some((text) => text.includes('waits for you to go on')), {
@@ -1109,7 +1180,7 @@ test.describe('daydreams, the new engine', () => {
 			);
 		await page.getByRole('button', { name: 'Read aloud' }).click();
 		const player = page.getByRole('region', { name: 'Reading aloud' });
-		await player.getByRole('button', { name: 'Keep going' }).click();
+		await toggleReadingOption(page, 'Keep going');
 		await passageMenu(page, 'Listen');
 		await expect(player.getByRole('button', { name: 'Pause' })).toBeVisible();
 		const notes = () => page.evaluate(() => (globalThis as unknown as { notes: number }).notes);
@@ -1405,13 +1476,15 @@ test.describe('daydreams, the new engine', () => {
 		await expect(player).toHaveCount(0);
 		await page.getByRole('button', { name: 'Read aloud' }).click();
 		await expect(player).toContainText('Tap Listen on a passage');
-		// In the dock, under the turn, so it stays in sight wherever the story is scrolled.
+		// A bubble at the end of the floating row, after the turn, so it stays in
+		// sight wherever the story is scrolled.
 		await expect(
 			page.locator('.dock').getByRole('region', { name: 'Reading aloud' })
 		).toBeVisible();
-		const chipsTop = (await page.getByRole('list', { name: 'Your turn' }).boundingBox())?.y ?? 0;
-		const playerTop = (await player.boundingBox())?.y ?? 0;
-		expect(playerTop).toBeGreaterThan(chipsTop);
+		const continueLeft =
+			(await page.getByRole('button', { name: 'Continue daydream' }).boundingBox())?.x ?? 0;
+		const playerLeft = (await player.boundingBox())?.x ?? 0;
+		expect(playerLeft).toBeGreaterThan(continueLeft);
 
 		const spoken = page.waitForRequest((request) => request.url().endsWith('/api/dreams/speak'));
 		await passageMenu(page, 'Listen');
@@ -1474,6 +1547,21 @@ test.describe('daydreams, the new engine', () => {
 		await reply(page, 'I wait.');
 		expect((await next).postDataJSON().setup.capabilities).toContain('voice');
 		await saved(page);
+
+		// Too narrow for even the icons on one line, the turn's controls wrap
+		// rather than push the player off the screen.
+		await page.setViewportSize({ width: 200, height: 600 });
+		const dock = page.locator('.dock');
+		await expect(player.getByRole('button', { name: 'Play' })).toBeInViewport({ ratio: 1 });
+		await expect(dock.getByRole('button', { name: 'Write response…' })).toBeInViewport({
+			ratio: 1
+		});
+		const rows = await dock
+			.locator('.turn-controls > *')
+			.evaluateAll(
+				(controls) => new Set(controls.map((control) => control.getBoundingClientRect().top)).size
+			);
+		expect(rows).toBeGreaterThan(1);
 	});
 
 	test('is only for an account with the feature', async ({ page }) => {
