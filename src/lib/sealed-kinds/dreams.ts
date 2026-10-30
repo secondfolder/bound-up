@@ -221,7 +221,21 @@ const passageSchema = z.object({
 	 * differently"), kept and sent with that turn from then on. Added in
 	 * place before the engine was deployed (sealed-fixtures/README.md).
 	 */
-	readAs: z.enum(READINGS).optional()
+	readAs: z.enum(READINGS).optional(),
+	/**
+	 * Its tokens and cost, and how much of its prompt the provider's cache
+	 * served, for debug mode (docs/dreams.md, "Debug mode"). Added in place
+	 * before the engine was deployed.
+	 */
+	usage: z
+		.object({
+			promptTokens: z.number().int().min(0),
+			cachedTokens: z.number().int().min(0),
+			completionTokens: z.number().int().min(0),
+			cost: z.number().nullable(),
+			latencyMs: z.number().int().min(0).optional()
+		})
+		.optional()
 });
 
 /**

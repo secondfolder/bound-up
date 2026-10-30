@@ -29,12 +29,35 @@
 
 export type Ended = 'complete' | 'stopped' | 'refused' | 'failed';
 
+/** A reply's tokens and cost, as the provider reported them. */
+export type ReplyUsage = {
+	promptTokens: number;
+	cachedTokens: number;
+	completionTokens: number;
+	cost: number | null;
+};
+
 export type DreamEvent =
 	| { type: 'text'; text: string }
 	| { type: 'thinking'; text: string }
 	| { type: 'restart'; reason: 'refused' | 'failed' }
-	| { type: 'done'; ended: Ended; model: string; provider: string }
-	| { type: 'failed'; message: string }
+	| {
+			type: 'done';
+			ended: Ended;
+			model: string;
+			provider: string;
+			/** What it cost, and how much of the prompt the provider's cache served. */
+			usage?: ReplyUsage;
+			latencyMs?: number;
+	  }
+	| {
+			type: 'failed';
+			message: string;
+			/** What went wrong, only for an account that can turn on debug mode. */
+			detail?: string;
+	  }
+	/** The request as it went to the model, only for an account that can turn on debug mode. */
+	| { type: 'exchange'; request: unknown }
 	| { type: 'fetch'; url: string; ok: boolean; allowed: boolean }
 	| { type: 'search'; query: string; ok: boolean }
 	| { type: 'research'; text: string }
@@ -74,6 +97,7 @@ function decode(name: string, data: string): DreamEvent | null {
 		case 'failed':
 		case 'fetch':
 		case 'search':
+		case 'exchange':
 			return event;
 		default:
 			return null;

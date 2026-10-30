@@ -111,6 +111,24 @@ export type Streaming = {
 
 type Opened<T> = { turnId: string; value: T };
 
+/** What really went wrong, for debug mode: the server's detail, or the page's own error. */
+function detailOf(cause: unknown): string | null {
+	if (cause instanceof DreamRequestError) {
+		return cause.detail;
+	}
+	return cause instanceof Error ? (cause.stack ?? cause.message) : String(cause);
+}
+
+/** A request to the model and what came back, for debug mode. */
+export type Exchange = {
+	request: unknown;
+	reply: string;
+	thinking: string;
+	provider: string;
+	usage?: StreamResult['usage'];
+	latencyMs?: number;
+};
+
 /** How many of the user's other daydreams are read for recent directions and names. */
 const RECENT_DREAMS = 20;
 
@@ -203,6 +221,14 @@ export class DreamSession {
 	 * passages for delivery cues and sounds. For this page only.
 	 */
 	listening = $state(false);
+	/** What really went wrong with `problem`, for debug mode. */
+	problemDetail = $state<string | null>(null);
+	/**
+	 * Each request as it went to the model, with its reply, by turn for a
+	 * passage and by step for the setup, for debug mode: only an account that
+	 * can turn it on is sent them, and they are kept for this page only.
+	 */
+	exchanges = $state(new Map<string, Exchange>());
 	/** Notices for the user, newest last. */
 	notices = $state<DreamNotice[]>([]);
 	readonly #seed: () => number;
@@ -325,6 +351,7 @@ export class DreamSession {
 		const abort = new AbortController();
 		this.#abort = abort;
 		this.problem = null;
+		this.problemDetail = null;
 		try {
 			await work(abort.signal);
 		} catch (cause) {
@@ -333,6 +360,9 @@ export class DreamSession {
 					cause instanceof DreamRequestError
 						? cause.message
 						: 'Something went wrong. Please try again.';
+				// Shown only in debug mode: what the server said, for an account
+				// that can turn it on, or the error this page met itself.
+				this.problemDetail = detailOf(cause);
 			}
 		} finally {
 			if (this.#abort === abort) {
@@ -393,6 +423,7 @@ export class DreamSession {
 		this.lookups = [];
 		this.researched = null;
 		let researched: string | null = null;
+		const watch = this.#watch();
 		const reply = await streamReply(
 			'read',
 			readRequestFor(setup, this.worded, drawNudges(cryptoRandom), {
@@ -401,8 +432,7 @@ export class DreamSession {
 			}),
 			{
 				signal,
-				onText: (text) => this.#streamed(text),
-				onThinking: (thinking) => this.#thought(thinking),
+				...watch.options,
 				onLookup: (lookup) => {
 					this.lookups = [...this.lookups, lookup];
 				},
@@ -418,6 +448,7 @@ export class DreamSession {
 				502
 			);
 		}
+		watch.keep('setup:read', reply);
 		const reading = parseBriefReading(reply.text);
 		// A separate research step's findings are kept as written: the reading
 		// was told not to repeat them (docs/dreams.md, "Research").
@@ -432,15 +463,13 @@ export class DreamSession {
 
 	async #build(setup: DreamSetup, signal: AbortSignal) {
 		this.streaming = { what: 'build', text: '' };
+		const watch = this.#watch();
 		const reply = await streamReply(
 			'build',
 			buildRequestFor(setup, this.worded, this.#previousBuild, await this.#recent(setup)),
-			{
-				signal,
-				onText: (text) => this.#streamed(text),
-				onThinking: (thinking) => this.#thought(thinking)
-			}
+			{ signal, ...watch.options }
 		);
+		watch.keep('setup:build', reply);
 		const { passage, ...build } = parseBuild(reply.text);
 		if (!(build.title && passage) || reply.ended === 'refused') {
 			throw new DreamRequestError(
@@ -452,14 +481,16 @@ export class DreamSession {
 		// Shown to the user before it is played: the summary waits on Start
 		// (docs/dreams.md, "The setup page").
 		await this.#saveSetup({ ...setup, build, awaitingStart: true });
-		await this.#keepPassage({
+		const opening = await this.#keepPassage({
 			parentId: null,
 			request: 'opening',
 			source: passage,
 			ended: reply.ended === 'complete' ? 'complete' : reply.ended,
 			model: reply.model,
-			provider: reply.provider
+			provider: reply.provider,
+			...(reply.usage ? { usage: { ...reply.usage, latencyMs: reply.latencyMs } } : {})
 		});
+		watch.keep(opening, reply);
 	}
 
 	#recentSetups: Promise<DreamSetup[]> | null = null;
@@ -488,6 +519,46 @@ export class DreamSession {
 		if (this.streaming) {
 			this.streaming = { ...this.streaming, text };
 		}
+	}
+
+	/**
+	 * The callbacks every streamed request shares (its words and thinking as
+	 * they come, and the request itself for debug mode), and `keep`, which
+	 * files the request with its reply under a key once it has one.
+	 */
+	#watch() {
+		let request: unknown = null;
+		let thinking = '';
+		return {
+			options: {
+				onText: (text: string) => this.#streamed(text),
+				onThinking: (text: string) => {
+					thinking = text;
+					this.#thought(text);
+				},
+				onExchange: (sent: unknown) => {
+					request = sent;
+				}
+			},
+			keep: (key: string, reply: StreamResult) => this.#record(key, request, reply, thinking)
+		};
+	}
+
+	/** Keeps a request and its reply for debug mode, when the server sent the request. */
+	#record(key: string, request: unknown, reply: StreamResult, thinking: string) {
+		if (request === null) {
+			return;
+		}
+		const next = new Map(this.exchanges);
+		next.set(key, {
+			request,
+			reply: reply.text,
+			thinking,
+			provider: reply.provider,
+			...(reply.usage ? { usage: reply.usage } : {}),
+			...(reply.latencyMs === undefined ? {} : { latencyMs: reply.latencyMs })
+		});
+		this.exchanges = next;
 	}
 
 	#thought(thinking: string) {
@@ -1039,12 +1110,9 @@ export class DreamSession {
 			}
 		}
 		let reply: StreamResult;
+		const watch = this.#watch();
 		try {
-			reply = await streamReply('passage', body, {
-				signal: input.signal,
-				onText: (text) => this.#streamed(text),
-				onThinking: (thinking) => this.#thought(thinking)
-			});
+			reply = await streamReply('passage', body, { signal: input.signal, ...watch.options });
 		} catch (cause) {
 			// Stopped: what arrived is kept as a version, like a failure part way.
 			const text = this.streaming?.text ?? '';
@@ -1061,8 +1129,10 @@ export class DreamSession {
 			ended: reply.ended,
 			model: reply.model,
 			provider: reply.provider,
-			...(input.readAs ? { readAs: input.readAs } : {})
+			...(input.readAs ? { readAs: input.readAs } : {}),
+			...(reply.usage ? { usage: { ...reply.usage, latencyMs: reply.latencyMs } } : {})
 		});
+		watch.keep(kept, reply);
 		this.chips = input.different && others.length > 0 ? { turnId: kept, options: others } : null;
 		if (reply.ended === 'refused' || reply.ended === 'failed') {
 			this.problem =
@@ -1086,6 +1156,7 @@ export class DreamSession {
 		model: string;
 		provider: string;
 		readAs?: Reading;
+		usage?: DreamPassageTurn['usage'];
 	}) {
 		const id = crypto.randomUUID();
 		const turn: DreamPassageTurn = {
@@ -1095,7 +1166,8 @@ export class DreamSession {
 			ended: input.ended,
 			model: input.model,
 			provider: input.provider,
-			...(input.readAs ? { readAs: input.readAs } : {})
+			...(input.readAs ? { readAs: input.readAs } : {}),
+			...(input.usage ? { usage: input.usage } : {})
 		};
 		await appendTurn(this.id, { id, parentId: input.parentId, role: 'model', content: turn });
 		const parentIndex = this.path.findIndex((entry) => entry.id === input.parentId);

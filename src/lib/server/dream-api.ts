@@ -1,4 +1,4 @@
-import { error, isHttpError, json } from '@sveltejs/kit';
+import { error, json } from '@sveltejs/kit';
 import { type DreamEvent, encodeEvent } from '$lib/dream/events';
 import { classifyReply } from '$lib/model-providers';
 import { splitOpenRouterModelId } from '$lib/model-search';
@@ -9,7 +9,7 @@ import type { ModelMessage } from '$lib/server/dream/prompts/core';
 import { researchMessages } from '$lib/server/dream/prompts/research';
 import { relay, toolEvent } from '$lib/server/dream/relay';
 import { SAMPLING, type Sampling } from '$lib/server/dream/sampling';
-import { requireFeature } from '$lib/server/features';
+import { requireFeature, userHasFeature } from '$lib/server/features';
 import { recordOutcome, routeToBest } from '$lib/server/model-providers/store';
 import { rateLimitMessage } from '$lib/server/rate-limit';
 import { SSE_HEADERS } from '$lib/server/realtime';
@@ -186,6 +186,7 @@ export async function streamStory(
 		return refused;
 	}
 	const routing = await route(event.locals, config);
+	const debug = await canDebug(event.locals, userId);
 	const replyTo = (resolved: StoryCall) => {
 		const { lookups } = resolved;
 		return relay({
@@ -204,6 +205,7 @@ export async function streamStory(
 			configuredModel: config.openrouterModelId,
 			providers: routing.providers,
 			record: routing.record,
+			debug,
 			...(lookups && looksUp(lookups)
 				? {
 						hosts: lookups.fetch?.hosts ?? [],
@@ -349,40 +351,74 @@ export async function askOnce(
 	}
 	const routing = await route(event.locals, config);
 	const [provider] = routing.providers;
+	const debug = await canDebug(event.locals, userId);
+	const request = {
+		// Unchecked, unpinned, under the model as configured: see `route`.
+		model: provider ? routing.listed : config.openrouterModelId,
+		messages: call.messages,
+		temperature: call.temperature,
+		minP: call.minP,
+		maxTokens: call.maxTokens,
+		...(provider ? { providers: [provider] } : {})
+	};
 	try {
 		const reply = await complete({
 			baseUrl: config.baseUrl,
 			apiKey: config.apiKey,
-			// Unchecked, unpinned, under the model as configured: see `route`.
-			model: provider ? routing.listed : config.openrouterModelId,
-			messages: call.messages,
-			temperature: call.temperature,
-			minP: call.minP,
-			maxTokens: call.maxTokens,
 			signal: event.request.signal,
-			...(provider ? { providers: [provider] } : {})
+			...request
 		});
+		const about = {
+			model: routing.listed,
+			provider: provider ?? reply.provider ?? '',
+			usage: reply.usage,
+			latencyMs: reply.latencyMs,
+			...(debug ? { request } : {})
+		};
 		// Only a refusal counts against a provider here: a fill's answer can
 		// rightly be short (`<elements></elements>`), which a passage's cannot.
 		if (classifyReply(reply.text, reply.finishReason) === 'refused') {
 			if (provider) {
 				await routing.record(provider, 'refused');
 			}
-			error(502, 'That could not be filled in just now. Try again in a moment.');
+			return failure(
+				debug,
+				`Refused by ${about.provider || 'the provider'}:\n${reply.text.slice(0, 2000)}`
+			);
 		}
 		if (provider) {
 			await routing.record(provider, 'complied');
 		}
-		return json({ text: reply.text });
+		return json({ text: reply.text, ...about });
 	} catch (cause) {
-		if (isHttpError(cause)) {
-			throw cause;
-		}
 		if (provider) {
 			await routing.record(provider, 'error').catch(() => undefined);
 		}
 		// Not the error: an upstream message can quote the request back.
 		console.error('[dreams] a fill call failed');
-		error(502, 'That could not be filled in just now. Try again in a moment.');
+		return failure(debug, cause instanceof Error ? cause.message : String(cause));
 	}
+}
+
+const FILL_FAILED = 'That could not be filled in just now. Try again in a moment.';
+
+/**
+ * A small call that could not be answered: a 502 the page can retry, saying
+ * what went wrong only to an account that can turn on debug mode, whose page
+ * shows it when debug mode is on (docs/dreams.md, "Debug mode").
+ */
+function failure(debug: boolean, detail: string): Response {
+	return json(
+		{ message: FILL_FAILED, ...(debug ? { detail: detail.slice(0, 4000) } : {}) },
+		{ status: 502 }
+	);
+}
+
+/**
+ * Whether the account holds debug mode: the feature, not the device's
+ * switch, which only decides what the page shows. It decides whether what
+ * went wrong, and what was sent, come back with an answer.
+ */
+async function canDebug(locals: App.Locals, userId: string): Promise<boolean> {
+	return await userHasFeature(locals.db, userId, 'debugMode');
 }

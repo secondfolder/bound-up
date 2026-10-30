@@ -137,6 +137,26 @@ passage, a fraction of a cent on the models in use (measured 2026-10-30),
 and the prompt asks for restraint instead: "there to use, never to use up".
 A build from before still has its `capabilities`, which nothing reads.
 
+### Debug mode
+
+Only an account that holds debug mode (the feature, not the device's switch,
+which only decides what is shown) is sent what debug mode shows:
+
+- **The request as it went to the model** (`exchange` events on a streamed
+  reply; `request` with a small call's answer), never the key. The page keeps
+  each with its reply and the model's thinking for as long as it is open
+  (`session.exchanges`), by turn for a passage and by step for the setup.
+- **What really went wrong** (`detail` on a `failed` event or a 502): an
+  upstream error, a refusal's words. With debug mode on, the setup page
+  shows it under its problem, and an error the page met itself (the one that
+  reads "Something went wrong") shows its own message and stack.
+
+Every reply also says what it cost and how much of its prompt the cache
+served (`usage` on `done`), which each passage keeps (`usage` on the turn).
+With debug mode on, each passage's end shows "N% cached" and an info button
+that opens the request (`DreamExchange`): provider, model, tokens, cost,
+time, and the full transcript when this page sent it.
+
 ### Prompt caching
 
 The providers cache a prompt's opening by themselves; no request asks for

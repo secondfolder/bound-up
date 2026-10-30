@@ -385,6 +385,31 @@ test.describe('daydreams, the new engine', () => {
 		expect(designedAgain).toBe(false);
 	});
 
+	test('in debug mode, each passage says how much was cached, and shows its request', async ({
+		page
+	}) => {
+		const who = await dreamer(page);
+		await grantFeature(who.email, 'debugMode');
+		await page
+			.context()
+			.addCookies([{ name: 'debug', value: '1', url: new URL(page.url()).origin }]);
+		// The app shell read the account's features before the grant.
+		await page.reload();
+		await waitForHydration(page);
+		await start(page, 'A quiet evening');
+		await play(page);
+		await saved(page);
+
+		const last = page.locator('li.passage').last();
+		await expect(last.getByText(/^\d+% cached$/)).toBeVisible();
+		await last.getByRole('button', { name: "About this passage's request" }).click();
+		const dialog = page.locator('wa-dialog[open]');
+		await expect(dialog.getByText('Provider', { exact: true })).toBeVisible();
+		// Kept on this page: the messages sent, and the reply.
+		await expect(dialog.getByText('Sent', { exact: true })).toBeVisible();
+		await expect(dialog.getByText('system', { exact: true })).toBeVisible();
+	});
+
 	test('choosing first, Surprise me, and Try another idea', async ({ page }) => {
 		await dreamer(page);
 		await start(page, 'A quiet evening [pick]');

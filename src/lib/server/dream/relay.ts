@@ -48,6 +48,11 @@ export type RelayOptions = {
 	) => Promise<Completion>;
 	/** The sites a fetch may read from; a page elsewhere is shown as not allowed. */
 	hosts?: readonly string[];
+	/**
+	 * Whether the account can turn on debug mode: then each attempt's request
+	 * is sent, and a failure says what it was (docs/dreams.md, "Debug mode").
+	 */
+	debug?: boolean;
 };
 
 function endedFor(outcome: ReplyOutcome, finishReason: string | null): Ended {
@@ -94,21 +99,25 @@ export function relay(options: RelayOptions): ReadableStream<Uint8Array> {
 				const last = index === plan.length - 1;
 				let wrote = false;
 				let completion: Completion;
+				const attempt = {
+					...options.request,
+					model: provider ? options.listedModel : options.configuredModel,
+					...(provider ? { providers: [provider] } : {})
+				};
+				if (options.debug) {
+					const { signal: _signal, apiKey: _key, ...shown } = attempt;
+					send({ type: 'exchange', request: shown });
+				}
 				try {
 					completion = await call(
-						{
-							...options.request,
-							model: provider ? options.listedModel : options.configuredModel,
-							...(provider ? { providers: [provider] } : {}),
-							onReasoning: (text) => send({ type: 'thinking', text })
-						},
+						{ ...attempt, onReasoning: (text) => send({ type: 'thinking', text }) },
 						(text) => {
 							wrote = true;
 							send({ type: 'text', text });
 						},
 						(used) => send(toolEvent(used, options.hosts ?? []))
 					);
-				} catch {
+				} catch (cause) {
 					// Stopped by the user: nobody's fault, and nothing to send.
 					if (options.request.signal?.aborted || cancelled) {
 						close();
@@ -118,7 +127,13 @@ export function relay(options: RelayOptions): ReadableStream<Uint8Array> {
 						await options.record(provider, 'error').catch(() => undefined);
 					}
 					if (wrote || last) {
-						send({ type: 'failed', message: FAILED_MESSAGE });
+						send({
+							type: 'failed',
+							message: FAILED_MESSAGE,
+							...(options.debug
+								? { detail: cause instanceof Error ? cause.message : String(cause) }
+								: {})
+						});
 						close();
 						return;
 					}
@@ -134,7 +149,9 @@ export function relay(options: RelayOptions): ReadableStream<Uint8Array> {
 						type: 'done',
 						ended: endedFor(outcome, completion.finishReason),
 						model: options.listedModel,
-						provider: provider ?? completion.provider ?? ''
+						provider: provider ?? completion.provider ?? '',
+						usage: completion.usage,
+						latencyMs: completion.latencyMs
 					});
 					close();
 					return;

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount, tick } from 'svelte';
 	import type { Attachment } from 'svelte/attachments';
+	import { page } from '$app/state';
 	import ResponsiveDialog from '$lib/components/ResponsiveDialog.svelte';
 	import { unlockedIdentity } from '$lib/crypto/session.svelte';
 	import { elementLabel, linkableNames } from '$lib/dream/elements';
@@ -22,6 +23,7 @@
 	import { MAX_INPUT_CHARS, MAX_PASSAGE_CHARS } from '$lib/sealed-kinds/dreams';
 	import type { FishVoicePresetId } from '$lib/server-settings';
 	import DreamCard from './DreamCard.svelte';
+	import DreamExchange from './DreamExchange.svelte';
 	import DreamMarkup, { type MarkupInputs } from './DreamMarkup.svelte';
 	import DreamNotices from './DreamNotices.svelte';
 	import DreamTextBox from './DreamTextBox.svelte';
@@ -69,6 +71,21 @@
 	const build = $derived(session.setup?.build ?? null);
 
 	let cardId = $state<string | null>(null);
+	/** Debug mode, on this device for an account that holds it: display only. */
+	const debugOn = $derived(Boolean(page.data.debug));
+	/** The passage whose request is shown, in debug mode. */
+	let aboutId = $state<string | null>(null);
+	const about = $derived(
+		aboutId ? session.path.find((entry) => entry.id === aboutId)?.turn : undefined
+	);
+
+	function showAbout(turnId: string) {
+		aboutId = turnId;
+	}
+
+	function cachedShare(usage: { promptTokens: number; cachedTokens: number }): number {
+		return usage.promptTokens > 0 ? Math.round((usage.cachedTokens / usage.promptTokens) * 100) : 0;
+	}
 	let turnBox = $state<ReturnType<typeof DreamTextBox> | null>(null);
 	let editing = $state<{ turnId: string; source: string } | null>(null);
 	const card = $derived(elements.find((element) => element.id === cardId) ?? null);
@@ -627,6 +644,15 @@
 								Edit
 							</wa-dropdown-item>
 						</wa-dropdown>
+						{#if debugOn}
+							<!-- Debug mode: how much of the prompt the cache served, and the request. -->
+							{#if passage.usage}
+								<span class="debug-note">{cachedShare(passage.usage)}% cached</span>
+							{/if}
+							<wa-button size="s" appearance="plain" onclick={() => showAbout(entry.id)}>
+								<wa-icon name="circle-info" label="About this passage's request"></wa-icon>
+							</wa-button>
+						{/if}
 						{#if versions.ids.length > 1}
 							<span class="versions">
 								<wa-button
@@ -780,6 +806,23 @@
 		</DreamTextBox>
 	</div>
 </div>
+
+{#if about?.kind === 'passage' && aboutId}
+	<DreamExchange
+		label="About this passage's request"
+		about={{
+			provider: about.provider,
+			model: about.model,
+			usage: about.usage,
+			ended: about.ended,
+			request: about.request
+		}}
+		exchange={session.exchanges.get(aboutId)}
+		onclose={() => {
+			aboutId = null;
+		}}
+	/>
+{/if}
 
 {#if card}
 	<DreamCard
@@ -1191,5 +1234,11 @@
 		overflow: hidden;
 		color: var(--wa-color-text-quiet);
 		font-size: var(--wa-font-size-s);
+	}
+
+	.debug-note {
+		font-family: var(--wa-font-family-code);
+		font-size: var(--wa-font-size-xs);
+		color: var(--wa-color-text-quiet);
 	}
 </style>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import RadioButton from '$lib/components/segmented/RadioButton.svelte';
 	import RadioButtonGroup from '$lib/components/segmented/RadioButtonGroup.svelte';
 	import { type Build, parseBuild } from '$lib/dream/build';
@@ -44,6 +45,8 @@
 	} = $props();
 
 	const setup = $derived(session.setup);
+	/** Debug mode, on this device for an account that holds it: display only. */
+	const debugOn = $derived(Boolean(page.data.debug));
 	const streaming = $derived(session.streaming);
 	/** The reading, as it streams or as kept. */
 	const reading = $derived(
@@ -388,6 +391,10 @@
 	{#if session.problem}
 		<wa-callout variant="danger">
 			<p>{session.problem}</p>
+			{#if debugOn && session.problemDetail}
+				<!-- Debug mode: what really went wrong, for an account that can turn it on. -->
+				<pre class="problem-detail">{session.problemDetail}</pre>
+			{/if}
 			<wa-button size="s" appearance="outlined" onclick={() => session.runSetup()}>Try again</wa-button>
 		</wa-callout>
 	{/if}
@@ -879,6 +886,15 @@
 		margin: 0;
 		padding-left: 1.25em;
 		font-size: var(--wa-font-size-s);
+		overflow-wrap: anywhere;
+	}
+
+	.problem-detail {
+		max-height: 16rem;
+		margin: var(--wa-space-xs) 0 0;
+		overflow: auto;
+		font-size: var(--wa-font-size-xs);
+		white-space: pre-wrap;
 		overflow-wrap: anywhere;
 	}
 </style>

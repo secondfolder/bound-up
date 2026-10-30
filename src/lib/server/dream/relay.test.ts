@@ -38,7 +38,7 @@ function stubStream(script: Script) {
 	});
 }
 
-async function run(providers: string[], script: Script) {
+async function run(providers: string[], script: Script, debug = false) {
 	const recorded: [string, ReplyOutcome][] = [];
 	const stream = stubStream(script);
 	const body = relay({
@@ -50,7 +50,8 @@ async function run(providers: string[], script: Script) {
 			recorded.push([provider, outcome]);
 			return Promise.resolve();
 		},
-		stream
+		stream,
+		debug
 	});
 	const events: DreamEvent[] = [];
 	for await (const event of readEvents(body)) {
@@ -66,6 +67,7 @@ async function run(providers: string[], script: Script) {
 		search: () => '',
 		research: () => '',
 		thinking: () => '',
+		exchange: () => '',
 		audio: () => '',
 		words: () => ''
 	};
@@ -84,8 +86,12 @@ describe('relay', () => {
 			type: 'done',
 			ended: 'complete',
 			model: 'z-ai/glm-5.2',
-			provider: 'open/fp8'
+			provider: 'open/fp8',
+			usage: { promptTokens: 1, cachedTokens: 0, completionTokens: 1, cost: 0 },
+			latencyMs: 1
 		});
+		// Only an account that can turn on debug mode is sent the request.
+		expect(events.some((event) => event.type === 'exchange')).toBe(false);
 		expect(recorded).toEqual([['open/fp8', 'complied']]);
 		expect(stream.mock.calls[0]?.[0]).toMatchObject({
 			model: 'z-ai/glm-5.2',
@@ -183,5 +189,13 @@ describe('relay', () => {
 		expect(events.filter((event) => event.type === 'search')).toEqual([
 			{ type: 'search', query: 'obedience captions', ok: true }
 		]);
+	});
+
+	it('sends a debug account the request, never the key, and what a failure was', async () => {
+		const { events } = await run(['open/fp8'], { 'open/fp8': { text: '', fail: 'before' } }, true);
+		const exchange = events.find((event) => event.type === 'exchange');
+		expect(exchange).toMatchObject({ request: { model: 'z-ai/glm-5.2', providers: ['open/fp8'] } });
+		expect(JSON.stringify(exchange)).not.toContain('"apiKey"');
+		expect(events.at(-1)).toMatchObject({ type: 'failed', detail: expect.any(String) });
 	});
 });

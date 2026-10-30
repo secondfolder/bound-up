@@ -12,7 +12,7 @@
 import { decryptAttachment, encryptAttachment } from '$lib/crypto/messages';
 import { openRecord, sealRecord } from '$lib/crypto/sealed';
 import { vaultById, vaultsSettled } from '$lib/crypto/vaults.svelte';
-import { type DreamEvent, type Ended, readEvents } from '$lib/dream/events';
+import { type DreamEvent, type Ended, type ReplyUsage, readEvents } from '$lib/dream/events';
 import type {
 	BuildRequest,
 	DesignRequest,
@@ -47,10 +47,13 @@ import type { SealedRefView } from '$lib/types';
 
 export class DreamRequestError extends Error {
 	readonly status: number;
+	/** What really went wrong, sent only to an account that can turn on debug mode. */
+	readonly detail: string | null;
 
-	constructor(message: string, status: number) {
+	constructor(message: string, status: number, detail: string | null = null) {
 		super(message);
 		this.status = status;
+		this.detail = detail;
 	}
 }
 
@@ -60,8 +63,15 @@ async function send(url: string, init?: RequestInit): Promise<Response> {
 		throw new DreamRequestError(NETWORK_FAILURE, 0);
 	}
 	if (!response.ok) {
-		const body = (await response.json().catch(() => null)) as { message?: string } | null;
-		throw new DreamRequestError(body?.message ?? SERVER_FAILURE, response.status);
+		const body = (await response.json().catch(() => null)) as {
+			message?: string;
+			detail?: string;
+		} | null;
+		throw new DreamRequestError(
+			body?.message ?? SERVER_FAILURE,
+			response.status,
+			body?.detail ?? null
+		);
 	}
 	return response;
 }
@@ -225,6 +235,9 @@ export type StreamResult = {
 	ended: Ended;
 	model: string;
 	provider: string;
+	/** Tokens, cost and how much the cache served, as the provider reported them. */
+	usage?: ReplyUsage;
+	latencyMs?: number;
 };
 
 /** A page read or a search made for a brief (docs/dreams.md, "Research"). */
@@ -247,6 +260,8 @@ export async function streamReply<Path extends keyof StreamPaths>(
 		onText?: (text: string) => void;
 		/** The model's thinking so far, as it streams; reset with the reply on a restart. */
 		onThinking?: (thinking: string) => void;
+		/** The request as it went to the model, for an account that can turn on debug mode. */
+		onExchange?: (request: unknown) => void;
 		/** A page read or a search made for the brief, as it happens. */
 		onLookup?: (lookup: Lookup) => void;
 		/** What a separate research step found, kept as the daydream's research. */
@@ -273,6 +288,10 @@ export async function streamReply<Path extends keyof StreamPaths>(
 				options.onThinking?.(thinking);
 				continue;
 			}
+			if (event.type === 'exchange') {
+				options.onExchange?.(event.request);
+				continue;
+			}
 			if (event.type === 'text') {
 				text += event.text;
 				options.onText?.(text);
@@ -294,12 +313,23 @@ export async function streamReply<Path extends keyof StreamPaths>(
 		last = { type: 'failed', message: NETWORK_FAILURE };
 	}
 	if (last?.type === 'done') {
-		return { text, ended: last.ended, model: last.model, provider: last.provider };
+		return {
+			text,
+			ended: last.ended,
+			model: last.model,
+			provider: last.provider,
+			...(last.usage ? { usage: last.usage } : {}),
+			...(last.latencyMs === undefined ? {} : { latencyMs: last.latencyMs })
+		};
 	}
 	if (text) {
 		return { text, ended: 'failed', model: '', provider: '' };
 	}
-	throw new DreamRequestError(last?.type === 'failed' ? last.message : SERVER_FAILURE, 502);
+	throw new DreamRequestError(
+		last?.type === 'failed' ? last.message : SERVER_FAILURE,
+		502,
+		last?.type === 'failed' ? (last.detail ?? null) : null
+	);
 }
 
 async function askWhole(path: string, body: unknown, signal?: AbortSignal): Promise<string> {
