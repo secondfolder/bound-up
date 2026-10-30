@@ -6,10 +6,10 @@
  * covers, and the latest timings for that chunk, `chunk_seq`).
  *
  * The S2 models read free words in square brackets as directions, which is
- * how the story model's delivery cues reach them. S2 Pro speaks adult text
- * as written: measured 2026-10-30 by reading an explicit line and
- * transcribing the audio with Fish's own speech-to-text, which gave it back
- * word for word.
+ * how the story model's delivery cues reach them. S2.1 Pro, like S2 Pro
+ * before it, speaks adult text as written: measured 2026-10-30 by reading an
+ * explicit line and transcribing the audio with Fish's own speech-to-text,
+ * which gave it back word for word.
  *
  * Alias-free, like the rest of `server/dream`: it takes its key and base URL
  * as arguments.
@@ -17,8 +17,14 @@
 
 export const DEFAULT_FISH_BASE_URL = 'https://api.fish.audio';
 
-/** The model every request names. S1 retires at the end of 2026; S2 Pro is what was measured. */
-export const FISH_MODEL = 's2-pro';
+/**
+ * The model every request names: S2.1 Pro, Fish's newest and its default,
+ * at the same price as S2 Pro. Chosen by ear 2026-10-30: S2 Pro at
+ * `balanced` latency cut the last word of a clip short ("waiting" lost its
+ * "-ing"), and a `[break]` after the text kept the word but ended each clip
+ * with a sharp breath; S2.1 Pro at `balanced` kept every word whole.
+ */
+export const FISH_MODEL = 's2.1-pro';
 
 export type SpeechRequest = {
 	baseUrl: string;
@@ -65,12 +71,9 @@ export async function streamSpeech(
 			reference_id: request.voice,
 			format: 'mp3',
 			mp3_bitrate: 64,
-			// Not `balanced`, which starts in about 0.4 s rather than 2.5 s but
-			// cut the last word of a clip short ("waiting" ended without its
-			// "-ing"), heard 2026-10-30. A `[break]` after the text kept the word
-			// but ended each clip with a sharp breath. The wait is mostly hidden:
-			// each clip is fetched while the one before plays.
-			latency: 'normal',
+			// The first audio in about half a second, where `normal` takes about
+			// 2.5 s, and with S2.1 Pro no worse to hear (`FISH_MODEL`).
+			latency: 'balanced',
 			normalize: true
 		}),
 		signal: request.signal

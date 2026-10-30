@@ -98,7 +98,7 @@ describe('POST /api/dreams/speak', () => {
 		const events = await eventsOf(response);
 		const [url, init] = upstream.mock.calls[0] as [string, RequestInit];
 		expect(url).toBe('https://fish.test/v1/tts/stream/with-timestamp');
-		expect(new Headers(init.headers).get('model')).toBe('s2-pro');
+		expect(new Headers(init.headers).get('model')).toBe('s2.1-pro');
 		expect(new Headers(init.headers).get('authorization')).toBe('Bearer fish-key');
 		expect(JSON.parse(String(init.body))).toMatchObject({
 			text: '[soft] Come closer.',

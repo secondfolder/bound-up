@@ -809,8 +809,8 @@ likes.
 of the one playing so a change of speaker does not wait. The route checks the
 feature, the disclosure and the daily limit (`spendVoice`, counted before the
 request, in UTF-8 bytes as Fish bills; a day is a UTC date), then relays
-Fish's stream (`/v1/tts/stream/with-timestamp`, S2 Pro, mp3, at `normal`
-latency: `balanced` starts sooner but cut each clip's last word short) as the engine's
+Fish's stream (`/v1/tts/stream/with-timestamp`, S2.1 Pro at `balanced`
+latency, mp3; S2 Pro cut each clip's last word short, see `FISH_MODEL`) as the engine's
 events: `audio` pieces and `words`, the latest timings for each of Fish's
 chunks. The browser joins the pieces into a clip and keeps it for the page,
 so replaying costs nothing; nothing is stored anywhere, and the server keeps
@@ -835,9 +835,9 @@ and stops once the user scrolls.
 **The lock screen** shows "Bound Up" and nothing else (Media Session), with
 play, pause, back and next: it is the most public surface the app has.
 
-**Fish Audio** (`src/lib/server/dream/fish.ts`). Its S2 Pro reads adult text
-as written: measured 2026-10-30 by reading an explicit line in the default
-voice and transcribing the audio with Fish's own speech-to-text, which gave
+**Fish Audio** (`src/lib/server/dream/fish.ts`). Its S2.1 Pro, like S2 Pro,
+reads adult text as written: measured 2026-10-30 by reading an explicit line
+in the default voice and transcribing the audio with Fish's own speech-to-text, which gave
 it back word for word. Its terms do not address adult content either way.
 Speech is $15 a million bytes, so a 2,000-character passage is about 3¢, and
 the default limit (30,000 a day) about 45¢ an account a day.
