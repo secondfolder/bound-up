@@ -8,6 +8,7 @@
 	import ProviderChecks from '$lib/components/admin/ProviderChecks.svelte';
 	import ProviderKeyDialog from '$lib/components/admin/ProviderKeyDialog.svelte';
 	import SecretSettingField from '$lib/components/admin/SecretSettingField.svelte';
+	import VoiceSample from '$lib/components/dreams/VoiceSample.svelte';
 	import InputField from '$lib/components/InputField.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import SavedNote from '$lib/components/SavedNote.svelte';
@@ -713,6 +714,9 @@
 					legend="Narrator voice"
 					presets={voicePresets}
 				>
+					{#snippet besidePreset(preset)}
+						<VoiceSample voice={preset.id} label={`Hear ${preset.label}`} />
+					{/snippet}
 					{#snippet providerField()}
 						<ModelProviderField
 							superform={voiceForm}

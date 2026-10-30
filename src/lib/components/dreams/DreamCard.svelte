@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import ResponsiveDialog from '$lib/components/ResponsiveDialog.svelte';
 	import type { DreamElement } from '$lib/dream/elements';
 	import DreamElementForm from './DreamElementForm.svelte';
@@ -19,6 +20,7 @@
 		onedit,
 		dreamId = '',
 		colour,
+		voice,
 		onclose
 	}: {
 		element: DreamElement;
@@ -32,6 +34,8 @@
 		/** Names drawn for this element's description, or null when none could be. */
 		ondraw?: () => Promise<{ given: string[]; family: string[] } | null>;
 		onrename?: (name: string) => Promise<void>;
+		/** Their voice and a way to change it, for a person while reading aloud is on. */
+		voice?: Snippet;
 		onclose: () => void;
 	} = $props();
 
@@ -90,6 +94,12 @@
 			<wa-icon name={elementIcon(element.type)} style:color={colour} aria-hidden="true"></wa-icon>
 			{heading(element.type)}{element.also.length > 0 ? ` · also ${element.also.join(', ')}` : ''}
 		</p>
+		{#if voice}
+			<section class="voice">
+				<h3>Voice</h3>
+				{@render voice()}
+			</section>
+		{/if}
 		{#if shown.length === 0 && seed}
 			<p class="seed">{seed}</p>
 		{/if}

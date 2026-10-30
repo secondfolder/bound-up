@@ -52,6 +52,16 @@ test('an admin sees what is set up, and sends themselves a test email', async ({
 	const voices = page.getByRole('article', { name: 'Voices' });
 	await expect(voices.getByText('Working')).toBeVisible();
 	await expect(voices.getByRole('radio', { name: /Breathy/ })).toBeChecked();
+	// Each voice can be heard before choosing it, and hearing one does not choose it.
+	const sample = page.waitForResponse((response) =>
+		response.url().endsWith('/api/dreams/voice-sample')
+	);
+	await voices.getByRole('button', { name: 'Hear Tender' }).click();
+	const heard = await sample;
+	expect(heard.status()).toBe(200);
+	expect(heard.headers()['content-type']).toBe('audio/mpeg');
+	expect(heard.request().postDataJSON()).toEqual({ voice: 'tender' });
+	await expect(voices.getByRole('radio', { name: /Breathy/ })).toBeChecked();
 
 	await clickWaButton(page, 'Send a test email');
 	await expect(email.getByText(`Sent to ${root.email}.`)).toBeVisible();

@@ -6,7 +6,7 @@
 	import ResponsiveDialog from '$lib/components/ResponsiveDialog.svelte';
 	import { unlockedIdentity } from '$lib/crypto/session.svelte';
 	import type { View } from '$lib/dream/build';
-	import { colourValues } from '$lib/dream/colours';
+	import { colourValues, YOU_ID } from '$lib/dream/colours';
 	import { elementLabel, linkableNames } from '$lib/dream/elements';
 	import { fieldKey } from '$lib/dream/fields';
 	import { suggestionsIn } from '$lib/dream/footer';
@@ -20,7 +20,7 @@
 	} from '$lib/dream/readings';
 	import { footerOf } from '$lib/dream/story';
 	import { DEFAULT_STYLE, isPreset, OWN_STYLE, STYLE_PRESETS } from '$lib/dream/styles';
-	import { voiceForSpeaker } from '$lib/dream/voices';
+	import { voiceFor, voiceForSpeaker } from '$lib/dream/voices';
 	import { ReadAloud, SPEEDS, type SpokenReport } from '$lib/dream-browser/reader.svelte';
 	import { loadReadingOptions, saveReadingOptions } from '$lib/dream-browser/reading-options';
 	import type { DreamSession } from '$lib/dream-browser/session.svelte';
@@ -33,6 +33,7 @@
 	import DreamMarkup, { type MarkupInputs } from './DreamMarkup.svelte';
 	import DreamNotices from './DreamNotices.svelte';
 	import DreamTextBox from './DreamTextBox.svelte';
+	import DreamVoiceChoice from './DreamVoiceChoice.svelte';
 	import DreamVoices from './DreamVoices.svelte';
 	import { elementIcon } from './element-icons';
 
@@ -1594,17 +1595,34 @@
 {/if}
 
 {#if card}
+	{const person = card.type === 'character' || card.type === 'you'}
 	<DreamCard
 		element={card}
 		colour={colours.get(card.id)}
 		filling={session.filling.has(`card:${card.id}`)}
 		ondraw={() => session.namesFor(card.id)}
 		onrename={(name) => session.rename(card.id, name)}
+		voice={reader && voice && session.listening && person ? cardVoice : undefined}
 		onclose={() => {
 			cardId = null;
 		}}
 	/>
 {/if}
+
+<!-- A person's voice on their card while reading aloud is on: the user's own
+     lines go by `you`, whatever their element is called. -->
+{#snippet cardVoice()}
+	{#if card}
+		<DreamVoiceChoice
+			{session}
+			id={card.type === 'you' ? YOU_ID : card.id}
+			who={card.type === 'you' ? 'You' : elementLabel(card)}
+			suits={card.type === 'you'
+				? null
+				: voiceFor(card, session.id, session.setup?.voices?.narrator ?? voice?.narratorPreset ?? null)}
+		/>
+	{/if}
+{/snippet}
 
 {#if editing}
 	{const target = $derived(editing)}

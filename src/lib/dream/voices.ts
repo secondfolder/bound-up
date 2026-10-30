@@ -18,6 +18,13 @@ import { genderOf } from './gender';
 /** What a voice request names: the narrator, or one of the curated voices. */
 export type VoiceName = 'narrator' | FishVoicePresetId;
 
+/**
+ * What a voice says when it is tried before choosing it (`VoiceSample`):
+ * one line, the same for every voice so they can be compared, and nothing
+ * a passer-by would mind overhearing.
+ */
+export const VOICE_SAMPLE = 'Hello. This is how I sound, reading a story to you. Shall we begin?';
+
 const GENDERS = { feminine: 'female', masculine: 'male' } as const;
 const OLDER = /\b(?:older|old|middle-aged|mature|forties|fifties|sixties|grey|gray|silver|aged)\b/i;
 const WORD = /[\p{L}-]+/gu;

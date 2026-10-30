@@ -1270,7 +1270,18 @@ character speak in the narrator's voice until the user chooses one for
 them. All are chosen from **Voices** in the player, a menu for the
 narrator, one for the user and one for each character, each in their
 colour, and kept with the daydream (`voices` in the sealed setup,
-`session.setVoice`).
+`session.setVoice`). While reading aloud is on, a person's card has their
+voice too (`DreamVoiceChoice`, the same control as in the menu), so a
+character can be given one where they are being looked at.
+
+Every voice can be heard before it is chosen (`VoiceSample`): a play button
+beside each, here and beside each preset on Admin → Server settings, plays
+the voice saying one sample line, the same for all (`VOICE_SAMPLE`), so they
+can be compared. It comes from `/api/dreams/voice-sample` as one clip, not a
+stream; for an admin, or anyone who may read aloud, whose sample counts
+against the day's reading. The server keeps each voice's clip once made (the
+line never changes, so neither does the clip), and the page keeps what it
+fetched, so trying a voice again costs nothing. One plays at a time.
 
 A voice that suits each character is still worked out, but only marked in
 their menu ("suits them"), never chosen for them: a voice of code's choosing

@@ -325,7 +325,9 @@ Audio, with its key under Model providers. The Voices card holds:
   public voices chosen from Fish's sensual, seductive and narration tags,
   never one named after or imitating a real person and never one tagged as a
   child; each is also a voice characters are matched to. Breathy, the voice
-  the plan was first tried with, is the default.
+  the plan was first tried with, is the default. Each preset has a play
+  button beside it that plays the voice saying one sample line, once the
+  key is saved ([dreams.md](dreams.md), "Voices").
 - **The daily limit per account** (`voiceDailyCap`), in characters (UTF-8
   bytes, which is what Fish bills): 30,000 when unset, about 45¢ at Fish's
   $15 a million.

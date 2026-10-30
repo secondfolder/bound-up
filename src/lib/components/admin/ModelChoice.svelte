@@ -49,7 +49,8 @@
 		presets,
 		providerField,
 		onmissing,
-		ontools
+		ontools,
+		besidePreset
 	}: {
 		superform: SuperForm<T>;
 		choiceField: FormPathLeaves<T>;
@@ -63,6 +64,11 @@
 		onmissing?: (missing: boolean) => void;
 		/** Whether OpenRouter lists the custom model it has found as calling tools. */
 		ontools?: (tools: boolean) => void;
+		/**
+		 * Drawn beside each preset, outside its label, so pressing it does not
+		 * choose the preset: a voice's play button.
+		 */
+		besidePreset?: Snippet<[ModelPresetOption]>;
 	} = $props();
 
 	// svelte-ignore state_referenced_locally
@@ -143,23 +149,26 @@
 	<legend>{legend}</legend>
 	{@render providerField?.()}
 	{#each presets as preset (preset.id)}
-		<label class="option">
-			<input
-				type="radio"
-				{name}
-				value={preset.id}
-				checked={$choice === preset.id}
-				onchange={() => choose(preset.id)}
-			/>
-			<span class="text">
-				<span class="label">{preset.label}</span>
-				<small>{preset.description}</small>
-				<small class="id"
-					><code>{preset.modelId}</code>{#if preset.baseLabel}
-						· {preset.baseLabel}{/if}</small
-				>
-			</span>
-		</label>
+		<div class="preset">
+			<label class="option">
+				<input
+					type="radio"
+					{name}
+					value={preset.id}
+					checked={$choice === preset.id}
+					onchange={() => choose(preset.id)}
+				/>
+				<span class="text">
+					<span class="label">{preset.label}</span>
+					<small>{preset.description}</small>
+					<small class="id"
+						><code>{preset.modelId}</code>{#if preset.baseLabel}
+							· {preset.baseLabel}{/if}</small
+					>
+				</span>
+			</label>
+			{@render besidePreset?.(preset)}
+		</div>
 	{/each}
 	<label class="option">
 		<input
@@ -273,6 +282,17 @@
 
 		.id {
 			overflow-wrap: anywhere;
+		}
+	}
+
+	.preset {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+
+		.option {
+			flex: 1 1 auto;
+			min-width: 0;
 		}
 	}
 

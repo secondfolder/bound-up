@@ -1089,6 +1089,12 @@ test.describe('daydreams, the new engine', () => {
 		const yours = dialog.locator('.row').nth(1);
 		await expect(yours.locator('.who')).toHaveText('You');
 		await expect(yours.locator('wa-button[slot="trigger"]')).toHaveText('Same as the narrator');
+		// Each voice can be heard: hers is the narrator's until one is chosen.
+		const sample = page.waitForRequest((request) =>
+			request.url().endsWith('/api/dreams/voice-sample')
+		);
+		await dialog.getByRole('button', { name: /^Hear Ottilie.*’s voice$/ }).click();
+		expect((await sample).postDataJSON()).toEqual({ voice: 'narrator' });
 		const row = dialog.locator('.row', { has: page.locator('.who', { hasText: 'Ottilie' }) });
 		const trigger = row.locator('wa-button[slot="trigger"]');
 		await expect(trigger).toHaveText('Same as the narrator');
@@ -1111,6 +1117,35 @@ test.describe('daydreams, the new engine', () => {
 			})
 			.toBe('smoky');
 		expect(asked.find((entry) => entry.text.includes('lamp turns'))?.voice).toBe('narrator');
+
+		// While reading aloud, her card has her voice, to hear and to change.
+		await player.getByRole('button', { name: 'Pause' }).click();
+		await page
+			.locator('ol.turns')
+			.getByRole('button', { name: 'Ottilie', exact: true })
+			.first()
+			.click();
+		const card = page.locator('wa-dialog[open]');
+		const cardTrigger = card.locator('.voice wa-button[slot="trigger"]');
+		await expect(cardTrigger).toHaveText('Smoky');
+		await expect(card.getByRole('button', { name: /^Hear Ottilie.*’s voice$/ })).toBeVisible();
+		await cardTrigger.click();
+		await card.getByRole('menuitemcheckbox', { name: /^Tender/ }).click();
+		await expect(cardTrigger).toHaveText('Tender');
+		await page.keyboard.press('Escape');
+		await expect(card).toHaveCount(0);
+		await (await readingOptions(page)).getByRole('button', { name: 'Voices' }).click();
+		await expect(trigger).toHaveText('Tender');
+		await page.keyboard.press('Escape');
+		// With reading aloud off, a card says nothing of voices.
+		await page.getByRole('button', { name: 'Read aloud' }).click();
+		await page
+			.locator('ol.turns')
+			.getByRole('button', { name: 'Ottilie', exact: true })
+			.first()
+			.click();
+		await expect(page.locator('wa-dialog[open] .card')).toBeVisible();
+		await expect(page.locator('wa-dialog[open] .voice')).toHaveCount(0);
 	});
 
 	test('Keep going turned on after the end asks for the next passage at once', async ({ page }) => {
