@@ -877,78 +877,15 @@
 		<wa-callout variant="warning">{session.problem}</wa-callout>
 	{/if}
 
-	{#if reader && session.listening}
-		<section class="player" aria-label="Reading aloud">
-			<span class="speaker" aria-live="polite">
-				{#if reader.loading}
-					Getting the voice ready…
-				{:else if reader.turnId}
-					{reader.speaker}
-				{:else}
-					Tap Listen on a passage
-				{/if}
-			</span>
-			<span class="controls">
-				<wa-button size="s" appearance="plain" disabled={reader.turnId === null} onclick={() => reader.back()}>
-					<wa-icon name="backward-step" label="Back a sentence"></wa-icon>
-				</wa-button>
-				{#if reader.turnId && !reader.paused}
-					<!-- Playing, or loading to play: pausing holds a clip still on its way. -->
-					<wa-button size="s" appearance="plain" onclick={() => reader.pause()}>
-						<wa-icon name="pause" label="Pause"></wa-icon>
-					</wa-button>
-				{:else}
-					<wa-button
-						size="s"
-						appearance="plain"
-						disabled={reader.turnId === null && session.lastPassage === null}
-						onclick={() => {
-							if (reader.turnId) {
-								reader.resume();
-							} else if (session.lastPassage) {
-								listen(session.lastPassage.id);
-							}
-						}}
-					>
-						<wa-icon name="play" label="Play"></wa-icon>
-					</wa-button>
-				{/if}
-				<wa-button size="s" appearance="plain" onclick={nextSpeed}>
-					<span class="wa-visually-hidden">Speed</span>
-					{reader.rate}×
-				</wa-button>
-			</span>
-			<span class="options">
-				<!-- Toggles: native, because wa-button forwards no aria-pressed. -->
-				<button
-					type="button"
-					class="toggle"
-					aria-pressed={reader.readNew}
-					onclick={() => {
-						reader.readNew = !reader.readNew;
-					}}>{reader.readNew ? '✓ ' : ''}Read new passages</button
-				>
-				<button
-					type="button"
-					class="toggle"
-					aria-pressed={reader.highlight}
-					onclick={() => reader.setHighlight(!reader.highlight)}
-					>{reader.highlight ? '✓ ' : ''}Highlight</button
-				>
-			</span>
-			{#if reader.problem}<p class="problem">{reader.problem}</p>{/if}
-		</section>
-	{/if}
-
-	<!-- The user's turn, three ways (docs/dreams.md, "Your turn"): a suggestion,
-	     their own words, or Continue. Each is drawn as what it is: suggestions
-	     as the speech bubbles a sent turn becomes, their own words as the box
-	     they will be, Continue as handing the story on. -->
-	<div class="compose" class:stuck={stuck} data-writing={writing}>
-		<!-- Never more than half the screen, so the story stays in sight; what
-		     does not fit scrolls, starting at its end (`startAtEnd`). -->
-		<div class="compose-scroll" {@attach startAtEnd}>
-			<div class="compose-inner">
+	<!-- The dock at the bottom (docs/dreams.md, "Your turn"): reading aloud,
+	     and the user's turn, three ways: a suggestion, Continue, or their own
+	     words. -->
+	<div class="dock" class:stuck={stuck} data-writing={writing}>
+		<!-- The dock is never more than half the screen, so the story stays in
+		     sight; the turn takes what room reading aloud leaves, and what does not fit
+		     scrolls, starting at its end (`startAtEnd`). -->
+		<div class="dock-scroll" {@attach startAtEnd}>
+			<div class="dock-inner">
 				{#if session.busy}
 					<div class="turn-row">
 						<wa-button appearance="outlined" onclick={() => session.stop()}>
@@ -1019,9 +956,73 @@
 				</div>
 			</div>
 		</div>
+		<!-- Read aloud, under the turn and outside its scroller, so it is in
+		     sight however many chips there are. -->
+		{#if reader && session.listening}
+			<section class="player" aria-label="Reading aloud">
+				<span class="speaker" aria-live="polite">
+					{#if reader.loading}
+						Getting the voice ready…
+					{:else if reader.turnId}
+						{reader.speaker}
+					{:else}
+						Tap Listen on a passage
+					{/if}
+				</span>
+				<span class="controls">
+					<wa-button size="s" appearance="plain" disabled={reader.turnId === null} onclick={() => reader.back()}>
+						<wa-icon name="backward-step" label="Back a sentence"></wa-icon>
+					</wa-button>
+					{#if reader.turnId && !reader.paused}
+						<!-- Playing, or loading to play: pausing holds a clip still on its way. -->
+						<wa-button size="s" appearance="plain" onclick={() => reader.pause()}>
+							<wa-icon name="pause" label="Pause"></wa-icon>
+						</wa-button>
+					{:else}
+						<wa-button
+							size="s"
+							appearance="plain"
+							disabled={reader.turnId === null && session.lastPassage === null}
+							onclick={() => {
+								if (reader.turnId) {
+									reader.resume();
+								} else if (session.lastPassage) {
+									listen(session.lastPassage.id);
+								}
+							}}
+						>
+							<wa-icon name="play" label="Play"></wa-icon>
+						</wa-button>
+					{/if}
+					<wa-button size="s" appearance="plain" onclick={nextSpeed}>
+						<span class="wa-visually-hidden">Speed</span>
+						{reader.rate}×
+					</wa-button>
+				</span>
+				<span class="options">
+					<!-- Toggles: native, because wa-button forwards no aria-pressed. -->
+					<button
+						type="button"
+						class="toggle"
+						aria-pressed={reader.readNew}
+						onclick={() => {
+							reader.readNew = !reader.readNew;
+						}}>{reader.readNew ? '✓ ' : ''}Read new passages</button
+					>
+					<button
+						type="button"
+						class="toggle"
+						aria-pressed={reader.highlight}
+						onclick={() => reader.setHighlight(!reader.highlight)}
+						>{reader.highlight ? '✓ ' : ''}Highlight</button
+					>
+				</span>
+				{#if reader.problem}<p class="problem">{reader.problem}</p>{/if}
+			</section>
+		{/if}
 	</div>
 	<!-- In sight exactly when the page is scrolled to its end (`watchStuck`). -->
-	<div class="compose-end" aria-hidden="true" {@attach watchStuck}></div>
+	<div class="dock-end" aria-hidden="true" {@attach watchStuck}></div>
 </div>
 
 {#if about?.kind === 'passage' && aboutId}
@@ -1180,10 +1181,8 @@
 		color: inherit;
 	}
 
+	/* Inside the dock, which is what sticks. */
 	.player {
-		position: sticky;
-		bottom: 0;
-		z-index: 1;
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
@@ -1405,10 +1404,15 @@
 	/* Stuck to the bottom of what scrolls while the story runs on under it,
 	   and sitting at the story's end once scrolled there, as the kink list's
 	   pinned bar does at the top. */
-	.compose {
+	.dock {
 		position: sticky;
 		bottom: 0;
 		z-index: 1;
+		display: flex;
+		flex-direction: column;
+		gap: var(--wa-space-xs);
+		max-height: 50dvh;
+		box-sizing: border-box;
 		padding-block: var(--wa-space-s);
 
 		/* The background it takes only while stuck, from one edge of the page
@@ -1515,17 +1519,18 @@
 		gap: var(--wa-space-xs);
 	}
 
-	/* At most half the screen. The scroller is inside the sticky box rather
-	   than the box itself: a scroller clips what is drawn beyond it, and the
-	   stuck background reaches right across the page. */
-	.compose-scroll {
-		max-height: 50dvh;
+	/* The room the dock has left beside reading aloud. The scroller is inside
+	   the sticky box rather than the box itself: a scroller clips what is
+	   drawn beyond it, and the stuck background reaches right across the page. */
+	.dock-scroll {
+		flex: 0 1 auto;
+		min-height: 0;
 		overflow-y: auto;
 		overscroll-behavior: contain;
 	}
 
 	/* A little room inside the scroller, so a focus ring is not clipped. */
-	.compose-inner {
+	.dock-inner {
 		display: flex;
 		flex-direction: column;
 		gap: var(--wa-space-xs);
@@ -1533,7 +1538,7 @@
 	}
 
 	/* Zero height, only where it is matters (`watchStuck`). */
-	.compose-end {
+	.dock-end {
 		block-size: 0;
 	}
 

@@ -627,16 +627,19 @@ to take it each drawn as what it is:
   keeping what it holds for when it is opened again; the box stays mounted
   while put away, so a draft is restored on load.
 
-The area is sticky at the bottom of what scrolls, as the kink list's pinned
-bar is at the top: at the story's end it sits on the page with no
-background, and scrolled up it stays in sight with a background, faded in,
-right across the page (`watchStuck`, a sentinel just after it that is out
-of sight below exactly when it is stuck). It is never more than half the
-screen tall, so the story stays in sight on a phone: what does not fit
-scrolls inside it, kept scrolled to its end, nearest the thumb
-(`startAtEnd`). The scroller is inside the sticky box rather than the box
-itself, because a scroller clips what is drawn beyond it, and the stuck
-background reaches right across the page.
+The turn is in the **dock**, with the read-aloud player under it when
+reading aloud is on. The dock is sticky at the bottom of what scrolls, as
+the kink list's pinned bar is at the top: at the story's end it sits on the
+page with no background, and scrolled up it stays in sight with a
+background, faded in, right across the page (`watchStuck`, a sentinel just
+after it that is out of sight below exactly when it is stuck). It is never
+more than half the screen tall, so the story stays in sight on a phone: the
+player keeps its room, and what of the turn does not fit scrolls inside it,
+kept scrolled to its end, nearest the thumb (`startAtEnd`). The scroller is
+inside the sticky box rather than the box itself, because a scroller clips
+what is drawn beyond it, and the stuck background reaches right across the
+page. The player used to stick on its own, just above the turn, where the
+two could overlap.
 
 While a passage is being written, the area holds only Stop. The box empties
 as its words are sent, not once the answer has finished, and gets them back
@@ -1095,7 +1098,8 @@ needs a Fish Audio key (Admin → Server settings → Voices,
 **Off until asked.** "Read aloud" beside the title turns it on for the page
 (`session.listening`); nothing ever plays on load, because sound in a public
 place is a privacy risk and browsers block it anyway. It adds a Listen button
-to each passage and a player above the input box: who is speaking, back a
+to each passage and a player in the dock, under the turn (see "Your
+turn"): who is speaking, back a
 sentence, play and pause, speed (0.75× to 2×, tapping cycles), "Read new
 passages" (each passage that arrives from then on is read once it is
 finished) and "Highlight". With read aloud on, tapping any word of a

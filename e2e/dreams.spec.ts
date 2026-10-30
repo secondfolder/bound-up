@@ -355,7 +355,7 @@ test.describe('daydreams, the new engine', () => {
 		await start(page, 'A quiet evening');
 		await play(page);
 		await saved(page);
-		const turn = page.locator('.compose');
+		const turn = page.locator('.dock');
 		const main = page.locator('main');
 
 		// At the end of the story: no background of its own.
@@ -368,9 +368,9 @@ test.describe('daydreams, the new engine', () => {
 
 		// Never more than half the screen: what does not fit scrolls, from its end.
 		await page.setViewportSize({ width: 320, height: 300 });
-		const scroller = page.locator('.compose-scroll');
+		const scroller = page.locator('.dock-scroll');
 		await expect
-			.poll(() => scroller.evaluate((element) => element.getBoundingClientRect().height))
+			.poll(() => turn.evaluate((element) => element.getBoundingClientRect().height))
 			.toBeLessThanOrEqual(150);
 		await expect
 			.poll(() =>
@@ -791,6 +791,13 @@ test.describe('daydreams, the new engine', () => {
 		await expect(player).toHaveCount(0);
 		await page.getByRole('button', { name: 'Read aloud' }).click();
 		await expect(player).toContainText('Tap Listen on a passage');
+		// In the dock, under the turn, so it stays in sight wherever the story is scrolled.
+		await expect(
+			page.locator('.dock').getByRole('region', { name: 'Reading aloud' })
+		).toBeVisible();
+		const chipsTop = (await page.getByRole('list', { name: 'Your turn' }).boundingBox())?.y ?? 0;
+		const playerTop = (await player.boundingBox())?.y ?? 0;
+		expect(playerTop).toBeGreaterThan(chipsTop);
 
 		const spoken = page.waitForRequest((request) => request.url().endsWith('/api/dreams/speak'));
 		await passageMenu(page, 'Listen');
