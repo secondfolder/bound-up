@@ -21,6 +21,8 @@ export type PassageInput = {
 	setup: Pick<Build, 'heat' | 'telling' | 'capabilities' | 'elements' | 'presentation'> & {
 		musts: readonly string[];
 		research: string;
+		/** Blocks designed for this daydream (docs/dreams.md, "Designed blocks"). */
+		designs?: readonly { kind: string; description: string; slots: readonly string[] }[];
 	};
 	limits: readonly string[];
 	preferences: readonly string[];
@@ -71,6 +73,12 @@ const READING = `The user wrote words this turn. Start your reply by saying how 
 - ooc: they stepped out of the story to talk to you. Answer briefly, out of the story, and carry the story on only if they ask you to.
 If the user chose how their words are meant, read them that way.`;
 
+/**
+ * Designing a block (docs/dreams.md, "Designed blocks"): described once,
+ * drawn by a designer from then on.
+ */
+const DESIGN_NOTE = `A block of a kind with no layout of its own can be designed. The first time, describe it with design="what it looks like, and what each slot is for", and put its content in named slots: <block kind="ration-card" title="Week 3" design="A worn paper ration card: the holder's name, a square for each day to punch, an official stamp."><slot name="holder">You</slot><slot name="days">x Mon; x Tue; Wed; Thu</slot><slot name="stamp">ISSUED</slot></block>. A slot holds words, a list (one item a line, or separated by semicolons, an item starting "x " ticked), or a number. It is drawn from your description, and kept for this daydream.`;
+
 /** A reading the user chose, said before their words. */
 const READING_NOTES: Readonly<Record<Reading, string>> = {
 	action: 'The user chose how this is meant: something they say or do in the story.',
@@ -93,7 +101,10 @@ export function historyPassage(source: string, allowed?: ReadonlySet<string>): s
 		body = body.replace(TAG, (tag, ...rest) => {
 			const groups = rest.at(-1) as { name?: string } | undefined;
 			const name = groups?.name?.toLowerCase() ?? '';
-			return allowed.has(name) || TURN_TAGS.has(name) ? tag : '';
+			// A designed block's slots are part of the block markup.
+			const kept =
+				allowed.has(name) || TURN_TAGS.has(name) || (name === 'slot' && allowed.has('block'));
+			return kept ? tag : '';
 		});
 	}
 	const next = lastNext(source);
@@ -169,6 +180,14 @@ function setupSection(input: PassageInput): string {
 	}
 	if (setup.research) {
 		parts.push(wrap('research', setup.research));
+	}
+	if (setup.capabilities.includes('blocks')) {
+		parts.push(DESIGN_NOTE);
+	}
+	if (setup.designs && setup.designs.length > 0) {
+		parts.push(
+			`Blocks designed for this daydream. Use one by its kind with these slots, and no design attribute:\n${bulletList(setup.designs.map((design) => `${design.kind} (slots: ${design.slots.join(', ')}): ${design.description}`))}`
+		);
 	}
 	if (input.preferences.length > 0) {
 		parts.push(wrap('preferences', bulletList(input.preferences)));

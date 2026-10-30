@@ -31,6 +31,8 @@ export const SAMPLING = {
 	elements: { temperature: 0.6, maxTokens: 3000 },
 	more: { temperature: 0.9, maxTokens: 3000 },
 	summary: { temperature: 0.3, maxTokens: 3000 },
+	/** Designing a block: a layout to a description, steady. */
+	design: { temperature: 0.4, maxTokens: 3000 },
 	/** The research step, for a story model without tools: a faithful record. */
 	research: { temperature: 0.3, maxTokens: 4000 },
 	/** The simulated player, which should act like different people. */

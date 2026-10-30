@@ -621,6 +621,32 @@ its accessible name from its own words ("Initial: You will kneel."). A block
 with fields has a Done button, labelled by its kind, that sends the turn.
 Deck and draw wait for dice in phase 7.
 
+### Designed blocks
+
+A block of a kind no layout covers can be designed for the daydream
+(`src/lib/dream/designs.ts`). The first time the story model uses one, it
+describes it, `design="what it looks like, and what each slot is for"`, with
+its content in named slots: `<slot name="days">x Mon; Tue</slot>`. The page
+then asks for its design (`/api/dreams/design`): the story model again, with
+a designer's prompt (`prompts/design.ts`), given only the description, the
+slots and what first filled them, and replying with a layout in a small
+language of a few parts (stacks, rows, grids, text in a handful of styles,
+label-and-value pairs, lists, punch boxes, meters, dividers, and a frame:
+card, paper, ticket, screen, badge or plain). Never HTML: `parseDesign` checks
+the reply against the language, its size (40 parts, 5 deep) and that it draws
+only the slots given, and keeps nothing that fails, so a design can shape a
+block but never put anything else on the page. Each part is drawn from the
+daydream's theme (`DreamDesign.svelte`).
+
+A design is kept with the daydream (the setup's `designs`, twelve at most)
+and listed in every later passage's prompt by kind, slots and description,
+so using it again is its kind and slots with no `design`, and nothing is
+designed twice. Until a design comes, or if it fails, the block is the
+generic card with each slot labelled, and "Designing this…" while it is
+asked for. Fields in a designed block are drawn under it, and work as in
+any block. Capabilities are untouched: this is something the blocks
+capability can do.
+
 ### Views and themes
 
 **Tap-through** shows the passage being answered a beat at a time

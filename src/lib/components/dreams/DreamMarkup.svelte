@@ -1,4 +1,5 @@
 <script lang="ts" module>
+	import type { BlockDesign } from '$lib/dream/designs';
 	/**
 	 * What the user can set in a passage, and what they set. Live only on the
 	 * passage being answered; earlier ones show what was sent.
@@ -22,6 +23,8 @@
 	};
 
 	const STILL: MarkupInputs = { live: false, choices: {}, values: {} };
+	const NO_DESIGNS: ReadonlyMap<string, BlockDesign> = new Map();
+	const NOTHING: ReadonlySet<string> = new Set();
 
 	/** Pictures on a passage (docs/dreams.md, "Pictures"), by marker key. */
 	export type MarkupPictures = {
@@ -39,6 +42,7 @@
 
 <script lang="ts">
 	import { splitBeats, tidyBreaks } from '$lib/dream/beats';
+	import { LAID_OUT_KINDS, slotsOf } from '$lib/dream/designs';
 	import {
 		fieldKey,
 		outcomeFor,
@@ -52,6 +56,7 @@
 	import { type InlineSegment, inlineSegments, speakerShade } from '$lib/dream/inline';
 	import { type MarkupNode, type MarkupTag, parseMarkup, plainText } from '$lib/dream/markup';
 	import { setChanges } from '$lib/dream/story';
+	import DreamDesign from './DreamDesign.svelte';
 	import DreamField from './DreamField.svelte';
 
 	/**
@@ -75,6 +80,8 @@
 		view = 'scroll',
 		inputs = STILL,
 		pictures,
+		designs = NO_DESIGNS,
+		designing = NOTHING,
 		onref,
 		onmore
 	}: {
@@ -89,6 +96,10 @@
 		view?: 'scroll' | 'tap';
 		inputs?: MarkupInputs;
 		pictures?: MarkupPictures;
+		/** Blocks designed for this daydream, by kind (docs/dreams.md, "Designed blocks"). */
+		designs?: ReadonlyMap<string, BlockDesign>;
+		/** Kinds being designed now. */
+		designing?: ReadonlySet<string>;
 		onref: (id: string) => void;
 		onmore: (key: string, phrase: string) => void;
 	} = $props();
@@ -150,24 +161,8 @@
 	/** A paragraph break, after `tidyBreaks` has made them all one. */
 	const PARAGRAPH_BREAK = '\n\n';
 	const BLOCK_TAGS = new Set(['block', 'texts', 'letter']);
-	/** Kinds with a layout of their own; any other is the generic labelled card. */
-	const LAYOUTS = new Set([
-		'contract',
-		'rules',
-		'report',
-		'questionnaire',
-		'punch-card',
-		'schedule',
-		'texts',
-		'group-chat',
-		'email',
-		'voice-note',
-		'call-response',
-		'lines',
-		'letter',
-		'deck',
-		'countdown'
-	]);
+	/** Kinds with a layout of their own; any other is the generic labelled card, or designed. */
+	const LAYOUTS = LAID_OUT_KINDS;
 	const DONE_LABELS: Record<string, string> = {
 		contract: 'Sign and return',
 		questionnaire: 'Hand it in',
@@ -255,6 +250,18 @@
 	{const block = $derived(blockFor.get(node))}
 	{const kind = $derived(block?.kind ?? 'block')}
 	{const label = $derived(block?.title || kindLabel(kind))}
+	{const design = $derived(LAYOUTS.has(kind) ? undefined : designs.get(kind))}
+	{#if design}
+		<DreamDesign {design} slots={slotsOf(node)} title={block?.title ?? ''} />
+		{#each node.children as child, index (index)}
+			{#if child.type === 'tag' && child.name === 'field'}{@render tree([child])}{/if}
+		{/each}
+		{#if block && block.fields.length > 0 && live && inputs.done}
+			<div class="block-done">
+				<wa-button appearance="accent" variant="brand" onclick={() => inputs.done?.()}>Done</wa-button>
+			</div>
+		{/if}
+	{:else}
 	<section class="block" data-kind={LAYOUTS.has(kind) ? kind : 'generic'} aria-label={label}>
 		{#if kind === 'email'}
 			<dl class="email-head">
@@ -303,7 +310,11 @@
 				</wa-button>
 			</div>
 		{/if}
+		{#if designing.has(kind)}
+			<p class="quiet designing" role="status" data-unspoken>Designing this…</p>
+		{/if}
 	</section>
+	{/if}
 {/snippet}
 
 {#snippet dice(offered: NonNullable<typeof roll>)}
@@ -401,6 +412,9 @@
 			{:else}
 				{@render tree(node.children)}
 			{/if}
+		{:else if node.name === 'slot'}
+			<!-- A designed block's slot, before its design comes: labelled, so nothing is lost. -->
+			<span class="slot"><span class="slot-name" data-unspoken>{kindLabel(node.attrs.name ?? '')}</span> {@render tree(node.children)}</span>
 		{:else if node.name === 'option'}
 			<!-- Options belong to a field or a question, which draws them. -->
 		{:else if node.name === 'roll'}
@@ -1011,6 +1025,15 @@
 
 		wa-skeleton::part(indicator) {
 			border-radius: var(--wa-border-radius-m);
+		}
+	}
+
+	.slot {
+		display: block;
+
+		.slot-name {
+			color: var(--wa-color-text-quiet);
+			font-size: var(--wa-font-size-s);
 		}
 	}
 </style>

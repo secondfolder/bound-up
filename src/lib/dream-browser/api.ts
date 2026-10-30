@@ -15,6 +15,7 @@ import { vaultById, vaultsSettled } from '$lib/crypto/vaults.svelte';
 import { type DreamEvent, type Ended, readEvents } from '$lib/dream/events';
 import type {
 	BuildRequest,
+	DesignRequest,
 	FillRequest,
 	PassageRequest,
 	ReadRequest,
@@ -304,6 +305,11 @@ async function askWhole(path: string, body: unknown, signal?: AbortSignal): Prom
 /** One of the small calls: the model's whole reply. */
 export function fill(body: FillRequest, signal?: AbortSignal): Promise<string> {
 	return askWhole('/api/dreams/fill', body, signal);
+}
+
+/** A block's design, as the designer's reply: `parseDesign` checks it (docs/dreams.md, "Designed blocks"). */
+export function designBlock(body: DesignRequest, signal?: AbortSignal): Promise<string> {
+	return askWhole('/api/dreams/design', body, signal);
 }
 
 /** Where the story could go next, as `<direction>` tags with likelihoods. */

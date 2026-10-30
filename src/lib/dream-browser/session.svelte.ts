@@ -20,9 +20,10 @@ import {
 	wordPreferences
 } from '$lib/dream/assemble';
 import { parseBuild } from '$lib/dream/build';
+import { designsWanted, LAID_OUT_KINDS, MAX_DESIGNS, parseDesign } from '$lib/dream/designs';
 import { type DreamElement, parseElements } from '$lib/dream/elements';
 import { turnInputs } from '$lib/dream/fields';
-import { findTag, parseMarkup } from '$lib/dream/markup';
+import { findTag, findTags, parseMarkup } from '$lib/dream/markup';
 import { drawNudges } from '$lib/dream/nudges';
 import { pickDirection } from '$lib/dream/pick';
 import { picturePrompt } from '$lib/dream/pictures';
@@ -74,6 +75,7 @@ import type {
 import {
 	appendTurn,
 	DreamRequestError,
+	designBlock,
 	drawNames,
 	fill,
 	type Lookup,
@@ -694,6 +696,49 @@ export class DreamSession {
 		return this.#attempt(() => this.#saveSetup({ ...setup, awaitingStart: false }));
 	}
 
+	/** Kinds of block being designed, for the page to show they are on their way. */
+	designing = $state(new Set<string>());
+
+	/**
+	 * Blocks a passage described that no layout covers are designed
+	 * (docs/dreams.md, "Designed blocks"), two a passage at most, in the
+	 * background: until a design comes the block is the generic card. A
+	 * design that fails its check is not kept, and is asked for again the
+	 * next time the kind is described.
+	 */
+	async #designFrom(source: string): Promise<void> {
+		const { setup } = this;
+		if (!setup?.build) {
+			return;
+		}
+		const known = new Set([
+			...LAID_OUT_KINDS,
+			...(setup.designs ?? []).map((design) => design.kind),
+			...this.designing
+		]);
+		const tags = findTags(parseMarkup(source, { final: true }), 'block');
+		const wanted = designsWanted(tags, known).slice(0, 2);
+		for (const request of wanted) {
+			this.designing = new Set([...this.designing, request.kind]);
+			try {
+				const reply = await designBlock({ ...request, theme: setup.build.presentation.theme });
+				const design = parseDesign(reply, request);
+				const latest = this.setup;
+				if (design && latest) {
+					const designs = [
+						...(latest.designs ?? []).filter((kept) => kept.kind !== design.kind),
+						design
+					];
+					await this.#saveSetup({ ...latest, designs: designs.slice(-MAX_DESIGNS) });
+				}
+			} finally {
+				const left = new Set(this.designing);
+				left.delete(request.kind);
+				this.designing = left;
+			}
+		}
+	}
+
 	/** Saves an element changed by hand on the setup page; Update has the build follow it. */
 	async editElement(changed: DreamElement): Promise<boolean> {
 		const { setup } = this;
@@ -1050,6 +1095,7 @@ export class DreamSession {
 			if (input.request !== 'edit') {
 				await this.#fromFooter(input.source).catch(() => undefined);
 			}
+			void this.#designFrom(input.source).catch(() => undefined);
 		}
 		return id;
 	}

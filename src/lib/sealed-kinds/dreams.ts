@@ -13,6 +13,7 @@
 import { z } from 'zod';
 import { HEAT_LEVELS, MAX_TELLING_CHARS, THEMES, VIEWS } from '../dream/build';
 import { CAPABILITIES } from '../dream/capabilities';
+import { blockDesignSchema, MAX_DESIGNS } from '../dream/designs';
 import { MAX_ELEMENT_CHARS, MAX_ELEMENTS } from '../dream/elements';
 import { MAX_DIRECTIONS } from '../dream/reading';
 import { READINGS } from '../dream/readings';
@@ -179,7 +180,13 @@ export const dreamSetupKind = defineSealedKind({
 				 * Update to have the build follow them (docs/dreams.md, "Changing
 				 * what was made"). Added in place before the engine was deployed.
 				 */
-				pendingEdits: z.array(required(400)).max(24).optional()
+				pendingEdits: z.array(required(400)).max(24).optional(),
+				/**
+				 * Blocks designed for this daydream (docs/dreams.md, "Designed
+				 * blocks"), offered to the story model by kind from then on.
+				 * Added in place before the engine was deployed.
+				 */
+				designs: z.array(blockDesignSchema).max(MAX_DESIGNS).optional()
 			})
 		}
 	]

@@ -352,6 +352,39 @@ test.describe('daydreams, the new engine', () => {
 		await saved(page);
 	});
 
+	test('a block no layout covers is designed once, kept, and drawn from then on', async ({
+		page
+	}) => {
+		await dreamer(page);
+		await start(page, 'A quiet evening');
+		await play(page);
+		await saved(page);
+
+		const designed = page.waitForResponse(
+			(response) => response.url().endsWith('/api/dreams/design') && response.ok()
+		);
+		await box(page, 'Your turn').fill('[design]');
+		await clickWaButton(page, 'Send');
+		await designed;
+		// Drawn from its design: the stamp and four punch boxes, two of them filled.
+		const card = page.getByRole('region', { name: 'Week 3' });
+		await expect(card).toHaveAttribute('data-frame', 'ticket');
+		await expect(card.locator('.boxes li')).toHaveCount(4);
+		await expect(card.locator('.boxes li.filled')).toHaveCount(2);
+		await expect(card.getByText('ISSUED')).toBeVisible();
+		await saved(page);
+
+		// Kept with the daydream: after a reload it is drawn the same, not designed again.
+		let designedAgain = false;
+		page.on('request', (request) => {
+			designedAgain ||= request.url().endsWith('/api/dreams/design');
+		});
+		await page.reload();
+		await waitForHydration(page);
+		await expect(page.getByRole('region', { name: 'Week 3' }).locator('.boxes li')).toHaveCount(4);
+		expect(designedAgain).toBe(false);
+	});
+
 	test('choosing first, Surprise me, and Try another idea', async ({ page }) => {
 		await dreamer(page);
 		await start(page, 'A quiet evening [pick]');

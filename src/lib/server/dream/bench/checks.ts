@@ -100,7 +100,8 @@ function passageChecks(build: Build | null, source: string, index: number): Chec
 	const nodes = parseMarkup(source, { final: true });
 	const allowed = allowedTags(build?.capabilities ?? []);
 	const unknown = [...tagNames(nodes)].filter(
-		(name) => !(allowed.has(name) || TURN_TAGS.has(name))
+		(name) =>
+			!(allowed.has(name) || TURN_TAGS.has(name) || (name === 'slot' && allowed.has('block')))
 	);
 	const footerTag = findTag(nodes, 'after');
 	const footer = footerTag ? parseFooter(plainText(footerTag.children)) : null;

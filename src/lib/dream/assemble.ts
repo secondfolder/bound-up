@@ -153,7 +153,12 @@ export function passageRequestFor(
 			elements: story.elements,
 			presentation: build.presentation,
 			musts: setup.reading?.musts ?? [],
-			research: setup.reading?.research.text ?? ''
+			research: setup.reading?.research.text ?? '',
+			designs: (setup.designs ?? []).map(({ kind, description, slots }) => ({
+				kind,
+				description,
+				slots: slots.map((slot) => slot.name)
+			}))
 		},
 		...worded,
 		history: story.history,

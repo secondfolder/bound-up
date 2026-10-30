@@ -62,6 +62,10 @@
 	const elements = $derived(session.elements);
 	const names = $derived(linkableNames(elements));
 	const expansions = $derived(session.expansions);
+	/** Blocks designed for this daydream, by kind (docs/dreams.md, "Designed blocks"). */
+	const designs = $derived(
+		new Map((session.setup?.designs ?? []).map((design) => [design.kind, design]))
+	);
 	const build = $derived(session.setup?.build ?? null);
 
 	let cardId = $state<string | null>(null);
@@ -552,6 +556,8 @@
 						view={entry.id === answering ? view : 'scroll'}
 						inputs={inputsFor(entry.id, index)}
 						{pictures}
+						{designs}
+						designing={session.designing}
 						onref={openCard}
 						onmore={(key, phrase) => expand(entry.id, key, phrase)}
 					/>
@@ -653,6 +659,7 @@
 						{names}
 						{expansions}
 						filling={session.filling}
+						{designs}
 						streaming
 						onref={openCard}
 						onmore={() => undefined}

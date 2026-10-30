@@ -20,6 +20,7 @@ import {
 } from '../sealed-kinds/dreams';
 import { HEAT_LEVELS, MAX_TELLING_CHARS, THEMES, VIEWS } from './build';
 import { CAPABILITIES } from './capabilities';
+import { MAX_DESIGNS } from './designs';
 import { MAX_ELEMENTS } from './elements';
 import { READINGS } from './readings';
 import { MAX_SPOKEN_CHARS } from './speech';
@@ -65,6 +66,8 @@ export const buildRequestSchema = z.object({
 export type BuildRequest = z.output<typeof buildRequestSchema>;
 
 const SLUG = /^[\w-]{1,40}$/;
+/** A designed block's kind or slot name. */
+const DESIGN_NAME = /^[a-z][\w-]{0,39}$/;
 const slug = z.string().regex(SLUG);
 const turnExtras = {
 	choices: z
@@ -112,7 +115,18 @@ const setupSchema = z.object({
 		notes: z.string().max(400)
 	}),
 	musts: strings(400, 20),
-	research: z.string().max(8000)
+	research: z.string().max(8000),
+	/** Blocks designed for this daydream, by kind and slots (docs/dreams.md, "Designed blocks"). */
+	designs: z
+		.array(
+			z.object({
+				kind: required(40),
+				description: required(600),
+				slots: z.array(required(40)).max(16)
+			})
+		)
+		.max(MAX_DESIGNS)
+		.optional()
 });
 
 export const passageRequestSchema = z.object({
@@ -176,3 +190,16 @@ export const speakRequestSchema = z.object({
 });
 
 export type SpeakRequest = z.output<typeof speakRequestSchema>;
+
+/** A block to design: its kind, the story model's description, and its slots as first filled. */
+export const designRequestSchema = z.object({
+	kind: z.string().regex(DESIGN_NAME),
+	description: required(600),
+	slots: z
+		.array(z.object({ name: z.string().regex(DESIGN_NAME), example: z.string().max(1000) }))
+		.min(1)
+		.max(16),
+	theme: z.enum(THEMES)
+});
+
+export type DesignRequest = z.output<typeof designRequestSchema>;
