@@ -35,6 +35,7 @@ import {
 } from '$lib/dream/preferences';
 import { cryptoRandom } from '$lib/dream/random';
 import { parseBriefReading } from '$lib/dream/reading';
+import type { Reading } from '$lib/dream/readings';
 import {
 	codePick,
 	type SetupStep,
@@ -855,6 +856,35 @@ export class DreamSession {
 		);
 	}
 
+	/**
+	 * "Read it differently" (docs/dreams.md, "How a turn is read"): the turn
+	 * is answered again, read the way the user chose, as a version beside the
+	 * passage that answered it. The reading is kept on the new passage, so it
+	 * goes with the turn from then on.
+	 */
+	reread(turnId: string, reading: Reading): Promise<void> {
+		const index = this.path.findIndex((entry) => entry.id === turnId);
+		const input = this.path[index];
+		if (input?.turn?.kind !== 'input') {
+			return Promise.resolve();
+		}
+		const turn = userTurnOf(input.turn);
+		if (turn.kind !== 'words') {
+			return Promise.resolve();
+		}
+		const path = this.path.slice(0, index + 1);
+		return this.#attempt((signal) =>
+			this.#passage({
+				parentId: turnId,
+				pending: { ...turn, readAs: reading },
+				take: null,
+				signal,
+				path,
+				readAs: reading
+			})
+		);
+	}
+
 	/** The user's own rewrite of a passage, kept as a version beside it. */
 	edit(turnId: string, source: string): Promise<void> {
 		const index = this.path.findIndex((entry) => entry.id === turnId);
@@ -887,6 +917,8 @@ export class DreamSession {
 		steer?: string | null;
 		/** Ask where it could go first, pick, and offer the rest as chips. */
 		different?: boolean;
+		/** The reading the user chose for the turn it answers, kept on the passage. */
+		readAs?: Reading;
 	}) {
 		const { setup } = this;
 		if (!setup?.build) {
@@ -944,7 +976,8 @@ export class DreamSession {
 			source: reply.text,
 			ended: reply.ended,
 			model: reply.model,
-			provider: reply.provider
+			provider: reply.provider,
+			...(input.readAs ? { readAs: input.readAs } : {})
 		});
 		this.chips = input.different && others.length > 0 ? { turnId: kept, options: others } : null;
 		if (reply.ended === 'refused' || reply.ended === 'failed') {
@@ -968,6 +1001,7 @@ export class DreamSession {
 		ended: DreamPassageTurn['ended'];
 		model: string;
 		provider: string;
+		readAs?: Reading;
 	}) {
 		const id = crypto.randomUUID();
 		const turn: DreamPassageTurn = {
@@ -976,7 +1010,8 @@ export class DreamSession {
 			request: input.request,
 			ended: input.ended,
 			model: input.model,
-			provider: input.provider
+			provider: input.provider,
+			...(input.readAs ? { readAs: input.readAs } : {})
 		};
 		await appendTurn(this.id, { id, parentId: input.parentId, role: 'model', content: turn });
 		const parentIndex = this.path.findIndex((entry) => entry.id === input.parentId);

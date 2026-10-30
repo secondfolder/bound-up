@@ -369,6 +369,8 @@
 			{#each node.text.split(PARAGRAPH_BREAK) as paragraph, at (at)}{#if at > 0}<span class="beat" aria-hidden="true"></span>{/if}{@render inline(inlineSegments(paragraph, names))}{/each}
 		{:else if node.type === 'ref'}
 			<button type="button" class="name" onclick={() => onref(node.id)}>{node.text}</button>
+		{:else if node.name === 'reading' || node.name === 'yours'}
+			<!-- How the turn before was read: drawn with that turn, not here. -->
 		{:else if node.name === 'after'}
 			<!-- The footer is notes for the model. -->
 		{:else if node.name === 'beat'}

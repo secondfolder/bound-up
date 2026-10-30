@@ -44,8 +44,23 @@ export function splitBeats(nodes: readonly MarkupNode[]): MarkupNode[][] {
 	return beats;
 }
 
-/** Tags drawn as blocks of their own, whose edges are already a break. */
-const BLOCK_TAGS = new Set(['beat', 'block', 'texts', 'letter', 'roll', 'ask', 'picture']);
+/**
+ * Tags drawn as blocks of their own, whose edges are already a break, and
+ * tags never drawn in the passage at all (how the turn was read, the
+ * footer), whose line breaks would otherwise be a blank line.
+ */
+const BLOCK_TAGS = new Set([
+	'beat',
+	'block',
+	'texts',
+	'letter',
+	'roll',
+	'ask',
+	'picture',
+	'reading',
+	'yours',
+	'after'
+]);
 const EDGE_START = /^\s*\n/;
 const EDGE_END = /\n\s*$/;
 const BLANK_LINES = /\n\s*\n\s*/g;

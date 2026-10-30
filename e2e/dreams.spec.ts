@@ -271,6 +271,35 @@ test.describe('daydreams, the new engine', () => {
 		await expect(page.getByRole('button', { name: 'I take the key.', exact: true })).toHaveCount(0);
 	});
 
+	test('a turn is drawn as it was read, written out for you, and can be read differently', async ({
+		page
+	}) => {
+		await dreamer(page);
+		await start(page, 'A quiet evening');
+		await play(page);
+		await saved(page);
+
+		// An instruction for the user's own turn is written out for them.
+		await box(page, 'Your turn').fill('Tell her I am staying');
+		await clickWaButton(page, 'Send');
+		await saved(page);
+		const turn = page.locator('li.you').last();
+		await expect(turn).toContainText('"I am staying," I tell her.');
+		await expect(turn).toContainText('Written out for you');
+		await turn.getByRole('button', { name: 'Show what you sent' }).click();
+		await expect(turn).toContainText('Tell her I am staying');
+		// The tags are never drawn in the passage.
+		await expect(page.locator('li.passage').last()).not.toContainText('I tell her');
+
+		// Read differently: a version beside it, the reading kept and shown.
+		await turn.getByRole('button', { name: 'Read it differently' }).click();
+		await turn.getByRole('menuitem', { name: 'A direction for the story' }).click();
+		await saved(page);
+		await expect(page.locator('li.passage').last()).toContainText('2 / 2');
+		await expect(turn).toContainText('A direction for the story');
+		await expect(turn).toContainText('as you asked');
+	});
+
 	test('choosing first, Surprise me, and Try another idea', async ({ page }) => {
 		await dreamer(page);
 		await start(page, 'A quiet evening [pick]');

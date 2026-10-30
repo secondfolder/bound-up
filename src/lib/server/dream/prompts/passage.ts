@@ -12,6 +12,7 @@ import { allowedTags } from '../../../dream/capabilities';
 import { serializeElements } from '../../../dream/elements';
 import { nextNote, parseFooter } from '../../../dream/footer';
 import { findTag, parseMarkup, plainText } from '../../../dream/markup';
+import { explicitOoc, type Reading } from '../../../dream/readings';
 import type { UserTurn } from '../../../dream/story';
 import { bulletList, CORE_RULES, limitsSection, type ModelMessage, wrap } from './core';
 import { passageFormat } from './passage-format';
@@ -56,6 +57,32 @@ const FOOTER_TAG = /<after>[\s\S]*?(?:<\/after>|$)/;
 
 const TAG = /<\/?(?<name>[a-z][\w-]*)\b[^>]*>/gi;
 
+/** How a turn was read, and the turn written out: kept in every passage's history. */
+const TURN_TAGS = new Set(['reading', 'yours']);
+
+/**
+ * How to read the user's words (docs/dreams.md, "How a turn is read"),
+ * from the first engine's `READING`. Said first in the reply, before
+ * anything is written: asked after, a model named whatever reading its
+ * passage had already acted on.
+ */
+const READING = `The user wrote words this turn. Start your reply by saying how you read them, as <reading as="…"/>, before anything else:
+- action: something they say or do in the story. Write what follows from it.
+- direction: a request about where the story should go ("make it slower", "more of her"). Take the story that way; their character does nothing they did not do.
+- instruction: what their own turn should be, said as an instruction ("tell her I'm leaving"). First write their turn out, as <yours>…</yours>: in the first person, as they would have written it, doing exactly what they asked and nothing more. Then write what follows from it.
+- story: part of the story itself, written by them. Carry on from it as if you had written it.
+- ooc: they stepped out of the story to talk to you. Answer briefly, out of the story, and carry the story on only if they ask you to.
+If the user chose how their words are meant, read them that way.`;
+
+/** A reading the user chose, said before their words. */
+const READING_NOTES: Readonly<Record<Reading, string>> = {
+	action: 'The user chose how this is meant: something they say or do in the story.',
+	direction: 'The user chose how this is meant: a direction for where the story goes.',
+	instruction: 'The user chose how this is meant: an instruction for their own turn, to write out.',
+	story: 'The user chose how this is meant: part of the story, written by them.',
+	ooc: 'The user chose how this is meant: out of character, to you.'
+};
+
 /**
  * A past passage as it goes back to the model: markup kept, footer cut to its
  * "next" line. With `allowed`, any tag this daydream did not enable is
@@ -68,7 +95,8 @@ export function historyPassage(source: string, allowed?: ReadonlySet<string>): s
 	if (allowed) {
 		body = body.replace(TAG, (tag, ...rest) => {
 			const groups = rest.at(-1) as { name?: string } | undefined;
-			return allowed.has(groups?.name?.toLowerCase() ?? '') ? tag : '';
+			const name = groups?.name?.toLowerCase() ?? '';
+			return allowed.has(name) || TURN_TAGS.has(name) ? tag : '';
 		});
 	}
 	const next = lastNext(source);
@@ -93,6 +121,11 @@ export function describeTurn(turn: UserTurn): string {
 			(turn.rolls?.length ?? 0) >
 		0;
 	if (turn.kind === 'words') {
+		// Out-of-character syntax is always read so, whatever the model makes of it.
+		const chosen = turn.readAs ?? (explicitOoc(turn.text) ? 'ooc' : null);
+		if (chosen) {
+			parts.push(READING_NOTES[chosen]);
+		}
 		parts.push(wrap('user', turn.text));
 	} else if (!filled) {
 		// Not silence from the user's character, which a character then
@@ -182,6 +215,9 @@ function nowSection(
 		parts.push(
 			`This passage was written for this moment, and the user wants something else to happen:\n${wrap('not-this', historyPassage(input.notThis, allowed))}\nNot this: what happens must be different, not only the words.`
 		);
+	}
+	if (last?.turn.kind === 'words' && input.mode !== 'directions') {
+		parts.push(READING);
 	}
 	if (input.mode === 'directions') {
 		parts.push(DIRECTIONS_ASK);

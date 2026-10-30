@@ -315,7 +315,19 @@ function dreamReplyFor(messages) {
 		const reply = said
 			? `You say "${said}", and Ottilie smiles.`
 			: 'Ottilie waits for you to go on.';
-		return `${take}${reply} The sea is loud below.\n<after>\n{"next":"The stairs."}\n</after>`;
+		// How it read the words: as the user chose, or a turn starting "Tell
+		// her" is an instruction, written out; anything else something said.
+		const chose =
+			user.match(/The user chose how this is meant: (?<how>[a-z ]+)/)?.groups?.how ?? '';
+		let reading = '';
+		if (chose.startsWith('a direction')) {
+			reading = '<reading as="direction"/>\n';
+		} else if (said.startsWith('Tell her')) {
+			reading = `<reading as="instruction"/>\n<yours>"${said.slice('Tell her '.length)}," I tell her.</yours>\n`;
+		} else if (said) {
+			reading = '<reading as="action"/>\n';
+		}
+		return `${reading}${take}${reply} The sea is loud below.\n<after>\n{"next":"The stairs."}\n</after>`;
 	}
 	return null;
 }

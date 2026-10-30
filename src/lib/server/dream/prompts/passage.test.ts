@@ -58,4 +58,17 @@ describe('history', () => {
 		const past = messages.find((message) => message.role === 'assistant')?.content ?? '';
 		expect(past).toBe('<more>x</more> hums');
 	});
+
+	it('asks how words were read, says a reading the user chose, and keeps both in history', () => {
+		expect(describeTurn({ kind: 'words', text: 'Make it slower', readAs: 'direction' })).toMatch(
+			/^The user chose how this is meant: a direction/
+		);
+		expect(describeTurn({ kind: 'words', text: '(can we skip ahead?)' })).toContain(
+			'out of character, to you'
+		);
+		expect(describeTurn({ kind: 'words', text: 'I wait.' })).not.toContain('chose how');
+		expect(
+			historyPassage('<reading as="instruction"/><yours>I tell her.</yours>She nods.', new Set())
+		).toBe('<reading as="instruction"/><yours>I tell her.</yours>She nods.');
+	});
 });

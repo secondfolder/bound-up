@@ -33,7 +33,7 @@ data would simply stop showing. So:
   before the kink list was first deployed. The new daydream engine's
   `dream-setup` v1 and `dream-detail` v1 and v2 gained optional fields in
   place (an element's `short` name, the reading's `lookups`, the setup's
-  `awaitingStart`) before the engine was first deployed; being optional, the
+  `awaitingStart`, a passage's `readAs`) before the engine was first deployed; being optional, the
   fixtures still open unchanged. Once a version has been
   deployed, it is frozen like the rest.
 - **All fixtures share one vault**: the key is bytes 0–31, and the vault id is

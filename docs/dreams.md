@@ -465,6 +465,25 @@ them throws anything away; each adds a turn beside the passage:
   along with what is asked of them or pushing back.
 - **Stop**: what had arrived is kept as a version, marked stopped.
 
+**How a turn is read** (`src/lib/dream/readings.ts`), from the first engine's
+readings. When the user wrote words, the model says first, before the
+passage, how it read them, as `<reading as="…"/>` (`READING` in
+`prompts/passage.ts`): **action**, something they say or do, a plain bubble;
+**direction**, where the story should go, drawn as a marker rather than a
+bubble, since it is no turn in the story; **instruction**, what their own
+turn should be ("Tell her I'm staying"), which the model writes out first as
+`<yours>` in the first person and then answers: the bubble shows it,
+"Written out for you", with "Show what you sent" for the words sent, set apart
+as a note; **story**, part of the story they wrote; and **ooc**, out of
+character, which a turn in out-of-character syntax (`(`, `[`, `//`, `OOC:`)
+always is (`explicitOoc`). Asked after the passage instead, a model named
+whatever reading its passage had already acted on. Both tags stay in the
+history the model reads, and are never drawn in the passage. **Read it
+differently**, the menu on each turn, answers the turn again with the
+reading chosen, as a version beside the passage (`reread`): the reading is
+kept on the new passage (`readAs`) and sent with the turn from then on, as a
+note before the user's words, and the turn says "as you asked".
+
 **Suggestions.** Each passage's footer offers two to four things the user
 might write next (`{"suggest": [...]}`), in their own voice and varied: one
 going along with the moment, one resisting or turning it, one somewhere

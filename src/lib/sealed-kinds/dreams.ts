@@ -15,6 +15,7 @@ import { HEAT_LEVELS, MAX_TELLING_CHARS, THEMES, VIEWS } from '../dream/build';
 import { CAPABILITIES } from '../dream/capabilities';
 import { MAX_ELEMENT_CHARS, MAX_ELEMENTS } from '../dream/elements';
 import { MAX_DIRECTIONS } from '../dream/reading';
+import { READINGS } from '../dream/readings';
 import { defineSealedKind } from '../sealed';
 import { isClientId } from '../vault';
 
@@ -201,7 +202,13 @@ const passageSchema = z.object({
 	ended: z.enum(['complete', 'stopped', 'refused', 'failed']),
 	/** Which model and provider wrote it, for "Behind the scenes"; empty for an edit. */
 	model: text(120),
-	provider: text(120)
+	provider: text(120),
+	/**
+	 * How the user chose to have the turn before it read ("Read it
+	 * differently"), kept and sent with that turn from then on. Added in
+	 * place before the engine was deployed (sealed-fixtures/README.md).
+	 */
+	readAs: z.enum(READINGS).optional()
 });
 
 /**

@@ -6,6 +6,14 @@
 	import { elementLabel, linkableNames } from '$lib/dream/elements';
 	import { fieldKey } from '$lib/dream/fields';
 	import { suggestionsIn } from '$lib/dream/footer';
+	import {
+		explicitOoc,
+		isReading,
+		READING_CHOICES,
+		READINGS,
+		type Reading,
+		turnReading
+	} from '$lib/dream/readings';
 	import { footerOf } from '$lib/dream/story';
 	import { voiceForSpeaker } from '$lib/dream/voices';
 	import { ReadAloud, SPEEDS } from '$lib/dream-browser/reader.svelte';
@@ -130,6 +138,49 @@
 			: '';
 		inputsDraft?.save({ text, tagIds: [] });
 	});
+
+	// ── how a turn was read ──────────────────────────────────────────────────
+
+	/**
+	 * How the passage after a turn read it (docs/dreams.md, "How a turn is
+	 * read"): from the passage kept after it, or the one arriving. A turn in
+	 * out-of-character syntax is that, whatever the model said.
+	 */
+	function answerTo(
+		turnId: string,
+		index: number
+	): { reading: Reading | null; yours: string | null; chosen: Reading | null } {
+		const next = session.path[index + 1]?.turn;
+		const input = session.path[index]?.turn;
+		const ooc = input?.kind === 'input' && explicitOoc(input.text);
+		let found: { reading: Reading | null; yours: string | null } = { reading: null, yours: null };
+		let chosen: Reading | null = null;
+		if (next?.kind === 'passage') {
+			found = turnReading(next.source);
+			chosen = next.readAs ?? null;
+		} else if (session.streaming?.what === 'passage' && session.streaming.parentId === turnId) {
+			found = turnReading(session.streaming.text);
+		}
+		const reading = chosen ?? (ooc ? 'ooc' : found.reading);
+		return { reading, yours: reading === 'instruction' ? found.yours : null, chosen };
+	}
+
+	let showingSent = $state(new Set<string>());
+
+	function toggleSent(turnId: string) {
+		const next = new Set(showingSent);
+		if (!next.delete(turnId)) {
+			next.add(turnId);
+		}
+		showingSent = next;
+	}
+
+	function reread(event: WaSelectEvent, turnId: string) {
+		const choice = event.detail.item.value;
+		if (isReading(choice)) {
+			void session.reread(turnId, choice);
+		}
+	}
 
 	// ── a passage's menu ─────────────────────────────────────────────────────
 
@@ -383,11 +434,53 @@
 			{#if entry.turn === null}
 				<li class="unreadable">This part can't be shown on this device.</li>
 			{:else if entry.turn.kind === 'input'}
-				<li class="you">
-					{#if entry.turn.text.trim()}
-						<p>{entry.turn.text}</p>
-					{:else}
+				{const sent = $derived(entry.turn.text.trim())}
+				{const answer = $derived(answerTo(entry.id, index))}
+				<li class="you" data-reading={answer.reading ?? 'action'}>
+					{#if !sent}
 						<p class="quiet">Continue</p>
+					{:else if answer.reading === 'direction'}
+						<!-- A direction is no turn in the story: a marker, not a bubble. -->
+						<p class="direction-marker">
+							<wa-icon name="signs-post" aria-hidden="true"></wa-icon>
+							{sent}
+						</p>
+					{:else if answer.yours && !showingSent.has(entry.id)}
+						<p>{answer.yours}</p>
+					{:else}
+						<p class:sent-note={Boolean(answer.yours)}>{sent}</p>
+					{/if}
+					{#if sent}
+						<div class="turn-note">
+							{#if answer.yours}
+								{showingSent.has(entry.id) ? 'What you sent' : 'Written out for you'} ·
+								<!-- A toggle: native, because wa-button forwards no aria-pressed. -->
+								<button
+									type="button"
+									class="link"
+									aria-pressed={showingSent.has(entry.id)}
+									onclick={() => toggleSent(entry.id)}>Show what you sent</button
+								>
+							{:else if answer.reading === 'direction'}
+								A direction for the story
+							{:else if answer.reading === 'ooc'}
+								Out of character
+							{:else if answer.reading === 'story'}
+								Part of the story
+							{/if}
+							{#if answer.chosen}<span>· as you asked</span>{/if}
+							{#if !session.busy}
+								<wa-dropdown placement="bottom-end" onwa-select={(event: WaSelectEvent) => reread(event, entry.id)}>
+									<wa-button slot="trigger" size="s" appearance="plain" pill>
+										<wa-icon name="ellipsis-vertical" variant="solid" label="Read it differently"></wa-icon>
+									</wa-button>
+									<h3 class="menu-heading">Read it as…</h3>
+									{#each READINGS.filter((reading) => reading !== (answer.reading ?? 'action')) as reading (reading)}
+										<wa-dropdown-item value={reading}>{READING_CHOICES[reading]}</wa-dropdown-item>
+									{/each}
+								</wa-dropdown>
+							{/if}
+						</div>
 					{/if}
 				</li>
 			{:else}
@@ -884,6 +977,54 @@
 		p {
 			margin: 0;
 			white-space: pre-line;
+		}
+
+		/* What was sent, shown beside its written-out turn: a note, never mistaken for it. */
+		.sent-note {
+			font-style: italic;
+			border-left: 2px dashed var(--wa-color-brand-border-normal);
+			padding-left: var(--wa-space-xs);
+		}
+
+		.turn-note {
+			display: flex;
+			flex-wrap: wrap;
+			align-items: center;
+			justify-content: flex-end;
+			gap: var(--wa-space-3xs);
+			margin-top: var(--wa-space-3xs);
+			font-size: var(--wa-font-size-xs);
+			color: var(--wa-color-text-quiet);
+		}
+
+		.link {
+			all: unset;
+			cursor: pointer;
+			text-decoration: underline;
+
+			&:focus-visible {
+				outline: var(--wa-focus-ring);
+			}
+		}
+
+		.menu-heading {
+			margin: var(--wa-space-xs) var(--wa-space-s) var(--wa-space-3xs);
+			font-size: var(--wa-font-size-xs);
+			color: var(--wa-color-text-quiet);
+		}
+	}
+
+	/* A direction is no turn in the story, so not a bubble. */
+	.you[data-reading='direction'] {
+		align-self: center;
+		background: transparent;
+
+		.direction-marker {
+			display: flex;
+			align-items: center;
+			gap: var(--wa-space-xs);
+			font-style: italic;
+			color: var(--wa-color-text-quiet);
 		}
 	}
 

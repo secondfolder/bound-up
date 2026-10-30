@@ -29,5 +29,6 @@ describe('tidyBreaks', () => {
 		expect(tidy('One.\n\n\n\nTwo.')).toBe('One.\n\nTwo.');
 		expect(tidy('One.\n\n<beat/>\n\nTwo.')).toBe('One.|<beat>|Two.');
 		expect(tidy('\n\nOne. <say who="a">"Hi."</say> Two.\n')).toBe('One. |<say>| Two.');
+		expect(tidy('<reading as="action"/>\nShe nods.')).toBe('<reading>|She nods.');
 	});
 });

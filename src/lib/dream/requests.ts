@@ -21,6 +21,7 @@ import {
 import { HEAT_LEVELS, MAX_TELLING_CHARS, THEMES, VIEWS } from './build';
 import { CAPABILITIES } from './capabilities';
 import { MAX_ELEMENTS } from './elements';
+import { READINGS } from './readings';
 import { MAX_SPOKEN_CHARS } from './speech';
 
 const required = (max: number) => z.string().trim().min(1).max(max);
@@ -92,7 +93,12 @@ const turnExtras = {
 
 const userTurnSchema = z.discriminatedUnion('kind', [
 	z.object({ kind: z.literal('continue'), ...turnExtras }),
-	z.object({ kind: z.literal('words'), text: required(MAX_INPUT_CHARS), ...turnExtras })
+	z.object({
+		kind: z.literal('words'),
+		text: required(MAX_INPUT_CHARS),
+		readAs: z.enum(READINGS).optional(),
+		...turnExtras
+	})
 ]);
 
 const setupSchema = z.object({

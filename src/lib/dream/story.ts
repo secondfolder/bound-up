@@ -18,6 +18,7 @@ import type {
 import type { DreamElement } from './elements';
 import { type FooterEntry, parseFooter } from './footer';
 import { findTag, findTags, parseMarkup, plainText } from './markup';
+import type { Reading } from './readings';
 import { repeatedPhrases } from './repetition';
 
 /** A turn on the path, opened: null when it could not be. */
@@ -40,7 +41,15 @@ export type TurnRoll = { id: string; sides: number; value: number };
  * Continue, either with the choices they set, the fields they filled in
  * (docs/dreams.md, "Fields") and the question they answered.
  */
-export type UserTurn = ({ kind: 'continue' } | { kind: 'words'; text: string }) & {
+export type UserTurn = (
+	| { kind: 'continue' }
+	| {
+			kind: 'words';
+			text: string;
+			/** How the user chose to have it read ("Read it differently"). */
+			readAs?: Reading;
+	  }
+) & {
 	choices?: TurnChoice[];
 	fields?: TurnField[];
 	answers?: TurnAnswer[];
@@ -62,6 +71,13 @@ function isPassage(entry: PathTurn): entry is { id: string; turn: DreamPassageTu
 
 function isInput(entry: PathTurn | undefined): entry is { id: string; turn: DreamInputTurn } {
 	return entry?.turn?.kind === 'input';
+}
+
+/** A turn as it goes to the model, with the reading the user chose for it, if they did. */
+function withChosenReading(input: DreamInputTurn | null, answered: PathTurn | undefined): UserTurn {
+	const turn = userTurnOf(input);
+	const chosen = answered?.turn?.kind === 'passage' ? answered.turn.readAs : undefined;
+	return turn.kind === 'words' && chosen ? { ...turn, readAs: chosen } : turn;
 }
 
 /** What the user's turn tells the model: words, choices, fields, answers and rolls. */
@@ -96,8 +112,10 @@ export function historyFor(path: readonly PathTurn[], pending: UserTurn): Histor
 		if (next === undefined) {
 			turn = pending;
 		} else if (isInput(next)) {
-			// The last input on the path is the one being answered.
-			turn = index + 2 >= path.length ? pending : userTurnOf(next.turn);
+			// The last input on the path is the one being answered. A reading the
+			// user chose is kept on the passage that answered it, and goes with
+			// the turn from then on.
+			turn = index + 2 >= path.length ? pending : withChosenReading(next.turn, path[index + 2]);
 		} else {
 			turn = { kind: 'continue' };
 		}

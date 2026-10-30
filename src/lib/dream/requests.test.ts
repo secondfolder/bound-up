@@ -7,6 +7,7 @@ describe('passageRequestSchema', () => {
 		const turn: Required<Extract<UserTurn, { kind: 'words' }>> = {
 			kind: 'words',
 			text: 'I sign.',
+			readAs: 'direction',
 			choices: [{ id: 'pen', value: 'red' }],
 			fields: [{ block: 'terms', name: 'c1', value: 'initialled' }],
 			answers: [{ id: 'pace', text: 'Slower' }],
