@@ -115,6 +115,23 @@ export function dreamPicturesPrefix(dreamId: string): string {
 }
 
 /**
+ * Where a voice's sample clip is kept (docs/dreams.md, "Voices"): one per
+ * Fish voice, model and line, hashed so a Fish id (any characters it likes)
+ * makes a safe key, and so changing the model or the line makes new clips
+ * rather than serving the old ones. Kept for good, under `permanent/`.
+ */
+export async function voiceSampleKey(voice: string, model: string, line: string): Promise<string> {
+	const digest = await crypto.subtle.digest(
+		'SHA-256',
+		new TextEncoder().encode(JSON.stringify([voice, model, line]))
+	);
+	const hex = [...new Uint8Array(digest)]
+		.map((byte) => byte.toString(16).padStart(2, '0'))
+		.join('');
+	return `permanent/voice-samples/${hex}`;
+}
+
+/**
  * Where a notebook entry's versions live (docs/notebook.md, "Versions"): the
  * sealed snapshots, kept for good, so under `permanent/`.
  *

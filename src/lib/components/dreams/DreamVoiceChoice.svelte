@@ -55,11 +55,15 @@
 	/>
 	<wa-dropdown placement="bottom-end" onwa-select={choose}>
 		<wa-button slot="trigger" size="s" appearance="outlined" with-caret>{current}</wa-button>
-		<wa-dropdown-item type="checkbox" value={DEFAULT} checked={own === null}>Same as the narrator</wa-dropdown-item>
+		<wa-dropdown-item type="checkbox" value={DEFAULT} checked={own === null}>
+			Same as the narrator
+			<span slot="details"><VoiceSample voice={narrator ?? 'narrator'} label="Hear the narrator" /></span>
+		</wa-dropdown-item>
 		{#each FISH_VOICE_PRESETS as preset (preset.id)}
 			<wa-dropdown-item type="checkbox" value={preset.id} checked={own === preset.id}>
 				{preset.label}{preset.id === suits ? ' · suits them' : ''}
 				<small class="line">{preset.description}</small>
+				<span slot="details"><VoiceSample voice={preset.id} label={`Hear ${preset.label}`} /></span>
 			</wa-dropdown-item>
 		{/each}
 	</wa-dropdown>

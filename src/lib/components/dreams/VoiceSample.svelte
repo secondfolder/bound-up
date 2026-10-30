@@ -6,12 +6,15 @@
 </script>
 
 <script lang="ts">
+	import type { Attachment } from 'svelte/attachments';
 	import { reportRequestFailure, tryFetch } from '$lib/request-failure.svelte';
 
 	/**
 	 * Plays a voice saying one sample line, to hear it before choosing it
 	 * (docs/dreams.md, "Voices"): a voice preset, or this daydream's narrator.
 	 * Again stops it. One plays at a time across every button on the page.
+	 * Inside a voice menu's items too, so voices can be tried one after
+	 * another without the menu closing each time.
 	 */
 	let {
 		voice,
@@ -82,9 +85,24 @@
 			mine.stop();
 		}
 	}
+
+	/**
+	 * The click goes no further than the button: inside a `wa-dropdown-item`,
+	 * the menu would take it as choosing that voice and close. Svelte's
+	 * delegated `onclick` runs at the root, after the menu has seen it, so the
+	 * listener is the button's own.
+	 */
+	const press: Attachment<HTMLElement> = (element) => {
+		const onClick = (event: Event) => {
+			event.stopPropagation();
+			void toggle();
+		};
+		element.addEventListener('click', onClick);
+		return () => element.removeEventListener('click', onClick);
+	};
 </script>
 
-<wa-button class="voice-sample" size="s" appearance="plain" pill onclick={toggle}>
+<wa-button class="voice-sample" size="s" appearance="plain" pill {@attach press}>
 	{#if status === 'loading'}
 		<wa-spinner aria-label="Getting the voice ready"></wa-spinner>
 	{:else if status === 'playing'}

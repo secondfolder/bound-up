@@ -1099,6 +1099,15 @@ test.describe('daydreams, the new engine', () => {
 		const trigger = row.locator('wa-button[slot="trigger"]');
 		await expect(trigger).toHaveText('Same as the narrator');
 		await trigger.click();
+		// Voices can be heard from inside the menu, which stays open to try another.
+		const inMenu = page.waitForRequest((request) =>
+			request.url().endsWith('/api/dreams/voice-sample')
+		);
+		await row.getByRole('button', { name: 'Hear Tender' }).click();
+		expect((await inMenu).postDataJSON()).toEqual({ voice: 'tender' });
+		await expect(row.getByRole('menuitemcheckbox', { name: /^Tender/ })).not.toBeChecked();
+		await expect(row.getByRole('menuitemcheckbox', { name: /^Smoky/ })).toBeVisible();
+		await expect(trigger).toHaveText('Same as the narrator');
 		await row.getByRole('menuitemcheckbox', { name: /^Smoky/ }).click();
 		await expect(trigger).toHaveText('Smoky');
 		await page.keyboard.press('Escape');

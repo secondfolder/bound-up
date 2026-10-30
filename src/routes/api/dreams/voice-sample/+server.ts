@@ -5,9 +5,11 @@ import { VOICE_SAMPLE } from '$lib/dream/voices';
 import { isAdmin } from '$lib/server/admin';
 import { fishVoiceFor, readVoiceConfig } from '$lib/server/daydream/voice-config';
 import { hasAcceptedDisclosure } from '$lib/server/daydreams';
-import { streamSpeech } from '$lib/server/dream/fish';
+import { FISH_MODEL, streamSpeech } from '$lib/server/dream/fish';
 import { spendVoice } from '$lib/server/dream-voice';
 import { userHasFeature } from '$lib/server/features';
+import { createMediaStore, type MediaStore } from '$lib/server/media/backend';
+import { voiceSampleKey } from '$lib/server/media/index';
 import type { RequestHandler } from './$types';
 
 /**
@@ -22,8 +24,10 @@ const sampleRequestSchema = z.object({ voice: z.string().trim().min(1).max(40) }
 /**
  * Each voice's sample once it has been made, by the Fish voice it is in:
  * the line never changes, so neither does what it sounds like, and trying
- * the same voice twice should not cost twice. A few dozen small clips at
- * most, one per voice, for as long as the process (or isolate) lives.
+ * the same voice twice should not cost twice. Kept in media storage (R2, or
+ * the media directory) so a restart or a fresh isolate does not make it
+ * again, and here too, so the same isolate does not read it back each time.
+ * A few dozen small clips at most, one per voice.
  */
 const samples = new Map<string, Uint8Array<ArrayBuffer>>();
 
@@ -51,8 +55,11 @@ export const POST: RequestHandler = async ({ locals, platform, request }) => {
 	if (!voice) {
 		error(400, 'That voice is not one this server has. Reload and try again.');
 	}
-	const kept = samples.get(voice);
+	const store = await createMediaStore({ platform });
+	const key = await voiceSampleKey(voice, FISH_MODEL, VOICE_SAMPLE);
+	const kept = samples.get(voice) ?? (await stored(store, key));
 	if (kept) {
+		samples.set(voice, kept);
 		return clip(kept);
 	}
 	if (!admin) {
@@ -93,8 +100,22 @@ export const POST: RequestHandler = async ({ locals, platform, request }) => {
 		at += piece.length;
 	}
 	samples.set(voice, whole);
+	// Kept for next time, but a clip already made is served even if keeping it fails.
+	await store
+		.put(key, new Response(whole).body as ReadableStream<Uint8Array>, whole.length)
+		.catch(() => undefined);
 	return clip(whole);
 };
+
+/** A sample made before, from media storage, or null when there is none (or it cannot be read). */
+async function stored(store: MediaStore, key: string): Promise<Uint8Array<ArrayBuffer> | null> {
+	try {
+		const object = await store.get(key);
+		return object ? new Uint8Array(await new Response(object.body).arrayBuffer()) : null;
+	} catch {
+		return null;
+	}
+}
 
 function clip(bytes: Uint8Array<ArrayBuffer>): Response {
 	return new Response(bytes, { headers: { 'content-type': 'audio/mpeg' } });

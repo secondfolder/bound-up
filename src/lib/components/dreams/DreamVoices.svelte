@@ -65,11 +65,15 @@
 				<wa-button slot="trigger" size="s" appearance="outlined" with-caret
 					>{narrator ? presetName(narrator) : serverName}</wa-button
 				>
-				<wa-dropdown-item type="checkbox" value={DEFAULT} checked={narrator === null}>{serverName}</wa-dropdown-item>
+				<wa-dropdown-item type="checkbox" value={DEFAULT} checked={narrator === null}>
+					{serverName}
+					<span slot="details"><VoiceSample voice="narrator" label="Hear this server’s narrator" /></span>
+				</wa-dropdown-item>
 				{#each FISH_VOICE_PRESETS as preset (preset.id)}
 					<wa-dropdown-item type="checkbox" value={preset.id} checked={narrator === preset.id}>
 						{preset.label}
 						<small class="line">{preset.description}</small>
+						<span slot="details"><VoiceSample voice={preset.id} label={`Hear ${preset.label}`} /></span>
 					</wa-dropdown-item>
 				{/each}
 			</wa-dropdown>
