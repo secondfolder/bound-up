@@ -272,7 +272,8 @@ export class DreamSession {
 	researched = $state<string | null>(null);
 	/**
 	 * Whether the user is listening to this daydream read aloud, which asks
-	 * passages for delivery cues and sounds. For this page only.
+	 * passages for delivery cues and sounds. The page restores it from, and
+	 * keeps it in, the device's reading options (`reading-options.ts`).
 	 */
 	listening = $state(false);
 	/** What really went wrong with `problem`, for debug mode. */

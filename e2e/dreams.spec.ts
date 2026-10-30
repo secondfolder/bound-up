@@ -650,6 +650,47 @@ test.describe('daydreams, the new engine', () => {
 		await expect(morePanel).toContainText('It is warm from her hand');
 	});
 
+	test('read aloud and the player’s options are as they were left, after a reload', async ({
+		page
+	}) => {
+		const who = await dreamer(page);
+		await grantFeature(who.email, 'dreamVoice');
+		await start(page, 'A quiet evening');
+		await play(page);
+		await saved(page);
+
+		const player = page.getByRole('region', { name: 'Reading aloud' });
+		const option = (name: string) => player.getByRole('button', { name: new RegExp(name) });
+		await page.getByRole('button', { name: 'Read aloud' }).click();
+		await option('Read new passages').click();
+		await option('Keep going').click();
+		await option('Highlight').click();
+		// A wa-button: its text is the host's, not the inner button's.
+		const speed = player.locator('wa-button', { hasText: 'Speed' });
+		await speed.click();
+		await expect(speed).toContainText('1.25×');
+
+		await page.reload();
+		await waitForHydration(page);
+		await expect(page.getByRole('button', { name: 'Read aloud' })).toHaveAttribute(
+			'aria-pressed',
+			'true'
+		);
+		await expect(option('Read new passages')).toHaveAttribute('aria-pressed', 'true');
+		await expect(option('Keep going')).toHaveAttribute('aria-pressed', 'true');
+		await expect(option('Highlight')).toHaveAttribute('aria-pressed', 'false');
+		await expect(speed).toContainText('1.25×');
+
+		// Turned off, it stays off.
+		await page.getByRole('button', { name: 'Read aloud' }).click();
+		await page.reload();
+		await waitForHydration(page);
+		await expect(page.getByRole('button', { name: 'Read aloud' })).toHaveAttribute(
+			'aria-pressed',
+			'false'
+		);
+	});
+
 	test('reading aloud carries on into the next passage, which Keep going asks for near the end', async ({
 		page
 	}) => {
@@ -853,7 +894,7 @@ test.describe('daydreams, the new engine', () => {
 
 		await page.reload();
 		await waitForHydration(page);
-		await page.getByRole('button', { name: 'Read aloud' }).click();
+		// Read aloud is still on: it is kept with the player's options.
 		await player.getByRole('button', { name: 'Play' }).click();
 		const resumed = await firstLit();
 		expect(resumed.passage).toBe(0);
@@ -869,7 +910,7 @@ test.describe('daydreams, the new engine', () => {
 		);
 		await page.reload();
 		await waitForHydration(page);
-		await page.getByRole('button', { name: 'Read aloud' }).click();
+		// Read aloud is still on: it is kept with the player's options.
 		await player.getByRole('button', { name: 'Play' }).click();
 		expect((await firstLit()).passage).toBe(1);
 	});
@@ -913,7 +954,6 @@ test.describe('daydreams, the new engine', () => {
 		await page.keyboard.press('Escape');
 		await page.reload();
 		await waitForHydration(page);
-		await page.getByRole('button', { name: 'Read aloud' }).click();
 		await player.getByRole('button', { name: 'Voices' }).click();
 		await expect(trigger).toHaveText('Smoky');
 		await page.keyboard.press('Escape');

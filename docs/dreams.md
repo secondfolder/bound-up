@@ -1124,9 +1124,14 @@ Any daydream can be listened to, behind a feature of its own,
 needs a Fish Audio key (Admin → Server settings → Voices,
 [server-settings.md](server-settings.md#voices)).
 
-**Off until asked.** "Read aloud" beside the title turns it on for the page
+**Off until asked.** "Read aloud" beside the title turns it on
 (`session.listening`); nothing ever plays on load, because sound in a public
-place is a privacy risk and browsers block it anyway. It adds a Listen button
+place is a privacy risk and browsers block it anyway. Whether it is on, and
+the player's options below (Read new passages, Highlight, Keep going, the
+speed), are kept on the device for every daydream, as the user left them
+(`dream-reading-options` in local storage, `reading-options.ts`): they are
+the reader's habits, not a story's. Being on only shows the player; it still
+waits for play. It adds a Listen button
 to each passage and a player in the dock, under the turn (see "Your
 turn"): who is speaking, back a
 sentence, play and pause, speed (0.75× to 2×, tapping cycles), "Read new

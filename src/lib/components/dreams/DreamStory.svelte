@@ -21,6 +21,7 @@
 	import { DEFAULT_STYLE, isPreset, OWN_STYLE, STYLE_PRESETS } from '$lib/dream/styles';
 	import { voiceForSpeaker } from '$lib/dream/voices';
 	import { ReadAloud, SPEEDS, type SpokenReport } from '$lib/dream-browser/reader.svelte';
+	import { loadReadingOptions, saveReadingOptions } from '$lib/dream-browser/reading-options';
 	import type { DreamSession } from '$lib/dream-browser/session.svelte';
 	import { type DraftSession, openDraft } from '$lib/messaging/drafts';
 	import { MAX_INPUT_CHARS, MAX_PASSAGE_CHARS } from '$lib/sealed-kinds/dreams';
@@ -465,6 +466,33 @@
 		: null;
 	onDestroy(() => reader?.dispose());
 
+	// Read aloud and the player's options are as the user left them, on this
+	// device, for every daydream. Restored before anything is saved, so the
+	// defaults the page starts with never overwrite them.
+	let optionsLoaded = $state(false);
+	onMount(() => {
+		const options = loadReadingOptions();
+		if (reader) {
+			session.listening = options.listening;
+			reader.readNew = options.readNew;
+			reader.setHighlight(options.highlight);
+			reader.setKeepGoing(options.keepGoing);
+			reader.setRate(options.rate);
+		}
+		optionsLoaded = true;
+	});
+	$effect(() => {
+		if (optionsLoaded && reader) {
+			saveReadingOptions({
+				listening: session.listening,
+				readNew: reader.readNew,
+				highlight: reader.highlight,
+				keepGoing: reader.keepGoing,
+				rate: reader.rate
+			});
+		}
+	});
+
 	function speakerName(who: string | null): string {
 		if (who === 'you') {
 			return 'You';
@@ -612,11 +640,10 @@
 
 	function toggleListening() {
 		session.listening = !session.listening;
+		// Read new passages stays as it was: it only acts while listening, and
+		// is one of the options kept for next time.
 		if (!session.listening) {
 			reader?.stop();
-			if (reader) {
-				reader.readNew = false;
-			}
 		}
 	}
 
