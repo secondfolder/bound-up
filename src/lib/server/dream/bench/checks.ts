@@ -7,7 +7,7 @@
  */
 
 import type { Build } from '../../../dream/build';
-import { allowedTags } from '../../../dream/capabilities';
+import { allowedTags, passageCapabilities } from '../../../dream/capabilities';
 import { parseFooter } from '../../../dream/footer';
 import { findTag, findTags, parseMarkup, plainText, tagNames } from '../../../dream/markup';
 import type { BriefReading } from '../../../dream/reading';
@@ -85,7 +85,7 @@ function buildChecks({ brief, build }: CheckInput): CheckResult[] {
 		{
 			id: 'structure-fits-brief',
 			ok: inRange(build.elements.length, brief.expect.elements),
-			detail: `${build.elements.length} elements (${build.elements.map((element) => `${element.type}:${element.name}`).join(', ') || 'none'}), expected ${brief.expect.elements.join('–')}; capabilities: ${build.capabilities.join(', ') || 'none'}`
+			detail: `${build.elements.length} elements (${build.elements.map((element) => `${element.type}:${element.name}`).join(', ') || 'none'}), expected ${brief.expect.elements.join('–')}`
 		},
 		{ id: 'telling-length', ok: words <= 300, detail: `${words} words of telling notes` },
 		{
@@ -96,9 +96,9 @@ function buildChecks({ brief, build }: CheckInput): CheckResult[] {
 	];
 }
 
-function passageChecks(build: Build | null, source: string, index: number): CheckResult[] {
+function passageChecks(source: string, index: number): CheckResult[] {
 	const nodes = parseMarkup(source, { final: true });
-	const allowed = allowedTags(build?.capabilities ?? []);
+	const allowed = allowedTags(passageCapabilities(false));
 	const unknown = [...tagNames(nodes)].filter(
 		(name) =>
 			!(allowed.has(name) || TURN_TAGS.has(name) || (name === 'slot' && allowed.has('block')))
@@ -184,7 +184,7 @@ export function runChecks(input: CheckInput): CheckResult[] {
 	return [
 		...readingChecks(input),
 		...buildChecks(input),
-		...input.passages.flatMap((source, index) => passageChecks(input.build, source, index)),
+		...input.passages.flatMap((source, index) => passageChecks(source, index)),
 		...proseChecks(input),
 		...timingChecks(input)
 	];

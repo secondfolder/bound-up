@@ -11,6 +11,7 @@
  */
 
 import { type Build, parseBuild } from '../../../dream/build';
+import { passageCapabilities } from '../../../dream/capabilities';
 import { drawNudges, type Nudge } from '../../../dream/nudges';
 import { pickDirection } from '../../../dream/pick';
 import { seededRandom, seedFrom } from '../../../dream/random';
@@ -208,7 +209,7 @@ async function runSteps(
 				setup: {
 					heat: build.heat,
 					telling: build.telling,
-					capabilities: build.capabilities,
+					capabilities: passageCapabilities(false),
 					elements: build.elements,
 					presentation: build.presentation,
 					musts: run.reading.musts,

@@ -142,11 +142,16 @@ export function memoryFor(
 	const lastSummarised = onPath.length > 0 ? (position.get(onPath.at(-1)?.turnId ?? '') ?? -1) : -1;
 	const history = historyFor(path, pending);
 	const passageIndexes = path.flatMap((entry, index) => (isPassage(entry) ? [index] : []));
-	const unsummarised = passageIndexes.filter((index) => index > lastSummarised).length;
-	const keep = Math.min(MAX_RECENT_PASSAGES, Math.max(RECENT_PASSAGES, unsummarised));
+	const summarised = passageIndexes.filter((index) => index <= lastSummarised).length;
+	// From a fixed point, the last few passages the latest summary covers,
+	// rather than the last few passages: a window sliding on by one each
+	// passage changed the opening of the history every time, and the
+	// provider's cache could serve none of it (docs/dreams.md, "Prompt
+	// caching"). It moves only when a scene is summarised.
+	const kept = history.slice(Math.max(0, summarised - RECENT_PASSAGES));
 	return {
 		summaries: onPath.map((entry) => entry.summary.text),
-		history: history.slice(-keep)
+		history: kept.slice(-MAX_RECENT_PASSAGES)
 	};
 }
 

@@ -22,6 +22,19 @@ export const CAPABILITIES = [
 
 export type Capability = (typeof CAPABILITIES)[number];
 
+/**
+ * What every passage may use (docs/dreams.md, "Capabilities"): all of
+ * them, always, but voice, which is on only while the user listens, and
+ * research, which is no passage's to do. A daydream used to choose its
+ * capabilities in its build, so a passage could not use one the build had
+ * not foreseen; measured 2026-10-30, sending them all costs about 670 input
+ * tokens a passage, a fraction of a cent, so they are simply offered, and
+ * the prompt asks for restraint instead.
+ */
+export function passageCapabilities(listening: boolean): Capability[] {
+	return CAPABILITIES.filter((name) => name !== 'research' && (name !== 'voice' || listening));
+}
+
 /** Markup every daydream may use, whatever it opted into. */
 export const ALWAYS_ALLOWED_TAGS: readonly string[] = ['say', 'beat', 'after', 'p'];
 

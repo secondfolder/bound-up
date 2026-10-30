@@ -16,7 +16,8 @@ prompts. Requests that fit none of them were hard to serve, stories in the same
 voice came out alike, and the combinations were a lot to maintain. The new one
 has the model write **telling notes** (prose about what this daydream is and
 how it reads) and **elements** (anything worth a record, of any type), and
-offers a **menu of capabilities** it may opt into. Code supplies the
+offers **capabilities** (stats, reveals, choices, questions, blocks, tone,
+dice, pictures, voice) any passage may use. Code supplies the
 randomness: the model lists several directions and code picks one.
 
 ## What exists now
@@ -119,12 +120,50 @@ that scene on, which is the user asking it to.
    raised to a power set by the spread (`tiltFor`), so a wide brief leans
    towards the unlikely directions.
 3. **Building and opening** (`buildMessages`): title, heat, telling notes,
-   presentation (view and a theme from a curated set), capabilities, elements,
-   and the opening passage in the same reply.
-4. **Passages** (`passageMessages`): the fixed core and the chosen
-   capabilities' blocks first, then the setup, the story so far (footers cut
-   to their `next` line), and last what is happening now, including the
-   phrases repeated in recent passages as "don't reuse".
+   presentation (view and a theme from a curated set), elements, and the
+   opening passage in the same reply.
+4. **Passages** (`passageMessages`): the fixed core and every capability's
+   block first, then what stays the same in the setup (telling notes, musts,
+   research), the story so far (footers cut to their `next` line), and last
+   what changes as it goes (the elements as they stand, the designed blocks,
+   the preferences) with what is happening now, including the phrases
+   repeated in recent passages as "don't reuse". See "Prompt caching".
+
+**Capabilities are always offered** (`passageCapabilities`): every passage
+may use any of them but voice, which is on only while the user listens.
+The build used to choose them, so a story could not roll a die it had not
+foreseen needing; sending them all is about 670 more input tokens a
+passage, a fraction of a cent on the models in use (measured 2026-10-30),
+and the prompt asks for restraint instead: "there to use, never to use up".
+A build from before still has its `capabilities`, which nothing reads.
+
+### Prompt caching
+
+The providers cache a prompt's opening by themselves; no request asks for
+it. Measured 2026-10-30 on GLM 5.2: every provider lists a cached-read
+price, and the same prompt sent twice to DeepInfra, Novita or Wafer came
+back with 98% of it read from cache, its prompt cost about 80% lower. A
+response says so in `usage.prompt_tokens_details.cached_tokens`, which the
+client reads (`cachedTokens`) and the bench reports ("Passages after the
+first: …% of their prompts read from cache").
+
+A cache serves only an identical opening, on the same provider, so:
+
+- **The provider is the same from passage to passage**: the best tier, in a
+  fixed order (`bestProviders`), unless one is backing off.
+- **What changes goes last.** The elements change after nearly every passage
+  (stats move, `#afterPassage` keeps facts), so they, the designed blocks
+  and the preferences come after the history, in the message that asks for
+  the passage; the system prompt and the history before them stay the same.
+  With the elements in the system prompt, as they were, a cache could serve
+  only what came before them.
+- **The history holds still between summaries** (`memoryFor`): it starts at
+  a fixed point, the last six passages the latest summary covers, rather
+  than the last six passages, which slid on by one every passage and changed
+  its opening each time. It moves when a scene is summarised.
+
+An occasional miss is the provider's own (a request served by another of
+its machines).
 
 The core rules (`prompts/core.ts`) are code, never model-written text: adults
 only, no real people, the user's limits, consent as settled, quoted material
@@ -210,8 +249,7 @@ npm run dreams:bench -- --models z-ai/glm-5.2 --briefs training --runs 1 --passa
 - A model passed its own indecision on to the user as `<pick by="user">`; the
   reading prompt now says that is only for briefs that ask to choose.
 - The opening used `<ask>` without opting into questions, which the bench
-  flags. The prompt now says the opening uses only the chosen capabilities'
-  markup.
+  flagged; capabilities have since become always offered.
 
 ## The judge
 
@@ -563,8 +601,7 @@ taken.
 ## Interactive text (phase 3)
 
 Everything below is drawn by `DreamMarkup`
-(`src/lib/components/dreams/`), from tags the daydream's capabilities
-enabled. Each interactive part is a real button whose name says what it does,
+(`src/lib/components/dreams/`), from the capabilities' tags. Each interactive part is a real button whose name says what it does,
 in reading order, so the keyboard and a screen reader reach all of it:
 
 | Markup | Drawn as | Its name |

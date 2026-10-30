@@ -15,7 +15,17 @@ export type Completion = {
 	/** The upstream provider OpenRouter routed to, e.g. "DeepInfra". */
 	provider: string | null;
 	finishReason: string | null;
-	usage: { promptTokens: number; completionTokens: number; cost: number | null };
+	usage: {
+		promptTokens: number;
+		/**
+		 * Of the prompt, how much the provider read from its cache: the
+		 * provider caches a prompt's opening by itself, and says so here
+		 * (`prompt_tokens_details.cached_tokens`, measured 2026-10-30).
+		 */
+		cachedTokens: number;
+		completionTokens: number;
+		cost: number | null;
+	};
 	latencyMs: number;
 	/** When the first words arrived, for a streamed completion; null when not streamed. */
 	firstTokenMs: number | null;
@@ -42,7 +52,12 @@ type ChatResponse = {
 		delta?: { content?: string | null };
 		finish_reason?: string | null;
 	}[];
-	usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number };
+	usage?: {
+		prompt_tokens?: number;
+		completion_tokens?: number;
+		cost?: number;
+		prompt_tokens_details?: { cached_tokens?: number };
+	};
 	error?: { message?: string; code?: number };
 };
 
@@ -89,6 +104,7 @@ export async function complete(request: CompletionRequest): Promise<Completion> 
 		finishReason: choice?.finish_reason ?? null,
 		usage: {
 			promptTokens: data.usage?.prompt_tokens ?? 0,
+			cachedTokens: data.usage?.prompt_tokens_details?.cached_tokens ?? 0,
 			completionTokens: data.usage?.completion_tokens ?? 0,
 			cost: data.usage?.cost ?? null
 		},
@@ -138,7 +154,7 @@ export async function stream(
 		text: '',
 		provider: null,
 		finishReason: null,
-		usage: { promptTokens: 0, completionTokens: 0, cost: null },
+		usage: { promptTokens: 0, cachedTokens: 0, completionTokens: 0, cost: null },
 		latencyMs: 0,
 		firstTokenMs: null
 	};
@@ -183,6 +199,7 @@ function applyChunk(
 	if (chunk.usage) {
 		result.usage = {
 			promptTokens: chunk.usage.prompt_tokens ?? 0,
+			cachedTokens: chunk.usage.prompt_tokens_details?.cached_tokens ?? 0,
 			completionTokens: chunk.usage.completion_tokens ?? 0,
 			cost: chunk.usage.cost ?? null
 		};
@@ -208,7 +225,12 @@ type ResponsesEvent = {
 	};
 	response?: {
 		status?: string;
-		usage?: { input_tokens?: number; output_tokens?: number; cost?: number };
+		usage?: {
+			input_tokens?: number;
+			output_tokens?: number;
+			cost?: number;
+			input_tokens_details?: { cached_tokens?: number };
+		};
 		error?: { message?: string };
 	};
 	error?: { message?: string };
@@ -254,7 +276,7 @@ export async function streamResponses(
 		text: '',
 		provider: null,
 		finishReason: null,
-		usage: { promptTokens: 0, completionTokens: 0, cost: null },
+		usage: { promptTokens: 0, cachedTokens: 0, completionTokens: 0, cost: null },
 		latencyMs: 0,
 		firstTokenMs: null
 	};
@@ -326,6 +348,7 @@ function applyResponsesEvent(
 		if (usage) {
 			result.usage = {
 				promptTokens: usage.input_tokens ?? 0,
+				cachedTokens: usage.input_tokens_details?.cached_tokens ?? 0,
 				completionTokens: usage.output_tokens ?? 0,
 				cost: usage.cost ?? null
 			};

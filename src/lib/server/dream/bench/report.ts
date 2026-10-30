@@ -66,6 +66,22 @@ function fingerprintTable(runs: readonly BenchRun[]): string[] {
 	});
 }
 
+/**
+ * How much of the passages' prompts the providers read from their caches
+ * (docs/dreams.md, "Prompt caching"): the passages after the first, which
+ * are the ones a cache can serve.
+ */
+function cacheLine(runs: readonly BenchRun[]): string {
+	const passages = runs.flatMap((run) =>
+		run.steps.filter((step) => step.step.startsWith('passage') && step.step !== 'passage 1')
+	);
+	const prompt = passages.reduce((sum, step) => sum + step.completion.usage.promptTokens, 0);
+	const cached = passages.reduce((sum, step) => sum + step.completion.usage.cachedTokens, 0);
+	return prompt > 0
+		? `Passages after the first: ${Math.round((cached / prompt) * 100)}% of their prompts read from cache (${cached} of ${prompt} tokens).`
+		: 'No passages after the first, so nothing a cache could serve.';
+}
+
 export function summary(runs: readonly BenchRun[]): string {
 	const groups = new Map<string, BenchRun[]>();
 	for (const run of runs) {
@@ -76,6 +92,8 @@ export function summary(runs: readonly BenchRun[]): string {
 		'# Daydream bench',
 		'',
 		`${runs.length} runs, $${runs.reduce((sum, run) => sum + run.cost, 0).toFixed(4)} in all.`,
+		'',
+		cacheLine(runs),
 		'',
 		'| Brief · model | Runs | Errors | Checks passed | Variety |',
 		'| --- | --- | --- | --- | --- |'
@@ -128,7 +146,7 @@ export function runDocument(run: BenchRun): string {
 		lines.push(
 			`## ${step.step}`,
 			'',
-			`${completion.provider ?? 'unknown provider'} · ${completion.latencyMs} ms · ${completion.usage.promptTokens} in / ${completion.usage.completionTokens} out · finish: ${completion.finishReason ?? '?'}`,
+			`${completion.provider ?? 'unknown provider'} · ${completion.latencyMs} ms · ${completion.usage.promptTokens} in (${completion.usage.cachedTokens} cached) / ${completion.usage.completionTokens} out · finish: ${completion.finishReason ?? '?'}`,
 			''
 		);
 		for (const message of step.messages) {

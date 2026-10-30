@@ -166,6 +166,13 @@ export function describeTurn(turn: UserTurn): string {
 	return parts.join('\n');
 }
 
+/**
+ * What stays the same from passage to passage, in the system prompt: the
+ * telling notes, how it is shown, the musts, the research. Everything that
+ * changes as the story goes is in `stateSection`, after the history, so the
+ * opening of every passage's prompt is the same as the last one's and the
+ * provider's cache serves it (docs/dreams.md, "Prompt caching").
+ */
 function setupSection(input: PassageInput): string {
 	const { setup } = input;
 	const parts = [wrap('telling', setup.telling || 'No notes: follow the brief.')];
@@ -175,14 +182,28 @@ function setupSection(input: PassageInput): string {
 	if (setup.musts.length > 0) {
 		parts.push(`What the brief requires:\n${bulletList(setup.musts)}`);
 	}
-	if (setup.elements.length > 0) {
-		parts.push(wrap('elements', serializeElements(setup.elements)));
-	}
 	if (setup.research) {
 		parts.push(wrap('research', setup.research));
 	}
 	if (setup.capabilities.includes('blocks')) {
 		parts.push(DESIGN_NOTE);
+	}
+	return parts.join('\n\n');
+}
+
+/**
+ * What changes as the story goes, sent just before what is asked for now:
+ * the elements as they stand (stats move, cards fill in), the blocks designed
+ * so far, and the preferences, which grow and of which leanings are left out
+ * now and then.
+ */
+function stateSection(input: PassageInput): string {
+	const { setup } = input;
+	const parts: string[] = [];
+	if (setup.elements.length > 0) {
+		parts.push(
+			`The elements as they stand now:\n${wrap('elements', serializeElements(setup.elements))}`
+		);
 	}
 	if (setup.designs && setup.designs.length > 0) {
 		parts.push(
@@ -278,6 +299,10 @@ export function passageMessages(input: PassageInput): ModelMessage[] {
 			messages.push({ role: 'user', content: describeTurn(entry.turn) });
 		}
 	}
-	messages.push({ role: 'user', content: nowSection(input, last) });
+	const state = stateSection(input);
+	messages.push({
+		role: 'user',
+		content: state ? `${state}\n\n${nowSection(input, last)}` : nowSection(input, last)
+	});
 	return messages;
 }

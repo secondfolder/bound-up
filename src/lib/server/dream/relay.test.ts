@@ -31,7 +31,7 @@ function stubStream(script: Script) {
 			text: step.text,
 			provider: 'Upstream',
 			finishReason: step.finish ?? 'stop',
-			usage: { promptTokens: 1, completionTokens: 1, cost: 0 },
+			usage: { promptTokens: 1, cachedTokens: 0, completionTokens: 1, cost: 0 },
 			latencyMs: 1,
 			firstTokenMs: 1
 		});
@@ -161,7 +161,7 @@ describe('relay', () => {
 					text: PROSE,
 					provider: 'p',
 					finishReason: 'stop',
-					usage: { promptTokens: 1, completionTokens: 1, cost: 0 },
+					usage: { promptTokens: 1, cachedTokens: 0, completionTokens: 1, cost: 0 },
 					latencyMs: 1,
 					firstTokenMs: 1
 				});

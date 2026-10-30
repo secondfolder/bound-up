@@ -15,7 +15,8 @@ const ALWAYS = `How to write a passage:
 - Speech: <say who="id">"Line."</say>, with the speaker's element id, so their words are drawn in their colour. Narration stays outside it.
 - Length: as long as the telling notes say. Without a word on it, a few short paragraphs, ending where the user would want to act.
 - <beat/> marks a pause between beats. Some readers see one beat at a time, so put one wherever a reader would naturally stop for a moment.
-- Write only the tags described here. Anything else is shown as plain text.`;
+- Write only the tags described here. Anything else is shown as plain text.
+- Everything described below is there to use, never to use up: reach for one only where this moment calls for it, and most passages need none.`;
 
 const FOOTER = `End every passage with a footer, one JSON object per line:
 <after>

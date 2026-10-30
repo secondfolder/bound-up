@@ -39,7 +39,7 @@ function reply(text: string): Completion {
 		text,
 		provider: 'Stub',
 		finishReason: 'stop',
-		usage: { promptTokens: 10, completionTokens: 10, cost: 0.001 },
+		usage: { promptTokens: 10, cachedTokens: 0, completionTokens: 10, cost: 0.001 },
 		latencyMs: 5,
 		firstTokenMs: 3
 	};
@@ -78,11 +78,12 @@ describe('runBrief', () => {
 		expect(run.build?.elements.map((element) => element.id)).toEqual(['ines', 'you']);
 		expect(run.passages).toHaveLength(3);
 		expect(run.cost).toBeCloseTo(0.004);
-		// The passage prompt carries the chosen capabilities' blocks, and only those.
+		// Every capability is offered to every passage, but voice, which is
+		// only for a user who is listening.
 		const passageSystem = sent[2]?.messages[0]?.content ?? '';
 		expect(passageSystem).toContain('Stats.');
-		expect(passageSystem).toContain('Blocks.');
-		expect(passageSystem).not.toContain('Choices.');
+		expect(passageSystem).toContain('Choices.');
+		expect(passageSystem).not.toContain('Voice.');
 	});
 
 	it('flags what is off: here, a spread far narrower than an open brief needs', async () => {

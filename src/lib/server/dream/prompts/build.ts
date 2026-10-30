@@ -10,7 +10,7 @@
  */
 
 import { THEMES, VIEWS } from '../../../dream/build';
-import { CAPABILITIES } from '../../../dream/capabilities';
+import { passageCapabilities } from '../../../dream/capabilities';
 import type { Nudge } from '../../../dream/nudges';
 import { OVERUSED_NAMES } from '../../../dream/repetition';
 import {
@@ -47,7 +47,7 @@ export type BuildInput = {
 
 const INSTRUCTIONS = `This step builds the daydream from the brief and the chosen direction, and then writes its opening.
 
-Use only as much structure as the brief needs. A daydream with no elements and no capabilities is a good answer when the brief asks for something simple; a story with several people and things to track is a good answer when it asks for that.
+Use only as much structure as the brief needs. A daydream with no elements is a good answer when the brief asks for something simple; a story with several people and things to track is a good answer when it asks for that.
 
 Reply with these parts, in this order:
 
@@ -65,9 +65,6 @@ Pacing: when the brief explicitly asks for a kink, a sexual act or a particular 
 <presentation view="…" theme="…">a sentence on what passages should look like</presentation>
 view: ${VIEWS.join(', ')}. scroll is ordinary reading; tap shows one beat at a time, for slow, heavy scenes; texts is for a daydream told as messages; monologue is one voice in short lines.
 theme: ${THEMES.join(', ')}.
-
-<capabilities>a comma-separated list, possibly empty</capabilities>
-From: ${CAPABILITIES.filter((name) => name !== 'research' && name !== 'voice').join(', ')}. Choose only what this daydream will actually use. What each does is described under "How to write a passage" below.
 
 <elements>
 Anything worth keeping a record of, as tags. The tag is the element's type, and any type is allowed. Known types the app does more with:
@@ -90,7 +87,7 @@ Names: choose names that suit each person's background and age. Where their back
 <passage>
 the opening passage, written as described below, ending with its footer inside the passage
 </passage>
-In the opening, use only the markup for the capabilities you listed above.`;
+In the opening, use only the markup described below, and only where the moment calls for it.`;
 
 export function buildMessages(input: BuildInput): ModelMessage[] {
 	const system = [
@@ -98,7 +95,7 @@ export function buildMessages(input: BuildInput): ModelMessage[] {
 		limitsSection(input.limits),
 		INSTRUCTIONS,
 		// Not voice: that is on when the user listens, never the build's choice.
-		passageFormat(CAPABILITIES.filter((name) => name !== 'research' && name !== 'voice'))
+		passageFormat(passageCapabilities(false))
 	].join('\n\n');
 	const parts = [wrap('brief', input.brief)];
 	if (input.musts.length > 0) {

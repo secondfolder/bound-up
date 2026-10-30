@@ -8,6 +8,7 @@
  */
 
 import type { DreamPreference, DreamSetup, DreamSetupBuild } from '../sealed-kinds/dreams';
+import { passageCapabilities } from './capabilities';
 import type { DreamElement } from './elements';
 import type { Nudge } from './nudges';
 import type { BuildRequest, PassageRequest, ReadRequest } from './requests';
@@ -146,10 +147,7 @@ export function passageRequestFor(
 		setup: {
 			heat: build.heat,
 			telling: build.telling,
-			capabilities:
-				story.listening && !build.capabilities.includes('voice')
-					? [...build.capabilities, 'voice']
-					: build.capabilities,
+			capabilities: passageCapabilities(Boolean(story.listening)),
 			elements: story.elements,
 			presentation: build.presentation,
 			musts: setup.reading?.musts ?? [],

@@ -41,7 +41,7 @@ function stubComplete(request: CompletionRequest) {
 		text: refused ? "I'm sorry, but I can't write that." : PROSE,
 		provider,
 		finishReason: provider === 'filter/bf16' && refused ? 'content_filter' : 'stop',
-		usage: { promptTokens: 1, completionTokens: 1, cost: 0 },
+		usage: { promptTokens: 1, cachedTokens: 0, completionTokens: 1, cost: 0 },
 		latencyMs: 1,
 		firstTokenMs: null
 	});

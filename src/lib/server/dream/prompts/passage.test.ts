@@ -71,4 +71,44 @@ describe('history', () => {
 			historyPassage('<reading as="instruction"/><yours>I tell her.</yours>She nods.', new Set())
 		).toBe('<reading as="instruction"/><yours>I tell her.</yours>She nods.');
 	});
+
+	it('keeps what changes as the story goes after the history, so the opening stays the same', () => {
+		const element = (composure: number) => ({
+			id: 'you',
+			type: 'you',
+			name: 'You',
+			also: [],
+			shown: true,
+			fields: [],
+			stats: [
+				{ name: 'composure', kind: 'meter' as const, value: composure, max: 100, description: '' }
+			]
+		});
+		const ask = (composure: number, preferences: string[]) =>
+			passageMessages({
+				setup: {
+					heat: 'steamy',
+					telling: 'Reports.',
+					capabilities: ['stats'],
+					elements: [element(composure)],
+					presentation: { view: 'scroll', theme: 'rust', notes: '' },
+					musts: [],
+					research: ''
+				},
+				limits: [],
+				preferences,
+				history: [
+					{ passage: 'One.', turn: { kind: 'continue' } },
+					{ passage: 'Two.', turn: { kind: 'continue' } }
+				],
+				repeated: []
+			});
+		const before = ask(30, []);
+		const after = ask(45, ['Usually: slower']);
+		// Everything but the last message is the same: the cache serves all of it.
+		expect(after.slice(0, -1)).toEqual(before.slice(0, -1));
+		expect(after.at(-1)?.content).toContain('value="45"');
+		expect(after.at(-1)?.content).toContain('slower');
+		expect(before[0]?.content).not.toContain('<elements>');
+	});
 });

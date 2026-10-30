@@ -86,8 +86,12 @@ describe('memoryFor', () => {
 		}
 		const memory = memoryFor(path, [summary('p9', 'The first scene.')], { kind: 'continue' });
 		expect(memory.summaries).toEqual(['The first scene.']);
-		// Only three since the summary, but never fewer than six.
+		// Everything since the summary, and the last six it covers, from a
+		// point that holds still until the next summary.
 		expect(memory.history.map((entry) => entry.passage)).toEqual([
+			'Passage 4.',
+			'Passage 5.',
+			'Passage 6.',
 			'Passage 7.',
 			'Passage 8.',
 			'Passage 9.',
@@ -95,6 +99,13 @@ describe('memoryFor', () => {
 			'Passage 11.',
 			'Passage 12.'
 		]);
+		// One passage on, it starts where it did: the prompt's opening is unchanged.
+		const later = memoryFor(
+			[...path, passage('p13', 'Passage 13.')],
+			[summary('p9', 'The first scene.')],
+			{ kind: 'continue' }
+		);
+		expect(later.history[0]?.passage).toBe('Passage 4.');
 	});
 
 	it('ignores a summary from another branch, and caps the passages sent', () => {

@@ -113,8 +113,7 @@ describe('serializeBuild', () => {
 			title: build.title,
 			heat: build.heat,
 			telling: build.telling,
-			presentation: build.presentation,
-			capabilities: build.capabilities
+			presentation: build.presentation
 		});
 	});
 });
