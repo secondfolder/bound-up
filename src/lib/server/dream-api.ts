@@ -282,13 +282,14 @@ function afterStep(
 export async function researchFirst(
 	locals: App.Locals,
 	config: DaydreamConfig,
-	input: { brief: string; lookups: Lookups },
+	input: { brief: string; lookups: Lookups; userId: string },
 	send: Send,
 	signal: AbortSignal
 ): Promise<string | null> {
 	if (!config.researchModel) {
 		return null;
 	}
+	const debug = await canDebug(locals, input.userId);
 	const routing = await providersFor(locals, config.researchModel);
 	if (routing.checked && routing.providers.length === 0) {
 		return null;
@@ -296,21 +297,26 @@ export async function researchFirst(
 	const [provider] = routing.providers;
 	const { lookups } = input;
 	try {
+		const request = {
+			baseUrl: config.baseUrl,
+			apiKey: config.apiKey,
+			model: provider ? routing.listed : config.researchModel,
+			messages: researchMessages({
+				brief: input.brief,
+				canFetch: lookups.fetch !== null,
+				canSearch: lookups.search
+			}),
+			...SAMPLING.research,
+			signal,
+			tools: toolsFor(lookups),
+			...(provider ? { providers: [provider] } : {})
+		};
+		if (debug) {
+			const { signal: _signal, apiKey: _key, ...shown } = request;
+			send({ type: 'exchange', request: shown, step: 'research' });
+		}
 		const reply = await streamResponses(
-			{
-				baseUrl: config.baseUrl,
-				apiKey: config.apiKey,
-				model: provider ? routing.listed : config.researchModel,
-				messages: researchMessages({
-					brief: input.brief,
-					canFetch: lookups.fetch !== null,
-					canSearch: lookups.search
-				}),
-				...SAMPLING.research,
-				signal,
-				tools: toolsFor(lookups),
-				...(provider ? { providers: [provider] } : {})
-			},
+			request,
 			() => undefined,
 			(used) => send(toolEvent(used, lookups.fetch?.hosts ?? []))
 		);

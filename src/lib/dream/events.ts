@@ -57,7 +57,12 @@ export type DreamEvent =
 			detail?: string;
 	  }
 	/** The request as it went to the model, only for an account that can turn on debug mode. */
-	| { type: 'exchange'; request: unknown }
+	| {
+			type: 'exchange';
+			request: unknown;
+			/** A request before the reply's own: the research step's. */
+			step?: 'research';
+	  }
 	| { type: 'fetch'; url: string; ok: boolean; allowed: boolean }
 	| { type: 'search'; query: string; ok: boolean }
 	| { type: 'research'; text: string }

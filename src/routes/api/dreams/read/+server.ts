@@ -56,7 +56,7 @@ export const POST: RequestHandler = async (event) => {
 			const research = await researchFirst(
 				event.locals,
 				config,
-				{ brief: input.brief, lookups },
+				{ brief: input.brief, lookups, userId },
 				send,
 				signal
 			);

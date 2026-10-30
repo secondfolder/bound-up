@@ -7,14 +7,16 @@
 	import { parseMarkup, plainText } from '$lib/dream/markup';
 	import { parseBriefReading } from '$lib/dream/reading';
 	import {
+		type Lookup,
 		type ResearchMode,
-		type SetupStepKey,
+		type SetupProgressStep,
 		type StepStatus,
 		setupProgress
 	} from '$lib/dream/setup-progress';
 	import type { DreamSession } from '$lib/dream-browser/session.svelte';
 	import { MAX_AMENDMENT_CHARS } from '$lib/sealed-kinds/dreams';
 	import DreamCard from './DreamCard.svelte';
+	import DreamExchange from './DreamExchange.svelte';
 	import DreamNotices from './DreamNotices.svelte';
 	import DreamTextBox from './DreamTextBox.svelte';
 	import { elementIcon } from './element-icons';
@@ -73,10 +75,10 @@
 		setup
 			? setupProgress({
 					setup,
-					streaming,
-					research,
-					lookups: session.lookups.length,
-					researched: session.researched !== null
+					pending: session.pendingTrail,
+					live: session.liveStep,
+					lookups: session.lookups,
+					research
 				})
 			: []
 	);
@@ -101,7 +103,12 @@
 	});
 
 	/** The live line goes under the step being written, never under one waiting on the user. */
-	const LIVE_STEPS = new Set<SetupStepKey>(['read', 'directions', 'build', 'opening']);
+	/** The step whose request is shown, in debug mode. */
+	let exchangeId = $state<string | null>(null);
+	const exchangeStep = $derived(progress.find((entry) => entry.id === exchangeId) ?? null);
+	function showExchange(id: string) {
+		exchangeId = id;
+	}
 
 	const STATUS_WORDS: Record<StepStatus, string> = {
 		done: 'done',
@@ -172,10 +179,10 @@
 	}
 </script>
 
-{#snippet lookups()}
-	{#if session.lookups.length > 0}
+{#snippet lookups(found: readonly Lookup[], showFound: boolean)}
+	{#if found.length > 0}
 		<ul class="substeps" aria-label="Looked up for the brief">
-			{#each session.lookups as lookup, index (index)}
+			{#each found as lookup, index (index)}
 				{#if lookup.type === 'search'}
 					<li data-ok={lookup.ok}>
 						<span aria-hidden="true">{lookup.ok ? '✓' : '✗'}</span>
@@ -202,7 +209,7 @@
 			{/each}
 		</ul>
 	{/if}
-	{#if researchText}
+	{#if showFound && researchText}
 		<wa-details summary="What it found">
 			<p class="research">{researchText}</p>
 		</wa-details>
@@ -340,25 +347,32 @@
 	{/if}
 {/snippet}
 
-{#snippet result(key: SetupStepKey)}
-	{#if key === 'research'}
-		{@render lookups()}
-	{:else if key === 'read'}
-		{#if reading && reading.musts.length > 0}
+{#snippet result(entry: SetupProgressStep)}
+	{const showing = $derived(entry.current || entry.status === 'active')}
+	{#if entry.kind === 'research'}
+		{@render lookups(entry.lookups, showing)}
+	{:else if entry.kind === 'read'}
+		<!-- What a reading looked up for itself (a story model with tools) is its substeps. -->
+		{@render lookups(entry.lookups, showing && research === 'self')}
+		{#if showing && reading && reading.musts.length > 0}
 			<ul class="musts" aria-label="What it must have">
 				{#each reading.musts as must (must)}<li>{must}</li>{/each}
 			</ul>
 		{/if}
-	{:else if key === 'directions'}
-		{@render directions()}
-	{:else if key === 'ask'}
+		{#if showing}{@render directions()}{/if}
+	{:else if entry.kind === 'answer'}
+		{#if entry.current && setup?.reading?.ask && setup.reading.answer}
+			<p class="result">{setup.reading.ask.text} <strong>{setup.reading.answer}</strong></p>
+		{/if}
+	{:else if entry.kind === 'ask'}
 		{@render question()}
-	{:else if key === 'pick'}
-		{@render pick()}
-	{:else if key === 'build'}
-		{@render built()}
-	{:else if key === 'opening' && openingText && !streamedBuild}
-		<p class="result quiet">“{firstLine(openingText)}”</p>
+	{:else if entry.kind === 'pick'}
+		{#if showing || entry.status === 'yours'}{@render pick()}{/if}
+	{:else if entry.kind === 'build'}
+		{#if showing}
+			{@render built()}
+			{#if openingText && !streamedBuild}<p class="result quiet">“{firstLine(openingText)}”</p>{/if}
+		{/if}
 	{/if}
 {/snippet}
 
@@ -372,17 +386,23 @@
 	</section>
 
 	<ol class="steps">
-		{#each progress as entry (entry.key)}
-			<li data-status={entry.status} data-step={entry.key}>
+		{#each progress as entry (entry.id)}
+			<li data-status={entry.status} data-step={entry.kind}>
 				<span class="mark" aria-hidden="true"></span>
 				<div class="body">
-					<span class="label"
-						>{entry.label}<span class="wa-visually-hidden">, {STATUS_WORDS[entry.status]}</span></span
-					>
-					{#if entry.status === 'active' && LIVE_STEPS.has(entry.key) && liveLine}
+					<span class="label">
+						<span>{entry.label}<span class="wa-visually-hidden">, {STATUS_WORDS[entry.status]}</span></span>
+						{#if debugOn && session.exchanges.has(`setup:${entry.id}`)}
+							<!-- Debug mode: this step's request to the model, and its reply. -->
+							<wa-button size="s" appearance="plain" onclick={() => showExchange(entry.id)}>
+								<wa-icon name="circle-info" label={`The request for “${entry.label}”`}></wa-icon>
+							</wa-button>
+						{/if}
+					</span>
+					{#if entry.status === 'active' && liveLine}
 						<p class="live" aria-live="off">{liveLine}</p>
 					{/if}
-					{@render result(entry.key)}
+					{@render result(entry)}
 				</div>
 			</li>
 		{/each}
@@ -478,6 +498,17 @@
 				{#each worded.preferences as preference (preference)}<li>{preference}</li>{/each}
 			</ul>
 		</wa-details>
+	{/if}
+
+	{#if exchangeStep && exchangeId}
+		<DreamExchange
+			label={`The request for “${exchangeStep.label}”`}
+			about={{}}
+			exchange={session.exchanges.get(`setup:${exchangeId}`)}
+			onclose={() => {
+				exchangeId = null;
+			}}
+		/>
 	{/if}
 
 	{#if card}
@@ -627,6 +658,9 @@
 	}
 
 	.label {
+		display: flex;
+		align-items: center;
+		gap: var(--wa-space-2xs);
 		font-weight: var(--wa-font-weight-semibold);
 	}
 

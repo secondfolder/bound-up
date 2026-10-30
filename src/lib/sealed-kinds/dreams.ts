@@ -110,6 +110,21 @@ const lookupSchema = z.discriminatedUnion('type', [
 	z.object({ type: z.literal('search'), query: z.string().max(400), ok: z.boolean() })
 ]);
 
+/** At most this many steps are kept in a setup's trail; the oldest go first. */
+export const MAX_TRAIL = 40;
+
+/** One step a setup was made by: a request to the model, a pick, or an answer. */
+const trailStepSchema = z.object({
+	id: required(40),
+	kind: z.enum(['research', 'read', 'answer', 'pick', 'build']),
+	/** Pages read and searches made during this request. */
+	lookups: z.array(lookupSchema).max(24).optional(),
+	/** For a pick: whether code or the user chose. */
+	by: z.enum(['code', 'user']).optional()
+});
+
+export type DreamTrailStep = z.output<typeof trailStepSchema>;
+
 /** Step 1's reading of the brief (`BriefReading`, without the build it may carry). */
 const readingSchema = z.object({
 	musts: z.array(required(400)).max(20),
@@ -186,7 +201,14 @@ export const dreamSetupKind = defineSealedKind({
 				 * blocks"), offered to the story model by kind from then on.
 				 * Added in place before the engine was deployed.
 				 */
-				designs: z.array(blockDesignSchema).max(MAX_DESIGNS).optional()
+				designs: z.array(blockDesignSchema).max(MAX_DESIGNS).optional(),
+				/**
+				 * The steps it has been set up by, in the order they were taken
+				 * (docs/dreams.md, "The setup page"): each request to the model
+				 * and what it looked up, each pick and answer. Added in place
+				 * before the engine was deployed.
+				 */
+				trail: z.array(trailStepSchema).max(MAX_TRAIL).optional()
 			})
 		}
 	]

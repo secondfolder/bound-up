@@ -23,6 +23,7 @@ import { parseBuild } from '$lib/dream/build';
 import { designsWanted, LAID_OUT_KINDS, MAX_DESIGNS, parseDesign } from '$lib/dream/designs';
 import { type DreamElement, parseElements } from '$lib/dream/elements';
 import { turnInputs } from '$lib/dream/fields';
+import { asksForResearch } from '$lib/dream/links';
 import { findTag, findTags, parseMarkup } from '$lib/dream/markup';
 import { drawNudges } from '$lib/dream/nudges';
 import { pickDirection } from '$lib/dream/pick';
@@ -48,6 +49,7 @@ import {
 	withElementChange,
 	withReading
 } from '$lib/dream/setup-flow';
+import type { LiveStep, ResearchMode } from '$lib/dream/setup-progress';
 import {
 	elementsAt,
 	expansionsAt,
@@ -63,14 +65,16 @@ import {
 } from '$lib/dream/story';
 import { indexTree, latestLeafUnder, versionsOf } from '$lib/dream/tree';
 import type { DreamTreeNodeView, DreamView } from '$lib/dream/views';
-import type {
-	DreamDetail,
-	DreamPassageTurn,
-	DreamPreference,
-	DreamSetup,
-	DreamSetupBuild,
-	DreamSummary,
-	PassageRequest as PassageKind
+import {
+	type DreamDetail,
+	type DreamPassageTurn,
+	type DreamPreference,
+	type DreamSetup,
+	type DreamSetupBuild,
+	type DreamSummary,
+	type DreamTrailStep,
+	MAX_TRAIL,
+	type PassageRequest as PassageKind
 } from '$lib/sealed-kinds/dreams';
 import {
 	appendTurn,
@@ -111,6 +115,17 @@ export type Streaming = {
 
 type Opened<T> = { turnId: string; value: T };
 
+/** A setup with one more step on its trail, oldest dropped past the cap (docs/dreams.md, "The setup page"). */
+function withStep(
+	setup: DreamSetup,
+	step: Omit<DreamTrailStep, 'id'> & { id?: string }
+): DreamSetup {
+	const entry = { ...step, id: step.id ?? crypto.randomUUID().slice(0, 12) };
+	// The trail as kept: one worked out for an older setup (`trailOf`) would
+	// already hold the step being added.
+	return { ...setup, trail: [...(setup.trail ?? []), entry].slice(-MAX_TRAIL) };
+}
+
 /** What really went wrong, for debug mode: the server's detail, or the page's own error. */
 function detailOf(cause: unknown): string | null {
 	if (cause instanceof DreamRequestError) {
@@ -142,6 +157,8 @@ export type SessionOptions = {
 	userId: string;
 	/** The user's own preferences, as stored, and their revision (null before any). */
 	general: { revision: number | null; preferences: DreamPreference[] };
+	/** How this server researches a brief, which decides the setup's first steps. */
+	research?: ResearchMode;
 };
 
 /**
@@ -209,6 +226,14 @@ export class DreamSession {
 	general = $state<DreamPreference[]>([]);
 	#generalRevision: number | null;
 	readonly #userId: string;
+	readonly #research: ResearchMode;
+	/** The request being made now, for the setup page's steps. */
+	liveStep = $state<LiveStep | null>(null);
+	/**
+	 * Steps taken on this page that are kept with the setup once the request
+	 * they came in is: a separate research step, until its reading is done.
+	 */
+	pendingTrail = $state<DreamTrailStep[]>([]);
 	/**
 	 * Pages step 1 read and searches it made for the brief, each with how it
 	 * went, as they happen; kept with the reading once it is saved.
@@ -247,6 +272,7 @@ export class DreamSession {
 		this.#seed = options.seed ?? (() => Math.floor(cryptoRandom() * 2 ** 31));
 		this.#random = options.random ?? cryptoRandom;
 		this.#userId = options.userId;
+		this.#research = options.research ?? 'none';
 		this.general = options.general.preferences;
 		this.#generalRevision = options.general.revision;
 	}
@@ -368,6 +394,7 @@ export class DreamSession {
 			if (this.#abort === abort) {
 				this.#abort = null;
 				this.streaming = null;
+				this.liveStep = null;
 			}
 		}
 	}
@@ -404,7 +431,7 @@ export class DreamSession {
 							502
 						);
 					}
-					await this.#saveSetup(picked);
+					await this.#saveSetup(withStep(picked, { kind: 'pick', by: 'code' }));
 				} else if (step === 'build') {
 					await this.#build(setup, signal);
 				} else {
@@ -422,8 +449,41 @@ export class DreamSession {
 		this.streaming = { what: 'read', text: '' };
 		this.lookups = [];
 		this.researched = null;
+		this.pendingTrail = [];
 		let researched: string | null = null;
-		const watch = this.#watch();
+		const readId = crypto.randomUUID().slice(0, 12);
+		// A research model works first, as a request of its own: its step comes
+		// before the reading's, with what it looked up under it.
+		const separate = this.#research === 'model' && asksForResearch(setup.brief);
+		const researchId = crypto.randomUUID().slice(0, 12);
+		let researchRequest: unknown = null;
+		this.liveStep = separate ? { id: researchId, kind: 'research' } : { id: readId, kind: 'read' };
+		const researchDone = () => {
+			if (this.liveStep?.kind === 'research') {
+				this.pendingTrail = [{ id: researchId, kind: 'research', lookups: this.lookups }];
+				this.lookups = [];
+				this.liveStep = { id: readId, kind: 'read' };
+				if (researchRequest !== null) {
+					this.#record(
+						`setup:${researchId}`,
+						researchRequest,
+						{
+							text: researched ?? '',
+							ended: 'complete',
+							model: '',
+							provider: ''
+						},
+						''
+					);
+				}
+			}
+		};
+		const watch = this.#watch({
+			onResearchRequest: (request) => {
+				researchRequest = request;
+			},
+			onFirstText: researchDone
+		});
 		const reply = await streamReply(
 			'read',
 			readRequestFor(setup, this.worded, drawNudges(cryptoRandom), {
@@ -439,6 +499,7 @@ export class DreamSession {
 				onResearch: (text) => {
 					researched = text;
 					this.researched = text;
+					researchDone();
 				}
 			}
 		);
@@ -448,28 +509,37 @@ export class DreamSession {
 				502
 			);
 		}
-		watch.keep('setup:read', reply);
+		researchDone();
+		watch.keep(`setup:${readId}`, reply);
 		const reading = parseBriefReading(reply.text);
 		// A separate research step's findings are kept as written: the reading
 		// was told not to repeat them (docs/dreams.md, "Research").
-		await this.#saveSetup(
-			withReading(
-				setup,
-				researched ? { ...reading, research: { needed: true, text: researched } } : reading,
-				this.lookups
-			)
+		const lookups = [...this.pendingTrail.flatMap((step) => step.lookups ?? []), ...this.lookups];
+		let next = withReading(
+			setup,
+			researched ? { ...reading, research: { needed: true, text: researched } } : reading,
+			lookups
 		);
+		for (const step of this.pendingTrail) {
+			next = withStep(next, step);
+		}
+		next = withStep(next, { id: readId, kind: 'read', lookups: this.lookups });
+		await this.#saveSetup(next);
+		this.pendingTrail = [];
+		this.liveStep = null;
 	}
 
 	async #build(setup: DreamSetup, signal: AbortSignal) {
 		this.streaming = { what: 'build', text: '' };
+		const buildId = crypto.randomUUID().slice(0, 12);
+		this.liveStep = { id: buildId, kind: 'build' };
 		const watch = this.#watch();
 		const reply = await streamReply(
 			'build',
 			buildRequestFor(setup, this.worded, this.#previousBuild, await this.#recent(setup)),
 			{ signal, ...watch.options }
 		);
-		watch.keep('setup:build', reply);
+		watch.keep(`setup:${buildId}`, reply);
 		const { passage, ...build } = parseBuild(reply.text);
 		if (!(build.title && passage) || reply.ended === 'refused') {
 			throw new DreamRequestError(
@@ -480,7 +550,10 @@ export class DreamSession {
 		this.#previousBuild = null;
 		// Shown to the user before it is played: the summary waits on Start
 		// (docs/dreams.md, "The setup page").
-		await this.#saveSetup({ ...setup, build, awaitingStart: true });
+		await this.#saveSetup(
+			withStep({ ...setup, build, awaitingStart: true }, { id: buildId, kind: 'build' })
+		);
+		this.liveStep = null;
 		const opening = await this.#keepPassage({
 			parentId: null,
 			request: 'opening',
@@ -526,18 +599,25 @@ export class DreamSession {
 	 * they come, and the request itself for debug mode), and `keep`, which
 	 * files the request with its reply under a key once it has one.
 	 */
-	#watch() {
+	#watch(hooks: { onResearchRequest?: (request: unknown) => void; onFirstText?: () => void } = {}) {
 		let request: unknown = null;
 		let thinking = '';
 		return {
 			options: {
-				onText: (text: string) => this.#streamed(text),
+				onText: (text: string) => {
+					hooks.onFirstText?.();
+					this.#streamed(text);
+				},
 				onThinking: (text: string) => {
 					thinking = text;
 					this.#thought(text);
 				},
-				onExchange: (sent: unknown) => {
-					request = sent;
+				onExchange: (sent: unknown, step?: 'research') => {
+					if (step === 'research') {
+						hooks.onResearchRequest?.(sent);
+					} else {
+						request = sent;
+					}
 				}
 			},
 			keep: (key: string, reply: StreamResult) => this.#record(key, request, reply, thinking)
@@ -578,7 +658,7 @@ export class DreamSession {
 			return Promise.resolve();
 		}
 		return this.#attempt(async () => {
-			let next = withAnswer(setup, text);
+			let next = withStep(withAnswer(setup, text), { kind: 'answer' });
 			if (remember !== 'none') {
 				const preference = preferenceFromAnswer(question, text, this.#random);
 				if (remember === 'story') {
@@ -723,9 +803,11 @@ export class DreamSession {
 			return Promise.resolve();
 		}
 		this.stop();
-		return this.#attempt(() => this.#saveSetup(userPick(setup, directionId, this.#seed()))).then(
-			() => this.runSetup()
-		);
+		return this.#attempt(() =>
+			this.#saveSetup(
+				withStep(userPick(setup, directionId, this.#seed()), { kind: 'pick', by: 'user' })
+			)
+		).then(() => this.runSetup());
 	}
 
 	/** "Surprise me" when the brief asked to choose: code's pick, as if it had not. */
@@ -735,9 +817,9 @@ export class DreamSession {
 			return Promise.resolve();
 		}
 		this.stop();
-		return this.#attempt(() => this.#saveSetup(codePick(setup, this.#seed()))).then(() =>
-			this.runSetup()
-		);
+		return this.#attempt(() =>
+			this.#saveSetup(withStep(codePick(setup, this.#seed()), { kind: 'pick', by: 'code' }))
+		).then(() => this.runSetup());
 	}
 
 	/** Ideas already tried on this page, by direction text, for "Try another idea". */
@@ -762,7 +844,9 @@ export class DreamSession {
 		}
 		const next = codePick(setup, this.#seed(), this.#tried);
 		if (next !== setup) {
-			return this.#attempt(() => this.#saveSetup(next)).then(() => this.runSetup());
+			return this.#attempt(() =>
+				this.#saveSetup(withStep(next, { kind: 'pick', by: 'code' }))
+			).then(() => this.runSetup());
 		}
 		this.#notThese = [...this.#notThese, ...reading.directions.map((direction) => direction.text)];
 		this.#tried = new Set();

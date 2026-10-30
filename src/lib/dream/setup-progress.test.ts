@@ -25,61 +25,74 @@ const setup = (fields: Partial<DreamSetup> = {}): DreamSetup => ({
 	...fields
 });
 
-const progress = (fields: Partial<ProgressInput>) =>
-	Object.fromEntries(
-		setupProgress({
-			setup: setup(),
-			streaming: null,
-			research: 'self',
-			lookups: 0,
-			researched: false,
-			...fields
-		}).map((step) => [step.key, step.status])
+const steps = (fields: Partial<ProgressInput>) =>
+	setupProgress({ setup: setup(), live: null, research: 'self', ...fields }).map(
+		(step) =>
+			`${step.label}: ${step.status}${step.current && step.status === 'done' ? ' (current)' : ''}`
 	);
 
 describe('setupProgress', () => {
-	it('marks each step done as its tag closes in the reply', () => {
-		expect(progress({ streaming: { what: 'read', text: '<musts>\n- re' } })).toEqual({
-			read: 'active',
-			directions: 'waiting',
-			pick: 'waiting',
-			build: 'waiting',
-			opening: 'waiting'
-		});
-		expect(
-			progress({ streaming: { what: 'read', text: '<musts>x</musts><spread n="3">' } })
-		).toMatchObject({ read: 'done', directions: 'active' });
+	it('shows each request as a step, in the order taken, with what is still to come', () => {
+		expect(steps({ live: { id: 'r1', kind: 'read' } })).toEqual([
+			'Analysing what you asked for: active',
+			'Picking one: waiting',
+			'Building it and writing the opening: waiting'
+		]);
 	});
 
-	it('looks things up first, for a brief that asks, and only then', () => {
+	it('puts a research model’s request first, as a step of its own, with its lookups under it', () => {
 		const brief = 'research obedience captions';
-		expect(
-			progress({
-				setup: setup({ brief }),
-				streaming: { what: 'read', text: '' },
-				lookups: 2
-			})
-		).toMatchObject({ research: 'active', read: 'waiting' });
-		expect(
-			progress({ setup: setup({ brief }), streaming: { what: 'read', text: '<musts>' } })
-		).toMatchObject({ research: 'done', read: 'active' });
-		expect(progress({ research: 'none', setup: setup({ brief }) })).not.toHaveProperty('research');
-		expect(progress({})).not.toHaveProperty('research');
+		const live = setupProgress({
+			setup: setup({ brief }),
+			live: { id: 'x', kind: 'research' },
+			lookups: [{ type: 'search', query: 'captions', ok: true }],
+			research: 'model'
+		});
+		expect(live[0]).toMatchObject({ kind: 'research', status: 'active' });
+		expect(live[0]?.lookups).toHaveLength(1);
+		expect(live[1]).toMatchObject({ kind: 'read', status: 'waiting' });
+		// A story model with tools looks things up inside its reading: no step of its own.
+		expect(steps({ setup: setup({ brief }), research: 'self' })[0]).toBe(
+			'Analysing what you asked for: waiting'
+		);
 	});
 
-	it('moves from building to the opening as its passage starts, and asks before picking', () => {
-		const chosen = { directionId: 'd1', by: 'code' as const, nudges: [], seed: 1 };
-		expect(
-			progress({
-				setup: setup({ reading, chosen }),
-				streaming: { what: 'build', text: '<title>T</title><passage>You' }
-			})
-		).toMatchObject({ pick: 'done', build: 'done', opening: 'active' });
+	it('adds a step for doing a thing again, and only the latest shows its results', () => {
+		const trail = [
+			{ id: 'a', kind: 'read' as const },
+			{ id: 'b', kind: 'pick' as const, by: 'code' as const },
+			{ id: 'c', kind: 'build' as const },
+			{ id: 'd', kind: 'pick' as const, by: 'user' as const },
+			{ id: 'e', kind: 'build' as const }
+		];
+		const chosen = { directionId: 'd2', by: 'user' as const, nudges: [], seed: 1 };
+		const build = {
+			title: 'T',
+			heat: 'steamy' as const,
+			telling: '',
+			presentation: { view: 'scroll' as const, theme: 'rust' as const, notes: '' },
+			capabilities: [],
+			elements: []
+		};
+		expect(steps({ setup: setup({ reading, chosen, build, trail }) })).toEqual([
+			'Analysing what you asked for: done (current)',
+			'Picked one: done',
+			'Building it and writing the opening: done',
+			'You chose an idea: done (current)',
+			'Building it again: done (current)'
+		]);
+	});
+
+	it('waits on the user for a question and for choosing an idea', () => {
 		const asked = setup({
-			reading: { ...reading, ask: { id: 'q', text: 'Who?', options: [], keep: 'story' } }
+			reading: { ...reading, ask: { id: 'q', text: 'Who?', options: [], keep: 'story' } },
+			trail: [{ id: 'a', kind: 'read' }]
 		});
-		expect(progress({ setup: asked })).toMatchObject({ ask: 'yours', pick: 'waiting' });
-		const byUser = setup({ reading: { ...reading, pick: { by: 'user', reason: '' } } });
-		expect(progress({ setup: byUser })).toMatchObject({ directions: 'done', pick: 'yours' });
+		expect(steps({ setup: asked })).toContain('A question for you: yours');
+		const byUser = setup({
+			reading: { ...reading, pick: { by: 'user', reason: '' } },
+			trail: [{ id: 'a', kind: 'read' }]
+		});
+		expect(steps({ setup: byUser })).toContain('Choose an idea: yours');
 	});
 });

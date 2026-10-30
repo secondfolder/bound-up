@@ -27,6 +27,7 @@
 			.then(async ({ revision, preferences }) => {
 				const opened = new DreamSession(view.id, {
 					userId: data.userId,
+					research: data.research,
 					general: { revision, preferences: preferences.preferences }
 				});
 				await opened.load(view);

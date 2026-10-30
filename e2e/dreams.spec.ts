@@ -228,8 +228,9 @@ test.describe('daydreams, the new engine', () => {
 		await expect(ready).toBeVisible();
 		// Every step done, each with what came of it, and nothing played yet.
 		const steps = page.locator('ol.steps > li');
-		await expect(steps).toHaveCount(5);
-		await expect(page.locator('ol.steps > li[data-status="done"]')).toHaveCount(5);
+		// One step for each thing really done: analysing, picking, building.
+		await expect(steps).toHaveCount(3);
+		await expect(page.locator('ol.steps > li[data-status="done"]')).toHaveCount(3);
 		await expect(page.locator('li[data-step="pick"]')).toContainText('Picked:');
 		await expect(ready).toContainText('Ottilie');
 		await expect(page.locator('ol.turns')).toHaveCount(0);
@@ -397,6 +398,19 @@ test.describe('daydreams, the new engine', () => {
 		await page.reload();
 		await waitForHydration(page);
 		await start(page, 'A quiet evening');
+
+		// Each setup step's request, and its reply, are a tap away.
+		await expect(page.getByRole('region', { name: 'The Keeper' })).toBeVisible();
+		await page
+			.locator('li[data-step="read"]')
+			.getByRole('button', { name: /^The request for/ })
+			.click();
+		const stepDialog = page.locator('wa-dialog[open]');
+		await expect(stepDialog.getByRole('heading', { name: 'Reply' })).toBeVisible();
+		await expect(stepDialog).toContainText('<musts>');
+		await page.keyboard.press('Escape');
+		await expect(page.locator('wa-dialog[open]')).toHaveCount(0);
+
 		await play(page);
 		await saved(page);
 

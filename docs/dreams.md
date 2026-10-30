@@ -443,40 +443,41 @@ work; the components in `src/lib/components/dreams/` draw it.
 ### The setup page
 
 Until the daydream is built and the user has pressed Start, the page is the
-setup, live (`DreamSetupView`). It lists every step it really takes, in the
-order they happen (`setupProgress` in `src/lib/dream/setup-progress.ts`), each
-marked as the plan's mockup marks them: a ring to come, a turning ring while it
-works, a filled tick when done, and for a step waiting on the user (a question,
-choosing an idea) a still ring with a beating dot, never the spinner, so
-waiting on the model and waiting on you look different. While a step is being written, the latest of
-what the model is writing shows under it, cleaned of tags; once it is done,
-what came of it does. Within one streamed reply a step is done as its tag
-closes, so they tick off as the model moves on.
+setup, live (`DreamSetupView`). It lists the steps the daydream was really
+set up by, in the order they were taken (`setupProgress` in
+`src/lib/dream/setup-progress.ts`): **each request to the model is a step**,
+what it looked up while it worked (each page read, each search) is under
+it, and a pick and an answer are steps too. Doing something again, building
+after a change or with another idea, is another step ("Building it again"),
+and only the latest of each kind shows its results. The steps taken are kept
+with the setup (`trail`, a setup from before it is worked out from what was
+kept), the request being made now is `session.liveStep`, and what is still
+to come follows from where the setup has got to. Each is marked as the
+plan's mockup marks them: a ring to come, a turning ring while it works, a
+filled tick when done, and for a step waiting on the user (a question,
+choosing an idea) the ring itself breathing, never the spinner. While a
+step works, the latest of what the model is writing shows under it, cleaned
+of tags, or its thinking until its words begin; once done, what came of it.
+With debug mode on, each step has a button for its request and the reply.
 
-1. **Looking things up**, only for a brief with links or one asking for
-   research, on a server that can (the page load's `research`: the story
-   model itself, a research model, or neither). It comes first either way:
-   a research model runs before the reading, and a story model calls its
-   tools before it writes. Each page read and each search is a line under
-   it, and what was found opens under "What it found". The lookups are kept
-   with the reading (`reading.lookups`), so they are still there after a
-   reload.
-2. **Analysing what you asked for**: the musts, as chips.
-3. **Thinking of directions** ("Thinking of 7 directions" once the spread is
-   written): the ideas as they arrive; once one is picked, "7 ideas · See
-   them all", each with "Use this one".
-4. **A question for you**, if step 1 asked one: it waits for an answer (an
-   option or the user's own words), and step 1 reads the brief again with
-   it, told not to ask again. Answered, it shows the answer.
-5. **Picking one**: code picks, leaning towards the less likely
-   (`codePick`), with the build's nudges drawn from the same seed; "Picked:
-   …" with "Try another idea". When the brief asked to choose, it is
-   **Choose an idea** and waits, with the ideas listed under it rather than
-   under "Thinking of directions", and "Surprise me".
-6. **Building it**: the title, how sexual, how it is shown, and the cast with
-   an icon for each known type (`element-icons.ts`) and its short name.
-7. **Writing the opening**: the build's `<passage>`, in the same reply; done,
-   its first sentence.
+- **Looking things up**, a request of its own only when a research model
+  does it (the page load's `research`); a story model with tools looks
+  things up inside its reading, and those are under that step. The pages
+  and searches are kept with the reading (`reading.lookups`).
+- **Analysing what you asked for**: the musts, as plain lines, and the
+  ideas: while they stream only a count ("5 ideas so far"), never cards
+  appearing and going, unless the brief asked to choose.
+- **A question for you**, when step 1 asked one, waiting on the user (an
+  option or their own words); then **You answered**.
+- **Picking one** (code, leaning towards the less likely, `codePick`), or
+  **Choose an idea** when the brief asked to choose, with the ideas under it
+  and "Surprise me"; "Try another idea" picks again.
+- **Building it and writing the opening**: one request. The title, how
+  sexual, how it is shown, the cast with an icon for each known type and its
+  short name, and the opening's first sentence.
+
+The brief is in a box of its own at the top, with any change asked for since
+under it.
 
 **Then a summary, which waits on Start** (the plan's "a surprise, with a
 quick look first"; it offered straight in as well, which this replaced):

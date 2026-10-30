@@ -261,7 +261,7 @@ export async function streamReply<Path extends keyof StreamPaths>(
 		/** The model's thinking so far, as it streams; reset with the reply on a restart. */
 		onThinking?: (thinking: string) => void;
 		/** The request as it went to the model, for an account that can turn on debug mode. */
-		onExchange?: (request: unknown) => void;
+		onExchange?: (request: unknown, step?: 'research') => void;
 		/** A page read or a search made for the brief, as it happens. */
 		onLookup?: (lookup: Lookup) => void;
 		/** What a separate research step found, kept as the daydream's research. */
@@ -289,7 +289,7 @@ export async function streamReply<Path extends keyof StreamPaths>(
 				continue;
 			}
 			if (event.type === 'exchange') {
-				options.onExchange?.(event.request);
+				options.onExchange?.(event.request, event.step);
 				continue;
 			}
 			if (event.type === 'text') {
